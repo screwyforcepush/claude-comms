@@ -1,7 +1,7 @@
 <template>
   <div 
-    class="group relative p-4 mobile:p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border border-[var(--theme-border-primary)] hover:border-[var(--theme-primary)] bg-gradient-to-r from-[var(--theme-bg-primary)] to-[var(--theme-bg-secondary)]"
-    :class="{ 'ring-2 ring-[var(--theme-primary)] border-[var(--theme-primary)] shadow-2xl': isExpanded }"
+    class="group relative p-4 mobile:p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-700 hover:border-blue-500 bg-gradient-to-r from-gray-800 to-gray-700"
+    :class="{ 'ring-2 ring-blue-500 border-blue-500 shadow-2xl': isExpanded }"
     @click="toggleExpanded"
   >
     <!-- App color indicator -->
@@ -22,22 +22,22 @@
         <!-- Mobile: App + Time on first row -->
         <div class="flex items-center justify-between mb-1">
           <span 
-            class="text-xs font-semibold text-[var(--theme-text-primary)] px-1.5 py-0.5 rounded-full border-2 bg-[var(--theme-bg-tertiary)] shadow-md"
+            class="text-xs font-semibold text-white px-1.5 py-0.5 rounded-full border-2 bg-gray-600 shadow-md"
             :style="{ ...appBgStyle, ...appBorderStyle }"
           >
             {{ event.source_app }}
           </span>
-          <span class="text-xs text-[var(--theme-text-tertiary)] font-medium">
+          <span class="text-xs text-gray-400 font-medium">
             {{ formatTime(event.timestamp) }}
           </span>
         </div>
         
         <!-- Mobile: Session + Event Type on second row -->
         <div class="flex items-center space-x-2">
-          <span class="text-xs text-[var(--theme-text-secondary)] px-1.5 py-0.5 rounded-full border bg-[var(--theme-bg-tertiary)]/50" :class="borderColorClass">
+          <span class="text-xs text-gray-300 px-1.5 py-0.5 rounded-full border bg-gray-600/50" :class="borderColorClass">
             {{ sessionIdShort }}
           </span>
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-[var(--theme-primary)] text-white shadow-md">
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white shadow-md">
             <span class="mr-1 text-sm">{{ hookEmoji }}</span>
             {{ event.hook_event_type }}
           </span>
@@ -48,34 +48,34 @@
       <div class="flex items-center justify-between mb-2 mobile:hidden">
         <div class="flex items-center space-x-4">
           <span 
-            class="text-base font-bold text-[var(--theme-text-primary)] px-2 py-0.5 rounded-full border-2 bg-[var(--theme-bg-tertiary)] shadow-lg"
+            class="text-base font-bold text-white px-2 py-0.5 rounded-full border-2 bg-gray-600 shadow-lg"
             :style="{ ...appBgStyle, ...appBorderStyle }"
           >
             {{ event.source_app }}
           </span>
-          <span class="text-sm text-[var(--theme-text-secondary)] px-2 py-0.5 rounded-full border bg-[var(--theme-bg-tertiary)]/50 shadow-md" :class="borderColorClass">
+          <span class="text-sm text-gray-300 px-2 py-0.5 rounded-full border bg-gray-600/50 shadow-md" :class="borderColorClass">
             {{ sessionIdShort }}
           </span>
-          <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-bold bg-[var(--theme-primary)] text-white shadow-lg">
+          <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-bold bg-blue-600 text-white shadow-lg">
             <span class="mr-1.5 text-base">{{ hookEmoji }}</span>
             {{ event.hook_event_type }}
           </span>
         </div>
-        <span class="text-sm text-[var(--theme-text-tertiary)] font-semibold">
+        <span class="text-sm text-gray-400 font-semibold">
           {{ formatTime(event.timestamp) }}
         </span>
       </div>
       
       <!-- Tool info and Summary - Desktop Layout -->
       <div class="flex items-center justify-between mb-2 mobile:hidden">
-        <div v-if="toolInfo" class="text-base text-[var(--theme-text-secondary)] font-semibold">
+        <div v-if="toolInfo" class="text-base text-gray-300 font-semibold">
           <span class="font-medium">{{ toolInfo.tool }}</span>
-          <span v-if="toolInfo.detail" class="ml-2 text-[var(--theme-text-tertiary)]" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
+          <span v-if="toolInfo.detail" class="ml-2 text-gray-400" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
         </div>
         
         <!-- Summary aligned to the right -->
-        <div v-if="event.summary" class="max-w-[50%] px-3 py-1.5 bg-[var(--theme-primary)]/10 border border-[var(--theme-primary)]/30 rounded-lg shadow-md">
-          <span class="text-sm text-[var(--theme-text-primary)] font-semibold">
+        <div v-if="event.summary" class="max-w-[50%] px-3 py-1.5 bg-blue-600/10 border border-blue-600/30 rounded-lg shadow-md">
+          <span class="text-sm text-white font-semibold">
             <span class="mr-1">📝</span>
             {{ event.summary }}
           </span>
@@ -84,13 +84,13 @@
 
       <!-- Tool info and Summary - Mobile Layout -->
       <div class="space-y-2 hidden mobile:block mb-2">
-        <div v-if="toolInfo" class="text-sm text-[var(--theme-text-secondary)] font-semibold w-full">
+        <div v-if="toolInfo" class="text-sm text-gray-300 font-semibold w-full">
           <span class="font-medium">{{ toolInfo.tool }}</span>
-          <span v-if="toolInfo.detail" class="ml-2 text-[var(--theme-text-tertiary)]" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
+          <span v-if="toolInfo.detail" class="ml-2 text-gray-400" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
         </div>
         
-        <div v-if="event.summary" class="w-full px-2 py-1 bg-[var(--theme-primary)]/10 border border-[var(--theme-primary)]/30 rounded-lg shadow-md">
-          <span class="text-xs text-[var(--theme-text-primary)] font-semibold">
+        <div v-if="event.summary" class="w-full px-2 py-1 bg-blue-600/10 border border-blue-600/30 rounded-lg shadow-md">
+          <span class="text-xs text-white font-semibold">
             <span class="mr-1">📝</span>
             {{ event.summary }}
           </span>
@@ -98,22 +98,22 @@
       </div>
       
       <!-- Expanded content -->
-      <div v-if="isExpanded" class="mt-2 pt-2 border-t-2 border-[var(--theme-primary)] bg-gradient-to-r from-[var(--theme-bg-primary)] to-[var(--theme-bg-secondary)] rounded-b-lg p-3 space-y-3">
+      <div v-if="isExpanded" class="mt-2 pt-2 border-t-2 border-blue-500 bg-gradient-to-r from-gray-800 to-gray-700 rounded-b-lg p-3 space-y-3">
         <!-- Payload -->
         <div>
           <div class="flex items-center justify-between mb-2">
-            <h4 class="text-base mobile:text-sm font-bold text-[var(--theme-primary)] drop-shadow-sm flex items-center">
+            <h4 class="text-base mobile:text-sm font-bold text-blue-400 drop-shadow-sm flex items-center">
               <span class="mr-1.5 text-xl mobile:text-base">📦</span>
               Payload
             </h4>
             <button
               @click.stop="copyPayload"
-              class="px-3 py-1 mobile:px-2 mobile:py-0.5 text-sm mobile:text-xs font-bold rounded-lg bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-dark)] text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center space-x-1"
+              class="px-3 py-1 mobile:px-2 mobile:py-0.5 text-sm mobile:text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-800 text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center space-x-1"
             >
               <span>{{ copyButtonText }}</span>
             </button>
           </div>
-          <pre class="text-sm mobile:text-xs text-[var(--theme-text-primary)] bg-[var(--theme-bg-tertiary)] p-3 mobile:p-2 rounded-lg overflow-x-auto max-h-64 overflow-y-auto font-mono border border-[var(--theme-primary)]/30 shadow-md hover:shadow-lg transition-shadow duration-200">{{ formattedPayload }}</pre>
+          <pre class="text-sm mobile:text-xs text-white bg-gray-600 p-3 mobile:p-2 rounded-lg overflow-x-auto max-h-64 overflow-y-auto font-mono border border-blue-600/30 shadow-md hover:shadow-lg transition-shadow duration-200">{{ formattedPayload }}</pre>
         </div>
         
         <!-- Chat transcript button -->
@@ -123,8 +123,8 @@
             :class="[
               'px-4 py-2 mobile:px-3 mobile:py-1.5 font-bold rounded-lg transition-all duration-200 flex items-center space-x-1.5 shadow-md hover:shadow-lg',
               isMobile 
-                ? 'bg-[var(--theme-bg-quaternary)] cursor-not-allowed opacity-50 text-[var(--theme-text-quaternary)] border border-[var(--theme-border-tertiary)]' 
-                : 'bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-primary-light)] hover:from-[var(--theme-primary-dark)] hover:to-[var(--theme-primary)] text-white border border-[var(--theme-primary-dark)] transform hover:scale-105'
+                ? 'bg-gray-500 cursor-not-allowed opacity-50 text-gray-400 border border-gray-600' 
+                : 'bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-800 hover:to-blue-600 text-white border border-blue-800 transform hover:scale-105'
             ]"
             :disabled="isMobile"
           >

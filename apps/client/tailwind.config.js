@@ -10,46 +10,6 @@ export default {
       screens: {
         'mobile': {'max': '699px'}, // Custom mobile breakpoint for < 700px
       },
-      colors: {
-        // Theme-aware colors using CSS custom properties
-        'theme': {
-          'primary': 'var(--theme-primary)',
-          'primary-hover': 'var(--theme-primary-hover)',
-          'primary-light': 'var(--theme-primary-light)',
-          'primary-dark': 'var(--theme-primary-dark)',
-          'bg': {
-            'primary': 'var(--theme-bg-primary)',
-            'secondary': 'var(--theme-bg-secondary)',
-            'tertiary': 'var(--theme-bg-tertiary)',
-            'quaternary': 'var(--theme-bg-quaternary)',
-          },
-          'text': {
-            'primary': 'var(--theme-text-primary)',
-            'secondary': 'var(--theme-text-secondary)',
-            'tertiary': 'var(--theme-text-tertiary)',
-            'quaternary': 'var(--theme-text-quaternary)',
-          },
-          'border': {
-            'primary': 'var(--theme-border-primary)',
-            'secondary': 'var(--theme-border-secondary)',
-            'tertiary': 'var(--theme-border-tertiary)',
-          },
-          'accent': {
-            'success': 'var(--theme-accent-success)',
-            'warning': 'var(--theme-accent-warning)',
-            'error': 'var(--theme-accent-error)',
-            'info': 'var(--theme-accent-info)',
-          }
-        }
-      },
-      boxShadow: {
-        'theme': 'var(--theme-shadow)',
-        'theme-lg': 'var(--theme-shadow-lg)',
-      },
-      transitionProperty: {
-        'theme': 'var(--theme-transition)',
-        'theme-fast': 'var(--theme-transition-fast)',
-      }
     },
   },
   plugins: [],
@@ -97,39 +57,5 @@ export default {
     'to-teal-600',
     'from-cyan-500',
     'to-cyan-600',
-    // Theme classes
-    'theme-bg-primary',
-    'theme-bg-secondary',
-    'theme-bg-tertiary',
-    'theme-bg-quaternary',
-    'theme-text-primary',
-    'theme-text-secondary',
-    'theme-text-tertiary',
-    'theme-text-quaternary',
-    'theme-border-primary',
-    'theme-border-secondary',
-    'theme-border-tertiary',
-    'theme-primary',
-    'theme-primary-bg',
-    'theme-primary-border',
-    'theme-accent-success',
-    'theme-accent-warning',
-    'theme-accent-error',
-    'theme-accent-info',
-    'theme-shadow',
-    'theme-shadow-lg',
-    'theme-transition',
-    'theme-transition-fast',
-    'theme-hover',
-    'theme-active',
-    'theme-focus',
-    'backdrop-blur',
-    // Theme class names
-    'theme-light',
-    'theme-dark',
-    'theme-modern',
-    'theme-earth',
-    'theme-glass',
-    'theme-high-contrast',
   ]
 }

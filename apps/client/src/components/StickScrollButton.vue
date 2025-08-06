@@ -4,8 +4,8 @@
     class="fixed bottom-6 right-6 mobile:bottom-4 mobile:right-4 p-4 mobile:p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center border-2 transform hover:scale-110"
     :class="[
       stickToBottom 
-        ? 'bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-primary-light)] text-white border-[var(--theme-primary-dark)] drop-shadow-md' 
-        : 'bg-[var(--theme-bg-primary)] hover:bg-[var(--theme-bg-secondary)] text-[var(--theme-text-primary)] border-[var(--theme-border-primary)] hover:border-[var(--theme-primary)]'
+        ? 'bg-gradient-to-r from-blue-600 to-blue-400 text-white border-blue-800 drop-shadow-md' 
+        : 'bg-gray-800 hover:bg-gray-700 text-white border-gray-600 hover:border-blue-500'
     ]"
     :title="stickToBottom ? 'Disable auto-scroll' : 'Enable auto-scroll'"
   >
