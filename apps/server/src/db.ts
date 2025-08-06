@@ -46,6 +46,35 @@ export function initDatabase(): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_session_id ON events(session_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_hook_event_type ON events(hook_event_type)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp)');
+  
+  // Create subagent registry table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS subagent_registry (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      subagent_type TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+  
+  // Create subagent message ledger table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS subagent_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sender TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      notified TEXT
+    )
+  `);
+  
+  // Create indexes for subagent tables
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_session ON subagent_registry(session_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_name ON subagent_registry(name)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_created ON subagent_registry(created_at)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_message_sender ON subagent_messages(sender)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_message_created ON subagent_messages(created_at)');
 }
 
 export function insertEvent(event: HookEvent): HookEvent {
@@ -104,4 +133,111 @@ export function getRecentEvents(limit: number = 100): HookEvent[] {
     summary: row.summary || undefined,
     timestamp: row.timestamp
   })).reverse();
+}
+
+// Subagent communication functions
+export function registerSubagent(sessionId: string, name: string, subagentType: string): number {
+  const stmt = db.prepare(`
+    INSERT INTO subagent_registry (session_id, name, subagent_type, created_at)
+    VALUES (?, ?, ?, ?)
+  `);
+  
+  const result = stmt.run(sessionId, name, subagentType, Date.now());
+  return result.lastInsertRowid as number;
+}
+
+export function sendSubagentMessage(sender: string, message: any): number {
+  const stmt = db.prepare(`
+    INSERT INTO subagent_messages (sender, message, created_at, notified)
+    VALUES (?, ?, ?, ?)
+  `);
+  
+  const result = stmt.run(
+    sender,
+    JSON.stringify(message),
+    Date.now(),
+    JSON.stringify([])
+  );
+  
+  return result.lastInsertRowid as number;
+}
+
+export function getUnreadMessages(subagentName: string): any[] {
+  // Get the most recent subagent registration with this name
+  const subagentStmt = db.prepare(`
+    SELECT created_at FROM subagent_registry 
+    WHERE name = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `);
+  
+  const subagent = subagentStmt.get(subagentName) as any;
+  if (!subagent) {
+    return [];
+  }
+  
+  // Get all messages created after this subagent was registered
+  const messagesStmt = db.prepare(`
+    SELECT id, sender, message, created_at, notified 
+    FROM subagent_messages 
+    WHERE created_at > ?
+    ORDER BY created_at ASC
+  `);
+  
+  const messages = messagesStmt.all(subagent.created_at) as any[];
+  
+  // Filter out messages where this subagent is already in the notified list
+  const unreadMessages = messages.filter(msg => {
+    const notified = JSON.parse(msg.notified || '[]');
+    return !notified.includes(subagentName);
+  });
+  
+  // Update the notified list for these messages
+  const updateStmt = db.prepare(`
+    UPDATE subagent_messages 
+    SET notified = ? 
+    WHERE id = ?
+  `);
+  
+  unreadMessages.forEach(msg => {
+    const notified = JSON.parse(msg.notified || '[]');
+    notified.push(subagentName);
+    updateStmt.run(JSON.stringify(notified), msg.id);
+  });
+  
+  // Return the messages
+  return unreadMessages.map(msg => ({
+    sender: msg.sender,
+    message: JSON.parse(msg.message),
+    created_at: msg.created_at
+  }));
+}
+
+export function getSubagents(sessionId: string) {
+  const stmt = db.prepare(`
+    SELECT id, name, subagent_type, created_at 
+    FROM subagent_registry 
+    WHERE session_id = ?
+    ORDER BY created_at DESC
+  `);
+  
+  return stmt.all(sessionId) as any[];
+}
+
+export function getAllSubagentMessages() {
+  const stmt = db.prepare(`
+    SELECT id, sender, message, created_at, notified 
+    FROM subagent_messages 
+    ORDER BY created_at DESC
+  `);
+  
+  const messages = stmt.all() as any[];
+  
+  // Same pattern as getUnreadMessages - parse JSON fields
+  return messages.map(msg => ({
+    sender: msg.sender,
+    message: JSON.parse(msg.message),
+    created_at: msg.created_at,
+    notified: JSON.parse(msg.notified || '[]')
+  }));
 }

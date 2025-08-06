@@ -89,6 +89,7 @@ export function useWebSocket(url: string) {
   return {
     events,
     isConnected,
-    error
+    error,
+    ws
   };
 }

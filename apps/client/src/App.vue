@@ -35,6 +35,7 @@
           
           <!-- Filters Toggle Button -->
           <button
+            v-if="activeTab === 'events'"
             @click="showFilters = !showFilters"
             class="p-3 mobile:p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 backdrop-blur-sm shadow-lg hover:shadow-xl"
             :title="showFilters ? 'Hide filters' : 'Show filters'"
@@ -46,31 +47,66 @@
       </div>
     </header>
     
-    <!-- Filters -->
-    <FilterPanel
-      v-if="showFilters"
-      :filters="filters"
-      @update:filters="filters = $event"
-    />
+    <!-- Tab Navigation -->
+    <div class="bg-gray-800 border-b border-gray-700">
+      <div class="flex space-x-1 px-4 py-2">
+        <button
+          @click="activeTab = 'events'"
+          :class="[
+            'px-4 py-2 rounded-t-lg font-semibold transition-all',
+            activeTab === 'events' 
+              ? 'bg-gray-900 text-blue-400 border-t-2 border-blue-400' 
+              : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
+          ]"
+        >
+          Event Timeline
+        </button>
+        <button
+          @click="activeTab = 'subagents'"
+          :class="[
+            'px-4 py-2 rounded-t-lg font-semibold transition-all',
+            activeTab === 'subagents' 
+              ? 'bg-gray-900 text-blue-400 border-t-2 border-blue-400' 
+              : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
+          ]"
+        >
+          Subagent Comms
+        </button>
+      </div>
+    </div>
     
-    <!-- Live Pulse Chart -->
-    <LivePulseChart
-      :events="events"
-      :filters="filters"
-    />
+    <!-- Tab Content -->
+    <template v-if="activeTab === 'events'">
+      <!-- Filters -->
+      <FilterPanel
+        v-if="showFilters"
+        :filters="filters"
+        @update:filters="filters = $event"
+      />
+      
+      <!-- Live Pulse Chart -->
+      <LivePulseChart
+        :events="events"
+        :filters="filters"
+      />
+      
+      <!-- Timeline -->
+      <EventTimeline
+        :events="events"
+        :filters="filters"
+        v-model:stick-to-bottom="stickToBottom"
+      />
+      
+      <!-- Stick to bottom button -->
+      <StickScrollButton
+        :stick-to-bottom="stickToBottom"
+        @toggle="stickToBottom = !stickToBottom"
+      />
+    </template>
     
-    <!-- Timeline -->
-    <EventTimeline
-      :events="events"
-      :filters="filters"
-      v-model:stick-to-bottom="stickToBottom"
-    />
-    
-    <!-- Stick to bottom button -->
-    <StickScrollButton
-      :stick-to-bottom="stickToBottom"
-      @toggle="stickToBottom = !stickToBottom"
-    />
+    <template v-else-if="activeTab === 'subagents'">
+      <SubagentComms :ws-connection="wsConnection" />
+    </template>
     
     <!-- Error message -->
     <div
@@ -90,10 +126,13 @@ import EventTimeline from './components/EventTimeline.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import StickScrollButton from './components/StickScrollButton.vue';
 import LivePulseChart from './components/LivePulseChart.vue';
+import SubagentComms from './components/SubagentComms.vue';
 
 // WebSocket connection
-const { events, isConnected, error } = useWebSocket('ws://localhost:4000/stream');
+const { events, isConnected, error, ws: wsConnection } = useWebSocket('ws://localhost:4000/stream');
 
+// Tab state
+const activeTab = ref('events');
 
 // Filters
 const filters = ref({
