@@ -1,10 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.8"
-# dependencies = [
-#     "anthropic",
-#     "python-dotenv",
-# ]
 # ///
 
 """
@@ -96,12 +92,6 @@ def main():
             except Exception as e:
                 print(f"Failed to read transcript: {e}", file=sys.stderr)
     
-    # Generate summary if requested
-    if args.summarize:
-        summary = generate_event_summary(event_data)
-        if summary:
-            event_data['summary'] = summary
-        # Continue even if summary generation fails
     
     # Send to server
     success = send_event_to_server(event_data, args.server_url)
