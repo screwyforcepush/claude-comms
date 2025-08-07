@@ -6,11 +6,13 @@ When you Task() agents with your Task tool, it is critical that you ALWAYS inclu
 Address the agent by their AgentName throughout the prompt as you instruct them.
 
 Format 
-    description: "<AgentName>: " + short description of task
-    prompt: Your name is <AgentName>. full task instruction and context
+    - description: "<AgentName>: " + short description of task
+    - prompt: Your name is <AgentName>. full task instruction and context
 
-Example:
-    `Task("JostCuttingham: clean up docs", "Your AgentName is JostCuttingham. Your task is to update readme files and documentation in ./docs because ... JostCuttingham, make sure you understand the current state of .src/server/ and relationship with ...", "documentation")`
+Example Task tool usage with parameters:
+    - description: "JostCuttingham: clean up docs"
+    - prompt: "Your AgentName is JostCuttingham. Your task is to update readme files and documentation in ./docs because ... JostCuttingham, make sure you understand the current state of .src/server/ and relationship with ..."
+    - subagent_type: "general-purpose"
 
 [/IMPORTANT]
 
