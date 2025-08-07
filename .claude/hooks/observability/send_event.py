@@ -19,7 +19,6 @@ import argparse
 import urllib.request
 import urllib.error
 from datetime import datetime
-from utils.summarizer import generate_event_summary
 
 def send_event_to_server(event_data, server_url='http://localhost:4000/events'):
     """Send event data to the observability server."""
