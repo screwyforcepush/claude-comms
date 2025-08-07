@@ -1,17 +1,26 @@
-# Multi-Agent Observability System
+# Claude Code Multi-Agent Observability & Communication System
 
-Real-time monitoring and visualization for Claude Code agents through comprehensive hook event tracking. You can watch the [full breakdown here](https://youtu.be/9ijnN985O_c).
+A comprehensive platform for monitoring, visualizing, and enabling communication between Claude Code agents through advanced hook event tracking and inter-agent messaging. You can watch the [full breakdown here](https://youtu.be/9ijnN985O_c).
 
 ## 🎯 Overview
 
-This system provides complete observability into Claude Code agent behavior by capturing, storing, and visualizing Claude Code [Hook events](https://docs.anthropic.com/en/docs/claude-code/hooks) in real-time. It enables monitoring of multiple concurrent agents with session tracking, event filtering, and live updates. 
+This dual-purpose system provides:
+
+1. **Complete Observability**: Real-time monitoring and visualization of Claude Code agent behavior through [Hook events](https://docs.anthropic.com/en/docs/claude-code/hooks)
+2. **Multi-Agent Communication**: Infrastructure for subagents to discover, message, and coordinate with each other
+
+The platform captures, stores, and visualizes all agent activities while enabling sophisticated inter-agent collaboration patterns, making it ideal for complex multi-agent workflows. 
 
 <img src="images/app.png" alt="Multi-Agent Observability Dashboard" style="max-width: 800px; width: 100%;">
 
 ## 🏗️ Architecture
 
 ```
-Claude Agents → Hook Scripts → HTTP POST → Bun Server → SQLite → WebSocket → Vue Client
+Claude Agents → Hook Scripts → HTTP POST → Bun Server → SQLite → WebSocket → Vue Dashboard
+                     ↓                          ↓
+              Communication Hooks        Message Routing
+                     ↓                          ↓
+               Inter-Agent Messages      Subagent Registry
 ```
 
 ![Agent Data Flow Animation](images/AgentDataFlowV2.gif)
@@ -29,7 +38,7 @@ Before getting started, ensure you have the following installed:
 
 ### Configure .claude Directory
 
-To setup observability in your repo,we need to copy the .claude directory to your project root.
+To setup observability and multi-agent communication in your repo, copy the .claude directory to your project root.
 
 To integrate the observability hooks into your projects:
 
@@ -126,19 +135,25 @@ claude-code-hooks-multi-agent-observability/
 │   ├── server/             # Bun TypeScript server
 │   │   ├── src/
 │   │   │   ├── index.ts    # Main server with HTTP/WebSocket endpoints
-│   │   │   ├── db.ts       # SQLite database management & migrations
+│   │   │   ├── db.ts       # SQLite database with 3 tables:
+│   │   │   │               # - events (observability)
+│   │   │   │               # - subagent_registry (agent tracking)
+│   │   │   │               # - subagent_messages (inter-agent comms)
 │   │   │   └── types.ts    # TypeScript interfaces
 │   │   ├── package.json
 │   │   └── events.db       # SQLite database (gitignored)
 │   │
-│   └── client/             # Vue 3 TypeScript client
+│   └── client/             # Vue 3 TypeScript dashboard
 │       ├── src/
-│       │   ├── App.vue     # Main app with theme & WebSocket management
+│       │   ├── App.vue     # Main app with dual tabs:
+│       │   │               # - Event Timeline (observability)
+│       │   │               # - Subagent Communications (messaging)
 │       │   ├── components/
 │       │   │   ├── EventTimeline.vue      # Event list with auto-scroll
 │       │   │   ├── EventRow.vue           # Individual event display
 │       │   │   ├── FilterPanel.vue        # Multi-select filters
 │       │   │   ├── ChatTranscriptModal.vue # Chat history viewer
+│       │   │   ├── SubagentComms.vue      # Message viewer & agent list
 │       │   │   ├── StickScrollButton.vue  # Scroll control
 │       │   │   └── LivePulseChart.vue     # Real-time activity chart
 │       │   ├── composables/
@@ -154,15 +169,23 @@ claude-code-hooks-multi-agent-observability/
 │
 ├── .claude/                # Claude Code integration
 │   ├── hooks/             # Hook scripts (Python with uv)
-│   │   ├── send_event.py  # Universal event sender
-│   │   ├── pre_tool_use.py    # Tool validation & blocking
-│   │   ├── post_tool_use.py   # Result logging
-│   │   ├── notification.py    # User interaction events
-│   │   ├── user_prompt_submit.py # User prompt logging & validation
-│   │   ├── stop.py           # Session completion
-│   │   └── subagent_stop.py  # Subagent completion
+│   │   ├── observability/ # Observability hooks
+│   │   │   ├── send_event.py     # Universal event sender with AI summary
+│   │   │   ├── pre_tool_use.py   # Tool validation & blocking
+│   │   │   ├── post_tool_use.py  # Result logging
+│   │   │   ├── notification.py   # User interaction events
+│   │   │   ├── user_prompt_submit.py # User prompt logging
+│   │   │   ├── stop.py          # Session completion with TTS
+│   │   │   └── subagent_stop.py # Subagent completion with TTS
+│   │   │
+│   │   └── comms/         # Communication hooks
+│   │       ├── send_message.py      # Send inter-agent messages
+│   │       └── get_unread_messages.py # Retrieve unread messages
 │   │
-│   └── settings.json      # Hook configuration
+│   ├── agents/            # Agent configurations
+│   │   └── hook-test-dummy.md  # Test agent for multi-agent comms
+│   │
+│   └── settings.json      # Hook configuration (currently commented out)
 │
 ├── scripts/               # Utility scripts
 │   ├── start-system.sh   # Launch server & client
@@ -178,10 +201,14 @@ claude-code-hooks-multi-agent-observability/
 
 > If you want to master claude code hooks watch [this video](https://github.com/disler/claude-code-hooks-mastery)
 
-The hook system intercepts Claude Code lifecycle events:
+The hook system provides two distinct capabilities:
 
-- **`send_event.py`**: Core script that sends event data to the observability server
+#### Observability Hooks (`.claude/hooks/observability/`)
+Intercepts Claude Code lifecycle events:
+
+- **`send_event.py`**: Core script that sends event data to the server
   - Supports `--add-chat` flag for including conversation history
+  - AI-powered summarization via OpenAI/Anthropic APIs
   - Validates server connectivity before sending
   - Handles all event types with proper error handling
 
@@ -189,30 +216,56 @@ The hook system intercepts Claude Code lifecycle events:
   - `pre_tool_use.py`: Blocks dangerous commands, validates tool usage
   - `post_tool_use.py`: Captures execution results and outputs
   - `notification.py`: Tracks user interaction points
-  - `user_prompt_submit.py`: Logs user prompts, supports validation (v1.0.54+)
-  - `stop.py`: Records session completion with optional chat history
-  - `subagent_stop.py`: Monitors subagent task completion
+  - `user_prompt_submit.py`: Logs user prompts, supports validation
+  - `stop.py`: Records session completion with TTS notifications
+  - `subagent_stop.py`: Monitors subagent completion with TTS alerts
+
+#### Communication Hooks (`.claude/hooks/comms/`)
+Enables inter-agent messaging:
+
+- **`send_message.py`**: Broadcast messages to other subagents
+  - Supports structured messages with type and data fields
+  - Automatic JSON parsing for complex payloads
+  - Session-independent messaging
+
+- **`get_unread_messages.py`**: Retrieve unread messages
+  - Filter by subagent name
+  - Mark messages as read on retrieval
+  - JSON or human-readable output formats
 
 ### 2. Server (`apps/server/`)
 
-Bun-powered TypeScript server with real-time capabilities:
+Bun-powered TypeScript server with comprehensive APIs:
 
-- **Database**: SQLite with WAL mode for concurrent access
-- **Endpoints**:
+- **Database**: SQLite with WAL mode and 3 tables:
+  - `events`: Observability event storage
+  - `subagent_registry`: Agent tracking and discovery
+  - `subagent_messages`: Inter-agent message queue
+
+- **Observability Endpoints**:
   - `POST /events` - Receive events from agents
   - `GET /events/recent` - Paginated event retrieval with filtering
   - `GET /events/filter-options` - Available filter values
   - `WS /stream` - Real-time event broadcasting
+
+- **Communication Endpoints**:
+  - `POST /subagents/register` - Register new subagents
+  - `POST /subagents/message` - Send inter-agent messages
+  - `POST /subagents/unread` - Get unread messages for agent
+  - `GET /subagents/messages` - Retrieve all messages
+  - `GET /subagents/:sessionId` - List agents in session
+
 - **Features**:
   - Automatic schema migrations
-  - Event validation
+  - Message read tracking
   - WebSocket broadcast to all clients
-  - Chat transcript storage
+  - Chat transcript storage with AI summaries
 
-### 3. Client (`apps/client/`)
+### 3. Dashboard (`apps/client/`)
 
-Vue 3 application with real-time visualization:
+Vue 3 application with dual-purpose interface:
 
+#### Event Timeline Tab
 - **Visual Design**:
   - Dual-color system: App colors (left border) + Session colors (second border)
   - Gradient indicators for visual distinction
@@ -222,11 +275,23 @@ Vue 3 application with real-time visualization:
 - **Features**:
   - Real-time WebSocket updates
   - Multi-criteria filtering (app, session, event type)
-  - Live pulse chart with session-colored bars and event type indicators
-  - Time range selection (1m, 3m, 5m) with appropriate data aggregation
+  - Live pulse chart with session-colored bars
+  - Time range selection (1m, 3m, 5m)
   - Chat transcript viewer with syntax highlighting
   - Auto-scroll with manual override
   - Event limiting (configurable via `VITE_MAX_EVENTS_TO_DISPLAY`)
+
+#### Subagent Communications Tab
+- **Agent Registry**:
+  - Live list of active subagents per session
+  - Agent type and creation time tracking
+  - Visual agent identification
+
+- **Message Display**:
+  - Real-time message updates
+  - Sender identification with timestamps
+  - Read receipt tracking
+  - Message type categorization
 
 - **Live Pulse Chart**:
   - Canvas-based real-time visualization
@@ -235,17 +300,27 @@ Vue 3 application with real-time visualization:
   - Smooth animations and glow effects
   - Responsive to filter changes
 
-## 🔄 Data Flow
+## 🔄 Data Flows
 
+### Observability Flow
 1. **Event Generation**: Claude Code executes an action (tool use, notification, etc.)
 2. **Hook Activation**: Corresponding hook script runs based on `settings.json` configuration
 3. **Data Collection**: Hook script gathers context (tool name, inputs, outputs, session ID)
-4. **Transmission**: `send_event.py` sends JSON payload to server via HTTP POST
-5. **Server Processing**:
+4. **AI Summarization**: Optional AI-powered summary generation
+5. **Transmission**: `send_event.py` sends JSON payload to server via HTTP POST
+6. **Server Processing**:
    - Validates event structure
    - Stores in SQLite with timestamp
    - Broadcasts to WebSocket clients
-6. **Client Update**: Vue app receives event and updates timeline in real-time
+7. **Dashboard Update**: Vue app receives event and updates timeline in real-time
+
+### Communication Flow
+1. **Agent Registration**: Subagents auto-register when created via Task tool
+2. **Message Sending**: Agent calls `send_message.py` with sender name and message
+3. **Server Routing**: Message stored in `subagent_messages` table
+4. **Message Retrieval**: Recipients poll using `get_unread_messages.py`
+5. **Read Tracking**: Server marks messages as read for each recipient
+6. **Dashboard Display**: Real-time updates show message exchange
 
 ## 🎨 Event Types & Visualization
 
@@ -259,54 +334,10 @@ Vue 3 application with real-time visualization:
 | PreCompact   | 📦     | Context compaction    | Session-based | Compaction details |
 | UserPromptSubmit | 💬 | User prompt submission | Session-based | Prompt: _"user message"_ (italic) |
 
-### UserPromptSubmit Event (v1.0.54+)
-
-The `UserPromptSubmit` hook captures every user prompt before Claude processes it. In the UI:
-- Displays as `Prompt: "user's message"` in italic text
-- Shows the actual prompt content inline (truncated to 100 chars)
-- Summary appears on the right side when AI summarization is enabled
-- Useful for tracking user intentions and conversation flow
-
-## 🔌 Integration
-
-### For New Projects
-
-1. Copy the event sender:
-   ```bash
-   cp .claude/hooks/send_event.py YOUR_PROJECT/.claude/hooks/
-   ```
-
-2. Add to your `.claude/settings.json`:
-   ```json
-   {
-     "hooks": {
-       "PreToolUse": [{
-         "matcher": ".*",
-         "hooks": [{
-           "type": "command",
-           "command": "uv run .claude/hooks/send_event.py --source-app YOUR_APP --event-type PreToolUse"
-         }]
-       }]
-     }
-   }
-   ```
-
-### For This Project
-
-Already integrated! Hooks run both validation and observability:
-```json
-{
-  "type": "command",
-  "command": "uv run .claude/hooks/pre_tool_use.py"
-},
-{
-  "type": "command", 
-  "command": "uv run .claude/hooks/send_event.py --source-app cc-hooks-observability --event-type PreToolUse"
-}
-```
 
 ## 🧪 Testing
 
+### System Testing
 ```bash
 # System validation
 ./scripts/test-system.sh
@@ -320,6 +351,24 @@ curl -X POST http://localhost:4000/events \
     "hook_event_type": "PreToolUse",
     "payload": {"tool_name": "Bash", "tool_input": {"command": "ls"}}
   }'
+```
+
+### Multi-Agent Communication Testing
+```bash
+# Send a message
+python3 .claude/hooks/comms/send_message.py \
+  --sender "Agent-Alpha" \
+  --message "Hello from Alpha!"
+
+# Check for messages
+python3 .claude/hooks/comms/get_unread_messages.py \
+  --name "Agent-Beta" \
+  --json
+
+# Test with hook-test-dummy agents
+# In Claude Code, create two parallel test agents:
+# Task 1: "Agent-Alpha: Test messaging system"
+# Task 2: "Agent-Beta: Respond to messages"
 ```
 
 ## ⚙️ Configuration
@@ -343,44 +392,28 @@ Copy `.env.sample` to `.env` in the project root and fill in your API keys:
 - Server: `4000` (HTTP/WebSocket)
 - Client: `5173` (Vite dev server)
 
-## 🛡️ Security Features
-
-- Blocks dangerous commands (`rm -rf`, etc.)
-- Prevents access to sensitive files (`.env`, private keys)
-- Validates all inputs before execution
-- No external dependencies for core functionality
-
 ## 📊 Technical Stack
 
-- **Server**: Bun, TypeScript, SQLite
-- **Client**: Vue 3, TypeScript, Vite, Tailwind CSS
-- **Hooks**: Python 3.8+, Astral uv, TTS (ElevenLabs or OpenAI), LLMs (Claude or OpenAI)
-- **Communication**: HTTP REST, WebSocket
+- **Server**: Bun, TypeScript, SQLite (with WAL mode)
+- **Dashboard**: Vue 3, TypeScript, Vite, Tailwind CSS
+- **Hooks**: Python 3.8+, Astral uv
+- **AI Features**: 
+  - TTS: ElevenLabs, OpenAI, or pyttsx3
+  - Summarization: OpenAI or Anthropic Claude
+- **Communication**: HTTP REST, WebSocket, Inter-process messaging
 
-## 🔧 Troubleshooting
 
-### Hook Scripts Not Working
+Claude Code automatically sets `$CLAUDE_PROJECT_DIR` to your project root, ensuring hooks work regardless of the current working directory.
 
-If your hook scripts aren't executing properly, it might be due to relative paths in your `.claude/settings.json`. Claude Code documentation recommends using absolute paths for command scripts.
+### Server Connection Issues
 
-**Solution**: Use the custom Claude Code slash command to automatically convert all relative paths to absolute paths:
+- Ensure the server is running: `./scripts/start-system.sh`
+- Check server logs: `tail -f apps/server/server.log`
+- Verify port 4000 is not in use: `lsof -i :4000`
 
-```bash
-# In Claude Code, simply run:
-/convert_paths_absolute
-```
+### Message Delivery Problems
 
-This command will:
-- Find all relative paths in your hook command scripts
-- Convert them to absolute paths based on your current working directory
-- Create a backup of your original settings.json
-- Show you exactly what changes were made
+- Verify subagent names are unique
+- Check server is running and accessible
+- Review message logs in the dashboard's Subagent Communications tab
 
-This ensures your hooks work correctly regardless of where Claude Code is executed from.
-
-## Master AI Coding
-> And prepare for Agentic Engineering
-
-Learn to code with AI with foundational [Principles of AI Coding](https://agenticengineer.com/principled-ai-coding?y=cchookobvs)
-
-Follow the [IndyDevDan youtube channel](https://www.youtube.com/@indydevdan) for more AI coding tips and tricks.

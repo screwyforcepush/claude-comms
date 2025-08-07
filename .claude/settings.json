@@ -1,104 +1,104 @@
-// {
-//   "hooks": {
-//     "PreToolUse": [
-//       {
-//         "matcher": "",
-//         "hooks": [
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/pre_tool_use.py"
-//           },
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PreToolUse --summarize"
-//           }
-//         ]
-//       }
-//     ],
-//     "PostToolUse": [
-//       {
-//         "matcher": "",
-//         "hooks": [
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/post_tool_use.py"
-//           },
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PostToolUse --summarize"
-//           }
-//         ]
-//       }
-//     ],
-//     "Notification": [
-//       {
-//         "matcher": "",
-//         "hooks": [
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/notification.py --notify "
-//           },
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type Notification --summarize"
-//           }
-//         ]
-//       }
-//     ],
-//     "Stop": [
-//       {
-//         "matcher": "",
-//         "hooks": [
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/stop.py --chat"
-//           },
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type Stop --add-chat"
-//           }
-//         ]
-//       }
-//     ],
-//     "SubagentStop": [
-//       {
-//         "matcher": "",
-//         "hooks": [
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/subagent_stop.py"
-//           },
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type SubagentStop"
-//           }
-//         ]
-//       }
-//     ],
-//     "PreCompact": [
-//       {
-//         "matcher": "",
-//         "hooks": [
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PreCompact"
-//           }
-//         ]
-//       }
-//     ],
-//     "UserPromptSubmit": [
-//       {
-//         "hooks": [
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/user_prompt_submit.py --log-only"
-//           },
-//           {
-//             "type": "command",
-//             "command": "uv run .claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type UserPromptSubmit --summarize"
-//           }
-//         ]
-//       }
-//     ]
-//   }
-// }
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/pre_tool_use.py"
+          },
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PreToolUse --summarize"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/post_tool_use.py"
+          },
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PostToolUse --summarize"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/notification.py --notify "
+          },
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type Notification --summarize"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/stop.py --chat"
+          },
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type Stop --add-chat"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/subagent_stop.py"
+          },
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type SubagentStop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PreCompact"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/user_prompt_submit.py --log-only"
+          },
+          {
+            "type": "command",
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type UserPromptSubmit --summarize"
+          }
+        ]
+      }
+    ]
+  }
+}
