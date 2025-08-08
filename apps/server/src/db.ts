@@ -187,9 +187,10 @@ export function getUnreadMessages(subagentName: string): any[] {
   const messages = messagesStmt.all(subagent.created_at) as any[];
   
   // Filter out messages where this subagent is already in the notified list
+  // and also filter out messages sent by this subagent itself
   const unreadMessages = messages.filter(msg => {
     const notified = JSON.parse(msg.notified || '[]');
-    return !notified.includes(subagentName);
+    return !notified.includes(subagentName) && msg.sender !== subagentName;
   });
   
   // Update the notified list for these messages
