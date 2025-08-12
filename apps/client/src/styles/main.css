@@ -1,3 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Import timeline-specific styles */
+@import './timeline.css';
+@import './timeline-utilities.css';

@@ -57,5 +57,23 @@ export default {
     'to-teal-600',
     'from-cyan-500',
     'to-cyan-600',
+    // Timeline animation classes
+    'timeline-fade-in',
+    'timeline-slide-in-left',
+    'timeline-slide-in-right',
+    'timeline-gpu-accelerated',
+    'timeline-agent-enter',
+    // Agent type classes
+    'agent-type-general-purpose',
+    'agent-type-engineer',
+    'agent-type-tester',
+    'agent-type-code-reviewer',
+    'agent-type-green-verifier',
+    'agent-type-architect',
+    'agent-type-deep-researcher',
+    'agent-type-designer',
+    'agent-type-business-analyst',
+    'agent-type-planner',
+    'agent-type-cloud-cicd',
   ]
 }
