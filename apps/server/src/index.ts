@@ -7,13 +7,16 @@ import {
   sendSubagentMessage,
   getUnreadMessages,
   getSubagents,
-  getAllSubagentMessages
+  getAllSubagentMessages,
+  updateSubagentCompletion,
+  getSessionsWithAgents
 } from './db';
 import type { 
   HookEvent, 
   RegisterSubagentRequest, 
   SendMessageRequest, 
-  GetUnreadMessagesRequest 
+  GetUnreadMessagesRequest,
+  UpdateSubagentCompletionRequest 
 } from './types';
 
 // Initialize database
@@ -185,10 +188,68 @@ const server = Bun.serve({
       });
     }
     
+    // POST /subagents/update-completion - Update subagent completion status
+    if (url.pathname === '/subagents/update-completion' && req.method === 'POST') {
+      try {
+        const request: UpdateSubagentCompletionRequest = await req.json();
+        const success = updateSubagentCompletion(request.session_id, request.name, {
+          completed_at: request.completed_at || Date.now(),
+          status: request.status,
+          ...(request.completion_metadata || {})
+        });
+        
+        if (success) {
+          // Broadcast to WebSocket clients
+          const message = JSON.stringify({ 
+            type: 'agent_status_update', 
+            data: request 
+          });
+          wsClients.forEach(client => {
+            try {
+              client.send(message);
+            } catch (err) {
+              wsClients.delete(client);
+            }
+          });
+          
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        } else {
+          return new Response(JSON.stringify({ error: 'Subagent not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (error) {
+        console.error('Error updating subagent completion:', error);
+        return new Response(JSON.stringify({ error: 'Failed to update completion' }), {
+          status: 400,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
+    // GET /subagents/sessions - Get all unique sessions with agent counts
+    if (url.pathname === '/subagents/sessions' && req.method === 'GET') {
+      try {
+        const sessions = getSessionsWithAgents();
+        return new Response(JSON.stringify(sessions), {
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error getting sessions:', error);
+        return new Response(JSON.stringify({ error: 'Failed to get sessions' }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
     // GET /subagents/:sessionId - Get all subagents for a session
     if (url.pathname.startsWith('/subagents/') && req.method === 'GET') {
       const sessionId = url.pathname.split('/')[2];
-      if (sessionId && sessionId !== 'register' && sessionId !== 'message' && sessionId !== 'unread' && sessionId !== 'messages') {
+      if (sessionId && sessionId !== 'register' && sessionId !== 'message' && sessionId !== 'unread' && sessionId !== 'messages' && sessionId !== 'update-completion' && sessionId !== 'sessions') {
         const subagents = getSubagents(sessionId);
         return new Response(JSON.stringify(subagents), {
           headers: { ...headers, 'Content-Type': 'application/json' }

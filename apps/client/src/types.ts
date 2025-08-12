@@ -41,3 +41,28 @@ export interface ChartConfig {
     text: string;
   };
 }
+
+export interface Session {
+  session_id: string;
+  created_at: string;
+  agent_count: number;
+}
+
+export interface AgentStatus {
+  id: number;
+  name: string;
+  subagent_type: string;
+  created_at: number;
+  status?: 'pending' | 'in_progress' | 'completed';
+  duration?: number;
+  token_count?: number;
+  tool_count?: number;
+  completion_timestamp?: number;
+}
+
+export interface SubagentMessage {
+  sender: string;
+  message: any;
+  created_at: number;
+  notified?: string[];
+}

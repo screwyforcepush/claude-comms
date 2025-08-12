@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import type { HookEvent, FilterOptions } from './types';
+import type { HookEvent, FilterOptions, UpdateSubagentCompletionRequest, SessionSummary } from './types';
 
 let db: Database;
 
@@ -54,9 +54,54 @@ export function initDatabase(): void {
       session_id TEXT NOT NULL,
       name TEXT NOT NULL,
       subagent_type TEXT NOT NULL,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      status TEXT DEFAULT 'pending',
+      total_duration_ms INTEGER,
+      total_tokens INTEGER,
+      total_tool_use_count INTEGER,
+      input_tokens INTEGER,
+      output_tokens INTEGER,
+      cache_creation_input_tokens INTEGER,
+      cache_read_input_tokens INTEGER
     )
   `);
+  
+  // Check and add new completion tracking columns for migration
+  try {
+    const columns = db.prepare("PRAGMA table_info(subagent_registry)").all() as any[];
+    const columnNames = columns.map((col: any) => col.name);
+    
+    if (!columnNames.includes('completed_at')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN completed_at INTEGER');
+    }
+    if (!columnNames.includes('status')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN status TEXT DEFAULT "pending"');
+    }
+    if (!columnNames.includes('total_duration_ms')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN total_duration_ms INTEGER');
+    }
+    if (!columnNames.includes('total_tokens')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN total_tokens INTEGER');
+    }
+    if (!columnNames.includes('total_tool_use_count')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN total_tool_use_count INTEGER');
+    }
+    if (!columnNames.includes('input_tokens')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN input_tokens INTEGER');
+    }
+    if (!columnNames.includes('output_tokens')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN output_tokens INTEGER');
+    }
+    if (!columnNames.includes('cache_creation_input_tokens')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN cache_creation_input_tokens INTEGER');
+    }
+    if (!columnNames.includes('cache_read_input_tokens')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN cache_read_input_tokens INTEGER');
+    }
+  } catch (error) {
+    // If the table doesn't exist yet, the CREATE TABLE above will handle it
+  }
   
   // Create subagent message ledger table
   db.exec(`
@@ -69,10 +114,33 @@ export function initDatabase(): void {
     )
   `);
   
+  // Add completion columns if they don't exist (for migration)
+  try {
+    const subagentColumns = db.prepare("PRAGMA table_info(subagent_registry)").all() as any[];
+    const hasStatusColumn = subagentColumns.some((col: any) => col.name === 'status');
+    if (!hasStatusColumn) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN status TEXT DEFAULT "active"');
+    }
+    
+    const hasCompletedAtColumn = subagentColumns.some((col: any) => col.name === 'completed_at');
+    if (!hasCompletedAtColumn) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN completed_at INTEGER');
+    }
+    
+    const hasCompletionMetadataColumn = subagentColumns.some((col: any) => col.name === 'completion_metadata');
+    if (!hasCompletionMetadataColumn) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN completion_metadata TEXT');
+    }
+  } catch (error) {
+    // If the table doesn't exist yet, the CREATE TABLE above will handle it
+  }
+
   // Create indexes for subagent tables
   db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_session ON subagent_registry(session_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_name ON subagent_registry(name)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_created ON subagent_registry(created_at)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_status ON subagent_registry(status)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_completed ON subagent_registry(completed_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_message_sender ON subagent_messages(sender)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_message_created ON subagent_messages(created_at)');
 }
@@ -216,7 +284,9 @@ export function getUnreadMessages(subagentName: string): any[] {
 
 export function getSubagents(sessionId: string) {
   const stmt = db.prepare(`
-    SELECT id, name, subagent_type, created_at 
+    SELECT id, name, subagent_type, created_at, completed_at, status, 
+           total_duration_ms, total_tokens, total_tool_use_count, 
+           input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens
     FROM subagent_registry 
     WHERE session_id = ?
     ORDER BY created_at DESC
@@ -241,4 +311,61 @@ export function getAllSubagentMessages() {
     created_at: msg.created_at,
     notified: JSON.parse(msg.notified || '[]')
   }));
+}
+
+export function updateSubagentCompletion(
+  sessionId: string, 
+  name: string, 
+  completionData: {
+    completed_at?: number;
+    status?: string;
+    total_duration_ms?: number;
+    total_tokens?: number;
+    total_tool_use_count?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  }
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE subagent_registry 
+    SET completed_at = COALESCE(?, completed_at),
+        status = COALESCE(?, status),
+        total_duration_ms = COALESCE(?, total_duration_ms),
+        total_tokens = COALESCE(?, total_tokens),
+        total_tool_use_count = COALESCE(?, total_tool_use_count),
+        input_tokens = COALESCE(?, input_tokens),
+        output_tokens = COALESCE(?, output_tokens),
+        cache_creation_input_tokens = COALESCE(?, cache_creation_input_tokens),
+        cache_read_input_tokens = COALESCE(?, cache_read_input_tokens)
+    WHERE session_id = ? AND name = ?
+  `);
+  
+  const result = stmt.run(
+    completionData.completed_at || null,
+    completionData.status || null,
+    completionData.total_duration_ms || null,
+    completionData.total_tokens || null,
+    completionData.total_tool_use_count || null,
+    completionData.input_tokens || null,
+    completionData.output_tokens || null,
+    completionData.cache_creation_input_tokens || null,
+    completionData.cache_read_input_tokens || null,
+    sessionId,
+    name
+  );
+  
+  return result.changes > 0;
+}
+
+export function getSessionsWithAgents(): { session_id: string; created_at: number; agent_count: number }[] {
+  const stmt = db.prepare(`
+    SELECT session_id, MAX(created_at) as created_at, COUNT(*) as agent_count
+    FROM subagent_registry 
+    GROUP BY session_id 
+    ORDER BY created_at DESC
+  `);
+  
+  return stmt.all() as { session_id: string; created_at: number; agent_count: number }[];
 }

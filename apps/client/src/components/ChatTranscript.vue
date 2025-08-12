@@ -48,7 +48,7 @@
             </button>
             <!-- Copy Button -->
             <button
-              @click="copyMessage(index, item.type || item.role)"
+              @click="copyMessage(index)"
               class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex items-center"
               :title="'Copy message'"
             >
@@ -111,7 +111,7 @@
             </button>
             <!-- Copy Button -->
             <button
-              @click="copyMessage(index, item.type || item.role)"
+              @click="copyMessage(index)"
               class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex items-center"
               :title="'Copy message'"
             >
@@ -158,7 +158,7 @@
             </button>
             <!-- Copy Button -->
             <button
-              @click="copyMessage(index, item.type || item.role)"
+              @click="copyMessage(index)"
               class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex items-center"
               :title="'Copy message'"
             >
@@ -199,7 +199,7 @@
             </button>
             <!-- Copy Button -->
             <button
-              @click="copyMessage(index, item.type || item.role)"
+              @click="copyMessage(index)"
               class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex items-center"
               :title="'Copy message'"
             >
@@ -284,7 +284,7 @@ const getCopyButtonText = (index: number) => {
   return copyButtonStates.value.get(index) || '📋';
 };
 
-const copyMessage = async (index: number, type: string) => {
+const copyMessage = async (index: number) => {
   const item = chatItems.value[index];
   
   try {

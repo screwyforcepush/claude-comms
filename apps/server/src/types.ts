@@ -21,6 +21,9 @@ export interface Subagent {
   name: string;
   subagent_type: string;
   created_at: number;
+  status?: string;
+  completed_at?: number;
+  completion_metadata?: any;
 }
 
 export interface SubagentMessage {
@@ -43,4 +46,18 @@ export interface SendMessageRequest {
 
 export interface GetUnreadMessagesRequest {
   subagent_name: string;
+}
+
+export interface UpdateSubagentCompletionRequest {
+  session_id: string;
+  name: string;
+  status: string;
+  completed_at?: number;
+  completion_metadata?: any;
+}
+
+export interface SessionSummary {
+  session_id: string;
+  agent_count: number;
+  created_at: number;
 }

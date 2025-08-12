@@ -70,7 +70,7 @@
               : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
           ]"
         >
-          Subagent Comms
+          Agents
         </button>
       </div>
     </div>
