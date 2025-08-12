@@ -138,7 +138,7 @@ Create a bespoke workflow for the Agent, leveraging specific tool instruction an
 - lint, dev, test, build commands
 - Use Playwrite to capture screenshots and "visually inspect" them
 - Phase level documentation artifacts in docs/project/phases/<phaseNumberName>
-- Project level gold docs in docs/project/guides/<phaseNumber> 
+- Project level gold docs in docs/project/guides/ 
 - Source of truth spec docs in docs/project/spec/
 - allign witih source of truth spec
 - "THINK HARD" or "PONDER" keywords trigger deeper thinking in critical decision steps
