@@ -302,16 +302,7 @@
               @click="selectBatch(batch)"
             />
             <!-- Subtle pulse effect -->
-            <circle 
-              :cx="getTimeX(batch.spawnTimestamp)" 
-              :cy="orchestratorY"
-              r="7" 
-              fill="none"
-              stroke="#00d4ff"
-              stroke-width="1.5"
-              opacity="0.4"
-              class="animate-ping spawn-pulse"
-            />
+            <!-- Floating circle animation removed to eliminate floating effect -->
             <!-- Refined batch label with background -->
             <rect
               :x="getTimeX(batch.spawnTimestamp) - 32"
@@ -458,20 +449,7 @@
             />
             
             <!-- Expanding ripple for new messages -->
-            <circle 
-              v-if="message.isRecentlyAdded"
-              :cx="message.position.x" 
-              :cy="message.position.y"
-              r="0"
-              fill="none"
-              stroke="#ffd93d"
-              stroke-width="2"
-              class="animate-ping"
-              opacity="0.8"
-            >
-              <animate attributeName="r" values="0;15;0" dur="2s" repeatCount="3" />
-              <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="3" />
-            </circle>
+            <!-- Recent message ping animation removed to eliminate floating circles -->
           </g>
         </g>
 

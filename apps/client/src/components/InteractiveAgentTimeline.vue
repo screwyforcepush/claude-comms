@@ -155,30 +155,11 @@
               @mouseenter="showAgentTooltip(agent, $event)"
               @mouseleave="hideTooltip"
             />
-            <!-- Direction indicator arrow -->
-            <path
-              v-if="agent.status === 'completed'"
-              :d="getDirectionArrow(agent, index, getAgentLaneY(index, agent))"
-              :fill="getAgentColor(agent.type)"
-              opacity="0.7"
-              class="cursor-pointer"
-              @click="selectAgentPath(agent)"
-            />
+            <!-- Direction indicator arrow - REMOVED -->
             
             <!-- Agent labels removed - will be handled by path-based labeling -->
 
-            <!-- Status Indicator -->
-            <circle 
-              :cx="getAgentEndX(agent) + 8" 
-              :cy="getAgentLaneY(index, agent)"
-              r="4" 
-              :fill="getStatusColor(agent.status)"
-              :class="agent.status === 'in_progress' ? 'animate-pulse' : ''"
-              class="cursor-pointer"
-              @click="selectAgentPath(agent)"
-              @mouseenter="showAgentTooltip(agent, $event)"
-              @mouseleave="hideTooltip"
-            />
+            <!-- Status Indicator - REMOVED -->
           </g>
         </g>
 
@@ -198,17 +179,7 @@
               @mouseenter="showBatchTooltip(batch, $event)"
               @mouseleave="hideTooltip"
             />
-            <!-- Pulse effect for spawn points -->
-            <circle 
-              :cx="getTimeX(batch.spawnTimestamp)" 
-              :cy="orchestratorY"
-              r="8" 
-              fill="none"
-              stroke="#00d4ff"
-              stroke-width="2"
-              opacity="0.6"
-              class="animate-ping"
-            />
+            <!-- Pulse effect for spawn points removed (was causing floating circles) -->
             <!-- Batch label with enhanced styling -->
             <text 
               :x="getTimeX(batch.spawnTimestamp)" 
@@ -559,13 +530,7 @@ const agentColors: Record<string, string> = {
   engineer: '#ff6b6b'
 };
 
-// Status Colors
-const statusColors = {
-  pending: '#6b7280',
-  in_progress: '#3b82f6',
-  completed: '#22c55e',
-  error: '#ef4444'
-};
+// Status Colors - REMOVED (no longer needed since status indicators removed)
 
 // Computed Properties
 const totalAgents = computed(() => props.agents.length);
@@ -731,9 +696,7 @@ const getAgentColor = (type: string): string => {
   return agentColors[type as keyof typeof agentColors] || agentColors.engineer;
 };
 
-const getStatusColor = (status: string): string => {
-  return statusColors[status as keyof typeof statusColors] || statusColors.pending;
-};
+// getStatusColor function - REMOVED (no longer needed since status indicators removed)
 
 // Smart lane allocation algorithm - tracks lane occupancy and reuses lanes
 const laneOccupancy = ref<Map<number, Array<{ start: number; end: number }>>>(new Map());
@@ -835,9 +798,9 @@ const getAgentCurvePath = (agent: any, index: number, agentY?: number): string =
   const endX = getAgentEndX(agent);
   const laneY = agentY || getAgentLaneY(index, agent);
   
-  // Calculate branch out and merge back control points
-  const branchOutDistance = 30; // How far to branch out from orchestrator
-  const mergeBackDistance = 30; // How far before merging back
+  // Calculate branch out and merge back control points - sharpened to 10% of original
+  const branchOutDistance = 3; // How far to branch out from orchestrator (reduced from 30)
+  const mergeBackDistance = 3; // How far before merging back (reduced from 30)
   
   // Create a git-tree-like path:
   // 1. Start from orchestrator at spawn time
@@ -865,17 +828,7 @@ const getAgentCurvePath = (agent: any, index: number, agentY?: number): string =
   }
 };
 
-// Direction arrow for completed agents
-const getDirectionArrow = (agent: any, index: number, agentY?: number): string => {
-  const endX = getAgentEndX(agent);
-  const laneY = agentY || getAgentLaneY(index, agent);
-  
-  // Small arrow pointing towards completion
-  return `M ${endX - 15} ${laneY - 5} 
-          L ${endX - 5} ${laneY} 
-          L ${endX - 15} ${laneY + 5} 
-          Z`;
-};
+// Direction arrow for completed agents - REMOVED (no longer needed)
 
 
 const getStrokeWidth = (status: string, isSelected: boolean = false): number => {
