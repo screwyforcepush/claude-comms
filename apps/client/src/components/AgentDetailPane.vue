@@ -45,7 +45,7 @@
         <div class="grid grid-cols-2 gap-2 text-sm">
           <div class="bg-gray-700 rounded-lg p-2">
             <div class="text-gray-400">Duration</div>
-            <div class="text-white font-medium">{{ formatDuration(selectedAgent.duration) }}</div>
+            <div class="text-white font-medium">{{ formatDuration(selectedAgent.total_duration_ms) }}</div>
           </div>
           <div class="bg-gray-700 rounded-lg p-2">
             <div class="text-gray-400">Session</div>
@@ -57,17 +57,40 @@
       <!-- Performance Metrics -->
       <div v-if="hasPerformanceData()" class="mb-6">
         <h4 class="text-white font-semibold mb-3">Performance</h4>
-        <div class="grid grid-cols-2 gap-3">
-          <div v-if="selectedAgent.token_count" class="bg-gray-700 rounded-lg p-3">
-            <div class="flex items-center justify-between">
-              <span class="text-gray-400 text-sm">Tokens</span>
-              <span class="text-blue-400 font-medium">{{ selectedAgent.token_count.toLocaleString() }}</span>
+        <div class="space-y-3">
+          <!-- Total Tokens -->
+          <div v-if="selectedAgent.total_tokens" class="bg-gray-700 rounded-lg p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-gray-400 text-sm">Total Tokens</span>
+              <span class="text-blue-400 font-medium">{{ selectedAgent.total_tokens.toLocaleString() }}</span>
+            </div>
+            <div v-if="selectedAgent.input_tokens || selectedAgent.output_tokens" class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-500">Input</span>
+                <span class="text-gray-300">{{ (selectedAgent.input_tokens || 0).toLocaleString() }}</span>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-500">Output</span>
+                <span class="text-gray-300">{{ (selectedAgent.output_tokens || 0).toLocaleString() }}</span>
+              </div>
+              <div v-if="selectedAgent.cache_creation_input_tokens || selectedAgent.cache_read_input_tokens" class="border-t border-gray-600 pt-1 mt-1">
+                <div v-if="selectedAgent.cache_creation_input_tokens" class="flex items-center justify-between text-xs">
+                  <span class="text-gray-500">Cache Write</span>
+                  <span class="text-purple-400">{{ selectedAgent.cache_creation_input_tokens.toLocaleString() }}</span>
+                </div>
+                <div v-if="selectedAgent.cache_read_input_tokens" class="flex items-center justify-between text-xs">
+                  <span class="text-gray-500">Cache Read</span>
+                  <span class="text-purple-400">{{ selectedAgent.cache_read_input_tokens.toLocaleString() }}</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div v-if="selectedAgent.tool_count" class="bg-gray-700 rounded-lg p-3">
+          
+          <!-- Tool Usage -->
+          <div v-if="selectedAgent.total_tool_use_count" class="bg-gray-700 rounded-lg p-3">
             <div class="flex items-center justify-between">
-              <span class="text-gray-400 text-sm">Tools</span>
-              <span class="text-green-400 font-medium">{{ selectedAgent.tool_count }}</span>
+              <span class="text-gray-400 text-sm">Tool Calls</span>
+              <span class="text-green-400 font-medium">{{ selectedAgent.total_tool_use_count }}</span>
             </div>
           </div>
         </div>
@@ -241,11 +264,33 @@ const formatTimestamp = (timestamp: number): string => {
   });
 };
 
-const formatDuration = (duration?: number): string => {
-  if (!duration) return 'N/A';
-  if (duration < 1000) return `${duration}ms`;
-  if (duration < 60000) return `${(duration / 1000).toFixed(1)}s`;
-  return `${(duration / 60000).toFixed(1)}min`;
+const formatDuration = (durationMs?: number): string => {
+  // First try the explicit duration field
+  if (durationMs && durationMs > 0) {
+    if (durationMs < 1000) return `${durationMs}ms`;
+    if (durationMs < 60000) return `${(durationMs / 1000).toFixed(1)}s`;
+    return `${(durationMs / 60000).toFixed(1)}min`;
+  }
+  
+  // Fallback: calculate from timestamps if available
+  if (props.selectedAgent?.completion_timestamp && props.selectedAgent?.created_at) {
+    const duration = props.selectedAgent.completion_timestamp - props.selectedAgent.created_at;
+    if (duration > 0) {
+      if (duration < 1000) return `${duration}ms`;
+      if (duration < 60000) return `${(duration / 1000).toFixed(1)}s`;
+      return `${(duration / 60000).toFixed(1)}min`;
+    }
+  }
+  
+  // Check if agent is still running
+  if (props.selectedAgent?.status === 'in_progress' && props.selectedAgent?.created_at) {
+    const elapsed = Date.now() - props.selectedAgent.created_at;
+    if (elapsed < 1000) return `${elapsed}ms (running)`;
+    if (elapsed < 60000) return `${(elapsed / 1000).toFixed(1)}s (running)`;
+    return `${(elapsed / 60000).toFixed(1)}min (running)`;
+  }
+  
+  return 'N/A';
 };
 
 const formatAgentType = (type?: string): string => {
@@ -285,7 +330,7 @@ const getAgentStatusColor = (status?: string): string => {
 };
 
 const hasPerformanceData = (): boolean => {
-  return !!(props.selectedAgent?.token_count || props.selectedAgent?.tool_count);
+  return !!(props.selectedAgent?.total_tokens || props.selectedAgent?.total_tool_use_count);
 };
 
 const getCollaborators = (): AgentStatus[] => {
@@ -331,9 +376,11 @@ const copyAgentDetails = async () => {
     `Started: ${formatTimestamp(props.selectedAgent.created_at)}`,
     props.selectedAgent.completion_timestamp ? 
       `Completed: ${formatTimestamp(props.selectedAgent.completion_timestamp)}` : '',
-    props.selectedAgent.duration ? `Duration: ${formatDuration(props.selectedAgent.duration)}` : '',
-    props.selectedAgent.token_count ? `Tokens: ${props.selectedAgent.token_count}` : '',
-    props.selectedAgent.tool_count ? `Tools: ${props.selectedAgent.tool_count}` : '',
+    props.selectedAgent.total_duration_ms ? `Duration: ${formatDuration(props.selectedAgent.total_duration_ms)}` : '',
+    props.selectedAgent.total_tokens ? `Tokens: ${props.selectedAgent.total_tokens}` : '',
+    props.selectedAgent.total_tool_use_count ? `Tools: ${props.selectedAgent.total_tool_use_count}` : '',
+    props.selectedAgent.input_tokens ? `Input Tokens: ${props.selectedAgent.input_tokens}` : '',
+    props.selectedAgent.output_tokens ? `Output Tokens: ${props.selectedAgent.output_tokens}` : '',
   ].filter(Boolean).join('\n');
   
   try {

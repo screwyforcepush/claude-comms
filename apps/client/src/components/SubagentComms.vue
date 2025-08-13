@@ -168,7 +168,7 @@
 
     <!-- Agent Detail Pane -->
     <AgentDetailPane
-      :visible="showAgentDetails"
+      :visible="showAgentDetails && activePane === 'agent'"
       :selected-agent="selectedAgent"
       :agents="subagents"
       :messages="messages"
@@ -178,6 +178,17 @@
       @message-selected="handleMessageSelectedFromAgent"
       @highlight-timeline="handleHighlightAgentOnTimeline"
     />
+
+    <!-- Message Detail Pane -->
+    <MessageDetailPane
+      :visible="showMessageDetails && activePane === 'message'"
+      :selected-message="selectedMessage"
+      :agents="subagents"
+      :session-id="selectedSessionId"
+      @close="handleMessageDetailClose"
+      @agent-selected="handleAgentSelectedFromMessage"
+      @highlight-timeline="handleHighlightMessageOnTimeline"
+    />
   </div>
 </template>
 
@@ -186,6 +197,7 @@ import { ref, onMounted, onUnmounted, watchEffect } from 'vue';
 import type { Session, AgentStatus, SubagentMessage } from '../types';
 import InteractiveAgentTimeline from './InteractiveAgentTimeline.vue';
 import AgentDetailPane from './AgentDetailPane.vue';
+import MessageDetailPane from './MessageDetailPane.vue';
 
 const props = defineProps<{
   wsConnection?: any;
@@ -197,8 +209,14 @@ const subagents = ref<AgentStatus[]>([]);
 const messages = ref<SubagentMessage[]>([]);
 const activeView = ref<'timeline' | 'list'>('timeline');
 const selectedAgent = ref<AgentStatus | null>(null);
+const selectedMessage = ref<SubagentMessage | null>(null);
 const showAgentDetails = ref(false);
+const showMessageDetails = ref(false);
 let refreshInterval: number | null = null;
+
+// Pane state management - ensure only one pane is open at a time
+type ActivePane = 'none' | 'agent' | 'message';
+const activePane = ref<ActivePane>('none');
 
 const refreshSessions = async () => {
   try {
@@ -274,16 +292,30 @@ const formatDuration = (duration: number): string => {
   return `${(duration / 1000).toFixed(1)}s`;
 };
 
+// Pane management helpers
+const closeAllPanes = () => {
+  showAgentDetails.value = false;
+  showMessageDetails.value = false;
+  activePane.value = 'none';
+};
+
 // Timeline event handlers
 const handleAgentSelected = (agent: AgentStatus) => {
   console.log('Agent selected:', agent);
   selectedAgent.value = agent;
+  // Close message pane if open and show agent pane
+  closeAllPanes();
   showAgentDetails.value = true;
+  activePane.value = 'agent';
 };
 
 const handleMessageClicked = (message: SubagentMessage) => {
   console.log('Message clicked:', message);
-  // Future: Show message details in modal or sidebar
+  selectedMessage.value = message;
+  // Close agent pane if open and show message pane
+  closeAllPanes();
+  showMessageDetails.value = true;
+  activePane.value = 'message';
 };
 
 const handleBatchSelected = (batch: any) => {
@@ -310,7 +342,16 @@ const handleSelectionChanged = (selection: { agent?: AgentStatus; message?: Suba
   console.log('Selection changed:', selection);
   if (selection.agent) {
     selectedAgent.value = selection.agent;
+    // Close message pane if open and show agent pane
+    closeAllPanes();
     showAgentDetails.value = true;
+    activePane.value = 'agent';
+  } else if (selection.message) {
+    selectedMessage.value = selection.message;
+    // Close agent pane if open and show message pane
+    closeAllPanes();
+    showMessageDetails.value = true;
+    activePane.value = 'message';
   }
 };
 
@@ -318,16 +359,42 @@ const handleSelectionChanged = (selection: { agent?: AgentStatus; message?: Suba
 const handleAgentDetailClose = () => {
   showAgentDetails.value = false;
   selectedAgent.value = null;
+  activePane.value = 'none';
 };
 
 const handleAgentDetailSelected = (agent: AgentStatus) => {
   selectedAgent.value = agent;
-  // Keep the pane open with the new agent
+  // Keep the pane open with the new agent - no need to close/reopen
 };
 
 const handleMessageSelectedFromAgent = (message: SubagentMessage) => {
   console.log('Message selected from agent detail:', message);
-  // Future: Could show message details or scroll to message in timeline
+  selectedMessage.value = message;
+  // Switch from agent pane to message pane
+  closeAllPanes();
+  showMessageDetails.value = true;
+  activePane.value = 'message';
+};
+
+// Message detail pane event handlers
+const handleMessageDetailClose = () => {
+  showMessageDetails.value = false;
+  selectedMessage.value = null;
+  activePane.value = 'none';
+};
+
+const handleAgentSelectedFromMessage = (agent: AgentStatus) => {
+  console.log('Agent selected from message detail:', agent);
+  selectedAgent.value = agent;
+  // Switch from message pane to agent pane
+  closeAllPanes();
+  showAgentDetails.value = true;
+  activePane.value = 'agent';
+};
+
+const handleHighlightMessageOnTimeline = (messageId: string) => {
+  console.log('Highlight message on timeline:', messageId);
+  // Future: Scroll to and highlight message on timeline
 };
 
 const handleHighlightAgentOnTimeline = (agentId: number) => {

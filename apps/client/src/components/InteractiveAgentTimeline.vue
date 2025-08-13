@@ -25,10 +25,13 @@
         :width="containerWidth"
         :height="containerHeight"
         class="absolute top-0 left-0 w-full h-full"
+        :class="{ 'cursor-grabbing': isPanning, 'cursor-grab': !isPanning }"
+        @mousedown="handleMouseDown"
         @mousemove="handleMouseMove"
+        @mouseup="handleMouseUp"
         @click="handleClickAndHideTooltip"
         @wheel="handleWheel"
-        @mouseleave="hideTooltip"
+        @mouseleave="handleMouseLeave"
       >
         <!-- Grid Background -->
         <defs>
@@ -66,7 +69,7 @@
             </feMerge>
           </filter>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
+        <rect width="100%" height="100%" fill="url(#grid)" style="pointer-events: none;" />
 
         <!-- Time Axis -->
         <g class="time-axis">
@@ -232,7 +235,7 @@
 
         <!-- Agent Completion Points -->
         <g class="completion-points" style="z-index: 25;">
-          <g v-for="(agent, index) in completedAgents" :key="`complete-${agent.agentId}`">
+          <g v-for="agent in completedAgents" :key="`complete-${agent.agentId}`">
             <!-- Completion indicator at the merge point -->
             <circle 
               :cx="getAgentEndX(agent)" 
@@ -338,27 +341,6 @@
         </g>
       </svg>
 
-      <!-- Message Detail Pane -->
-      <MessageDetailPane 
-        :visible="detailPaneVisible"
-        :selected-message="selectedMessage"
-        :agents="props.agents"
-        :session-id="props.sessionId"
-        @close="closeDetailPane"
-        @agent-selected="handleAgentSelected"
-        @highlight-timeline="highlightMessage"
-      />
-
-      <!-- Agent Detail Pane -->
-      <AgentDetailPane 
-        :visible="agentDetailPaneVisible"
-        :selected-agent="selectedAgent"
-        :messages="props.messages"
-        :session-id="props.sessionId"
-        @close="closeAgentDetailPane"
-        @message-selected="handleMessageSelectedFromAgent"
-        @highlight-timeline="highlightAgent"
-      />
 
       <!-- Timeline Tooltip -->
       <TimelineTooltip 
@@ -454,8 +436,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import type { AgentStatus, SubagentMessage } from '../types';
-import MessageDetailPane from './MessageDetailPane.vue';
-import AgentDetailPane from './AgentDetailPane.vue';
 import TimelineTooltip from './TimelineTooltip.vue';
 
 // Component Props
@@ -513,14 +493,19 @@ const containerHeight = computed(() => {
 const zoomLevel = ref(1);
 const panX = ref(0);
 const panY = ref(0);
+
+// Pan interaction state
+const isPanning = ref(false);
+const dragStartPos = ref({ x: 0, y: 0 });
+const initialPanPos = ref({ x: 0, y: 0 });
+const dragDistance = ref(0);
+const PAN_THRESHOLD = 5; // Minimum pixels to consider it a drag vs click
 const autoScroll = ref(props.followLatest);
 
 // Interaction State
 const selectedMessage = ref<SubagentMessage | null>(null);
 const selectedAgent = ref<AgentStatus | null>(null);
 const highlightedMessageId = ref<string>('');
-const detailPaneVisible = ref(false);
-const agentDetailPaneVisible = ref(false);
 const tooltip = ref<{
   visible: boolean;
   type: 'agent' | 'message' | 'batch' | 'prompt' | 'generic';
@@ -826,7 +811,7 @@ const getAgentEndX = (agent: any): number => {
   return getTimeX(endTime);
 };
 
-const getAgentLabelX = (agent: any, index: number): number => {
+const getAgentLabelX = (agent: any, _index: number): number => {
   const startX = getAgentStartX(agent);
   const endX = getAgentEndX(agent);
   
@@ -936,19 +921,33 @@ const getMessageRadius = (message: any): number => {
   return 3;
 };
 
-// Get message color based on read status
+// Get message color based on read status (excluding sender from read count)
 const getMessageColor = (message: SubagentMessage): string => {
   const notified = message.notified || [];
-  const totalAgents = visibleAgents.value.length;
+  const messageSender = message.sender;
   
-  if (notified.length === 0) {
-    // Unread by all agents - orange
+  // Find all related agents (excluding the sender)
+  const relatedAgentNames = visibleAgents.value
+    .map(agent => agent.name)
+    .filter(name => name !== messageSender);
+  
+  // Count how many related agents have read the message
+  const relatedAgentsReadCount = notified.filter(name => name !== messageSender).length;
+  const totalRelatedAgents = relatedAgentNames.length;
+  
+  // If no related agents exist (only sender), default to blue (complete)
+  if (totalRelatedAgents === 0) {
+    return '#3b82f6';
+  }
+  
+  if (relatedAgentsReadCount === 0) {
+    // Unread by all related agents - orange
     return '#ff9500';
-  } else if (notified.length < totalAgents) {
-    // Read by some agents - yellow
+  } else if (relatedAgentsReadCount < totalRelatedAgents) {
+    // Read by some related agents - yellow
     return '#ffd93d';
   } else {
-    // Read by all agents - blue
+    // Read by all related agents - blue
     return '#3b82f6';
   }
 };
@@ -988,9 +987,64 @@ const formatTimestamp = (timestamp: number): string => {
 };
 
 // Event Handlers
-const handleMouseMove = (_event: MouseEvent) => {
-  // Handle panning if dragging
-  // TODO: Implement drag panning
+const handleMouseDown = (event: MouseEvent) => {
+  // Check if clicking on background (SVG itself) vs interactive elements
+  if (event.target === timelineSvg.value) {
+    isPanning.value = true;
+    dragStartPos.value = { x: event.clientX, y: event.clientY };
+    initialPanPos.value = { x: panX.value, y: panY.value };
+    dragDistance.value = 0;
+    
+    // Prevent default to avoid text selection
+    event.preventDefault();
+    
+    // Add global event listeners for mouse move and up during drag
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+  }
+};
+
+const handleMouseMove = (event: MouseEvent) => {
+  // This handles mousemove within the SVG area
+  if (isPanning.value) {
+    updatePanPosition(event);
+  }
+};
+
+// Global mouse move handler for smooth dragging outside SVG bounds
+const handleGlobalMouseMove = (event: MouseEvent) => {
+  if (isPanning.value) {
+    updatePanPosition(event);
+  }
+};
+
+const updatePanPosition = (event: MouseEvent) => {
+  if (!isPanning.value) return;
+  
+  const deltaX = event.clientX - dragStartPos.value.x;
+  const deltaY = event.clientY - dragStartPos.value.y;
+  
+  // Calculate total drag distance for threshold check
+  dragDistance.value = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  
+  // Update pan position
+  panX.value = initialPanPos.value.x + deltaX;
+  panY.value = initialPanPos.value.y + deltaY;
+};
+
+const handleMouseUp = (event: MouseEvent) => {
+  handleGlobalMouseUp(event);
+};
+
+// Global mouse up handler
+const handleGlobalMouseUp = (_event: MouseEvent) => {
+  if (isPanning.value) {
+    isPanning.value = false;
+    
+    // Clean up global event listeners
+    document.removeEventListener('mousemove', handleGlobalMouseMove);
+    document.removeEventListener('mouseup', handleGlobalMouseUp);
+  }
 };
 
 const handleClick = (event: MouseEvent) => {
@@ -1001,8 +1055,10 @@ const handleClick = (event: MouseEvent) => {
 };
 
 const handleClickAndHideTooltip = (event: MouseEvent) => {
-  // Combine both click functionalities
-  handleClick(event);
+  // Only handle click if it wasn't a drag operation
+  if (dragDistance.value < PAN_THRESHOLD) {
+    handleClick(event);
+  }
   hideTooltipImmediate();
 };
 
@@ -1020,7 +1076,6 @@ const handleWheel = (event: WheelEvent) => {
 const selectMessage = (message: any) => {
   selectedMessage.value = message;
   selectedAgent.value = null;
-  detailPaneVisible.value = true;
   emit('message-clicked', message);
   emit('selection-changed', { message });
 };
@@ -1028,8 +1083,6 @@ const selectMessage = (message: any) => {
 const selectAgentPath = (agent: any) => {
   selectedAgent.value = agent;
   selectedMessage.value = null;
-  detailPaneVisible.value = false;
-  agentDetailPaneVisible.value = true;
   emit('agent-path-clicked', agent);
   emit('selection-changed', { agent });
 };
@@ -1043,17 +1096,12 @@ const selectPrompt = (prompt: any) => {
 };
 
 const handleAgentSelected = (agent: AgentStatus) => {
+  selectedAgent.value = agent;
+  selectedMessage.value = null;
   emit('agent-selected', agent);
+  emit('selection-changed', { agent });
 };
 
-const handleMessageSelectedFromAgent = (message: SubagentMessage) => {
-  selectedMessage.value = message;
-  selectedAgent.value = null;
-  agentDetailPaneVisible.value = false;
-  detailPaneVisible.value = true;
-  emit('message-clicked', message);
-  emit('selection-changed', { message });
-};
 
 const highlightAgent = (agentId: number) => {
   // Find and highlight the agent on timeline
@@ -1065,21 +1113,10 @@ const highlightAgent = (agentId: number) => {
   }
 };
 
-const closeDetailPane = () => {
-  detailPaneVisible.value = false;
-  selectedMessage.value = null;
-};
-
-const closeAgentDetailPane = () => {
-  agentDetailPaneVisible.value = false;
-  selectedAgent.value = null;
-};
 
 const clearSelections = () => {
   selectedMessage.value = null;
   selectedAgent.value = null;
-  detailPaneVisible.value = false;
-  agentDetailPaneVisible.value = false;
   emit('selection-changed', {});
 };
 
@@ -1252,6 +1289,18 @@ const resetZoom = () => {
   });
 };
 
+// Mouse leave handler that combines tooltip hiding and pan cleanup
+const handleMouseLeave = () => {
+  hideTooltip();
+  
+  // Clean up any ongoing pan operation when mouse leaves the timeline
+  if (isPanning.value) {
+    isPanning.value = false;
+    document.removeEventListener('mousemove', handleGlobalMouseMove);
+    document.removeEventListener('mouseup', handleGlobalMouseUp);
+  }
+};
+
 // Lifecycle
 const updateDimensions = () => {
   if (timelineContainer.value) {
@@ -1279,6 +1328,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateDimensions);
   document.removeEventListener('keydown', handleKeydown);
+  
+  // Clean up pan event listeners
+  document.removeEventListener('mousemove', handleGlobalMouseMove);
+  document.removeEventListener('mouseup', handleGlobalMouseUp);
   
   // Memory leak prevention
   if (rafId !== null) {
@@ -1319,6 +1372,15 @@ watch(() => props.height, (newHeight) => {
 .timeline-footer,
 .selection-info {
   flex-shrink: 0;
+}
+
+/* Pan cursor styles */
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grabbing {
+  cursor: grabbing;
 }
 
 /* Hover effects */
