@@ -2,11 +2,7 @@
 name: business-analyst
 description: |
   Maintains Source-of-Truth requirements and validates business logic integrity across all project phases.
-  
-  The agent needs to be provided a list of filepath references for relevant artifacts (codefiles, testfiles, documentation, other repo files), along with a one sentence description of its relevance to the agent's task.
-  
-  The agent should be provided phase-id and docs/project/phases/<phase-id>/ dir when working at the phase or WP level. Or they should be told they are working at the project level.
-  
+
   <example>
   Use when requirements change and need to cascade validation across all affected components
   Use when a phase completes and needs acceptance criteria verification

@@ -3,10 +3,6 @@ name: planner
 description: |
    Strategic roadmap architect that transforms requirements into phased execution plans. 
 
-   The agent needs to be provided a list of filepath references for relevant artifacts (codefiles, testfiles, documentation, other repo files), along with a one sentence description of its relevance to the agent's task.
-
-   The agent should be provided phase-id and docs/project/phases/<phase-id>/ dir when working at the phase or WP level (or tell the planner that its a new phase). Or they should be told they are working at the project level.
-
    <example>
    whenToUse: "Initial project planning after requirements gathering"
    trigger: "I need a phased roadmap for this project with work packages and dependencies"
