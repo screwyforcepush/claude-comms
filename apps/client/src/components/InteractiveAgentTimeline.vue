@@ -243,25 +243,23 @@
         <!-- Agent Completion Points -->
         <g class="completion-points" style="z-index: 25;">
           <g v-for="(agent, index) in completedAgents" :key="`complete-${agent.agentId}`">
+            <!-- Completion indicator at the merge point -->
             <circle 
               :cx="getAgentEndX(agent)" 
               :cy="orchestratorY"
-              r="6" 
+              r="5" 
               fill="#22c55e"
               stroke="#ffffff"
               stroke-width="2"
               class="drop-shadow-[0_0_12px_#22c55e] cursor-pointer transition-all duration-300"
-              opacity="0.8"
+              opacity="0.9"
               @click="selectAgentPath(agent)"
             />
-            <!-- Completion merge indicator -->
+            <!-- Small indicator showing successful merge -->
             <path
-              :d="getCompletionMergePath(agent, index, getAgentLaneY(index, agent))"
-              stroke="#22c55e"
-              stroke-width="2"
-              fill="none"
-              opacity="0.5"
-              stroke-dasharray="3,3"
+              :d="`M ${getAgentEndX(agent) - 3} ${orchestratorY} L ${getAgentEndX(agent)} ${orchestratorY + 4} L ${getAgentEndX(agent) + 3} ${orchestratorY - 1} Z`"
+              fill="#ffffff"
+              opacity="0.8"
             />
           </g>
         </g>
@@ -675,14 +673,22 @@ const batches = computed(() => {
         id: `batch-${key}`,
         spawnTimestamp: key,
         agents: [],
-        batchNumber: batchMap.size + 1
+        batchNumber: 0 // Will be assigned after sorting
       });
     }
     
     batchMap.get(key).agents.push(agent);
   });
   
-  return Array.from(batchMap.values());
+  // Convert to array and sort by spawn timestamp
+  const batchArray = Array.from(batchMap.values()).sort((a, b) => a.spawnTimestamp - b.spawnTimestamp);
+  
+  // Assign batch numbers in chronological order
+  batchArray.forEach((batch, index) => {
+    batch.batchNumber = index + 1;
+  });
+  
+  return batchArray;
 });
 
 const userPrompts = computed(() => {
@@ -829,15 +835,34 @@ const getAgentCurvePath = (agent: any, index: number, agentY?: number): string =
   const endX = getAgentEndX(agent);
   const laneY = agentY || getAgentLaneY(index, agent);
   
-  // Create curved path that branches from orchestrator
-  const midX = startX + (endX - startX) * 0.5;
-  const controlY = laneY - 20; // Peak of the curve
+  // Calculate branch out and merge back control points
+  const branchOutDistance = 30; // How far to branch out from orchestrator
+  const mergeBackDistance = 30; // How far before merging back
   
-  // Start from orchestrator, curve to agent lane, then back to orchestrator
-  return `M ${startX} ${orchestratorY} 
-          Q ${startX + 20} ${controlY} ${midX} ${laneY} 
-          T ${endX - 20} ${controlY} 
-          L ${endX} ${orchestratorY}`;
+  // Create a git-tree-like path:
+  // 1. Start from orchestrator at spawn time
+  // 2. Branch out with a curve to the agent lane
+  // 3. Run horizontally along the agent lane
+  // 4. Merge back to orchestrator at completion time
+  
+  if (agent.status === 'completed' && agent.endTime) {
+    // Completed agents: full lifecycle with merge back
+    return `M ${startX} ${orchestratorY} 
+            C ${startX + branchOutDistance} ${orchestratorY} 
+              ${startX + branchOutDistance} ${laneY} 
+              ${startX + branchOutDistance * 2} ${laneY}
+            L ${endX - mergeBackDistance * 2} ${laneY}
+            C ${endX - mergeBackDistance} ${laneY}
+              ${endX - mergeBackDistance} ${orchestratorY}
+              ${endX} ${orchestratorY}`;
+  } else {
+    // In-progress or pending agents: branch out but don't merge back yet
+    return `M ${startX} ${orchestratorY} 
+            C ${startX + branchOutDistance} ${orchestratorY} 
+              ${startX + branchOutDistance} ${laneY} 
+              ${startX + branchOutDistance * 2} ${laneY}
+            L ${endX} ${laneY}`;
+  }
 };
 
 // Direction arrow for completed agents
@@ -852,16 +877,6 @@ const getDirectionArrow = (agent: any, index: number, agentY?: number): string =
           Z`;
 };
 
-// Completion merge path indicator
-const getCompletionMergePath = (agent: any, index: number, agentY?: number): string => {
-  const endX = getAgentEndX(agent);
-  const laneY = agentY || getAgentLaneY(index, agent);
-  
-  // Simple curve from agent lane to orchestrator
-  return `M ${endX - 20} ${laneY} 
-          Q ${endX - 10} ${(laneY + orchestratorY) / 2} 
-          ${endX} ${orchestratorY}`;
-};
 
 const getStrokeWidth = (status: string, isSelected: boolean = false): number => {
   let width = 2;

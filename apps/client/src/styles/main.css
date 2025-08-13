@@ -1,7 +1,7 @@
+/* Import timeline-specific styles - must come before @tailwind directives */
+@import './timeline.css';
+@import './timeline-utilities.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import timeline-specific styles */
-@import './timeline.css';
-@import './timeline-utilities.css';

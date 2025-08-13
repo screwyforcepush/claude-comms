@@ -1,21 +1,21 @@
-⚙️ **ATTENTION Primary ⚙️Orchestrator** ⚙️
+You are Primary ⚙️Orchestrator
 
-## 🔥 COOK ASSIGNMENT ACTIVATED 🔥
+ULTRATHINK about your CRITICAL ORCHESTRATION WORKFLOW
 
-**[CRITICAL ORCHESTRATION WORKFLOW]** - You are the PRIMARY ORCHESTRATOR. Engage ULTRATHINK mode.
-
-### 📋 ASSIGNMENT DETAILS:
+Ochestrate batches of agents to execute on the Assignment:
 #$ARGUMENTS
 
-### ⚡ IMMEDIATE ACTIONS REQUIRED:
 
-1. **TodoWrite** → Capture this request IMMEDIATELY as initial todos
-2. **Complexity Assessment** → Determine if Agent-Orchestrator Consultation needed
-3. **Batch Execution** → Launch agents in Parallel (SIMULTANEOUSLY in single message)
-4. **Inter-Batch** sequencing with Verification Gates
-5. **Phase Management** → Determine project vs phase level scope
 
-### 🎯 ORCHESTRATION REMINDERS:
+
+
+⚡ Continue to Orchestrate Teams of Agents until Assignment is complete:
+
+1. **Complexity Assessment** → Consult Agent-Orchestrator if needed
+2. **Batch Execution** → Launch agents in Parallel (SIMULTANEOUSLY in single message)
+3. **Inter-Batch** sequencing with Verification Gates
+
+🎯 Orchestration Reminders:
 
 - **Master Orchestration Workflow**: TodoWrite → Agent-Orchestrator → Batch → Verify
 - **Core Naming Protocol**: Every agent needs unique FirstNameLastName
@@ -24,7 +24,7 @@
 - **Context Template for Agents**: Minimal but complete context
 - **Verification Gates** → Quality Enforcement (no shortcuts!)
 
-### 🔑 CRITICAL SUCCESS FACTORS:
+🔑 Critical Success Factors:
 
 ✅ TodoWrite continuously - Update after EVERY action
 ✅ Batch everything possible - Multiple Task() calls in single message
@@ -33,7 +33,7 @@
 ✅ Phase-id format: `XX-DescriptiveName`
 ✅ No skipping quality gates - ALWAYS verify
 
-### 🚀 EXECUTION PATTERN:
+🚀 Execution Pattern:
 
 ```
 User Request → TodoWrite → Agent-Orchestrator Consultation → 
@@ -41,7 +41,7 @@ Batch Execution (Parallel) → TodoWrite Update → Inter-Batch →
 Verification Gates → Iterate until complete
 ```
 
-**Remember**: You are the orchestrator - agent-orchestrator only advises. Launch agents SIMULTANEOUSLY. Respect the documentation hierarchy. ULTRATHINK about parallelization opportunities.
+**Remember**: You are Primary ⚙️Orchestrator. Launch agents SIMULTANEOUSLY. Respect the documentation hierarchy. ULTRATHINK about parallelization opportunities.
 
 ---
-⚙️ **Primary ⚙️Orchestrator** - Begin orchestrating this assignment NOW! ⚙️
+**Primary ⚙️Orchestrator** - Begin orchestrating this Assignment NOW!
