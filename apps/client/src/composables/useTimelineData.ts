@@ -1,18 +1,21 @@
 import { ref, computed, reactive, watch } from 'vue';
 import type { 
   TimelineData,
-  TimelineAgent,
-  TimelineBatch,
+  AgentPath,
+  AgentBatch,
   TimelineMessage,
-  TimelineUserPrompt,
-  TimelineTransformOptions,
-  TimelineConfig
+  UserPrompt,
+  TimelineConfig,
+  CurvePoint,
+  Point2D
 } from '../types/timeline';
 import type { AgentStatus, SubagentMessage, HookEvent } from '../types';
 import {
   createTimelineScale,
   detectAgentBatches,
   calculateAgentPath,
+  generateAgentPathString,
+  calculateOptimalControlPoints,
   calculateMessagePosition,
   calculateViewportHeight,
   detectMessageType,
@@ -51,7 +54,7 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
   /**
    * Transform raw agent data into timeline agents with positioning
    */
-  const timelineAgents = computed<TimelineAgent[]>(() => {
+  const timelineAgents = computed<AgentPath[]>(() => {
     if (agents.value.length === 0) return [];
     
     // Filter agents by session if specified
@@ -75,44 +78,31 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
     
     batches.forEach((batch, batchIndex) => {
       batch.agents.forEach((agent, agentIndex) => {
-        // Map server agent data to timeline agent
-        const timelineAgent: TimelineAgent = {
-          id: agent.id,
+        // Map server agent data to timeline agent path
+        const timelineAgent: AgentPath = {
+          agentId: agent.id.toString(),
           name: agent.name,
-          subagent_type: agent.subagent_type,
-          session_id: agent.session_id || '',
-          
-          // Status and timing
+          type: agent.subagent_type as any, // Cast to AgentType
+          startTime: agent.created_at,
+          endTime: agent.completion_timestamp || agent.completed_at || null,
           status: agent.status || 'pending',
-          created_at: agent.created_at,
-          completed_at: agent.completion_timestamp,
+          curveData: [], // Will be populated below
+          laneIndex: agentIndex,
+          batchId: batch.batch_id,
+          messages: [], // Will be populated later
+          sessionId: agent.session_id || '',
           
           // Performance metrics  
-          total_duration_ms: agent.duration,
-          total_tokens: agent.token_count,
-          total_tool_use_count: agent.tool_count,
-          
-          // Initialize position (will be calculated)
-          position: {
-            x: scale.timeToX(agent.created_at),
-            y: 0,
-            endX: agent.completion_timestamp ? scale.timeToX(agent.completion_timestamp) : undefined
-          },
-          
-          // Initialize path (will be calculated)
-          path: {
-            startPoint: { x: 0, y: 0 },
-            controlPoint1: { x: 0, y: 0 },
-            controlPoint2: { x: 0, y: 0 },
-            endPoint: { x: 0, y: 0 }
-          },
-          
-          // Batch information
-          batchId: batch.batch_id,
-          batchIndex: agentIndex
+          metrics: {
+            duration: agent.duration || 0,
+            tokenCount: agent.token_count || 0,
+            toolUseCount: agent.tool_count || 0,
+            messageCount: 0,
+            completionRate: agent.status === 'completed' ? 1 : 0
+          }
         };
         
-        // Calculate agent path with proper positioning
+        // Calculate sophisticated agent path with orchestrator connection
         const path = calculateAgentPath(
           timelineAgent,
           batchIndex,
@@ -121,8 +111,43 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
           config
         );
         
-        timelineAgent.path = path;
-        timelineAgent.position.y = path.startPoint.y;
+        // Calculate agent lane Y for the curved path
+        const orchestratorY = 200;
+        const batchSeparation = config.batch_separation;
+        const laneHeight = config.agent_lane_height;
+        const batchCenterY = orchestratorY + (batchIndex + 1) * batchSeparation;
+        const verticalSpread = (agentIndex - (batch.agents.length - 1) / 2) * (laneHeight * 0.8);
+        const agentLaneY = batchCenterY + verticalSpread;
+        
+        // Convert path to CurvePoint[] format for AgentPath interface
+        const curveData: CurvePoint[] = [
+          {
+            x: path.startPoint.x,
+            y: path.startPoint.y,
+            type: 'move'
+          },
+          {
+            x: path.startPoint.x + (path.endPoint.x - path.startPoint.x) * 0.3,
+            y: agentLaneY,
+            controlX: path.controlPoint1.x,
+            controlY: path.controlPoint1.y,
+            type: 'cubic'
+          },
+          {
+            x: path.startPoint.x + (path.endPoint.x - path.startPoint.x) * 0.7,
+            y: agentLaneY,
+            type: 'line'
+          },
+          {
+            x: path.endPoint.x,
+            y: path.endPoint.y,
+            controlX: path.controlPoint2.x,
+            controlY: path.controlPoint2.y,
+            type: 'cubic'
+          }
+        ];
+        
+        timelineAgent.curveData = curveData;
         
         transformedAgents.push(timelineAgent);
       });
@@ -134,11 +159,11 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
   /**
    * Transform batches with positioning data
    */
-  const timelineBatches = computed<TimelineBatch[]>(() => {
+  const timelineBatches = computed<AgentBatch[]>(() => {
     if (timelineAgents.value.length === 0) return [];
     
     // Group agents by batch
-    const batchMap = new Map<string, TimelineAgent[]>();
+    const batchMap = new Map<string, AgentPath[]>();
     timelineAgents.value.forEach(agent => {
       if (!batchMap.has(agent.batchId)) {
         batchMap.set(agent.batchId, []);
@@ -146,45 +171,55 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
       batchMap.get(agent.batchId)!.push(agent);
     });
     
-    // Create timeline batches
-    const batches: TimelineBatch[] = [];
+    // Create timeline batches with chronological numbering
+    const batchArray: Array<{agents: AgentPath[], batchId: string, minTime: number, maxTime: number}> = [];
+    
+    // First collect all batch data with spawn times
     batchMap.forEach((batchAgents, batchId) => {
-      const minTime = Math.min(...batchAgents.map(a => a.created_at));
-      const maxTime = Math.max(...batchAgents.map(a => a.completed_at || a.created_at));
-      
-      // Calculate batch positioning
-      const minY = Math.min(...batchAgents.map(a => a.position.y));
-      const maxY = Math.max(...batchAgents.map(a => a.position.y));
-      const minX = Math.min(...batchAgents.map(a => a.position.x));
-      const maxX = Math.max(...batchAgents.map(a => a.position.endX || a.position.x));
-      
-      const batch: TimelineBatch = {
-        id: batchId,
-        session_id: batchAgents[0].session_id,
-        spawn_time: minTime,
-        spawn_window: maxTime - minTime,
-        agents: batchAgents,
-        
-        position: {
-          x: minX - 20,
-          y: minY - 10,
-          width: Math.max(maxX - minX + 40, 100),
-          height: maxY - minY + 20
-        },
-        
-        total_agents: batchAgents.length,
-        completed_agents: batchAgents.filter(a => a.status === 'completed').length,
-        is_complete: batchAgents.every(a => a.status === 'completed'),
-        avg_completion_time: batchAgents
-          .filter(a => a.completed_at && a.created_at)
-          .reduce((sum, a) => sum + (a.completed_at! - a.created_at), 0) / 
-          batchAgents.filter(a => a.completed_at).length || undefined
-      };
-      
-      batches.push(batch);
+      const minTime = Math.min(...batchAgents.map(a => a.startTime));
+      const maxTime = Math.max(...batchAgents.map(a => a.endTime || a.startTime));
+      batchArray.push({ agents: batchAgents, batchId, minTime, maxTime });
     });
     
-    return batches.sort((a, b) => a.spawn_time - b.spawn_time);
+    // Sort batches chronologically by spawn time and create final batch objects
+    const sortedBatches = batchArray
+      .sort((a, b) => a.minTime - b.minTime)
+      .map((batchData, index) => {
+        const { agents: batchAgents, batchId, minTime, maxTime } = batchData;
+        
+        // Calculate batch positioning from curve data
+        const allXValues = batchAgents.flatMap(a => a.curveData.map(p => p.x));
+        const allYValues = batchAgents.flatMap(a => a.curveData.map(p => p.y));
+        const minX = Math.min(...allXValues);
+        const maxX = Math.max(...allXValues);
+        const minY = Math.min(...allYValues);
+        const maxY = Math.max(...allYValues);
+        
+        const batchAgentSpawns = batchAgents.map(agent => ({
+          agentId: agent.agentId,
+          name: agent.name,
+          type: agent.type,
+          color: getAgentTypeColor(agent.type),
+          description: `${agent.name} - ${agent.type}`,
+          task: undefined // Could be populated from agent metadata
+        }));
+        
+        const batch: AgentBatch = {
+          id: batchId,
+          spawnTimestamp: minTime,
+          completionTimestamp: batchAgents.every(a => a.endTime) ? maxTime : undefined,
+          agents: batchAgentSpawns,
+          batchNumber: index + 1, // Chronological numbering
+          orchestratorEventId: `orchestrator_${batchId}`,
+          parallelCount: batchAgents.length,
+          status: batchAgents.every(a => a.status === 'completed') ? 'completed' : 
+                 batchAgents.some(a => a.status === 'in_progress') ? 'running' : 'spawning'
+        };
+        
+        return batch;
+      });
+    
+    return sortedBatches;
   });
 
   /**
@@ -244,7 +279,7 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
   /**
    * Transform user prompts and system events
    */
-  const timelineUserPrompts = computed<TimelineUserPrompt[]>(() => {
+  const timelineUserPrompts = computed<UserPrompt[]>(() => {
     if (!transformOptions.show_user_prompts || events.value.length === 0) return [];
     
     // Create time scale
@@ -263,21 +298,14 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
     );
     
     return relevantEvents.map(event => ({
-      id: event.id || 0,
-      session_id: event.session_id,
+      id: (event.id || 0).toString(),
       timestamp: event.timestamp || 0,
       content: event.summary || JSON.stringify(event.payload),
-      hook_event_type: event.hook_event_type,
-      
-      position: {
-        x: scale.timeToX(event.timestamp || 0),
-        y: 20 // Fixed position at top
-      },
-      
-      type: event.hook_event_type === 'user_input' ? 'user_input' : 
-            event.hook_event_type === 'session_start' ? 'session_start' : 'system_event',
-      priority: event.hook_event_type === 'user_input' ? 'high' : 'medium'
-    })) as TimelineUserPrompt[];
+      sessionId: event.session_id,
+      eventId: event.id || 0,
+      responseTime: undefined, // Could be calculated from subsequent agent spawns
+      agentCount: undefined // Could be calculated from batch information
+    })) as UserPrompt[];
   });
 
   /**
@@ -391,14 +419,20 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
   /**
    * Utility functions for external use
    */
-  function findAgentAt(x: number, y: number): TimelineAgent | null {
+  function findAgentAt(x: number, y: number): AgentPath | null {
     return timelineAgents.value.find(agent => {
-      const path = agent.path;
-      // Simple bounding box check - could be enhanced with proper curve intersection
-      return x >= Math.min(path.startPoint.x, path.endPoint.x) &&
-             x <= Math.max(path.startPoint.x, path.endPoint.x) &&
-             y >= Math.min(path.startPoint.y, path.endPoint.y) - 10 &&
-             y <= Math.max(path.startPoint.y, path.endPoint.y) + 10;
+      const curveData = agent.curveData;
+      if (curveData.length === 0) return false;
+      
+      // Simple bounding box check using curve data
+      const xValues = curveData.map(p => p.x);
+      const yValues = curveData.map(p => p.y);
+      const minX = Math.min(...xValues);
+      const maxX = Math.max(...xValues);
+      const minY = Math.min(...yValues);
+      const maxY = Math.max(...yValues);
+      
+      return x >= minX && x <= maxX && y >= minY - 10 && y <= maxY + 10;
     }) || null;
   }
   
@@ -411,8 +445,31 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
     }) || null;
   }
   
-  function getAgentsByBatch(batchId: string): TimelineAgent[] {
+  function getAgentsByBatch(batchId: string): AgentPath[] {
     return timelineAgents.value.filter(agent => agent.batchId === batchId);
+  }
+  
+  /**
+   * Helper function to get agent type colors
+   */
+  function getAgentTypeColor(type: string): string {
+    const colorMap: Record<string, string> = {
+      'engineer': '#3b82f6',
+      'tester': '#10b981', 
+      'architect': '#8b5cf6',
+      'reviewer': '#f59e0b',
+      'planner': '#ef4444',
+      'analyst': '#06b6d4',
+      'researcher': '#84cc16',
+      'designer': '#ec4899',
+      'cloud-cicd': '#6366f1',
+      'general-purpose': '#6b7280',
+      'deep-researcher': '#059669',
+      'business-analyst': '#dc2626',
+      'green-verifier': '#16a34a',
+      'code-reviewer': '#ca8a04'
+    };
+    return colorMap[type] || '#6b7280';
   }
 
   return {

@@ -1,1018 +1,645 @@
-# Agent Timeline Visualization - Implementation Guide
+# Timeline Implementation Guide
 
-## Overview
-This guide provides step-by-step instructions for implementing the Agent Timeline Visualization component, designed to display multi-agent spawning, messaging, and batch execution patterns with real-time updates.
+## Quick Start Implementation
 
-## Prerequisites
-- Vue 3 with Composition API
-- TypeScript support
-- Tailwind CSS (already configured)
-- Existing WebSocket connection via `useWebSocket` composable
-- SVG knowledge for timeline rendering
+This guide provides engineers with immediate implementation steps for the polished timeline visualization.
 
-## File Structure
-```
-src/
-├── components/
-│   ├── AgentTimeline.vue              # Main timeline component
-│   ├── TimelineControls.vue           # Scale/zoom controls
-│   ├── TimelineTooltip.vue            # Hover tooltips
-│   └── MessageDetailPane.vue          # Side panel for messages
-├── composables/
-│   ├── useAgentColors.ts              # Agent color system
-│   ├── useTimelineData.ts             # Data processing
-│   ├── useTimelineInteraction.ts      # Click/hover logic
-│   └── useTimelineAnimation.ts        # Animation controls
-└── styles/
-    └── timeline.css                   # Component styles (provided)
-```
+## 1. Bezier Curve Implementation
 
-## 1. Data Structures & Types
-
-### Extend Existing Types
+### Core Curve Generator
 ```typescript
-// Add to existing types.ts
-export interface AgentTimelineEvent {
-  id: string;
-  type: 'agent_spawn' | 'agent_message' | 'agent_complete' | 'batch_start' | 'batch_end' | 'user_prompt';
-  agent_id: string;
-  agent_type: 'orchestrator' | 'coder' | 'architect' | 'reviewer' | 'tester' | 'verifier' | 'planner' | 'analyst' | 'researcher' | 'designer' | 'deployer';
-  timestamp: number;
-  session_id: string;
-  batch_id?: string;
-  message_content?: string;
-  target_agent?: string;
-  status?: 'pending' | 'in_progress' | 'completed' | 'error';
-  x?: number; // Timeline x position (calculated)
-  y?: number; // Timeline y position (calculated)
+// utils/bezierCurves.ts
+interface Point2D {
+  x: number;
+  y: number;
 }
 
-export interface BatchGroup {
-  id: string;
-  batch_id: string;
-  start_time: number;
-  end_time?: number;
-  agents: string[];
-  status: 'active' | 'completed' | 'error';
+interface BezierCurve {
+  start: Point2D;
+  control1: Point2D;
+  control2: Point2D;
+  end: Point2D;
+  arcLength: number;
+  pathData: string;
 }
 
-export interface TimelineViewport {
+export class TimelineCurveGenerator {
+  private readonly TENSION = 0.4;
+  private readonly ARC_SAMPLES = 100;
+  
+  generateAgentCurve(
+    spawnX: number,
+    laneY: number,
+    endX: number,
+    orchestratorY: number,
+    agentType: string
+  ): BezierCurve {
+    const start = { x: spawnX, y: orchestratorY };
+    const end = { x: endX, y: orchestratorY };
+    
+    // Calculate peak offset based on agent type and visual appeal
+    const peakOffset = this.calculatePeakOffset(agentType, laneY - orchestratorY);
+    const peak = {
+      x: spawnX + (endX - spawnX) * 0.5,
+      y: laneY + peakOffset
+    };
+    
+    // Generate control points for smooth curve
+    const control1 = {
+      x: spawnX + (peak.x - spawnX) * this.TENSION,
+      y: start.y + (peak.y - start.y) * 0.3
+    };
+    
+    const control2 = {
+      x: peak.x + (end.x - peak.x) * (1 - this.TENSION),
+      y: peak.y + (end.y - peak.y) * 0.7
+    };
+    
+    const arcLength = this.calculateArcLength([start, control1, control2, end]);
+    const pathData = `M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`;
+    
+    return {
+      start,
+      control1,
+      control2,
+      end,
+      arcLength,
+      pathData
+    };
+  }
+  
+  private calculatePeakOffset(agentType: string, baseLaneOffset: number): number {
+    // Add subtle variation based on agent type for visual interest
+    const typeVariations = {
+      architect: 0.8,
+      engineer: 1.0,
+      tester: 1.1,
+      reviewer: 0.9,
+      verifier: 1.0,
+      planner: 0.7,
+      analyst: 0.8,
+      researcher: 0.9,
+      designer: 1.2,
+      'cloud-cicd': 1.0,
+      'general-purpose': 1.0
+    };
+    
+    const variation = typeVariations[agentType as keyof typeof typeVariations] || 1.0;
+    return Math.sin(Math.abs(baseLaneOffset) * 0.05) * 15 * variation;
+  }
+  
+  private calculateArcLength(points: Point2D[]): number {
+    let length = 0;
+    const steps = this.ARC_SAMPLES;
+    
+    for (let i = 0; i < steps; i++) {
+      const t1 = i / steps;
+      const t2 = (i + 1) / steps;
+      
+      const p1 = this.evaluateBezier(points, t1);
+      const p2 = this.evaluateBezier(points, t2);
+      
+      length += Math.sqrt(
+        Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+      );
+    }
+    
+    return length;
+  }
+  
+  private evaluateBezier(points: Point2D[], t: number): Point2D {
+    const [p0, p1, p2, p3] = points;
+    const mt = 1 - t;
+    
+    return {
+      x: mt*mt*mt*p0.x + 3*mt*mt*t*p1.x + 3*mt*t*t*p2.x + t*t*t*p3.x,
+      y: mt*mt*mt*p0.y + 3*mt*mt*t*p1.y + 3*mt*t*t*p2.y + t*t*t*p3.y
+    };
+  }
+}
+```
+
+### Animation Implementation
+```typescript
+// utils/curveAnimations.ts
+export class CurveAnimator {
+  private animationFrames = new Map<string, number>();
+  
+  animatePathGrowth(
+    pathElement: SVGPathElement,
+    duration: number = 400,
+    easing: string = 'cubic-bezier(0.4, 0, 0.2, 1)'
+  ): Promise<void> {
+    return new Promise(resolve => {
+      const totalLength = pathElement.getTotalLength();
+      
+      pathElement.style.strokeDasharray = `0 ${totalLength}`;
+      pathElement.style.strokeDashoffset = '0';
+      
+      const animation = pathElement.animate([
+        { strokeDasharray: `0 ${totalLength}` },
+        { strokeDasharray: `${totalLength} 0` }
+      ], {
+        duration,
+        easing,
+        fill: 'forwards'
+      });
+      
+      animation.addEventListener('finish', () => {
+        pathElement.style.strokeDasharray = 'none';
+        resolve();
+      });
+    });
+  }
+  
+  animateProgressFlow(
+    pathElement: SVGPathElement,
+    progress: number // 0 to 1
+  ): void {
+    const totalLength = pathElement.getTotalLength();
+    const visibleLength = totalLength * progress;
+    const dashLength = Math.max(20, totalLength * 0.1);
+    
+    pathElement.style.strokeDasharray = `${dashLength} ${totalLength}`;
+    pathElement.style.strokeDashoffset = `${totalLength - visibleLength}`;
+  }
+}
+```
+
+## 2. Smart Y-Positioning Implementation
+
+### Lane Allocator
+```typescript
+// utils/laneAllocator.ts
+interface AgentInterval {
+  id: string;
   startTime: number;
   endTime: number;
-  scale: 'true_time' | 'equidistant';
-  zoom: number;
-  scrollLeft: number;
+  type: string;
+  priority: number;
+  preferredLane?: number;
 }
 
-export interface TimelineInteraction {
-  selectedAgents: string[];
-  hoveredElement?: AgentTimelineEvent;
-  messageDetailAgent?: string;
-  tooltipPosition?: { x: number; y: number };
+interface LaneAssignment {
+  agentId: string;
+  lane: number;
+  y: number;
 }
-```
 
-## 2. Color System Implementation
-
-### Create useAgentColors Composable
-```typescript
-// src/composables/useAgentColors.ts
-export function useAgentColors() {
-  const agentTypeColors = {
-    orchestrator: '#00d4ff',
-    coder: '#ff6b6b',
-    architect: '#4ecdc4',
-    reviewer: '#95e77e',
-    tester: '#ffd93d',
-    verifier: '#a78bfa',
-    planner: '#f97316',
-    analyst: '#ec4899',
-    researcher: '#06b6d4',
-    designer: '#8b5cf6',
-    deployer: '#22c55e'
-  } as const;
-
-  const statusColors = {
-    pending: '#6b7280',
-    'in_progress': '#3b82f6',
-    completed: '#22c55e',
-    error: '#ef4444'
-  } as const;
-
-  const getAgentColor = (agentType: string): string => {
-    return agentTypeColors[agentType as keyof typeof agentTypeColors] || '#3b82f6';
-  };
-
-  const getStatusColor = (status: string): string => {
-    return statusColors[status as keyof typeof statusColors] || statusColors.pending;
-  };
-
-  const getAgentGlowFilter = (agentType: string): string => {
-    const color = getAgentColor(agentType);
-    return `drop-shadow(0 0 8px ${color})`;
-  };
-
-  return {
-    agentTypeColors,
-    statusColors,
-    getAgentColor,
-    getStatusColor,
-    getAgentGlowFilter
-  };
-}
-```
-
-## 3. Data Processing Composable
-
-### Create useTimelineData Composable
-```typescript
-// src/composables/useTimelineData.ts
-import { computed, ref, watch } from 'vue';
-import type { AgentTimelineEvent, BatchGroup, TimelineViewport } from '../types';
-
-export function useTimelineData(events: Ref<AgentTimelineEvent[]>) {
-  const viewport = ref<TimelineViewport>({
-    startTime: 0,
-    endTime: 0,
-    scale: 'true_time',
-    zoom: 1,
-    scrollLeft: 0
-  });
-
-  // Calculate timeline dimensions
-  const timelineWidth = 1200;
-  const timelineHeight = 400;
-  const orchestratorY = 200;
-  const agentLaneHeight = 40;
-
-  // Process events into timeline positions
-  const processedEvents = computed(() => {
-    if (events.value.length === 0) return [];
-
-    const sortedEvents = [...events.value].sort((a, b) => a.timestamp - b.timestamp);
-    const startTime = sortedEvents[0]?.timestamp || Date.now();
-    const endTime = sortedEvents[sortedEvents.length - 1]?.timestamp || Date.now();
-    const timeRange = endTime - startTime || 1;
-
-    // Update viewport
-    viewport.value.startTime = startTime;
-    viewport.value.endTime = endTime;
-
-    // Assign agent lanes
-    const agentLanes = new Map<string, number>();
-    let currentLane = 0;
-
-    return sortedEvents.map((event, index) => {
-      // Calculate X position
-      let x: number;
-      if (viewport.value.scale === 'equidistant') {
-        x = 50 + (index / (sortedEvents.length - 1)) * (timelineWidth - 100);
-      } else {
-        x = 50 + ((event.timestamp - startTime) / timeRange) * (timelineWidth - 100);
+export class SmartLaneAllocator {
+  private readonly LANE_HEIGHT = 60;
+  private readonly TIME_BUFFER = 500; // 0.5s buffer
+  private readonly BASE_Y = 140;
+  
+  private lanes = new Map<number, AgentInterval[]>();
+  
+  allocateLanes(agents: AgentInterval[]): Map<string, LaneAssignment> {
+    this.lanes.clear();
+    
+    // Sort by start time, then priority
+    const sortedAgents = [...agents].sort((a, b) => {
+      if (Math.abs(a.startTime - b.startTime) < this.TIME_BUFFER) {
+        return b.priority - a.priority; // Higher priority first
       }
-
-      // Calculate Y position
-      let y: number;
-      if (event.agent_type === 'orchestrator') {
-        y = orchestratorY;
-      } else {
-        if (!agentLanes.has(event.agent_id)) {
-          agentLanes.set(event.agent_id, currentLane++);
-        }
-        const lane = agentLanes.get(event.agent_id)!;
-        y = orchestratorY - (lane + 1) * agentLaneHeight;
-      }
-
-      return {
-        ...event,
-        x,
+      return a.startTime - b.startTime;
+    });
+    
+    const assignments = new Map<string, LaneAssignment>();
+    
+    for (const agent of sortedAgents) {
+      const lane = this.findBestLane(agent);
+      const y = this.calculateY(lane);
+      
+      assignments.set(agent.id, {
+        agentId: agent.id,
+        lane,
         y
-      };
-    });
-  });
-
-  // Group events into batches
-  const batchGroups = computed<BatchGroup[]>(() => {
-    const batches = new Map<string, BatchGroup>();
-
-    processedEvents.value.forEach(event => {
-      if (!event.batch_id) return;
-
-      if (!batches.has(event.batch_id)) {
-        batches.set(event.batch_id, {
-          id: event.batch_id,
-          batch_id: event.batch_id,
-          start_time: event.timestamp,
-          agents: [],
-          status: 'active'
-        });
-      }
-
-      const batch = batches.get(event.batch_id)!;
-      if (!batch.agents.includes(event.agent_id)) {
-        batch.agents.push(event.agent_id);
-      }
-
-      if (event.type === 'batch_end') {
-        batch.end_time = event.timestamp;
-        batch.status = 'completed';
-      }
-    });
-
-    return Array.from(batches.values());
-  });
-
-  // Generate SVG paths for agent lifecycles
-  const agentPaths = computed(() => {
-    const paths = new Map<string, string>();
-    const agentEvents = new Map<string, AgentTimelineEvent[]>();
-
-    // Group events by agent
-    processedEvents.value.forEach(event => {
-      if (!agentEvents.has(event.agent_id)) {
-        agentEvents.set(event.agent_id, []);
-      }
-      agentEvents.get(event.agent_id)!.push(event);
-    });
-
-    // Generate curved paths for each agent
-    agentEvents.forEach((events, agentId) => {
-      if (events.length < 2) return;
-
-      const sortedEvents = events.sort((a, b) => a.timestamp - b.timestamp);
-      const spawn = sortedEvents[0];
-      const complete = sortedEvents[sortedEvents.length - 1];
-
-      if (spawn.agent_type === 'orchestrator') {
-        // Orchestrator is a straight line
-        paths.set(agentId, `M ${spawn.x},${spawn.y} L ${complete.x},${complete.y}`);
-      } else {
-        // Subagents have curved paths
-        const midX = (spawn.x + complete.x) / 2;
-        paths.set(agentId, 
-          `M ${spawn.x},${orchestratorY} ` +
-          `Q ${spawn.x + 20},${spawn.y + 20} ${midX},${spawn.y} ` +
-          `L ${complete.x - 20},${spawn.y} ` +
-          `Q ${complete.x - 20},${spawn.y + 20} ${complete.x},${orchestratorY}`
-        );
-      }
-    });
-
-    return paths;
-  });
-
-  const updateViewport = (changes: Partial<TimelineViewport>) => {
-    viewport.value = { ...viewport.value, ...changes };
-  };
-
-  return {
-    viewport: readonly(viewport),
-    processedEvents,
-    batchGroups,
-    agentPaths,
-    updateViewport,
-    timelineWidth,
-    timelineHeight,
-    orchestratorY
-  };
-}
-```
-
-## 4. Interaction Handling Composable
-
-### Create useTimelineInteraction Composable
-```typescript
-// src/composables/useTimelineInteraction.ts
-import { ref, reactive } from 'vue';
-import type { AgentTimelineEvent, TimelineInteraction } from '../types';
-
-export function useTimelineInteraction() {
-  const interaction = reactive<TimelineInteraction>({
-    selectedAgents: [],
-    hoveredElement: undefined,
-    messageDetailAgent: undefined,
-    tooltipPosition: undefined
-  });
-
-  const handleAgentHover = (event: AgentTimelineEvent, mouseEvent: MouseEvent) => {
-    interaction.hoveredElement = event;
-    interaction.tooltipPosition = {
-      x: mouseEvent.clientX,
-      y: mouseEvent.clientY
-    };
-  };
-
-  const handleAgentLeave = () => {
-    interaction.hoveredElement = undefined;
-    interaction.tooltipPosition = undefined;
-  };
-
-  const handleAgentClick = (event: AgentTimelineEvent, shiftKey: boolean = false) => {
-    if (shiftKey) {
-      // Multi-select with Shift
-      const index = interaction.selectedAgents.indexOf(event.agent_id);
-      if (index > -1) {
-        interaction.selectedAgents.splice(index, 1);
-      } else {
-        interaction.selectedAgents.push(event.agent_id);
-      }
-    } else {
-      // Single select
-      interaction.selectedAgents = [event.agent_id];
-    }
-  };
-
-  const handleMessageClick = (event: AgentTimelineEvent) => {
-    interaction.messageDetailAgent = event.agent_id;
-  };
-
-  const clearSelection = () => {
-    interaction.selectedAgents = [];
-  };
-
-  const closeMessageDetail = () => {
-    interaction.messageDetailAgent = undefined;
-  };
-
-  // Keyboard navigation
-  const handleKeyDown = (keyEvent: KeyboardEvent) => {
-    switch (keyEvent.key) {
-      case 'Escape':
-        clearSelection();
-        closeMessageDetail();
-        break;
-      case 'Enter':
-      case ' ':
-        if (interaction.hoveredElement) {
-          handleAgentClick(interaction.hoveredElement, keyEvent.shiftKey);
-        }
-        break;
-    }
-  };
-
-  return {
-    interaction: readonly(interaction),
-    handleAgentHover,
-    handleAgentLeave,
-    handleAgentClick,
-    handleMessageClick,
-    clearSelection,
-    closeMessageDetail,
-    handleKeyDown
-  };
-}
-```
-
-## 5. Animation Control Composable
-
-### Create useTimelineAnimation Composable
-```typescript
-// src/composables/useTimelineAnimation.ts
-import { ref, watch, nextTick } from 'vue';
-import type { AgentTimelineEvent } from '../types';
-
-export function useTimelineAnimation(events: Ref<AgentTimelineEvent[]>) {
-  const animationsEnabled = ref(true);
-  const prefersReducedMotion = ref(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-
-  // Watch for system preference changes
-  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
-    prefersReducedMotion.value = e.matches;
-  });
-
-  const shouldAnimate = computed(() => {
-    return animationsEnabled.value && !prefersReducedMotion.value;
-  });
-
-  const animateNewAgent = async (agentId: string) => {
-    if (!shouldAnimate.value) return;
-
-    await nextTick();
-    const agentElement = document.querySelector(`[data-agent-id="${agentId}"]`);
-    if (agentElement) {
-      agentElement.classList.add('timeline-animation');
-      (agentElement as SVGElement).style.animationName = 'agent-spawn';
-      
-      setTimeout(() => {
-        agentElement.classList.remove('timeline-animation');
-        (agentElement as SVGElement).style.animationName = '';
-      }, 300);
-    }
-  };
-
-  const animateNewMessage = async (messageId: string) => {
-    if (!shouldAnimate.value) return;
-
-    await nextTick();
-    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-    if (messageElement) {
-      (messageElement as SVGElement).style.animationName = 'message-pulse';
-      (messageElement as SVGElement).style.animationDuration = '2s';
-      (messageElement as SVGElement).style.animationIterationCount = '3';
-      
-      setTimeout(() => {
-        (messageElement as SVGElement).style.animation = '';
-      }, 6000);
-    }
-  };
-
-  const animateAgentCompletion = async (agentId: string) => {
-    if (!shouldAnimate.value) return;
-
-    await nextTick();
-    const agentElement = document.querySelector(`[data-agent-id="${agentId}"]`);
-    if (agentElement) {
-      agentElement.classList.add('timeline-animation');
-      (agentElement as SVGElement).style.animationName = 'agent-complete';
-      
-      setTimeout(() => {
-        agentElement.classList.remove('timeline-animation');
-        (agentElement as SVGElement).style.animationName = '';
-      }, 600);
-    }
-  };
-
-  // Watch for new events and trigger animations
-  let previousEventCount = 0;
-  watch(events, async (newEvents) => {
-    if (newEvents.length > previousEventCount) {
-      const newEvent = newEvents[newEvents.length - 1];
-      
-      switch (newEvent.type) {
-        case 'agent_spawn':
-          await animateNewAgent(newEvent.agent_id);
-          break;
-        case 'agent_message':
-          await animateNewMessage(newEvent.id);
-          break;
-        case 'agent_complete':
-          await animateAgentCompletion(newEvent.agent_id);
-          break;
-      }
-    }
-    
-    previousEventCount = newEvents.length;
-  }, { deep: true });
-
-  const toggleAnimations = () => {
-    animationsEnabled.value = !animationsEnabled.value;
-    
-    // Apply CSS class to disable animations
-    const container = document.querySelector('.timeline-container');
-    if (container) {
-      container.classList.toggle('animations-disabled', !animationsEnabled.value);
-    }
-  };
-
-  return {
-    animationsEnabled: readonly(animationsEnabled),
-    prefersReducedMotion: readonly(prefersReducedMotion),
-    shouldAnimate,
-    animateNewAgent,
-    animateNewMessage,
-    animateAgentCompletion,
-    toggleAnimations
-  };
-}
-```
-
-## 6. Main Timeline Component
-
-### Create AgentTimeline.vue
-```vue
-<template>
-  <div class="timeline-container" :class="{ 'animations-disabled': !shouldAnimate }">
-    <!-- Timeline Controls -->
-    <TimelineControls 
-      :viewport="viewport"
-      :animations-enabled="animationsEnabled"
-      @update-viewport="updateViewport"
-      @toggle-animations="toggleAnimations"
-    />
-    
-    <!-- Timeline SVG -->
-    <div class="timeline-viewport" ref="timelineViewport">
-      <svg 
-        :width="timelineWidth" 
-        :height="timelineHeight"
-        class="timeline-svg"
-        role="img"
-        :aria-labelledby="timelineId + '-title'"
-        :aria-describedby="timelineId + '-desc'"
-        @keydown="handleKeyDown"
-        tabindex="0"
-      >
-        <title :id="timelineId + '-title'">Agent Timeline Visualization</title>
-        <desc :id="timelineId + '-desc'">
-          Interactive timeline showing {{ processedEvents.length }} agent events across {{ Object.keys(agentPaths).length }} agents
-        </desc>
-        
-        <!-- Grid lines -->
-        <g class="grid-lines">
-          <line 
-            v-for="x in gridLines" 
-            :key="`grid-${x}`"
-            :x1="x" 
-            :y1="50" 
-            :x2="x" 
-            :y2="timelineHeight - 50"
-            class="grid-line"
-          />
-        </g>
-        
-        <!-- Time axis labels -->
-        <g class="time-labels">
-          <text
-            v-for="(time, index) in timeLabels"
-            :key="`time-${index}`"
-            :x="time.x"
-            :y="timelineHeight - 20"
-            class="time-label"
-          >
-            {{ time.label }}
-          </text>
-        </g>
-        
-        <!-- Orchestrator line -->
-        <line 
-          :x1="50" 
-          :y1="orchestratorY" 
-          :x2="timelineWidth - 50" 
-          :y2="orchestratorY"
-          class="orchestrator-line"
-        />
-        
-        <!-- Batch groupings -->
-        <g class="batch-groups">
-          <g 
-            v-for="batch in batchGroups" 
-            :key="batch.id"
-            class="batch-group"
-            :class="{ active: batch.status === 'active' }"
-          >
-            <rect
-              :x="getBatchX(batch) - 10"
-              :y="getBatchY(batch) - 10"
-              :width="getBatchWidth(batch) + 20"
-              :height="getBatchHeight(batch) + 20"
-              class="batch-group"
-              rx="8"
-            />
-            <text
-              :x="getBatchX(batch)"
-              :y="getBatchY(batch) - 15"
-              class="batch-label"
-            >
-              Batch {{ batch.id }}
-            </text>
-          </g>
-        </g>
-        
-        <!-- Agent lifecycle paths -->
-        <g class="agent-paths" role="list" aria-label="Agent lifecycles">
-          <path
-            v-for="(path, agentId) in agentPaths"
-            :key="`path-${agentId}`"
-            :d="path"
-            :class="[
-              'agent-line',
-              `agent-${getAgentType(agentId)}`,
-              { 
-                selected: interaction.selectedAgents.includes(agentId),
-                'multi-selected': interaction.selectedAgents.length > 1 && interaction.selectedAgents.includes(agentId)
-              }
-            ]"
-            :data-agent-id="agentId"
-            role="listitem"
-            :aria-label="getAgentAriaLabel(agentId)"
-            tabindex="0"
-            @click="(e) => handleAgentClick(getAgentById(agentId), e.shiftKey)"
-            @mouseenter="(e) => handleAgentHover(getAgentById(agentId), e)"
-            @mouseleave="handleAgentLeave"
-            @focus="(e) => handleAgentHover(getAgentById(agentId), e)"
-            @blur="handleAgentLeave"
-          />
-        </g>
-        
-        <!-- User prompts -->
-        <g class="user-prompts">
-          <circle
-            v-for="event in userPrompts"
-            :key="`prompt-${event.id}`"
-            :cx="event.x"
-            :cy="event.y"
-            r="5"
-            class="user-prompt"
-            @click="handleAgentClick(event)"
-          />
-        </g>
-        
-        <!-- Spawn points -->
-        <g class="spawn-points">
-          <circle
-            v-for="event in spawnPoints"
-            :key="`spawn-${event.id}`"
-            :cx="event.x"
-            :cy="event.y"
-            r="5"
-            class="spawn-point"
-            @click="handleAgentClick(event)"
-          />
-        </g>
-        
-        <!-- Agent labels -->
-        <g class="agent-labels">
-          <text
-            v-for="(label, agentId) in agentLabels"
-            :key="`label-${agentId}`"
-            :x="label.x"
-            :y="label.y - 10"
-            :class="[
-              'agent-label',
-              { highlighted: interaction.selectedAgents.includes(agentId) }
-            ]"
-          >
-            {{ label.text }}
-          </text>
-        </g>
-        
-        <!-- Message dots -->
-        <g class="message-dots" role="list" aria-label="Inter-agent messages">
-          <circle
-            v-for="event in messageEvents"
-            :key="`message-${event.id}`"
-            :cx="event.x"
-            :cy="event.y"
-            :r="getMessageRadius(event)"
-            class="message-dot"
-            :data-message-id="event.id"
-            role="listitem"
-            :aria-label="getMessageAriaLabel(event)"
-            tabindex="0"
-            @click="handleMessageClick(event)"
-            @mouseenter="(e) => handleAgentHover(event, e)"
-            @mouseleave="handleAgentLeave"
-          />
-        </g>
-      </svg>
-    </div>
-    
-    <!-- Tooltip -->
-    <TimelineTooltip 
-      v-if="interaction.hoveredElement && interaction.tooltipPosition"
-      :event="interaction.hoveredElement"
-      :position="interaction.tooltipPosition"
-    />
-    
-    <!-- Message Detail Pane -->
-    <MessageDetailPane
-      :open="!!interaction.messageDetailAgent"
-      :agent-id="interaction.messageDetailAgent"
-      :events="messageEventsForAgent"
-      @close="closeMessageDetail"
-    />
-    
-    <!-- Screen Reader Summary -->
-    <div class="sr-only" aria-live="polite">
-      Timeline updated: {{ processedEvents.length }} events, {{ Object.keys(agentPaths).length }} active agents
-    </div>
-  </div>
-</template>
-
-<script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
-import { useTimelineData } from '@/composables/useTimelineData';
-import { useTimelineInteraction } from '@/composables/useTimelineInteraction';
-import { useTimelineAnimation } from '@/composables/useTimelineAnimation';
-import { useAgentColors } from '@/composables/useAgentColors';
-import TimelineControls from './TimelineControls.vue';
-import TimelineTooltip from './TimelineTooltip.vue';
-import MessageDetailPane from './MessageDetailPane.vue';
-import type { AgentTimelineEvent } from '@/types';
-
-interface Props {
-  events: AgentTimelineEvent[];
-}
-
-const props = defineProps<Props>();
-const timelineId = `timeline-${Math.random().toString(36).slice(2)}`;
-
-// Composables
-const eventsRef = toRef(props, 'events');
-const { 
-  viewport, 
-  processedEvents, 
-  batchGroups, 
-  agentPaths, 
-  updateViewport,
-  timelineWidth,
-  timelineHeight,
-  orchestratorY
-} = useTimelineData(eventsRef);
-
-const { 
-  interaction, 
-  handleAgentHover, 
-  handleAgentLeave, 
-  handleAgentClick, 
-  handleMessageClick,
-  clearSelection,
-  closeMessageDetail,
-  handleKeyDown: handleInteractionKeyDown
-} = useTimelineInteraction();
-
-const {
-  animationsEnabled,
-  shouldAnimate,
-  toggleAnimations
-} = useTimelineAnimation(eventsRef);
-
-const { getAgentColor } = useAgentColors();
-
-// Computed properties
-const gridLines = computed(() => {
-  const lines = [];
-  for (let i = 0; i <= 10; i++) {
-    lines.push(50 + (i * (timelineWidth - 100)) / 10);
-  }
-  return lines;
-});
-
-const timeLabels = computed(() => {
-  if (processedEvents.value.length === 0) return [];
-  
-  const labels = [];
-  const startTime = viewport.value.startTime;
-  const endTime = viewport.value.endTime;
-  const timeRange = endTime - startTime;
-  
-  for (let i = 0; i <= 8; i++) {
-    const time = startTime + (i * timeRange) / 8;
-    const x = 50 + (i * (timelineWidth - 100)) / 8;
-    labels.push({
-      x,
-      label: new Date(time).toLocaleTimeString()
-    });
-  }
-  
-  return labels;
-});
-
-const userPrompts = computed(() => 
-  processedEvents.value.filter(e => e.type === 'user_prompt')
-);
-
-const spawnPoints = computed(() => 
-  processedEvents.value.filter(e => e.type === 'batch_start')
-);
-
-const messageEvents = computed(() => 
-  processedEvents.value.filter(e => e.type === 'agent_message')
-);
-
-const agentLabels = computed(() => {
-  const labels = new Map();
-  
-  Object.keys(agentPaths.value).forEach(agentId => {
-    const agentEvents = processedEvents.value.filter(e => e.agent_id === agentId);
-    if (agentEvents.length > 0) {
-      const firstEvent = agentEvents[0];
-      labels.set(agentId, {
-        x: firstEvent.x || 0,
-        y: firstEvent.y || 0,
-        text: getAgentDisplayName(firstEvent.agent_type)
       });
+      
+      this.assignToLane(lane, agent);
     }
-  });
+    
+    return assignments;
+  }
   
-  return labels;
-});
-
-const messageEventsForAgent = computed(() => {
-  if (!interaction.messageDetailAgent) return [];
-  return processedEvents.value.filter(e => 
-    e.agent_id === interaction.messageDetailAgent && e.type === 'agent_message'
-  );
-});
-
-// Helper methods
-const getAgentById = (agentId: string) => {
-  return processedEvents.value.find(e => e.agent_id === agentId) || processedEvents.value[0];
-};
-
-const getAgentType = (agentId: string) => {
-  const agent = getAgentById(agentId);
-  return agent?.agent_type || 'coder';
-};
-
-const getAgentDisplayName = (agentType: string) => {
-  const names = {
-    orchestrator: 'Orchestrator',
-    coder: 'Coder',
-    architect: 'Architect',
-    reviewer: 'Reviewer',
-    tester: 'Tester',
-    verifier: 'Verifier',
-    planner: 'Planner',
-    analyst: 'Analyst',
-    researcher: 'Researcher',
-    designer: 'Designer',
-    deployer: 'Deployer'
-  };
-  return names[agentType as keyof typeof names] || agentType;
-};
-
-const getMessageRadius = (event: AgentTimelineEvent) => {
-  return interaction.hoveredElement?.id === event.id ? 5 : 3;
-};
-
-const getAgentAriaLabel = (agentId: string) => {
-  const agent = getAgentById(agentId);
-  const agentEvents = processedEvents.value.filter(e => e.agent_id === agentId);
-  const messages = agentEvents.filter(e => e.type === 'agent_message').length;
+  private findBestLane(agent: AgentInterval): number {
+    // Try preferred lane first
+    if (agent.preferredLane !== undefined && 
+        this.canAssignToLane(agent.preferredLane, agent)) {
+      return agent.preferredLane;
+    }
+    
+    // Find lowest available lane
+    for (let lane = 0; lane < 20; lane++) {
+      if (this.canAssignToLane(lane, agent)) {
+        return lane;
+      }
+    }
+    
+    // Force assign to new lane
+    return this.lanes.size;
+  }
   
-  return `${getAgentDisplayName(agent.agent_type)} agent, ${messages} messages, ${agent.status || 'active'}`;
-};
-
-const getMessageAriaLabel = (event: AgentTimelineEvent) => {
-  return `Message from ${getAgentDisplayName(event.agent_type)} at ${new Date(event.timestamp).toLocaleTimeString()}`;
-};
-
-const getBatchX = (batch: any) => {
-  // Implementation for batch positioning
-  return 100;
-};
-
-const getBatchY = (batch: any) => {
-  return 100;
-};
-
-const getBatchWidth = (batch: any) => {
-  return 200;
-};
-
-const getBatchHeight = (batch: any) => {
-  return 150;
-};
-
-// Event handlers
-const handleKeyDown = (event: KeyboardEvent) => {
-  handleInteractionKeyDown(event);
-};
-
-// Component lifecycle
-onMounted(() => {
-  // Initialize component
-});
-
-onUnmounted(() => {
-  // Cleanup
-});
-</script>
-
-<style scoped>
-@import '@/styles/timeline.css';
-</style>
+  private canAssignToLane(lane: number, agent: AgentInterval): boolean {
+    const laneAgents = this.lanes.get(lane);
+    if (!laneAgents) return true;
+    
+    return !laneAgents.some(existing => 
+      this.intervalsOverlap(agent, existing)
+    );
+  }
+  
+  private intervalsOverlap(a: AgentInterval, b: AgentInterval): boolean {
+    return !(a.endTime + this.TIME_BUFFER < b.startTime || 
+             b.endTime + this.TIME_BUFFER < a.startTime);
+  }
+  
+  private assignToLane(lane: number, agent: AgentInterval): void {
+    if (!this.lanes.has(lane)) {
+      this.lanes.set(lane, []);
+    }
+    this.lanes.get(lane)!.push(agent);
+  }
+  
+  private calculateY(lane: number): number {
+    return this.BASE_Y + (lane * this.LANE_HEIGHT);
+  }
+}
 ```
 
-## 7. Supporting Components
+## 3. Label Placement Implementation
 
-### TimelineControls.vue (Basic Implementation)
-```vue
-<template>
-  <div class="timeline-controls">
-    <div class="timeline-scale-toggle">
-      <button
-        class="scale-mode-button"
-        :class="{ active: viewport.scale === 'true_time' }"
-        @click="$emit('update-viewport', { scale: 'true_time' })"
-      >
-        True Time
-      </button>
-      <button
-        class="scale-mode-button"
-        :class="{ active: viewport.scale === 'equidistant' }"
-        @click="$emit('update-viewport', { scale: 'equidistant' })"
-      >
-        Equidistant
-      </button>
-    </div>
-    
-    <div class="timeline-zoom-controls">
-      <button class="zoom-button" @click="$emit('update-viewport', { zoom: viewport.zoom * 1.2 })">
-        +
-      </button>
-      <span>{{ Math.round(viewport.zoom * 100) }}%</span>
-      <button class="zoom-button" @click="$emit('update-viewport', { zoom: viewport.zoom / 1.2 })">
-        -
-      </button>
-    </div>
-    
-    <button 
-      class="zoom-button"
-      @click="$emit('toggle-animations')"
-      :title="animationsEnabled ? 'Disable animations' : 'Enable animations'"
-    >
-      {{ animationsEnabled ? '⏸️' : '▶️' }}
-    </button>
-  </div>
-</template>
-
-<script setup lang="ts">
-import type { TimelineViewport } from '@/types';
-
-interface Props {
-  viewport: TimelineViewport;
-  animationsEnabled: boolean;
+### Curved Label Placer
+```typescript
+// utils/labelPlacer.ts
+interface LabelPlacement {
+  position: Point2D;
+  rotation: number;
+  offset: Point2D;
+  usesLeaderLine: boolean;
+  leaderPath?: string;
 }
 
-defineProps<Props>();
-defineEmits<{
-  'update-viewport': [changes: Partial<TimelineViewport>];
-  'toggle-animations': [];
-}>();
-</script>
-```
-
-## 8. Integration Steps
-
-### Step 1: Add to App.vue
-```vue
-<!-- Add to the Agents tab in App.vue -->
-<template v-else-if="activeTab === 'timeline'">
-  <AgentTimeline :events="timelineEvents" />
-</template>
-```
-
-### Step 2: Extend WebSocket Integration
-```typescript
-// In useWebSocket.ts, add timeline event handling
-const handleTimelineEvent = (event: any) => {
-  // Convert incoming WebSocket events to AgentTimelineEvent format
-  const timelineEvent: AgentTimelineEvent = {
-    id: event.id || `${Date.now()}-${Math.random()}`,
-    type: event.event_type,
-    agent_id: event.agent_id,
-    agent_type: event.agent_type || 'coder',
-    timestamp: event.timestamp || Date.now(),
-    session_id: event.session_id,
-    batch_id: event.batch_id,
-    message_content: event.message,
-    target_agent: event.target_agent,
-    status: event.status
-  };
+export class CurveLabelPlacer {
+  private readonly MAX_ROTATION = 30; // degrees
+  private readonly LABEL_OFFSET = 12;
+  private readonly MIN_CURVE_RADIUS = 50;
   
-  timelineEvents.value.push(timelineEvent);
-};
+  placeLabelOnCurve(
+    curve: BezierCurve,
+    labelText: string,
+    fontSize: number = 12
+  ): LabelPlacement {
+    const textWidth = this.estimateTextWidth(labelText, fontSize);
+    const optimalT = 0.35; // 35% along curve
+    
+    const position = this.evaluateBezierAtT(curve, optimalT);
+    const tangent = this.evaluateBezierTangentAtT(curve, optimalT);
+    const curvature = this.calculateCurvatureAtT(curve, optimalT);
+    
+    if (Math.abs(curvature) < 1 / this.MIN_CURVE_RADIUS) {
+      // Low curvature - place directly
+      return this.createDirectPlacement(position, tangent, labelText);
+    } else {
+      // High curvature - use leader line
+      return this.createLeaderLinePlacement(position, tangent, labelText);
+    }
+  }
+  
+  private createDirectPlacement(
+    position: Point2D,
+    tangent: Point2D,
+    text: string
+  ): LabelPlacement {
+    const angle = Math.atan2(tangent.y, tangent.x) * 180 / Math.PI;
+    const clampedRotation = Math.max(-this.MAX_ROTATION, 
+      Math.min(this.MAX_ROTATION, angle));
+    
+    const normal = this.getNormalVector(tangent);
+    const offset = {
+      x: normal.x * this.LABEL_OFFSET,
+      y: normal.y * this.LABEL_OFFSET
+    };
+    
+    return {
+      position,
+      rotation: clampedRotation,
+      offset,
+      usesLeaderLine: false
+    };
+  }
+  
+  private createLeaderLinePlacement(
+    curvePosition: Point2D,
+    tangent: Point2D,
+    text: string
+  ): LabelPlacement {
+    const normal = this.getNormalVector(tangent);
+    const leaderLength = 20;
+    
+    const labelPosition = {
+      x: curvePosition.x + normal.x * leaderLength,
+      y: curvePosition.y + normal.y * leaderLength
+    };
+    
+    const leaderPath = `M ${curvePosition.x} ${curvePosition.y} L ${labelPosition.x} ${labelPosition.y}`;
+    
+    return {
+      position: labelPosition,
+      rotation: 0, // Keep horizontal for readability
+      offset: { x: 0, y: 0 },
+      usesLeaderLine: true,
+      leaderPath
+    };
+  }
+  
+  private evaluateBezierAtT(curve: BezierCurve, t: number): Point2D {
+    const { start, control1, control2, end } = curve;
+    const mt = 1 - t;
+    
+    return {
+      x: mt*mt*mt*start.x + 3*mt*mt*t*control1.x + 3*mt*t*t*control2.x + t*t*t*end.x,
+      y: mt*mt*mt*start.y + 3*mt*mt*t*control1.y + 3*mt*t*t*control2.y + t*t*t*end.y
+    };
+  }
+  
+  private evaluateBezierTangentAtT(curve: BezierCurve, t: number): Point2D {
+    const { start, control1, control2, end } = curve;
+    const mt = 1 - t;
+    
+    const dx = 3*mt*mt*(control1.x - start.x) + 6*mt*t*(control2.x - control1.x) + 3*t*t*(end.x - control2.x);
+    const dy = 3*mt*mt*(control1.y - start.y) + 6*mt*t*(control2.y - control1.y) + 3*t*t*(end.y - control2.y);
+    
+    const length = Math.sqrt(dx*dx + dy*dy);
+    return { x: dx/length, y: dy/length };
+  }
+  
+  private getNormalVector(tangent: Point2D): Point2D {
+    return { x: -tangent.y, y: tangent.x };
+  }
+  
+  private calculateCurvatureAtT(curve: BezierCurve, t: number): number {
+    // Simplified curvature calculation
+    const epsilon = 0.001;
+    const p1 = this.evaluateBezierAtT(curve, t - epsilon);
+    const p2 = this.evaluateBezierAtT(curve, t + epsilon);
+    
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const distance = Math.sqrt(dx*dx + dy*dy);
+    
+    return distance > 0 ? Math.abs(Math.atan2(dy, dx)) / distance : 0;
+  }
+  
+  private estimateTextWidth(text: string, fontSize: number): number {
+    // Rough estimation: average character width * 0.6 * fontSize
+    return text.length * 0.6 * fontSize;
+  }
+}
 ```
 
-### Step 3: Add Timeline Tab
-```vue
-<!-- Add timeline tab to App.vue -->
-<button
-  @click="activeTab = 'timeline'"
-  :class="[
-    'px-4 py-2 rounded-t-lg font-semibold transition-all',
-    activeTab === 'timeline' 
-      ? 'bg-gray-900 text-blue-400 border-t-2 border-blue-400' 
-      : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
-  ]"
->
-  Timeline
-</button>
+## 4. CSS Implementation
+
+### Core Styles
+```scss
+// styles/timeline-enhanced.scss
+@import url('./timeline-tokens.css');
+
+.timeline-agent-path {
+  stroke-width: var(--stroke-width-normal);
+  fill: none;
+  transition: all var(--animation-duration-normal) var(--animation-easing-standard);
+  will-change: stroke-width, filter, opacity;
+  
+  &.status-spawning {
+    stroke-dasharray: 0, 1000;
+    animation: path-spawn var(--animation-duration-spawn) var(--animation-easing-standard) forwards;
+  }
+  
+  &.status-in-progress {
+    stroke-dasharray: 8, 4;
+    animation: progress-flow var(--animation-duration-pulse) linear infinite;
+    filter: var(--effects-glows-medium);
+  }
+  
+  &.status-completed {
+    stroke-dasharray: none;
+    opacity: 0.9;
+    filter: var(--effects-glows-subtle);
+  }
+  
+  &.status-completing {
+    animation: completion-glow var(--animation-duration-completion) var(--animation-easing-decelerate);
+  }
+  
+  &:hover {
+    stroke-width: var(--stroke-width-thick);
+    filter: brightness(1.2) var(--effects-glows-medium);
+  }
+}
+
+.agent-label {
+  position: absolute;
+  background: var(--surface-label-background);
+  backdrop-filter: var(--effects-blurs-backdrop);
+  border: var(--effects-borders-thin) solid var(--surface-white-alpha-20);
+  border-radius: var(--effects-border-radius-pill);
+  padding: 4px 12px;
+  font-size: var(--typography-labels-font-size);
+  font-weight: var(--typography-labels-font-weight);
+  font-family: var(--typography-labels-font-family);
+  color: var(--agent-color);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: var(--layout-z-index-labels);
+  
+  box-shadow: 
+    var(--effects-shadows-small),
+    0 0 0 1px var(--agent-color-alpha-20);
+  
+  transform-origin: center;
+  transition: all var(--animation-duration-fast) var(--animation-easing-standard);
+  
+  &.with-leader-line::after {
+    content: '';
+    position: absolute;
+    width: 2px;
+    height: var(--leader-length);
+    background: var(--agent-color-alpha-60);
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%) rotate(var(--leader-angle));
+    transform-origin: top;
+  }
+}
+
+.batch-spawn-point {
+  r: var(--spacing-spawn-point-radius);
+  fill: var(--colors-orchestrator-primary);
+  stroke: var(--surface-white);
+  stroke-width: var(--effects-borders-medium);
+  filter: var(--effects-glows-strong);
+  cursor: pointer;
+  transition: all var(--animation-duration-normal) var(--animation-easing-spring);
+  
+  &:hover {
+    r: calc(var(--spacing-spawn-point-radius) * 1.5);
+    filter: brightness(1.2) var(--effects-glows-strong);
+  }
+  
+  &.active {
+    animation: spawn-pulse var(--animation-duration-normal) var(--animation-easing-standard) infinite alternate;
+  }
+}
+
+// Animation keyframes
+@keyframes path-spawn {
+  from { stroke-dasharray: 0, 1000; }
+  to { stroke-dasharray: 1000, 0; }
+}
+
+@keyframes progress-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -20; }
+}
+
+@keyframes completion-glow {
+  0%, 100% { 
+    opacity: 1; 
+    filter: var(--effects-glows-subtle); 
+  }
+  50% { 
+    opacity: 1; 
+    filter: brightness(1.4) var(--effects-glows-strong); 
+  }
+}
+
+@keyframes spawn-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.1); opacity: 0.8; }
+}
+
+// Agent type color classes
+@each $agent-type in (architect, engineer, tester, reviewer, verifier, planner, analyst, researcher, designer, cloud-cicd, general-purpose) {
+  .agent-type-#{$agent-type} {
+    --agent-color: var(--colors-agents-#{$agent-type}-primary);
+    --agent-color-alpha-20: var(--colors-agents-#{$agent-type}-alpha-20);
+    --agent-color-alpha-40: var(--colors-agents-#{$agent-type}-alpha-40);
+    --agent-color-alpha-60: var(--colors-agents-#{$agent-type}-alpha-60);
+    --agent-color-alpha-80: var(--colors-agents-#{$agent-type}-alpha-80);
+    
+    stroke: var(--agent-color);
+    filter: var(--colors-agents-#{$agent-type}-glow);
+  }
+}
 ```
 
-## 9. Testing Guidelines
+## 5. React/Vue Component Integration
 
-### Unit Tests
-- Test color assignment consistency
-- Verify timeline positioning calculations
-- Test event filtering and processing
-- Validate accessibility attributes
+### Vue Component Enhancement
+```typescript
+// Add to existing InteractiveAgentTimeline.vue
+import { TimelineCurveGenerator } from '@/utils/bezierCurves';
+import { SmartLaneAllocator } from '@/utils/laneAllocator';
+import { CurveLabelPlacer } from '@/utils/labelPlacer';
 
-### Integration Tests  
-- Test WebSocket event handling
-- Verify real-time updates
-- Test responsive behavior
-- Validate keyboard navigation
+// In setup function
+const curveGenerator = new TimelineCurveGenerator();
+const laneAllocator = new SmartLaneAllocator();
+const labelPlacer = new CurveLabelPlacer();
 
-### Performance Tests
-- Monitor SVG rendering performance
-- Test with large datasets (1000+ events)
-- Verify animation performance
-- Check memory usage during real-time updates
+// Enhanced agent paths computation
+const enhancedAgentPaths = computed(() => {
+  const agentIntervals = visibleAgents.value.map(agent => ({
+    id: agent.agentId,
+    startTime: agent.startTime,
+    endTime: agent.endTime || Date.now(),
+    type: agent.type,
+    priority: getAgentPriority(agent.type)
+  }));
+  
+  const laneAssignments = laneAllocator.allocateLanes(agentIntervals);
+  
+  return visibleAgents.value.map(agent => {
+    const assignment = laneAssignments.get(agent.agentId);
+    const spawnX = getTimeX(agent.startTime);
+    const endX = getTimeX(agent.endTime || Date.now());
+    
+    const curve = curveGenerator.generateAgentCurve(
+      spawnX,
+      assignment?.y || getAgentLaneY(0),
+      endX,
+      orchestratorY,
+      agent.type
+    );
+    
+    const labelPlacement = labelPlacer.placeLabelOnCurve(
+      curve,
+      agent.name,
+      12
+    );
+    
+    return {
+      ...agent,
+      curve,
+      laneAssignment: assignment,
+      labelPlacement
+    };
+  });
+});
 
-## 10. Deployment Checklist
+function getAgentPriority(type: string): number {
+  const priorities = {
+    architect: 9,
+    planner: 8,
+    engineer: 7,
+    tester: 6,
+    reviewer: 5,
+    verifier: 4,
+    analyst: 3,
+    researcher: 2,
+    designer: 1,
+    'general-purpose': 0
+  };
+  return priorities[type as keyof typeof priorities] || 0;
+}
+```
 
-- [ ] All CSS custom properties defined
-- [ ] Responsive breakpoints tested
-- [ ] Accessibility validation passed
-- [ ] Animation performance optimized
-- [ ] WebSocket integration tested
-- [ ] Color contrast ratios verified
-- [ ] Keyboard navigation functional
-- [ ] Screen reader compatibility confirmed
-- [ ] Cross-browser compatibility tested
-- [ ] Performance benchmarks met
+## 6. Performance Considerations
 
-This implementation guide provides the foundation for building the Agent Timeline Visualization component while maintaining consistency with the existing design system and ensuring optimal performance and accessibility.
+### Virtualization Implementation
+```typescript
+// utils/virtualization.ts
+export class TimelineVirtualizer {
+  private readonly VIEWPORT_BUFFER = 100; // pixels
+  
+  cullVisibleElements<T extends { position: Point2D }>(
+    elements: T[],
+    viewport: { x: number; y: number; width: number; height: number }
+  ): T[] {
+    return elements.filter(element => {
+      const { position } = element;
+      return (
+        position.x >= viewport.x - this.VIEWPORT_BUFFER &&
+        position.x <= viewport.x + viewport.width + this.VIEWPORT_BUFFER &&
+        position.y >= viewport.y - this.VIEWPORT_BUFFER &&
+        position.y <= viewport.y + viewport.height + this.VIEWPORT_BUFFER
+      );
+    });
+  }
+  
+  shouldUseLOD(elementCount: number, zoomLevel: number): boolean {
+    return elementCount > 200 || zoomLevel < 0.5;
+  }
+}
+```
+
+## Next Steps
+
+1. **Install Dependencies**: Add the utility classes to your project
+2. **Update Styles**: Import the enhanced CSS tokens and animations  
+3. **Test Integration**: Start with bezier curves, then add lane allocation
+4. **Optimize Performance**: Add virtualization for large datasets
+5. **Validate Accessibility**: Test with screen readers and high contrast mode
+
+The implementation is modular - you can adopt each piece incrementally while maintaining existing functionality.

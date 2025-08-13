@@ -28,6 +28,11 @@ export const AGENT_TYPE_COLORS: Record<AgentType, string> = {
   researcher: '#06b6d4',     // Cyan - Research specialists
   designer: '#8b5cf6',       // Violet - UX/UI designers
   'cloud-cicd': '#22c55e',   // Green - DevOps/deployment
+  'general-purpose': '#9ca3af',  // Gray - General purpose agents
+  'deep-researcher': '#0ea5e9', // Blue - Deep research specialists
+  'business-analyst': '#d946ef', // Magenta - Business analysts
+  'green-verifier': '#84cc16',   // Lime - Green verifiers
+  'code-reviewer': '#f59e0b',    // Amber - Code reviewers
 } as const;
 
 /**

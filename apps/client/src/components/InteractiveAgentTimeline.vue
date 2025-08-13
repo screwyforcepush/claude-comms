@@ -36,6 +36,21 @@
             <path d="M 50 0 L 0 0 0 40" fill="none" stroke="rgba(59, 130, 246, 0.1)" stroke-width="1"/>
           </pattern>
           <!-- Glow filters for selections -->
+          <!-- Orchestrator gradient -->
+          <linearGradient id="orchestratorGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
+            <stop offset="50%" style="stop-color:#00d4ff;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+          </linearGradient>
+          <!-- Agent path gradients - optimized pooling -->
+          <g v-for="colorKey in agentColorKeys" :key="`grad-${colorKey}`">
+            <linearGradient :id="`agentGradient-${colorKey}`" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" :style="`stop-color:${agentColors[colorKey]};stop-opacity:0.3`" />
+              <stop offset="30%" :style="`stop-color:${agentColors[colorKey]};stop-opacity:1`" />
+              <stop offset="70%" :style="`stop-color:${agentColors[colorKey]};stop-opacity:1`" />
+              <stop offset="100%" :style="`stop-color:${agentColors[colorKey]};stop-opacity:0.3`" />
+            </linearGradient>
+          </g>
           <filter id="messageGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
             <feMerge>
@@ -85,102 +100,77 @@
           </g>
         </g>
 
-        <!-- Orchestrator Line -->
-        <g class="orchestrator-line">
+        <!-- Orchestrator Line Enhanced -->
+        <g class="orchestrator-line" style="z-index: 10;">
+          <!-- Main orchestrator trunk with stronger glow -->
+          <line 
+            :x1="timelineMargins.left" 
+            :y1="orchestratorY" 
+            :x2="containerWidth - timelineMargins.right" 
+            :y2="orchestratorY"
+            stroke="url(#orchestratorGradient)" 
+            stroke-width="6"
+            class="drop-shadow-[0_0_16px_#00d4ff]"
+            style="filter: drop-shadow(0 0 12px #00d4ff) drop-shadow(0 0 6px #00d4ff);"
+          />
+          <!-- Secondary glow layer -->
           <line 
             :x1="timelineMargins.left" 
             :y1="orchestratorY" 
             :x2="containerWidth - timelineMargins.right" 
             :y2="orchestratorY"
             stroke="#00d4ff" 
-            stroke-width="3"
-            class="drop-shadow-[0_0_8px_currentColor]"
+            stroke-width="12"
+            opacity="0.3"
+            class="animate-pulse"
           />
           <text 
             :x="timelineMargins.left - 10" 
             :y="orchestratorY + 5"
             text-anchor="end" 
             fill="#00d4ff" 
-            font-size="14px"
-            font-weight="600"
+            font-size="16px"
+            font-weight="700"
             font-family="system-ui"
+            class="drop-shadow-[0_0_8px_currentColor]"
           >
-            Orchestrator
+            ORCHESTRATOR
           </text>
         </g>
 
-        <!-- Agent Lanes -->
-        <g class="agent-lanes">
+        <!-- Agent Lanes with Curved Paths -->
+        <g class="agent-lanes" style="z-index: 20;">
           <g v-for="(agent, index) in visibleAgents" :key="agent.agentId" class="agent-lane">
-            <!-- Agent Lane Line -->
-            <line 
-              :x1="getAgentStartX(agent)" 
-              :y1="getAgentLaneY(index)" 
-              :x2="getAgentEndX(agent)" 
-              :y2="getAgentLaneY(index)"
-              :stroke="getAgentColor(agent.type)" 
+            <!-- Curved Agent Path connecting to orchestrator -->
+            <path
+              :d="getAgentCurvePath(agent, index, getAgentLaneY(index, agent))"
+              :stroke="`url(#agentGradient-${agent.type})`"
               :stroke-width="getStrokeWidth(agent.status, agent.agentId === selectedAgent?.id?.toString())"
               :class="getAgentLineClass(agent.status, agent.agentId === selectedAgent?.id?.toString())"
               class="cursor-pointer transition-all duration-200"
               :filter="agent.agentId === selectedAgent?.id?.toString() ? 'url(#agentGlow)' : ''"
+              fill="none"
+              style="will-change: transform; transform: translateZ(0);"
               @click="selectAgentPath(agent)"
               @mouseenter="showAgentTooltip(agent, $event)"
               @mouseleave="hideTooltip"
+            />
+            <!-- Direction indicator arrow -->
+            <path
+              v-if="agent.status === 'completed'"
+              :d="getDirectionArrow(agent, index, getAgentLaneY(index, agent))"
+              :fill="getAgentColor(agent.type)"
+              opacity="0.7"
+              class="cursor-pointer"
+              @click="selectAgentPath(agent)"
             />
             
-            <!-- Agent Label -->
-            <text 
-              :x="timelineMargins.left - 10" 
-              :y="getAgentLaneY(index) + 5"
-              text-anchor="end" 
-              :fill="getAgentColor(agent.type)" 
-              font-size="13px"
-              font-weight="500"
-              font-family="system-ui"
-              class="cursor-pointer hover:opacity-80 transition-opacity select-none"
-              @click="selectAgentPath(agent)"
-              @mouseenter="showAgentTooltip(agent, $event)"
-              @mouseleave="hideTooltip"
-            >
-              {{ agent.name }}
-            </text>
-
-            <!-- Agent Type Badge -->
-            <rect
-              :x="timelineMargins.left - 80"
-              :y="getAgentLaneY(index) - 10"
-              width="65"
-              height="16"
-              :fill="getAgentColor(agent.type) + '20'"
-              :stroke="getAgentColor(agent.type)"
-              stroke-width="1"
-              rx="8"
-              ry="8"
-              class="cursor-pointer hover:opacity-80 transition-opacity"
-              @click="selectAgentPath(agent)"
-              @mouseenter="showAgentTooltip(agent, $event)"
-              @mouseleave="hideTooltip"
-            />
-            <text 
-              :x="timelineMargins.left - 47.5" 
-              :y="getAgentLaneY(index) + 3"
-              text-anchor="middle" 
-              :fill="getAgentColor(agent.type)" 
-              font-size="10px"
-              font-weight="600"
-              font-family="system-ui"
-              class="cursor-pointer select-none"
-              @click="selectAgentPath(agent)"
-              @mouseenter="showAgentTooltip(agent, $event)"
-              @mouseleave="hideTooltip"
-            >
-              {{ agent.type.toUpperCase() }}
-            </text>
+            <!-- Agent labels removed - will be handled by path-based labeling -->
 
             <!-- Status Indicator -->
             <circle 
               :cx="getAgentEndX(agent) + 8" 
-              :cy="getAgentLaneY(index)"
+              :cy="getAgentLaneY(index, agent)"
               r="4" 
               :fill="getStatusColor(agent.status)"
               :class="agent.status === 'in_progress' ? 'animate-pulse' : ''"
@@ -192,36 +182,87 @@
           </g>
         </g>
 
-        <!-- Batch Spawn Points -->
-        <g class="batch-spawn-points">
+        <!-- Enhanced Spawn Points -->
+        <g class="batch-spawn-points" style="z-index: 25;">
           <g v-for="batch in batches" :key="batch.id">
+            <!-- Spawn point with branching effect -->
             <circle 
               :cx="getTimeX(batch.spawnTimestamp)" 
               :cy="orchestratorY"
-              r="6" 
+              r="8" 
               fill="#00d4ff"
               stroke="#ffffff"
-              stroke-width="2"
-              class="drop-shadow-[0_0_12px_currentColor] cursor-pointer hover:r-8 transition-all duration-200"
+              stroke-width="3"
+              class="drop-shadow-[0_0_16px_#00d4ff] cursor-pointer transition-all duration-300"
               @click="selectBatch(batch)"
               @mouseenter="showBatchTooltip(batch, $event)"
               @mouseleave="hideTooltip"
             />
+            <!-- Pulse effect for spawn points -->
+            <circle 
+              :cx="getTimeX(batch.spawnTimestamp)" 
+              :cy="orchestratorY"
+              r="8" 
+              fill="none"
+              stroke="#00d4ff"
+              stroke-width="2"
+              opacity="0.6"
+              class="animate-ping"
+            />
+            <!-- Batch label with enhanced styling -->
             <text 
               :x="getTimeX(batch.spawnTimestamp)" 
-              :y="orchestratorY - 15"
+              :y="orchestratorY - 20"
               text-anchor="middle" 
               fill="#00d4ff" 
-              font-size="12px"
-              font-weight="600"
+              font-size="13px"
+              font-weight="700"
               font-family="system-ui"
-              class="cursor-pointer select-none"
+              class="cursor-pointer select-none drop-shadow-[0_0_4px_currentColor]"
               @click="selectBatch(batch)"
               @mouseenter="showBatchTooltip(batch, $event)"
               @mouseleave="hideTooltip"
             >
-              B{{ batch.batchNumber }}
+              BATCH {{ batch.batchNumber }}
             </text>
+            <!-- Agent count indicator -->
+            <text 
+              :x="getTimeX(batch.spawnTimestamp)" 
+              :y="orchestratorY + 25"
+              text-anchor="middle" 
+              fill="#ffffff" 
+              font-size="10px"
+              font-weight="600"
+              opacity="0.8"
+            >
+              {{ batch.agents.length }} agents
+            </text>
+          </g>
+        </g>
+
+        <!-- Agent Completion Points -->
+        <g class="completion-points" style="z-index: 25;">
+          <g v-for="(agent, index) in completedAgents" :key="`complete-${agent.agentId}`">
+            <circle 
+              :cx="getAgentEndX(agent)" 
+              :cy="orchestratorY"
+              r="6" 
+              fill="#22c55e"
+              stroke="#ffffff"
+              stroke-width="2"
+              class="drop-shadow-[0_0_12px_#22c55e] cursor-pointer transition-all duration-300"
+              opacity="0.8"
+              @click="selectAgentPath(agent)"
+            />
+            <!-- Completion merge indicator -->
+            <path
+              :d="getCompletionMergePath(agent, index, getAgentLaneY(index, agent))"
+              stroke="#22c55e"
+              stroke-width="2"
+              fill="none"
+              opacity="0.5"
+              stroke-dasharray="3,3"
+            />
           </g>
         </g>
 
@@ -451,7 +492,22 @@ const timelineSvg = ref<SVGElement>();
 // Reactive State
 const isLoading = ref(false);
 const containerWidth = ref(1200);
-const containerHeight = ref(600);
+const baseContainerHeight = ref(600);
+
+// Dynamic container height based on lane allocation
+const containerHeight = computed(() => {
+  if (laneOccupancy.value.size === 0) return baseContainerHeight.value;
+  
+  // Find the maximum lane index being used
+  const maxLane = Math.max(...Array.from(laneOccupancy.value.keys()));
+  const maxLaneY = orchestratorY + 60 + (maxLane * agentLaneHeight);
+  
+  // Add padding for the bottom
+  const dynamicHeight = maxLaneY + 100; // 100px bottom padding
+  
+  // Use the larger of base height or calculated height
+  return Math.max(baseContainerHeight.value, dynamicHeight);
+});
 const zoomLevel = ref(1);
 const panX = ref(0);
 const panY = ref(0);
@@ -482,10 +538,10 @@ const timelineMargins = {
   left: 120
 };
 const orchestratorY = 80;
-const agentLaneHeight = 40;
+const agentLaneHeight = 55; // Increased from 40px to prevent overlaps
 
 // Agent Type Colors
-const agentColors = {
+const agentColors: Record<string, string> = {
   orchestrator: '#00d4ff',
   coder: '#ff6b6b',
   architect: '#4ecdc4',
@@ -516,8 +572,14 @@ const statusColors = {
 // Computed Properties
 const totalAgents = computed(() => props.agents.length);
 
+// Optimize gradient generation by pooling unique agent types
+const agentColorKeys = computed(() => {
+  const usedTypes = new Set(props.agents.map(agent => agent.subagent_type));
+  return Array.from(usedTypes);
+});
+
 const visibleAgents = computed(() => {
-  return props.agents.map((agent) => ({
+  const allAgents = props.agents.map((agent) => ({
     ...agent,
     agentId: agent.id.toString(),
     type: agent.subagent_type,
@@ -525,6 +587,36 @@ const visibleAgents = computed(() => {
     endTime: agent.completion_timestamp || null,
     status: agent.status || 'pending'
   }));
+
+  // Performance optimization: Limit visible agents for smooth rendering
+  // Virtual scrolling for large datasets
+  if (allAgents.length > 100) {
+    // Sort by creation time for temporal coherence
+    const sorted = allAgents.sort((a, b) => a.startTime - b.startTime);
+    
+    // Show recent agents + selection context
+    const recentCount = Math.min(50, sorted.length);
+    const recent = sorted.slice(-recentCount);
+    
+    // Add any selected agents that might be outside the recent window
+    const selectedSet = new Set();
+    if (selectedAgent.value) {
+      selectedSet.add(selectedAgent.value.id?.toString());
+    }
+    
+    const additionalSelected = sorted.filter(agent => 
+      selectedSet.has(agent.agentId) && !recent.some(r => r.agentId === agent.agentId)
+    );
+    
+    return [...recent, ...additionalSelected];
+  }
+  
+  return allAgents;
+});
+
+// Computed property for completed agents
+const completedAgents = computed(() => {
+  return visibleAgents.value.filter(agent => agent.status === 'completed');
 });
 
 const timeRange = computed(() => {
@@ -637,7 +729,81 @@ const getStatusColor = (status: string): string => {
   return statusColors[status as keyof typeof statusColors] || statusColors.pending;
 };
 
-const getAgentLaneY = (index: number): number => {
+// Smart lane allocation algorithm - tracks lane occupancy and reuses lanes
+const laneOccupancy = ref<Map<number, Array<{ start: number; end: number }>>>(new Map());
+
+const calculateLaneAllocations = (agents: any[]) => {
+  const allocations = new Map<string, number>();
+  const occupancy = new Map<number, Array<{ start: number; end: number }>>();
+  
+  // Sort agents by start time to process in chronological order
+  const sortedAgents = [...agents].sort((a, b) => a.startTime - b.startTime);
+  
+  for (const agent of sortedAgents) {
+    const agentStart = agent.startTime;
+    const agentEnd = agent.endTime || (agent.status === 'in_progress' ? Date.now() : agentStart + 30000); // Default 30s duration
+    
+    // Find first available lane
+    let assignedLane = 0;
+    let foundLane = false;
+    
+    while (!foundLane) {
+      const laneOccupants = occupancy.get(assignedLane) || [];
+      
+      // Check if this lane is free during the agent's time period
+      const hasOverlap = laneOccupants.some(occupant => 
+        !(agentEnd <= occupant.start || agentStart >= occupant.end)
+      );
+      
+      if (!hasOverlap) {
+        // Lane is available
+        foundLane = true;
+        allocations.set(agent.agentId, assignedLane);
+        
+        // Reserve this time slot in the lane
+        laneOccupants.push({ start: agentStart, end: agentEnd });
+        occupancy.set(assignedLane, laneOccupants);
+      } else {
+        // Try next lane
+        assignedLane++;
+      }
+      
+      // Safety limit to prevent infinite loops
+      if (assignedLane > 50) {
+        console.warn('Lane allocation exceeded limit, using fallback');
+        allocations.set(agent.agentId, assignedLane);
+        break;
+      }
+    }
+  }
+  
+  laneOccupancy.value = occupancy;
+  return allocations;
+};
+
+// Smart lane allocation - computed property
+const agentLaneAllocations = computed(() => {
+  return calculateLaneAllocations(visibleAgents.value);
+});
+
+// Main interface - preserve backward compatibility for DanLabels
+const getAgentLaneY = (index: number, agent?: any): number => {
+  // If agent is provided, use smart allocation
+  if (agent && agentLaneAllocations.value.has(agent.agentId)) {
+    const smartLaneIndex = agentLaneAllocations.value.get(agent.agentId) || 0;
+    return orchestratorY + 60 + (smartLaneIndex * agentLaneHeight);
+  }
+  
+  // For backward compatibility, also try to get agent from visibleAgents by index
+  if (!agent && index < visibleAgents.value.length) {
+    const agentFromIndex = visibleAgents.value[index];
+    if (agentFromIndex && agentLaneAllocations.value.has(agentFromIndex.agentId)) {
+      const smartLaneIndex = agentLaneAllocations.value.get(agentFromIndex.agentId) || 0;
+      return orchestratorY + 60 + (smartLaneIndex * agentLaneHeight);
+    }
+  }
+  
+  // Fallback to index-based allocation
   return orchestratorY + 60 + (index * agentLaneHeight);
 };
 
@@ -657,6 +823,46 @@ const getAgentEndX = (agent: any): number => {
   return getTimeX(endTime);
 };
 
+// New helper function for curved agent paths
+const getAgentCurvePath = (agent: any, index: number, agentY?: number): string => {
+  const startX = getAgentStartX(agent);
+  const endX = getAgentEndX(agent);
+  const laneY = agentY || getAgentLaneY(index, agent);
+  
+  // Create curved path that branches from orchestrator
+  const midX = startX + (endX - startX) * 0.5;
+  const controlY = laneY - 20; // Peak of the curve
+  
+  // Start from orchestrator, curve to agent lane, then back to orchestrator
+  return `M ${startX} ${orchestratorY} 
+          Q ${startX + 20} ${controlY} ${midX} ${laneY} 
+          T ${endX - 20} ${controlY} 
+          L ${endX} ${orchestratorY}`;
+};
+
+// Direction arrow for completed agents
+const getDirectionArrow = (agent: any, index: number, agentY?: number): string => {
+  const endX = getAgentEndX(agent);
+  const laneY = agentY || getAgentLaneY(index, agent);
+  
+  // Small arrow pointing towards completion
+  return `M ${endX - 15} ${laneY - 5} 
+          L ${endX - 5} ${laneY} 
+          L ${endX - 15} ${laneY + 5} 
+          Z`;
+};
+
+// Completion merge path indicator
+const getCompletionMergePath = (agent: any, index: number, agentY?: number): string => {
+  const endX = getAgentEndX(agent);
+  const laneY = agentY || getAgentLaneY(index, agent);
+  
+  // Simple curve from agent lane to orchestrator
+  return `M ${endX - 20} ${laneY} 
+          Q ${endX - 10} ${(laneY + orchestratorY) / 2} 
+          ${endX} ${orchestratorY}`;
+};
+
 const getStrokeWidth = (status: string, isSelected: boolean = false): number => {
   let width = 2;
   switch (status) {
@@ -669,7 +875,7 @@ const getStrokeWidth = (status: string, isSelected: boolean = false): number => 
 };
 
 const getAgentLineClass = (status: string, isSelected: boolean = false): string => {
-  const baseClass = 'drop-shadow-[0_0_8px_currentColor]';
+  const baseClass = 'drop-shadow-[0_0_8px_currentColor] transition-all duration-500 hover:drop-shadow-[0_0_12px_currentColor]';
   let classes = baseClass;
   
   if (status === 'in_progress') {
@@ -680,13 +886,18 @@ const getAgentLineClass = (status: string, isSelected: boolean = false): string 
     classes += ' drop-shadow-[0_0_16px_currentColor] opacity-100';
   }
   
+  if (status === 'completed') {
+    classes += ' transition-opacity duration-500';
+  }
+  
   return classes;
 };
 
 const getMessageY = (message: SubagentMessage): number => {
-  const agentIndex = visibleAgents.value.findIndex(agent => agent.name === message.sender);
-  if (agentIndex !== -1) {
-    return getAgentLaneY(agentIndex);
+  const agent = visibleAgents.value.find(agent => agent.name === message.sender);
+  if (agent) {
+    const agentIndex = visibleAgents.value.indexOf(agent);
+    return getAgentLaneY(agentIndex, agent);
   }
   return orchestratorY;
 };
@@ -871,26 +1082,52 @@ const hideTooltip = () => {
   };
 };
 
-// Control Functions
+// Performance-optimized update batching
+let rafId: number | null = null;
+let pendingUpdates: (() => void)[] = [];
+
+const batchUpdate = (updateFn: () => void) => {
+  pendingUpdates.push(updateFn);
+  
+  if (rafId === null) {
+    rafId = requestAnimationFrame(() => {
+      // Execute all pending updates in a single frame
+      const updates = [...pendingUpdates];
+      pendingUpdates = [];
+      rafId = null;
+      
+      // Batch DOM updates to minimize reflows
+      updates.forEach(update => update());
+    });
+  }
+};
+
+// Control Functions with batched updates
 const zoomIn = () => {
-  zoomLevel.value = Math.min(zoomLevel.value * 1.2, 5);
+  batchUpdate(() => {
+    zoomLevel.value = Math.min(zoomLevel.value * 1.2, 5);
+  });
 };
 
 const zoomOut = () => {
-  zoomLevel.value = Math.max(zoomLevel.value / 1.2, 0.2);
+  batchUpdate(() => {
+    zoomLevel.value = Math.max(zoomLevel.value / 1.2, 0.2);
+  });
 };
 
 const resetZoom = () => {
-  zoomLevel.value = 1;
-  panX.value = 0;
-  panY.value = 0;
+  batchUpdate(() => {
+    zoomLevel.value = 1;
+    panX.value = 0;
+    panY.value = 0;
+  });
 };
 
 // Lifecycle
 const updateDimensions = () => {
   if (timelineContainer.value) {
     containerWidth.value = timelineContainer.value.clientWidth;
-    containerHeight.value = props.height;
+    baseContainerHeight.value = props.height;
   }
 };
 
@@ -913,10 +1150,25 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateDimensions);
   document.removeEventListener('keydown', handleKeydown);
+  
+  // Memory leak prevention
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  
+  // Clear pending updates
+  pendingUpdates = [];
+  
+  // Clear any remaining timeouts
+  hideTooltip();
+  
+  // Clean up lane occupancy maps
+  laneOccupancy.value.clear();
 });
 
 watch(() => props.height, (newHeight) => {
-  containerHeight.value = newHeight;
+  baseContainerHeight.value = newHeight;
 });
 </script>
 
@@ -954,7 +1206,82 @@ watch(() => props.height, (newHeight) => {
   50% { opacity: 1; }
 }
 
-/* Mobile optimizations */
+/* Enhanced Timeline Animations */
+@keyframes dash-flow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -20;
+  }
+}
+
+@keyframes orchestrator-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px #00d4ff) drop-shadow(0 0 6px #00d4ff);
+    opacity: 1;
+  }
+  50% {
+    filter: drop-shadow(0 0 20px #00d4ff) drop-shadow(0 0 10px #00d4ff);
+    opacity: 0.9;
+  }
+}
+
+@keyframes agent-spawn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes completion-glow {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 16px #22c55e);
+  }
+}
+
+/* Orchestrator enhanced styling */
+.orchestrator-line line:first-child {
+  animation: orchestrator-pulse 3s ease-in-out infinite;
+}
+
+/* Agent path animations */
+.agent-lane path[stroke-dasharray] {
+  animation: dash-flow 2s linear infinite;
+}
+
+.agent-lane path {
+  animation: agent-spawn 0.8s ease-out;
+}
+
+.completion-points circle {
+  animation: completion-glow 2s ease-in-out infinite;
+}
+
+/* Hover effects */
+.agent-lane:hover path {
+  stroke-width: 4 !important;
+  filter: drop-shadow(0 0 8px currentColor) !important;
+}
+
+.spawn-point:hover circle {
+  r: 10;
+  filter: drop-shadow(0 0 20px #00d4ff);
+}
+
+/* Mobile optimizations - Enhanced for performance */
 @media (max-width: 768px) {
   .agent-timeline-container {
     font-size: 12px;
@@ -966,6 +1293,37 @@ watch(() => props.height, (newHeight) => {
   
   .timeline-header .text-sm {
     font-size: 11px;
+  }
+  
+  /* Aggressive performance optimizations on mobile */
+  .orchestrator-line line:first-child,
+  .agent-lane path,
+  .completion-points circle {
+    animation: none;
+  }
+  
+  /* Reduce GPU layers on mobile to save memory */
+  .agent-lane path {
+    transform: none !important;
+    will-change: auto;
+  }
+  
+  /* Simplify gradients on mobile */
+  .agent-lane path {
+    stroke: currentColor !important;
+  }
+  
+  /* Hide less important elements on small screens */
+  .message-flows {
+    display: none;
+  }
+  
+  /* Touch-friendly interaction zones */
+  .agent-lane,
+  .message-indicators circle,
+  .batch-spawn-points circle {
+    cursor: pointer;
+    touch-action: manipulation;
   }
 }
 
@@ -982,7 +1340,10 @@ watch(() => props.height, (newHeight) => {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .animate-pulse {
+  .animate-pulse,
+  .orchestrator-line line:first-child,
+  .agent-lane path,
+  .completion-points circle {
     animation: none;
   }
   

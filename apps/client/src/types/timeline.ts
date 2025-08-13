@@ -195,6 +195,29 @@ export interface PerformanceConfig {
   enableGPUAcceleration: boolean;
 }
 
+export interface LevelOfDetail {
+  showLabels: boolean;
+  showMessages: boolean;
+  showDetails: boolean;
+  simplifyPaths: boolean;
+  maxAgents: number;
+  maxMessages: number;
+  pathSimplificationTolerance: number;
+}
+
+export interface PerformanceMetrics {
+  fps: number;
+  frameTime: number;
+  memoryMB: number;
+  renderCount: number;
+  cullRatio: number;
+  elementCount: {
+    agents: number;
+    messages: number;
+    visible: number;
+  };
+}
+
 // ============================================================================
 // Component Props & Events
 // ============================================================================
@@ -230,7 +253,7 @@ export interface ViewportState {
   width: number;
   height: number;
   timeRange: TimeRange;
-  followMode: boolean; // Auto-scroll to latest
+  followMode?: boolean; // Auto-scroll to latest
 }
 
 export interface InteractionState {
