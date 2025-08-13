@@ -3,6 +3,10 @@
  * 
  * Test suite for validating timeline performance optimizations
  * with large datasets (100+ agents) to ensure 60fps rendering.
+ * 
+ * Updated for consolidated agent structure:
+ * - Engineers now include testing capabilities (previously separate tester role)
+ * - Gatekeeper consolidates code-reviewer and green-verifier roles
  */
 
 import { generateStressTestData } from './timelineTestData';

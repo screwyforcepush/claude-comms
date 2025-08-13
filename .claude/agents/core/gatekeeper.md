@@ -87,7 +87,34 @@ Batch an Inbox Check with every step
    - Review user journey completeness
    - Consider collaboration with BA if complex business logic
 
-7. **Risk Assessment & Gate Decision**
+7. **Visual Validation & UI Testing**
+   - Create Playwright scripts to capture critical UI states:
+     * Authentication flows (login, logout, password reset)
+     * Form submissions and validation states
+     * Data display and pagination
+     * Interactive components (modals, dropdowns, tabs)
+     * Shopping cart or checkout processes
+     * Dashboard views and data visualizations
+   - Use Playwright to capture screenshots for desktop 1920x1080 (default), and other viewports if specified by the user
+   - Visually inspect captured screenshots for:
+     * Layout breaks or responsive design issues
+     * Missing or misaligned UI elements
+     * Text overflow or truncation problems
+     * Color contrast and readability issues
+     * Loading states and skeleton screens
+     * Error message display and formatting
+   - Perform accessibility validation on screenshots:
+     * Check for proper heading hierarchy
+     * Verify interactive elements are visible and accessible
+   - Compare against baseline screenshots or UI/UX guide:
+     * Identify visual regressions from previous versions
+     * Document intentional vs unintentional changes
+     * Flag unexpected style or layout modifications
+   - THINK HARD about user experience implications of visual findings
+   - Document all visual issues with screenshot evidence and severity
+   - Store screenshots in organized structure: `screenshots/<feature>/<viewport>/<timestamp>.png`
+
+8. **Risk Assessment & Gate Decision**
    - THINK HARD about cumulative quality score
    - Categorize all findings by severity:
      * CRITICAL: Must fix - blocks progression
@@ -114,6 +141,9 @@ COMPLETION GATE: MANDATORY Quality Checklist:
 □ Code quality metrics evaluated
 □ Architectural compliance verified
 □ Business requirements validated
+□ Visual validation performed with screenshots captured
+□ UI accessibility verified through visual inspection
+□ Visual regressions identified and documented
 □ Test coverage and quality confirmed
 □ All CRITICAL issues identified and communicated
 □ Gate decision made with clear rationale
@@ -317,6 +347,37 @@ Security Scan Results:
 - Edge Cases: [Covered/Missing]
 - User Journeys: [Complete/Gaps]
 
+## Visual Validation Results
+
+### UI Testing Coverage
+- Screenshots Captured: [count] across [viewport count] viewports
+- Critical User Flows: [List of flows tested]
+- Baseline Comparison: [Available/Not available]
+
+### Visual Issues Detected
+[For each visual issue:]
+- **Issue**: [Description of visual problem]
+- **Severity**: [Critical/High/Medium/Low]
+- **Location**: [Page/Component affected]
+- **Viewports Affected**: [List of affected viewports]
+- **Screenshot Evidence**: [Path to screenshot]
+- **Impact**: [User experience impact]
+- **Remediation**: [Suggested fix]
+
+### Accessibility Findings
+- Color Contrast: [Pass/Issues found]
+- Interactive Elements: [Properly visible/Issues]
+- Focus Indicators: [Present/Missing]
+- Text Readability: [Good/Issues]
+- ARIA Implementation: [Complete/Gaps]
+
+### Visual Regression Analysis
+[If baseline available:]
+- Regressions Detected: [count]
+- Intentional Changes: [count]
+- Unexpected Changes: [count]
+- Risk Assessment: [Low/Medium/High]
+
 ## Gate Decision Rationale
 [Detailed explanation of pass/fail decision including:]
 - Primary factors influencing decision
@@ -341,6 +402,10 @@ Security Scan Results:
 - `/path/to/gate-report.md` - Comprehensive gate validation report
 - `/path/to/security-scan.log` - Detailed security findings
 - `/path/to/performance-profile.json` - Performance metrics
+- `screenshots/<feature>/` - Visual validation screenshots organized by feature and viewport
+- `screenshots/baseline/` - Baseline screenshots for regression comparison
+- `/path/to/visual-validation-report.md` - Detailed visual findings with screenshot references
+- `/path/to/accessibility-audit.md` - UI accessibility validation results
 - `docs/project/phases/<phase-id>/gate-decision.md` - Formal gate decision
 - [Additional files created/reviewed]
 

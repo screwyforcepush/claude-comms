@@ -88,27 +88,45 @@ export interface SimpleBatch {
 
 // Color mapping for agent types
 export const AGENT_TYPE_COLORS: Record<string, string> = {
-  'architect': '#4ecdc4',
-  'engineer': '#ff6b6b',
-  'coder': '#ff6b6b',
-  'tester': '#ffd93d',
-  'reviewer': '#95e77e',
-  'verifier': '#a78bfa',
-  'planner': '#f97316',
-  'analyst': '#ec4899',
-  'researcher': '#06b6d4',
-  'designer': '#8b5cf6',
-  'cloud-cicd': '#22c55e',
-  'general-purpose': '#9ca3af',
-  'deep-researcher': '#0ea5e9',
-  'business-analyst': '#d946ef',
-  'green-verifier': '#84cc16',
-  'code-reviewer': '#f59e0b'
+  // Core consolidated agent types
+  'architect': '#4ecdc4',           // Teal - System architects
+  'engineer': '#ff6b6b',            // Red coral - Engineers (includes testing capabilities)
+  'gatekeeper': '#10b981',          // Emerald - Quality gates (reviews, verification, validation)
+  'planner': '#f97316',             // Orange - Project planners
+  'business-analyst': '#d946ef',    // Magenta - Business analysts
+  'designer': '#8b5cf6',            // Violet - UX/UI designers
+  'deep-researcher': '#0ea5e9',     // Blue - Deep research specialists
+  'agent-orchestrator': '#9ca3af',  // Gray - Agent orchestrator
+  
+  // Legacy aliases for backward compatibility
+  'coder': '#ff6b6b',          // Maps to engineer
+  'tester': '#ff6b6b',         // Maps to engineer
+  'reviewer': '#10b981',       // Maps to gatekeeper
+  'verifier': '#10b981',       // Maps to gatekeeper
+  'green-verifier': '#10b981', // Maps to gatekeeper
+  'code-reviewer': '#10b981',  // Maps to gatekeeper
+  'analyst': '#d946ef',        // Maps to business-analyst
+  'researcher': '#0ea5e9',     // Maps to deep-researcher
+  'cloud-cicd': '#22c55e',     // Legacy - DevOps/deployment
+  'general-purpose': '#9ca3af' // Legacy - General purpose
 };
 
-// Default color for unknown types
+// Default color for unknown types with comprehensive legacy mapping
 export function getAgentTypeColor(type: string): string {
-  return AGENT_TYPE_COLORS[type] || AGENT_TYPE_COLORS['engineer'];
+  // Map legacy types to new consolidated types
+  const typeMapping: Record<string, string> = {
+    'code-reviewer': 'gatekeeper',
+    'green-verifier': 'gatekeeper',
+    'reviewer': 'gatekeeper',
+    'verifier': 'gatekeeper',
+    'tester': 'engineer',
+    'coder': 'engineer',
+    'analyst': 'business-analyst',
+    'researcher': 'deep-researcher'
+  };
+  
+  const mappedType = typeMapping[type] || type;
+  return AGENT_TYPE_COLORS[mappedType] || AGENT_TYPE_COLORS['engineer'];
 }
 
 // Safe property access helpers

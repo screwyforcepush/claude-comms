@@ -53,6 +53,7 @@ export interface AgentStatus {
   name: string;
   subagent_type: string;
   created_at: number;
+  session_id: string;
   status?: 'pending' | 'in_progress' | 'completed';
   duration?: number;
   token_count?: number;

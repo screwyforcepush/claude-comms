@@ -142,19 +142,9 @@
   filter: drop-shadow(0 0 10px rgba(34, 197, 94, 0.4));
 }
 
-.agent-type-tester {
-  stroke: #eab308;
-  filter: drop-shadow(0 0 10px rgba(234, 179, 8, 0.4));
-}
-
-.agent-type-code-reviewer {
+.agent-type-gatekeeper {
   stroke: #a855f7;
   filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.4));
-}
-
-.agent-type-green-verifier {
-  stroke: #10b981;
-  filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));
 }
 
 .agent-type-architect {

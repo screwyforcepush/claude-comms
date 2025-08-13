@@ -15,7 +15,8 @@ export const sampleAgents: AgentStatus[] = [
     completion_timestamp: 1700000120000,
     duration: 120000,
     token_count: 1500,
-    tool_count: 8
+    tool_count: 8,
+    session_id: "test-session-123"
   },
   {
     id: 2,
@@ -26,7 +27,8 @@ export const sampleAgents: AgentStatus[] = [
     completion_timestamp: 1700000110000,
     duration: 109000,
     token_count: 1200,
-    tool_count: 6
+    tool_count: 6,
+    session_id: "test-session-123"
   },
   
   // Batch 2: Implementation agents (spawned 5 minutes later)
@@ -39,7 +41,8 @@ export const sampleAgents: AgentStatus[] = [
     completion_timestamp: 1700000480000,
     duration: 180000,
     token_count: 2500,
-    tool_count: 15
+    tool_count: 15,
+    session_id: "test-session-123"
   },
   {
     id: 4,
@@ -49,29 +52,46 @@ export const sampleAgents: AgentStatus[] = [
     status: "in_progress",
     duration: undefined,
     token_count: 1800,
-    tool_count: 12
+    tool_count: 12,
+    session_id: "test-session-123"
   },
   {
     id: 5,
-    name: "TomTester",
-    subagent_type: "tester",
+    name: "DaveDatabase",
+    subagent_type: "engineer",
     created_at: 1700000302000, // 2ms later - same batch
     status: "pending",
     duration: undefined,
-    token_count: 500,
-    tool_count: 3
+    token_count: 800,
+    tool_count: 7,
+    session_id: "test-session-123"
   },
   
-  // Batch 3: Review agents (spawned 10 minutes later)
+  // Batch 3: Gatekeeper agents (spawned 10 minutes later)
   {
     id: 6,
-    name: "CarolReviewer",
-    subagent_type: "code-reviewer",
+    name: "CarolGatekeeper",
+    subagent_type: "gatekeeper",
     created_at: 1700000600000, // 10 minutes later
     status: "pending",
     duration: undefined,
     token_count: 200,
-    tool_count: 1
+    tool_count: 1,
+    session_id: "test-session-123"
+  },
+  
+  // Additional gatekeeper for comprehensive verification
+  {
+    id: 7,
+    name: "VictorVerifier",
+    subagent_type: "gatekeeper",
+    created_at: 1700000601000, // 1ms later - same batch
+    status: "completed",
+    completion_timestamp: 1700000750000,
+    duration: 149000,
+    token_count: 950,
+    tool_count: 12,
+    session_id: "test-session-123"
   }
 ];
 
@@ -92,19 +112,31 @@ export const sampleMessages: SubagentMessage[] = [
     sender: "BobBackend",
     message: "API endpoints implemented. All tests passing. Ready for integration.",
     created_at: 1700000450000,
-    notified: ["AliceFrontend", "TomTester"]
+    notified: ["AliceFrontend", "DaveDatabase"]
   },
   {
     sender: "AliceFrontend",
     message: "Frontend components 80% complete. Need clarification on user authentication flow.",
     created_at: 1700000520000,
-    notified: ["BobBackend", "AlexArchitect"]
+    notified: ["BobBackend", "AlexArchitect", "DaveDatabase"]
   },
   {
-    sender: "TomTester",
-    message: "Test suite created. Found 3 edge cases in user validation. Documenting findings.",
+    sender: "DaveDatabase",
+    message: "Database schema optimized. Migration scripts ready. Performance improved by 40%.",
     created_at: 1700000560000,
     notified: ["BobBackend", "AliceFrontend"]
+  },
+  {
+    sender: "CarolGatekeeper",
+    message: "Code review in progress. Security audit passed. Minor style issues found in auth module.",
+    created_at: 1700000620000,
+    notified: ["BobBackend", "AliceFrontend"]
+  },
+  {
+    sender: "VictorVerifier",
+    message: "All tests passing. Build successful. Performance benchmarks within acceptable range. Ready for deployment.",
+    created_at: 1700000680000,
+    notified: ["CarolGatekeeper"]
   }
 ];
 
@@ -189,7 +221,7 @@ export function generateStressTestData(agentCount: number = 100): {
   const events: HookEvent[] = [];
   
   const baseTime = Date.now() - 3600000; // 1 hour ago
-  const agentTypes = ['architect', 'engineer', 'tester', 'code-reviewer', 'planner'];
+  const agentTypes = ['architect', 'engineer', 'gatekeeper', 'planner', 'business-analyst', 'designer', 'deep-researcher'];
   const statusOptions: ('pending' | 'in_progress' | 'completed')[] = ['pending', 'in_progress', 'completed'];
   
   // Generate agents in batches
@@ -217,7 +249,8 @@ export function generateStressTestData(agentCount: number = 100): {
       completion_timestamp: completedAt,
       duration: completedAt ? completedAt - createdAt : undefined,
       token_count: Math.floor(Math.random() * 3000) + 500,
-      tool_count: Math.floor(Math.random() * 20) + 1
+      tool_count: Math.floor(Math.random() * 20) + 1,
+      session_id: "stress-test-session"
     });
     
     // Generate messages for some agents

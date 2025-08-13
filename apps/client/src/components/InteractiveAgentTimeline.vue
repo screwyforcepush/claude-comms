@@ -534,7 +534,7 @@ const agentColors: Record<string, string> = {
   coder: '#ff6b6b',
   architect: '#4ecdc4',
   reviewer: '#95e77e',
-  tester: '#ffd93d',
+  gatekeeper: '#a78bfa', // Consolidated from code-reviewer and green-verifier
   verifier: '#a78bfa',
   planner: '#f97316',
   analyst: '#ec4899',
@@ -544,9 +544,7 @@ const agentColors: Record<string, string> = {
   'general-purpose': '#9ca3af',
   'deep-researcher': '#0ea5e9',
   'business-analyst': '#d946ef',
-  'green-verifier': '#84cc16',
-  'code-reviewer': '#f59e0b',
-  engineer: '#ff6b6b'
+  engineer: '#ff6b6b' // Engineers now handle testing responsibilities
 };
 
 // Status Colors - REMOVED (no longer needed since status indicators removed)
@@ -712,7 +710,15 @@ const messageFlows = computed(() => {
 
 // Helper Functions
 const getAgentColor = (type: string): string => {
-  return agentColors[type as keyof typeof agentColors] || agentColors.engineer;
+  // Map legacy agent types to new consolidated structure
+  const typeMapping: Record<string, string> = {
+    'code-reviewer': 'gatekeeper',
+    'green-verifier': 'gatekeeper',
+    'tester': 'engineer' // Testers are now engineers
+  };
+  
+  const mappedType = typeMapping[type] || type;
+  return agentColors[mappedType as keyof typeof agentColors] || agentColors.engineer;
 };
 
 // getStatusColor function - REMOVED (no longer needed since status indicators removed)

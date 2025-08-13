@@ -17,22 +17,14 @@ import type { AgentType, CurvePoint, Point2D, TimelineColors } from '../types/ti
  */
 export const AGENT_TYPE_COLORS: Record<AgentType, string> = {
   // Core agent types with high contrast colors for dark theme
-  architect: '#4ecdc4',      // Teal - System architects 
-  engineer: '#ff6b6b',       // Red coral - General engineers
-  coder: '#ff6b6b',          // Red coral - Code-focused engineers
-  tester: '#ffd93d',         // Yellow - Test engineers
-  reviewer: '#95e77e',       // Green - Code reviewers
-  verifier: '#a78bfa',       // Purple - Green verifiers
-  planner: '#f97316',        // Orange - Project planners
-  analyst: '#ec4899',        // Pink - Business analysts
-  researcher: '#06b6d4',     // Cyan - Research specialists
-  designer: '#8b5cf6',       // Violet - UX/UI designers
-  'cloud-cicd': '#22c55e',   // Green - DevOps/deployment
-  'general-purpose': '#9ca3af',  // Gray - General purpose agents
-  'deep-researcher': '#0ea5e9', // Blue - Deep research specialists
-  'business-analyst': '#d946ef', // Magenta - Business analysts
-  'green-verifier': '#84cc16',   // Lime - Green verifiers
-  'code-reviewer': '#f59e0b',    // Amber - Code reviewers
+  architect: '#4ecdc4',           // Teal - System architects 
+  engineer: '#ff6b6b',            // Red coral - General engineers (includes testing capabilities)
+  gatekeeper: '#10b981',          // Emerald - Quality gates (reviews, verification, validation)
+  planner: '#f97316',             // Orange - Project planners
+  'business-analyst': '#d946ef',  // Magenta - Business analysts
+  designer: '#8b5cf6',            // Violet - UX/UI designers
+  'deep-researcher': '#0ea5e9',   // Blue - Deep research specialists
+  'agent-orchestrator': '#9ca3af' // Gray - Agent orchestrator
 } as const;
 
 /**

@@ -65,20 +65,12 @@ export interface AgentSpawn {
 export type AgentType = 
   | 'architect'
   | 'engineer' 
-  | 'coder'
-  | 'tester'
-  | 'reviewer'
-  | 'verifier'
+  | 'gatekeeper'
   | 'planner'
-  | 'analyst'
-  | 'researcher'
-  | 'designer'
-  | 'cloud-cicd'
-  | 'general-purpose'
-  | 'deep-researcher'
   | 'business-analyst'
-  | 'green-verifier'
-  | 'code-reviewer';
+  | 'designer'
+  | 'deep-researcher'
+  | 'agent-orchestrator';
 
 export interface AgentPath {
   agentId: string;
@@ -392,6 +384,32 @@ export interface CanvasRenderState {
   layers: Map<string, ImageData>;
   lastRenderTime: number;
   frameRate: number;
+}
+
+// ============================================================================
+// Data Transform Interface Types
+// ============================================================================
+
+export interface TimelineTransformOptions {
+  viewport_width: number;
+  viewport_height: number;
+  show_messages: boolean;
+  show_user_prompts: boolean;
+  auto_fit: boolean;
+  compact_mode: boolean;
+  session_filter?: string;
+}
+
+export interface TimelineAgent {
+  agentId: string;
+  name: string;
+  type: AgentType;
+  startTime: number;
+  endTime: number | null;
+  status: AgentStatus;
+  laneIndex: number;
+  batchId: string;
+  sessionId: string;
 }
 
 // ============================================================================

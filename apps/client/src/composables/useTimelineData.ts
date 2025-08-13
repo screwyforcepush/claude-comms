@@ -1,4 +1,4 @@
-import { ref, computed, reactive, watch } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import type { 
   TimelineData,
   AgentPath,
@@ -7,15 +7,13 @@ import type {
   UserPrompt,
   TimelineConfig,
   CurvePoint,
-  Point2D
+  TimelineTransformOptions
 } from '../types/timeline';
 import type { AgentStatus, SubagentMessage, HookEvent } from '../types';
 import {
   createTimelineScale,
   detectAgentBatches,
   calculateAgentPath,
-  generateAgentPathString,
-  calculateOptimalControlPoints,
   calculateMessagePosition,
   calculateViewportHeight,
   detectMessageType,
@@ -26,7 +24,7 @@ import {
 /**
  * Main composable for timeline data transformation
  */
-export function useTimelineData(options: TimelineTransformOptions = {}) {
+export function useTimelineData(options: Partial<TimelineTransformOptions> = {}) {
   // Reactive state
   const agents = ref<AgentStatus[]>([]);
   const messages = ref<SubagentMessage[]>([]);
@@ -42,13 +40,13 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
   
   // Transform options
   const transformOptions = reactive<TimelineTransformOptions>({
-    viewport_width: 1200,
-    viewport_height: 600,
-    show_messages: true,
-    show_user_prompts: true,
-    auto_fit: true,
-    compact_mode: false,
-    ...options
+    viewport_width: options.viewport_width || 1200,
+    viewport_height: options.viewport_height || 600,
+    show_messages: options.show_messages !== undefined ? options.show_messages : true,
+    show_user_prompts: options.show_user_prompts !== undefined ? options.show_user_prompts : true,
+    auto_fit: options.auto_fit !== undefined ? options.auto_fit : true,
+    compact_mode: options.compact_mode !== undefined ? options.compact_mode : false,
+    session_filter: options.session_filter
   });
 
   /**
@@ -62,8 +60,8 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
       ? agents.value.filter(agent => agent.session_id === transformOptions.session_filter)
       : agents.value;
     
-    // Detect batches
-    const batches = detectAgentBatches(filteredAgents, config.batch_spawn_threshold);
+    // Detect batches (using default threshold)
+    const batches = detectAgentBatches(filteredAgents, 5000); // 5 second threshold
     
     // Create time scale
     const timeDomain = calculateTimeDomain(filteredAgents, messages.value, events.value);
@@ -74,7 +72,7 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
     );
     
     // Transform agents with positioning
-    const transformedAgents: TimelineAgent[] = [];
+    const transformedAgents: AgentPath[] = [];
     
     batches.forEach((batch, batchIndex) => {
       batch.agents.forEach((agent, agentIndex) => {
@@ -113,8 +111,8 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
         
         // Calculate agent lane Y for the curved path
         const orchestratorY = 200;
-        const batchSeparation = config.batch_separation;
-        const laneHeight = config.agent_lane_height;
+        const batchSeparation = 120; // Fixed separation
+        const laneHeight = config.agentLaneHeight;
         const batchCenterY = orchestratorY + (batchIndex + 1) * batchSeparation;
         const verticalSpread = (agentIndex - (batch.agents.length - 1) / 2) * (laneHeight * 0.8);
         const agentLaneY = batchCenterY + verticalSpread;
@@ -187,13 +185,7 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
       .map((batchData, index) => {
         const { agents: batchAgents, batchId, minTime, maxTime } = batchData;
         
-        // Calculate batch positioning from curve data
-        const allXValues = batchAgents.flatMap(a => a.curveData.map(p => p.x));
-        const allYValues = batchAgents.flatMap(a => a.curveData.map(p => p.y));
-        const minX = Math.min(...allXValues);
-        const maxX = Math.max(...allXValues);
-        const minY = Math.min(...allYValues);
-        const maxY = Math.max(...allYValues);
+        // Note: Batch positioning could be enhanced in future versions
         
         const batchAgentSpawns = batchAgents.map(agent => ({
           agentId: agent.agentId,
@@ -243,20 +235,20 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
         // Create placeholder position if sender not found
         return {
           id: `msg_${index}`,
+          timestamp: msg.created_at,
           sender: msg.sender,
-          message: msg.message,
-          created_at: msg.created_at,
+          content: msg.message,
+          sessionId: 'unknown',
           position: {
             x: scale.timeToX(msg.created_at),
             y: 50 // Default position
           },
-          notified: msg.notified || [],
-          message_type: detectMessageType(msg.message)
+          type: detectMessageType(msg.message)
         } as TimelineMessage;
       }
       
       // Calculate message position
-      const { position, connection } = calculateMessagePosition(
+      const { position } = calculateMessagePosition(
         msg,
         senderAgent,
         undefined, // For now, we don't determine specific recipients
@@ -265,13 +257,12 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
       
       return {
         id: `msg_${index}`,
+        timestamp: msg.created_at,
         sender: msg.sender,
-        message: msg.message,
-        created_at: msg.created_at,
+        content: msg.message,
+        sessionId: senderAgent.sessionId,
         position,
-        connection,
-        notified: msg.notified || [],
-        message_type: detectMessageType(msg.message)
+        type: detectMessageType(msg.message)
       } as TimelineMessage;
     }).filter(msg => msg.position.x >= 0); // Filter out messages outside viewport
   });
@@ -282,13 +273,7 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
   const timelineUserPrompts = computed<UserPrompt[]>(() => {
     if (!transformOptions.show_user_prompts || events.value.length === 0) return [];
     
-    // Create time scale
-    const timeDomain = calculateTimeDomain(agents.value, messages.value, events.value);
-    const scale = createTimelineScale(
-      timeDomain,
-      transformOptions.viewport_width,
-      { left: 80, right: 40 }
-    );
+    // Note: Enhanced user prompt timing could be implemented in future versions
     
     // Filter relevant events (user inputs, task creations, etc.)
     const relevantEvents = events.value.filter(event => 
@@ -319,10 +304,7 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
       { left: 80, right: 40 }
     );
     
-    // Calculate optimal height
-    const calculatedHeight = transformOptions.auto_fit 
-      ? calculateViewportHeight(timelineBatches.value, config, { top: 60, bottom: 40 })
-      : transformOptions.viewport_height;
+    // Note: Auto-fit height calculation available for enhanced viewport sizing
     
     // Apply layout optimizations for performance
     const { agents: optimizedAgents, batches: optimizedBatches } = optimizeTimelineLayout(
@@ -332,30 +314,19 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
     );
     
     return {
-      scale,
-      batches: optimizedBatches,
-      agents: optimizedAgents,
+      orchestratorEvents: [], // TODO: Generate from events
+      userPrompts: timelineUserPrompts.value,
+      agentBatches: optimizedBatches,
+      agentPaths: optimizedAgents,
       messages: timelineMessages.value,
-      user_prompts: timelineUserPrompts.value,
-      
-      viewport: {
-        width: transformOptions.viewport_width,
-        height: calculatedHeight,
-        padding: {
-          top: 60,
-          right: 40,
-          bottom: 40,
-          left: 80
-        }
+      timeRange: {
+        start: timeDomain.start,
+        end: timeDomain.end,
+        duration: timeDomain.end - timeDomain.start,
+        pixelsPerMs: scale.timeToX(1) - scale.timeToX(0)
       },
-      
-      session: {
-        id: transformOptions.session_filter || 'all',
-        start_time: timeDomain.start,
-        end_time: timeDomain.end,
-        total_agents: agents.value.length,
-        is_active: agents.value.some(a => a.status !== 'completed')
-      }
+      sessionId: transformOptions.session_filter || 'all',
+      lastUpdated: Date.now()
     };
   });
 
@@ -455,19 +426,13 @@ export function useTimelineData(options: TimelineTransformOptions = {}) {
   function getAgentTypeColor(type: string): string {
     const colorMap: Record<string, string> = {
       'engineer': '#3b82f6',
-      'tester': '#10b981', 
+      'gatekeeper': '#10b981',
       'architect': '#8b5cf6',
-      'reviewer': '#f59e0b',
       'planner': '#ef4444',
-      'analyst': '#06b6d4',
-      'researcher': '#84cc16',
-      'designer': '#ec4899',
-      'cloud-cicd': '#6366f1',
-      'general-purpose': '#6b7280',
-      'deep-researcher': '#059669',
       'business-analyst': '#dc2626',
-      'green-verifier': '#16a34a',
-      'code-reviewer': '#ca8a04'
+      'designer': '#ec4899',
+      'deep-researcher': '#059669',
+      'agent-orchestrator': '#6366f1'
     };
     return colorMap[type] || '#6b7280';
   }
