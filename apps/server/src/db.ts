@@ -292,7 +292,13 @@ export function getSubagents(sessionId: string) {
     ORDER BY created_at DESC
   `);
   
-  return stmt.all(sessionId) as any[];
+  const agents = stmt.all(sessionId) as any[];
+  
+  // Map completed_at to completion_timestamp for client compatibility
+  return agents.map(agent => ({
+    ...agent,
+    completion_timestamp: agent.completed_at
+  }));
 }
 
 export function getAllSubagentMessages() {

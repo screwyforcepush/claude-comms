@@ -582,7 +582,7 @@ const visibleAgents = computed(() => {
     agentId: agent.id.toString(),
     type: agent.subagent_type,
     startTime: agent.created_at,
-    endTime: agent.completion_timestamp || null,
+    endTime: agent.completion_timestamp || agent.completed_at || null,
     status: agent.status || 'pending'
   }));
 

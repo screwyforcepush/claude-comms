@@ -57,7 +57,8 @@ export interface AgentStatus {
   duration?: number;
   token_count?: number;
   tool_count?: number;
-  completion_timestamp?: number;
+  completion_timestamp?: number; // Preferred field name
+  completed_at?: number; // Fallback for backward compatibility
 }
 
 export interface SubagentMessage {

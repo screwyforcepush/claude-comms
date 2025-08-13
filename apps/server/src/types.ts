@@ -23,6 +23,7 @@ export interface Subagent {
   created_at: number;
   status?: string;
   completed_at?: number;
+  completion_timestamp?: number; // Mapped from completed_at for client compatibility
   completion_metadata?: any;
 }
 
