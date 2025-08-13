@@ -69,6 +69,7 @@ docs/
 - **SoT**: Source-of-Truth requirements document
 - **Agent Orchestrator**: Your strategic advisor for team composition, batch sequencing, and workflow optimization
 - **Verification Gate**: Quality checkpoint that must pass before proceeding
+- **frontmatter**: the frontmatter block in the agent filie is for the your benefit, the agent does not see this in their prompt. it describes the agent to you and how to use it!
 
 ### Operating Principles
 

@@ -137,7 +137,7 @@ Create a bespoke workflow for the Agent, leveraging specific tool instruction an
 - Use perplexity ask to research
 - lint, dev, test, build commands
 - Use Playwrite to capture screenshots and "visually inspect" them
-- Phase level documentation artifacts in docs/project/phases/<phaseNumberName>
+- Phase level documentation artifacts in docs/project/phases/<phase-id>
 - Project level gold docs in docs/project/guides/ 
 - Source of truth spec docs in docs/project/spec/
 - allign witih source of truth spec
@@ -156,7 +156,7 @@ Batch an Inbox Check with every step
    5. PONDER allignment with Business Logic spec
    6. Use perplexity ask to research best practices, architecture approaches and reference implementations  
    7. THINK HARD and weigh up approach options within codebase and Business Logic context
-   8. Draft the solution design, implementation plan, success criteria, checklist document in your docs/project/phases/<phaseNumberName> dir
+   8. Draft the solution design, implementation plan, success criteria, checklist document in your docs/project/phases/<phase-id> dir
 
 COMPLETION GATE: Complete Impact analysis checklist:
 □ Modules Affected: List all components that need changes
@@ -174,7 +174,7 @@ Example Workflow: Implement, Test, Itterate:
 Batch an Inbox Check with every step
 
    1. Start broad with Bash `tree --gitignore` → project shape
-   2. Read relevant docs/project/guides/ and docs/project/phases/<phaseNumberName>/ docs relevant to your assignment.
+   2. Read relevant docs/project/guides/ and docs/project/phases/<phase-id>/ docs relevant to your assignment.
    3. Search/grep/glob codebase multiple rounds → existing patterns + conventions
    2. Apply Behavior-Driven Development + Test-Driven Development (BDDTDD) for solution implementation. Relevant Business Logic and User Flows defined in docs/project/spec/ must be represented by the test suite!
    3. Run lint, dev, test, build commands for itterative feedback loop. You can not introduce regressions!
@@ -200,7 +200,7 @@ Batch an Inbox Check with every step
    2. Review the code and associated tests. Relevant Business Logic and User Flows defined in the Businesslogic spec must be represented by the test suite!
    3. Visually inspect screenshots provided of UI changes.
    4. clean up any temp files like bespoke logs, screenshots, custom scripts, markdown files, etc. and/or update gitignore as needed.
-   5. THINK HARD about updating documentation in docs/project/phases/<phaseNumberName>. check off work completed sucessfully, or note issues for work you find incomplete. 
+   5. THINK HARD about updating documentation in docs/project/phases/<phase-id>. check off work completed sucessfully, or note issues for work you find incomplete. 
    6. Update project level documentation like READMEs, docs/project/guides/ to reflect actual changes.
 
 REPORT back to the user the status of each:
