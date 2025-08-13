@@ -26,7 +26,7 @@
         :height="containerHeight"
         class="absolute top-0 left-0 w-full h-full"
         @mousemove="handleMouseMove"
-        @click="handleClick"
+        @click="handleClickAndHideTooltip"
         @wheel="handleWheel"
         @mouseleave="hideTooltip"
       >
@@ -155,6 +155,25 @@
               @mouseenter="showAgentTooltip(agent, $event)"
               @mouseleave="hideTooltip"
             />
+            
+            <!-- Agent Type-Name Label on Branch -->
+            <text 
+              :x="getAgentLabelX(agent, index)"
+              :y="getAgentLaneY(index, agent) - 5"
+              text-anchor="middle" 
+              :fill="getAgentColor(agent.type)"
+              font-size="10px"
+              font-weight="600"
+              font-family="system-ui"
+              class="cursor-pointer select-none drop-shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-opacity duration-200"
+              :class="agent.agentId === selectedAgent?.id?.toString() ? 'opacity-100 font-bold' : 'opacity-80 hover:opacity-100'"
+              @click="selectAgentPath(agent)"
+              @mouseenter="showAgentTooltip(agent, $event)"
+              @mouseleave="hideTooltip"
+            >
+              {{ agent.type }}-{{ agent.name }}
+            </text>
+
             <!-- Direction indicator arrow - REMOVED -->
             
             <!-- Agent labels removed - will be handled by path-based labeling -->
@@ -242,7 +261,7 @@
               :cx="message.position.x" 
               :cy="message.position.y"
               :r="getMessageRadius(message)"
-              fill="#ffd93d"
+              :fill="getMessageColor(message)"
               stroke="#ffffff"
               stroke-width="1"
               :class="getMessageClasses(message)"
@@ -258,7 +277,7 @@
               :cy="message.position.y"
               r="8"
               fill="none"
-              stroke="#ffd93d"
+              :stroke="getMessageColor(message)"
               stroke-width="2"
               opacity="0.6"
               class="animate-pulse"
@@ -271,7 +290,7 @@
           <g v-for="flow in messageFlows" :key="`flow-${flow.from.id}-${flow.to.id}`">
             <path
               :d="flow.path"
-              stroke="#ffd93d"
+              :stroke="getMessageColor(flow.from)"
               stroke-width="1"
               fill="none"
               stroke-dasharray="3,3"
@@ -330,10 +349,23 @@
         @highlight-timeline="highlightMessage"
       />
 
+      <!-- Agent Detail Pane -->
+      <AgentDetailPane 
+        :visible="agentDetailPaneVisible"
+        :selected-agent="selectedAgent"
+        :messages="props.messages"
+        :session-id="props.sessionId"
+        @close="closeAgentDetailPane"
+        @message-selected="handleMessageSelectedFromAgent"
+        @highlight-timeline="highlightAgent"
+      />
+
       <!-- Timeline Tooltip -->
       <TimelineTooltip 
         :visible="tooltip.visible"
         :tooltip-data="tooltip"
+        @tooltip-mouse-enter="onTooltipMouseEnter"
+        @tooltip-mouse-leave="onTooltipMouseLeave"
       />
 
       <!-- Loading Overlay -->
@@ -423,6 +455,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import type { AgentStatus, SubagentMessage } from '../types';
 import MessageDetailPane from './MessageDetailPane.vue';
+import AgentDetailPane from './AgentDetailPane.vue';
 import TimelineTooltip from './TimelineTooltip.vue';
 
 // Component Props
@@ -487,6 +520,7 @@ const selectedMessage = ref<SubagentMessage | null>(null);
 const selectedAgent = ref<AgentStatus | null>(null);
 const highlightedMessageId = ref<string>('');
 const detailPaneVisible = ref(false);
+const agentDetailPaneVisible = ref(false);
 const tooltip = ref<{
   visible: boolean;
   type: 'agent' | 'message' | 'batch' | 'prompt' | 'generic';
@@ -792,6 +826,29 @@ const getAgentEndX = (agent: any): number => {
   return getTimeX(endTime);
 };
 
+const getAgentLabelX = (agent: any, index: number): number => {
+  const startX = getAgentStartX(agent);
+  const endX = getAgentEndX(agent);
+  
+  // Position label in the middle of the horizontal section
+  // Based on the curve path logic, the horizontal section starts after the curve-out
+  const branchOutDistance = 6; // Should match the curve calculation (2 * 3)
+  const mergeBackDistance = 6;  // Should match the curve calculation (2 * 3)
+  
+  if (agent.status === 'completed' && agent.endTime) {
+    // For completed agents, position in the middle of the horizontal section
+    const horizontalStart = startX + branchOutDistance;
+    const horizontalEnd = endX - mergeBackDistance;
+    return (horizontalStart + horizontalEnd) / 2;
+  } else {
+    // For in-progress agents, position towards the end of the current horizontal section
+    const horizontalStart = startX + branchOutDistance;
+    const currentLength = Math.max(0, endX - horizontalStart);
+    // Position at 60% along the horizontal section to avoid overlap with the branch end
+    return horizontalStart + (currentLength * 0.6);
+  }
+};
+
 // New helper function for curved agent paths
 const getAgentCurvePath = (agent: any, index: number, agentY?: number): string => {
   const startX = getAgentStartX(agent);
@@ -879,6 +936,23 @@ const getMessageRadius = (message: any): number => {
   return 3;
 };
 
+// Get message color based on read status
+const getMessageColor = (message: SubagentMessage): string => {
+  const notified = message.notified || [];
+  const totalAgents = visibleAgents.value.length;
+  
+  if (notified.length === 0) {
+    // Unread by all agents - orange
+    return '#ff9500';
+  } else if (notified.length < totalAgents) {
+    // Read by some agents - yellow
+    return '#ffd93d';
+  } else {
+    // Read by all agents - blue
+    return '#3b82f6';
+  }
+};
+
 const getMessageClasses = (message: any): string => {
   const baseClasses = 'cursor-pointer transition-all duration-200 animate-pulse';
   const isSelected = isMessageSelected(message);
@@ -926,6 +1000,12 @@ const handleClick = (event: MouseEvent) => {
   }
 };
 
+const handleClickAndHideTooltip = (event: MouseEvent) => {
+  // Combine both click functionalities
+  handleClick(event);
+  hideTooltipImmediate();
+};
+
 const handleWheel = (event: WheelEvent) => {
   event.preventDefault();
   const zoomFactor = 1.1;
@@ -949,6 +1029,7 @@ const selectAgentPath = (agent: any) => {
   selectedAgent.value = agent;
   selectedMessage.value = null;
   detailPaneVisible.value = false;
+  agentDetailPaneVisible.value = true;
   emit('agent-path-clicked', agent);
   emit('selection-changed', { agent });
 };
@@ -965,15 +1046,40 @@ const handleAgentSelected = (agent: AgentStatus) => {
   emit('agent-selected', agent);
 };
 
+const handleMessageSelectedFromAgent = (message: SubagentMessage) => {
+  selectedMessage.value = message;
+  selectedAgent.value = null;
+  agentDetailPaneVisible.value = false;
+  detailPaneVisible.value = true;
+  emit('message-clicked', message);
+  emit('selection-changed', { message });
+};
+
+const highlightAgent = (agentId: number) => {
+  // Find and highlight the agent on timeline
+  const agent = visibleAgents.value.find(a => a.agentId === agentId.toString());
+  if (agent) {
+    selectedAgent.value = agent;
+    // Trigger selection animation or highlight effect
+    emit('agent-selected', agent);
+  }
+};
+
 const closeDetailPane = () => {
   detailPaneVisible.value = false;
   selectedMessage.value = null;
+};
+
+const closeAgentDetailPane = () => {
+  agentDetailPaneVisible.value = false;
+  selectedAgent.value = null;
 };
 
 const clearSelections = () => {
   selectedMessage.value = null;
   selectedAgent.value = null;
   detailPaneVisible.value = false;
+  agentDetailPaneVisible.value = false;
   emit('selection-changed', {});
 };
 
@@ -986,68 +1092,123 @@ const highlightMessage = (messageId: string) => {
   }, 3000);
 };
 
-// Tooltip functions
+// Tooltip state management with delays
+let tooltipShowTimer: number | null = null;
+let tooltipHideTimer: number | null = null;
+const TOOLTIP_SHOW_DELAY = 200; // ms - reduced for better responsiveness
+const TOOLTIP_HIDE_DELAY = 150; // ms - slightly increased for stability
+
+const clearTooltipTimers = () => {
+  if (tooltipShowTimer) {
+    clearTimeout(tooltipShowTimer);
+    tooltipShowTimer = null;
+  }
+  if (tooltipHideTimer) {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = null;
+  }
+};
+
+// Tooltip functions with improved stability
 const showAgentTooltip = (agent: any, event: MouseEvent) => {
-  const rect = (event.target as SVGElement).getBoundingClientRect();
-  tooltip.value = {
-    visible: true,
-    type: 'agent' as const,
-    data: {
-      name: agent.name,
-      type: agent.type,
-      status: agent.status,
-      color: getAgentColor(agent.type),
-      duration: agent.duration
-    },
-    position: { x: rect.left + rect.width / 2, y: rect.top }
-  };
+  clearTooltipTimers();
+  
+  tooltipShowTimer = window.setTimeout(() => {
+    tooltip.value = {
+      visible: true,
+      type: 'agent' as const,
+      data: {
+        name: agent.name,
+        type: agent.type,
+        status: agent.status,
+        color: getAgentColor(agent.type),
+        duration: agent.duration
+      },
+      position: { x: event.clientX, y: event.clientY }
+    };
+  }, TOOLTIP_SHOW_DELAY);
 };
 
 const showMessageTooltip = (message: any, event: MouseEvent) => {
-  const rect = (event.target as SVGElement).getBoundingClientRect();
-  const preview = typeof message.message === 'string' 
-    ? message.message.substring(0, 50) + (message.message.length > 50 ? '...' : '')
-    : 'Object message';
-    
-  tooltip.value = {
-    visible: true,
-    type: 'message' as const,
-    data: {
-      sender: message.sender,
-      created_at: message.created_at,
-      preview
-    },
-    position: { x: rect.left + rect.width / 2, y: rect.top }
-  };
+  clearTooltipTimers();
+  
+  tooltipShowTimer = window.setTimeout(() => {
+    const preview = typeof message.message === 'string' 
+      ? message.message.substring(0, 50) + (message.message.length > 50 ? '...' : '')
+      : 'Object message';
+      
+    tooltip.value = {
+      visible: true,
+      type: 'message' as const,
+      data: {
+        sender: message.sender,
+        created_at: message.created_at,
+        preview
+      },
+      position: { x: event.clientX, y: event.clientY }
+    };
+  }, TOOLTIP_SHOW_DELAY);
 };
 
 const showBatchTooltip = (batch: any, event: MouseEvent) => {
-  const rect = (event.target as SVGElement).getBoundingClientRect();
-  tooltip.value = {
-    visible: true,
-    type: 'batch' as const,
-    data: batch,
-    position: { x: rect.left + rect.width / 2, y: rect.top }
-  };
+  clearTooltipTimers();
+  
+  tooltipShowTimer = window.setTimeout(() => {
+    tooltip.value = {
+      visible: true,
+      type: 'batch' as const,
+      data: batch,
+      position: { x: event.clientX, y: event.clientY }
+    };
+  }, TOOLTIP_SHOW_DELAY);
 };
 
 const showPromptTooltip = (prompt: any, event: MouseEvent) => {
-  const rect = (event.target as SVGElement).getBoundingClientRect();
-  tooltip.value = {
-    visible: true,
-    type: 'prompt' as const,
-    data: prompt,
-    position: { x: rect.left + rect.width / 2, y: rect.top }
-  };
+  clearTooltipTimers();
+  
+  tooltipShowTimer = window.setTimeout(() => {
+    tooltip.value = {
+      visible: true,
+      type: 'prompt' as const,
+      data: prompt,
+      position: { x: event.clientX, y: event.clientY }
+    };
+  }, TOOLTIP_SHOW_DELAY);
 };
 
 const hideTooltip = () => {
+  clearTooltipTimers();
+  
+  tooltipHideTimer = window.setTimeout(() => {
+    tooltip.value = {
+      visible: false,
+      type: 'generic',
+      data: null,
+      position: { x: 0, y: 0 }
+    };
+  }, TOOLTIP_HIDE_DELAY);
+};
+
+// Immediate hide function for specific cases
+const hideTooltipImmediate = () => {
+  clearTooltipTimers();
   tooltip.value = {
     visible: false,
     type: 'generic',
     data: null,
     position: { x: 0, y: 0 }
   };
+};
+
+// Tooltip hover tolerance handlers
+const onTooltipMouseEnter = () => {
+  // Cancel any pending hide when hovering over tooltip
+  clearTooltipTimers();
+};
+
+const onTooltipMouseLeave = () => {
+  // Hide tooltip when leaving tooltip area
+  hideTooltip();
 };
 
 // Performance-optimized update batching
@@ -1128,8 +1289,9 @@ onUnmounted(() => {
   // Clear pending updates
   pendingUpdates = [];
   
-  // Clear any remaining timeouts
-  hideTooltip();
+  // Clear tooltip timers and hide immediately
+  clearTooltipTimers();
+  hideTooltipImmediate();
   
   // Clean up lane occupancy maps
   laneOccupancy.value.clear();
@@ -1279,6 +1441,12 @@ watch(() => props.height, (newHeight) => {
   /* Simplify gradients on mobile */
   .agent-lane path {
     stroke: currentColor !important;
+  }
+  
+  /* Optimize agent labels for mobile */
+  .agent-lane text {
+    font-size: 8px !important;
+    font-weight: 500;
   }
   
   /* Hide less important elements on small screens */

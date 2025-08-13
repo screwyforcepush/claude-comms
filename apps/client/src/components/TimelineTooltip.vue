@@ -2,8 +2,11 @@
   <teleport to="body">
     <div
       v-if="visible && tooltipData"
-      class="timeline-tooltip fixed z-[9999] max-w-xs pointer-events-none"
+      class="timeline-tooltip fixed z-[9999] max-w-xs"
+      :class="{ 'pointer-events-none': !visible }"
       :style="tooltipStyle"
+      @mouseenter="onTooltipMouseEnter"
+      @mouseleave="onTooltipMouseLeave"
     >
       <div class="bg-gray-900 border border-gray-600 rounded-lg shadow-2xl p-3 text-sm">
         <!-- Tooltip Arrow -->
@@ -138,6 +141,12 @@ const props = defineProps<{
   tooltipData: TooltipData | null;
 }>();
 
+// Component Events
+const emit = defineEmits<{
+  'tooltip-mouse-enter': [];
+  'tooltip-mouse-leave': [];
+}>();
+
 // Computed styles
 const tooltipStyle = computed(() => {
   if (!props.tooltipData) return {};
@@ -148,24 +157,30 @@ const tooltipStyle = computed(() => {
     height: window.innerHeight
   };
 
-  // Calculate optimal position to avoid viewport edges
-  let left = x + 15;
-  let top = y - 10;
+  // Calculate optimal position to avoid viewport edges with improved stability
+  let left = x + 20;
+  let top = y - 15;
   
-  // Adjust if tooltip would go off-screen
+  // Adjust if tooltip would go off-screen with better boundaries
   const tooltipWidth = 320; // max-w-xs approximation
-  const tooltipHeight = 150; // estimated height
+  const tooltipHeight = 180; // estimated height
+  const margin = 30; // increased margin for stability
 
-  if (left + tooltipWidth > viewport.width - 20) {
-    left = x - tooltipWidth - 15;
+  if (left + tooltipWidth > viewport.width - margin) {
+    left = x - tooltipWidth - 20;
   }
   
-  if (top + tooltipHeight > viewport.height - 20) {
-    top = y - tooltipHeight + 10;
+  if (top + tooltipHeight > viewport.height - margin) {
+    top = y - tooltipHeight + 15;
   }
 
-  if (top < 20) {
-    top = y + 25;
+  if (top < margin) {
+    top = y + 30;
+  }
+  
+  // Ensure tooltip doesn't go off left edge
+  if (left < margin) {
+    left = margin;
   }
 
   return {
@@ -242,11 +257,22 @@ const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
 };
+
+// Mouse event handlers for tooltip hover tolerance
+const onTooltipMouseEnter = () => {
+  emit('tooltip-mouse-enter');
+};
+
+const onTooltipMouseLeave = () => {
+  emit('tooltip-mouse-leave');
+};
 </script>
 
 <style scoped>
 .timeline-tooltip {
   animation: tooltipFadeIn 0.15s ease-out;
+  /* Add a small buffer zone around the tooltip for better hover stability */
+  padding: 2px;
 }
 
 @keyframes tooltipFadeIn {

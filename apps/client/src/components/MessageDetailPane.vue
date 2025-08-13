@@ -235,7 +235,7 @@ const getMessageType = (message: SubagentMessage): string => {
   return 'message';
 };
 
-const getMessageRecipients = (message: SubagentMessage): string[] => {
+const getMessageRecipients = (_message: SubagentMessage): string[] => {
   // Since SubagentMessage doesn't have recipients field, infer from message content or return empty
   return [];
 };

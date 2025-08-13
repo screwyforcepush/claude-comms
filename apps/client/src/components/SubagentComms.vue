@@ -55,17 +55,8 @@
         
         <!-- Timeline View -->
         <div v-if="activeView === 'timeline'" class="h-full">
-          <div class="mb-4 flex justify-end">
-            <button
-              @click="timelineMode = timelineMode === 'basic' ? 'interactive' : 'basic'"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-            >
-              {{ timelineMode === 'basic' ? '🎯 Enable Interactions' : '📊 Basic View' }}
-            </button>
-          </div>
           
           <InteractiveAgentTimeline 
-            v-if="timelineMode === 'interactive'"
             :session-id="selectedSessionId"
             :agents="subagents"
             :messages="messages"
@@ -81,22 +72,6 @@
             @highlight-message="handleHighlightMessage"
             @selection-changed="handleSelectionChanged"
           />
-          
-          <AgentTimeline 
-            v-else
-            :session-id="selectedSessionId"
-            :agents="subagents"
-            :messages="messages"
-            :ws-connection="props.wsConnection"
-            :height="600"
-            :show-controls="true"
-            :auto-zoom="true"
-            :follow-latest="true"
-            @agent-selected="handleAgentSelected"
-            @message-clicked="handleMessageClicked"
-            @batch-selected="handleBatchSelected"
-            @prompt-clicked="handlePromptClicked"
-          />
         </div>
 
         <!-- List View (Original Layout) -->
@@ -108,7 +83,8 @@
               <div 
                 v-for="agent in subagents" 
                 :key="agent.id"
-                class="bg-gray-800 p-3 rounded-lg"
+                class="bg-gray-800 p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
+                @click="handleAgentSelected(agent)"
               >
                 <div class="flex items-center justify-between mb-2">
                   <div class="text-white font-semibold">{{ agent.name }}</div>
@@ -189,14 +165,27 @@
         </div>
       </div>
     </div>
+
+    <!-- Agent Detail Pane -->
+    <AgentDetailPane
+      :visible="showAgentDetails"
+      :selected-agent="selectedAgent"
+      :agents="subagents"
+      :messages="messages"
+      :session-id="selectedSessionId"
+      @close="handleAgentDetailClose"
+      @agent-selected="handleAgentDetailSelected"
+      @message-selected="handleMessageSelectedFromAgent"
+      @highlight-timeline="handleHighlightAgentOnTimeline"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watchEffect } from 'vue';
 import type { Session, AgentStatus, SubagentMessage } from '../types';
-import AgentTimeline from './AgentTimeline.vue';
 import InteractiveAgentTimeline from './InteractiveAgentTimeline.vue';
+import AgentDetailPane from './AgentDetailPane.vue';
 
 const props = defineProps<{
   wsConnection?: any;
@@ -207,7 +196,8 @@ const selectedSessionId = ref('');
 const subagents = ref<AgentStatus[]>([]);
 const messages = ref<SubagentMessage[]>([]);
 const activeView = ref<'timeline' | 'list'>('timeline');
-const timelineMode = ref<'basic' | 'interactive'>('interactive');
+const selectedAgent = ref<AgentStatus | null>(null);
+const showAgentDetails = ref(false);
 let refreshInterval: number | null = null;
 
 const refreshSessions = async () => {
@@ -287,7 +277,8 @@ const formatDuration = (duration: number): string => {
 // Timeline event handlers
 const handleAgentSelected = (agent: AgentStatus) => {
   console.log('Agent selected:', agent);
-  // Future: Show detailed agent information in sidebar
+  selectedAgent.value = agent;
+  showAgentDetails.value = true;
 };
 
 const handleMessageClicked = (message: SubagentMessage) => {
@@ -317,7 +308,31 @@ const handleHighlightMessage = (messageId: string) => {
 
 const handleSelectionChanged = (selection: { agent?: AgentStatus; message?: SubagentMessage }) => {
   console.log('Selection changed:', selection);
-  // Future: Update sidebar or status based on selection
+  if (selection.agent) {
+    selectedAgent.value = selection.agent;
+    showAgentDetails.value = true;
+  }
+};
+
+// Agent detail pane event handlers
+const handleAgentDetailClose = () => {
+  showAgentDetails.value = false;
+  selectedAgent.value = null;
+};
+
+const handleAgentDetailSelected = (agent: AgentStatus) => {
+  selectedAgent.value = agent;
+  // Keep the pane open with the new agent
+};
+
+const handleMessageSelectedFromAgent = (message: SubagentMessage) => {
+  console.log('Message selected from agent detail:', message);
+  // Future: Could show message details or scroll to message in timeline
+};
+
+const handleHighlightAgentOnTimeline = (agentId: number) => {
+  console.log('Highlight agent on timeline:', agentId);
+  // Future: Scroll to and highlight agent on timeline
 };
 
 // Listen to WebSocket for real-time updates

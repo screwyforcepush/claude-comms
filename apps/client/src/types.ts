@@ -59,6 +59,14 @@ export interface AgentStatus {
   tool_count?: number;
   completion_timestamp?: number; // Preferred field name
   completed_at?: number; // Fallback for backward compatibility
+  // Extended performance metrics from database
+  total_duration_ms?: number;
+  total_tokens?: number;
+  total_tool_use_count?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
 }
 
 export interface SubagentMessage {
