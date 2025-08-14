@@ -948,22 +948,53 @@ const timeTicks = computed(() => {
 // ============================================================================
 
 /**
+ * Group agents by batch based on start time proximity (5 second threshold)
+ */
+const getAgentBatches = (session: SessionData): Map<string, SessionAgent[]> => {
+  const batches = new Map<string, SessionAgent[]>();
+  
+  if (session.agents.length === 0) return batches;
+  
+  // Sort agents by start time to ensure proper batch grouping
+  const sortedAgents = [...session.agents].sort((a, b) => a.startTime - b.startTime);
+  
+  sortedAgents.forEach(agent => {
+    // Use 5 second threshold for batch detection
+    const batchKey = `batch_${Math.floor(agent.startTime / 5000)}`;
+    if (!batches.has(batchKey)) {
+      batches.set(batchKey, []);
+    }
+    batches.get(batchKey)!.push(agent);
+  });
+  
+  return batches;
+};
+
+/**
+ * Get the batch-specific lane index for an agent within its batch
+ */
+const getAgentBatchLaneIndex = (agent: SessionAgent, session: SessionData): number => {
+  const batches = getAgentBatches(session);
+  const batchKey = `batch_${Math.floor(agent.startTime / 5000)}`;
+  const batchAgents = batches.get(batchKey) || [];
+  
+  // Find the agent's index within its batch (sorted by start time)
+  const batchIndex = batchAgents.findIndex(a => a.agentId === agent.agentId);
+  
+  // Return 1-based index for proper lane positioning (lane 1 is closest to trunk)
+  return batchIndex >= 0 ? batchIndex + 1 : 1;
+};
+
+/**
  * Calculate the maximum number of agents in any batch for a given session
  */
 const getMaxAgentsInBatches = (session: SessionData): number => {
   if (session.agents.length === 0) return 0;
   
-  // Group agents by batch to find batch sizes
-  const batchAgentCounts = new Map<string, number>();
-  
-  session.agents.forEach(agent => {
-    // Use batch detection based on spawn timing (5 second threshold)
-    const batchKey = `batch_${Math.floor(agent.startTime / 5000)}`;
-    batchAgentCounts.set(batchKey, (batchAgentCounts.get(batchKey) || 0) + 1);
-  });
+  const batches = getAgentBatches(session);
   
   // Return the maximum batch size for this session
-  return Math.max(...Array.from(batchAgentCounts.values()), 0);
+  return Math.max(...Array.from(batches.values()).map(batch => batch.length), 0);
 };
 
 /**
@@ -1028,10 +1059,13 @@ const getSessionOrchestratorY = (sessionIndex: number): number => {
 
 const getAgentLaneY = (agent: SessionAgent, sessionIndex: number): number => {
   const sessionCenterY = getSessionOrchestratorY(sessionIndex);
-  // Ensure laneIndex is valid and normalize it
-  const normalizedLaneIndex = Math.max(1, agent.laneIndex || 1);
+  const session = visibleSessions.value[sessionIndex];
+  
+  // Use batch-specific lane index instead of session-wide lane index
+  const batchLaneIndex = getAgentBatchLaneIndex(agent, session);
+  
   // Position ALL agents below orchestrator line (matching reference implementation)
-  const laneOffset = normalizedLaneIndex * agentLaneHeight;
+  const laneOffset = batchLaneIndex * agentLaneHeight;
   return sessionCenterY + laneOffset;
 };
 
@@ -1316,6 +1350,9 @@ const selectEventIndicator = (indicator: EventIndicator, session: SessionData) =
       y: getSessionOrchestratorY(sessionIndex)
     };
   }
+  
+  // Open the event detail panel
+  openEventPanel(indicator);
   
   emit('event-indicator-clicked', indicator);
   
