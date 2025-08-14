@@ -913,7 +913,7 @@ const getMessageClasses = (message: any): string => {
   
   if (isSelected) return baseClasses + ' drop-shadow-[0_0_16px_#facc15] animate-pulse';
   if (isHighlighted) return baseClasses + ' drop-shadow-[0_0_12px_#facc15]';
-  return baseClasses + ' hover:drop-shadow-[0_0_8px_#facc15] hover:scale-110';
+  return baseClasses + ' hover:drop-shadow-[0_0_8px_#facc15]';
 };
 
 const isMessageSelected = (message: any): boolean => {
