@@ -67,7 +67,7 @@
             <path d="M 60 0 L 0 0 0 40" fill="none" stroke="rgba(59, 130, 246, 0.1)" stroke-width="1"/>
           </pattern>
           
-          <!-- Session colors gradients -->
+          <!-- Orchestrator gradient (matching Agents tab exactly) -->
           <linearGradient id="session-orchestrator" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
             <stop offset="50%" style="stop-color:#00d4ff;stop-opacity:1" />
@@ -84,9 +84,16 @@
             </linearGradient>
           </g>
           
-          <!-- Glow filters -->
-          <filter id="sessionGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <!-- Glow filters (matching Agents tab exactly) -->
+          <filter id="messageGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="agentGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
             <feMerge>
               <feMergeNode in="coloredBlur"/>
               <feMergeNode in="SourceGraphic"/>
@@ -145,17 +152,31 @@
               @click="selectSession(session)"
             />
             
-            <!-- Session Orchestrator Line -->
-            <line 
-              :x1="timelineMargins.left" 
-              :y1="getSessionOrchestratorY(sessionIndex)"
-              :x2="containerWidth - timelineMargins.right" 
-              :y2="getSessionOrchestratorY(sessionIndex)"
-              stroke="url(#session-orchestrator)" 
-              stroke-width="4"
-              class="drop-shadow-[0_0_8px_#00d4ff]"
-              opacity="0.8"
-            />
+            <!-- Session Orchestrator Line Enhanced (matching Agents tab style) -->
+            <g class="session-orchestrator-line" style="z-index: 10;">
+              <!-- Main orchestrator trunk with stronger glow (matching Agents tab) -->
+              <line 
+                :x1="timelineMargins.left" 
+                :y1="getSessionOrchestratorY(sessionIndex)"
+                :x2="containerWidth - timelineMargins.right" 
+                :y2="getSessionOrchestratorY(sessionIndex)"
+                stroke="url(#session-orchestrator)" 
+                stroke-width="6"
+                class="drop-shadow-[0_0_16px_#00d4ff]"
+                style="filter: drop-shadow(0 0 12px #00d4ff) drop-shadow(0 0 6px #00d4ff);"
+              />
+              <!-- Secondary glow layer (matching Agents tab) -->
+              <line 
+                :x1="timelineMargins.left" 
+                :y1="getSessionOrchestratorY(sessionIndex)"
+                :x2="containerWidth - timelineMargins.right" 
+                :y2="getSessionOrchestratorY(sessionIndex)"
+                stroke="#00d4ff" 
+                stroke-width="12"
+                opacity="0.3"
+                class="animate-pulse"
+              />
+            </g>
             
             <!-- Session Label -->
             <text 
@@ -191,8 +212,9 @@
                   :stroke-width="getAgentStrokeWidth(agent.status, isAgentSelected(agent))"
                   :class="getAgentPathClass(agent.status, isAgentSelected(agent))"
                   class="cursor-pointer transition-all duration-200"
+                  :filter="isAgentSelected(agent) ? 'url(#agentGlow)' : ''"
                   fill="none"
-                  @click="selectAgent(agent, session)"
+                  @click="showAgentDetails(agent, session, $event)"
                   @mouseenter="showAgentTooltip(agent, session, $event)"
                   @mouseleave="hideTooltip"
                 />
@@ -208,27 +230,61 @@
                   font-family="system-ui"
                   class="cursor-pointer select-none"
                   :class="isAgentSelected(agent) ? 'opacity-100 font-semibold' : 'opacity-70 hover:opacity-90'"
-                  @click="selectAgent(agent, session)"
+                  @click="showAgentDetails(agent, session, $event)"
                 >
                   {{ agent.name }}
                 </text>
               </g>
             </g>
 
-            <!-- Session Messages -->
-            <g class="session-messages" v-if="session.messages.length > 0">
+            <!-- Session Messages Enhanced (matching Agents tab exactly) -->
+            <g class="session-messages" v-if="session.messages.length > 0" style="z-index: 30;">
               <g v-for="message in session.messages" :key="message.id">
+                <!-- Message glow for visibility (behind main dot) -->
                 <circle 
                   :cx="getTimeX(message.timestamp)" 
                   :cy="getMessageY(message, sessionIndex)"
-                  r="2"
-                  :fill="getMessageColor(message)"
+                  :r="getMessageRadius(message) + 3"
+                  fill="#facc15"
+                  opacity="0.2"
+                  class="animate-pulse"
+                  style="pointer-events: none;"
+                />
+                <!-- Main message dot -->
+                <circle 
+                  :cx="getTimeX(message.timestamp)" 
+                  :cy="getMessageY(message, sessionIndex)"
+                  :r="getMessageRadius(message)"
+                  fill="#facc15"
                   stroke="#ffffff"
-                  stroke-width="1"
-                  class="cursor-pointer transition-all duration-200 hover:drop-shadow-[0_0_6px_currentColor]"
-                  @click="selectMessage(message, session)"
+                  stroke-width="2"
+                  :class="getMessageClasses(message)"
+                  :filter="isMessageSelected(message) ? 'url(#messageGlow)' : ''"
+                  @click="showMessageDetails(message, session, $event)"
                   @mouseenter="showMessageTooltip(message, session, $event)"
                   @mouseleave="hideTooltip"
+                />
+                <!-- Selection ring (matching Agents tab) -->
+                <circle 
+                  v-if="isMessageSelected(message)"
+                  :cx="getTimeX(message.timestamp)" 
+                  :cy="getMessageY(message, sessionIndex)"
+                  r="10"
+                  fill="none"
+                  stroke="#facc15"
+                  stroke-width="2"
+                  opacity="0.8"
+                  class="animate-pulse"
+                />
+                <!-- Message indicator badge for unread status -->
+                <circle 
+                  v-if="!isMessageSelected(message)"
+                  :cx="getTimeX(message.timestamp) + 3" 
+                  :cy="getMessageY(message, sessionIndex) - 3"
+                  r="2"
+                  fill="#ff6b6b"
+                  opacity="0.8"
+                  style="pointer-events: none;"
                 />
               </g>
             </g>
@@ -258,12 +314,19 @@
         </text>
       </svg>
 
-      <!-- Sessions Timeline Tooltip -->
-      <SessionsTooltip 
+      <!-- Sessions Timeline Tooltip (reusing Agents tab component) -->
+      <TimelineTooltip 
         :visible="tooltip.visible"
         :tooltip-data="tooltip"
         @tooltip-mouse-enter="onTooltipMouseEnter"
         @tooltip-mouse-leave="onTooltipMouseLeave"
+      />
+      
+      <!-- Enhanced Detail Panel -->
+      <DetailPanel
+        :visible="detailPanel.visible"
+        :detail-data="detailPanel"
+        @close="hideDetailPanel"
       />
 
       <!-- Loading Overlay -->
@@ -391,8 +454,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import SessionsTooltip from './SessionsTooltip.vue';
+import TimelineTooltip from './TimelineTooltip.vue';
 import SessionFilterPanel from './SessionFilterPanel.vue';
+import DetailPanel from './DetailPanel.vue';
 import { SessionFilterUtils, DEFAULT_SESSION_FILTERS } from '../types/session-filters';
 import type { SessionFilterState } from '../types/session-filters';
 import { SessionDataAdapter } from '../utils/session-data-adapter';
@@ -467,18 +531,7 @@ const initialPanPos = ref({ x: 0, y: 0 });
 const dragDistance = ref(0);
 const PAN_THRESHOLD = 5;
 
-// Momentum pan state
-const panVelocity = ref({ x: 0, y: 0 });
-const lastPanTime = ref(0);
-const lastPanPosition = ref({ x: 0, y: 0 });
-const momentumDecay = 0.95;
-let momentumAnimationId: number | null = null;
-
-// Smooth zoom state
-const isZooming = ref(false);
-const zoomCenter = ref({ x: 0, y: 0 });
-const targetZoom = ref(1);
-let zoomAnimationId: number | null = null;
+// Simplified interaction state - removed complex momentum animations
 
 // Time window transition state
 const isTimeWindowTransitioning = ref(false);
@@ -488,19 +541,33 @@ let timeWindowTransitionId: number | null = null;
 const selectedSession = ref<SessionData | null>(null);
 const selectedAgent = ref<SessionAgent | null>(null);
 const selectedMessage = ref<SessionMessage | null>(null);
+const highlightedMessageId = ref<string>('');
 
 // Loading state
 const isLoading = ref(false);
 
-// Tooltip state
+// Tooltip state (matching Agents tab interface)
 const tooltip = ref<{
   visible: boolean;
-  type: 'session' | 'agent' | 'message';
+  type: 'agent' | 'message' | 'batch' | 'prompt' | 'generic';
   data: any;
   position: { x: number; y: number };
 }>({ 
   visible: false, 
-  type: 'session', 
+  type: 'generic', 
+  data: null, 
+  position: { x: 0, y: 0 } 
+});
+
+// Detail panel state
+const detailPanel = ref<{
+  visible: boolean;
+  type: 'agent' | 'message';
+  data: any;
+  position: { x: number; y: number };
+}>({ 
+  visible: false, 
+  type: 'agent', 
   data: null, 
   position: { x: 0, y: 0 } 
 });
@@ -726,11 +793,17 @@ const getMessageY = (message: SessionMessage, sessionIndex: number): number => {
   const sender = session.agents.find(a => a.name === message.sender);
   
   if (sender) {
-    return getAgentLaneY(sender, sessionIndex);
+    // Position message on the agent's path with slight offset for visibility
+    const agentY = getAgentLaneY(sender, sessionIndex);
+    // Add small random offset to prevent overlap when multiple messages at same time
+    const timeOffset = (message.timestamp % 1000) / 200; // 0-5px offset based on timestamp
+    return agentY + timeOffset;
   }
   
-  // Fallback to orchestrator line
-  return getSessionOrchestratorY(sessionIndex);
+  // Fallback to orchestrator line with slight offset for visibility
+  const orchestratorY = getSessionOrchestratorY(sessionIndex);
+  const timeOffset = (message.timestamp % 1000) / 200;
+  return orchestratorY + timeOffset + 10; // Offset below orchestrator line
 };
 
 // ============================================================================
@@ -764,10 +837,35 @@ const getAgentPathClass = (status: string, isSelected: boolean): string => {
   return classes;
 };
 
+// Enhanced message styling functions (matching Agents tab)
+const getMessageRadius = (message: any): number => {
+  const isSelected = isMessageSelected(message);
+  const isHighlighted = message.id === highlightedMessageId.value;
+  
+  if (isSelected) return 6;
+  if (isHighlighted) return 5;
+  return 4;
+};
+
+// Get message color - now consistent yellow like Agents tab
 const getMessageColor = (message: SessionMessage): string => {
-  // Simple coloring based on message properties
-  // This could be enhanced with read status logic
-  return '#3b82f6';
+  // Use consistent yellow color like Agents tab for all messages
+  return '#facc15'; // Yellow color matching Agents tab
+};
+
+const getMessageClasses = (message: any): string => {
+  const baseClasses = 'cursor-pointer transition-all duration-200';
+  const isSelected = isMessageSelected(message);
+  const isHighlighted = message.id === highlightedMessageId.value;
+  
+  if (isSelected) return baseClasses + ' drop-shadow-[0_0_16px_#facc15] animate-pulse';
+  if (isHighlighted) return baseClasses + ' drop-shadow-[0_0_12px_#facc15]';
+  return baseClasses + ' hover:drop-shadow-[0_0_8px_#facc15] hover:scale-110';
+};
+
+const isMessageSelected = (message: any): boolean => {
+  return selectedMessage.value?.timestamp === message.timestamp && 
+         selectedMessage.value?.sender === message.sender;
 };
 
 const formatTimestamp = (timestamp: number): string => {
@@ -801,6 +899,32 @@ const selectAgent = (agent: SessionAgent, session: SessionData) => {
   emit('agent-selected', agent, session);
 };
 
+const showAgentDetails = (agent: SessionAgent, session: SessionData, event: MouseEvent) => {
+  hideTooltipImmediate(); // Hide any existing tooltips
+  
+  detailPanel.value = {
+    visible: true,
+    type: 'agent',
+    data: {
+      name: agent.name,
+      type: agent.type,
+      status: agent.status,
+      color: getAgentColor(agent.type),
+      duration: agent.endTime ? agent.endTime - agent.startTime : Date.now() - agent.startTime,
+      startTime: agent.startTime,
+      endTime: agent.endTime,
+      sessionName: session.displayName,
+      batchNumber: agent.batchNumber,
+      messageCount: session.messages.filter(m => m.sender === agent.name).length,
+      responsesCount: session.messages.filter(m => m.recipients && m.recipients.includes(agent.name)).length
+    },
+    position: { x: event.clientX, y: event.clientY }
+  };
+  
+  // Also update selection
+  selectAgent(agent, session);
+};
+
 const selectMessage = (message: SessionMessage, session: SessionData) => {
   selectedSession.value = session;
   selectedMessage.value = message;
@@ -808,10 +932,50 @@ const selectMessage = (message: SessionMessage, session: SessionData) => {
   emit('message-selected', message, session);
 };
 
+const showMessageDetails = (message: SessionMessage, session: SessionData, event: MouseEvent) => {
+  hideTooltipImmediate(); // Hide any existing tooltips
+  
+  // Calculate read status
+  const notified = message.notified || [];
+  const relatedAgents = session.agents.filter(a => a.name !== message.sender);
+  const readCount = notified.filter(name => name !== message.sender).length;
+  
+  detailPanel.value = {
+    visible: true,
+    type: 'message',
+    data: {
+      sender: message.sender,
+      content: message.content,
+      timestamp: message.timestamp,
+      sessionName: session.displayName,
+      recipients: message.recipients || relatedAgents.map(a => a.name),
+      readStatus: {
+        readCount,
+        totalRecipients: relatedAgents.length
+      },
+      metadata: message.metadata || null
+    },
+    position: { x: event.clientX, y: event.clientY }
+  };
+  
+  // Also update selection
+  selectMessage(message, session);
+};
+
 const clearSelections = () => {
   selectedSession.value = null;
   selectedAgent.value = null;
   selectedMessage.value = null;
+  hideDetailPanel();
+};
+
+const hideDetailPanel = () => {
+  detailPanel.value = {
+    visible: false,
+    type: 'agent',
+    data: null,
+    position: { x: 0, y: 0 }
+  };
 };
 
 // ============================================================================
@@ -872,76 +1036,20 @@ const getWindowShortcut = (windowValue: number): string => {
 // ============================================================================
 
 const zoomIn = () => {
-  // Center zoom on viewport center
-  if (sessionsContainer.value) {
-    const rect = sessionsContainer.value.getBoundingClientRect();
-    zoomCenter.value = {
-      x: rect.width / 2,
-      y: rect.height / 2
-    };
-  }
-  
-  targetZoom.value = Math.min(zoomLevel.value * 1.25, 10);
-  
-  if (!zoomAnimationId) {
-    animateZoom();
-  }
+  zoomLevel.value = Math.min(zoomLevel.value * 1.25, 10);
+  emit('zoom-changed', zoomLevel.value);
 };
 
 const zoomOut = () => {
-  // Center zoom on viewport center
-  if (sessionsContainer.value) {
-    const rect = sessionsContainer.value.getBoundingClientRect();
-    zoomCenter.value = {
-      x: rect.width / 2,
-      y: rect.height / 2
-    };
-  }
-  
-  targetZoom.value = Math.max(zoomLevel.value / 1.25, 0.1);
-  
-  if (!zoomAnimationId) {
-    animateZoom();
-  }
+  zoomLevel.value = Math.max(zoomLevel.value / 1.25, 0.1);
+  emit('zoom-changed', zoomLevel.value);
 };
 
 const resetView = () => {
-  // Stop any ongoing animations
-  if (zoomAnimationId) {
-    cancelAnimationFrame(zoomAnimationId);
-    zoomAnimationId = null;
-  }
-  if (momentumAnimationId) {
-    cancelAnimationFrame(momentumAnimationId);
-    momentumAnimationId = null;
-  }
-  
-  // Reset to default state with animation
-  targetZoom.value = 1;
-  
-  // Animate reset
-  const animateReset = () => {
-    const zoomDiff = 1 - zoomLevel.value;
-    const panXDiff = -panX.value;
-    const panYDiff = -panY.value;
-    
-    if (Math.abs(zoomDiff) < 0.01 && Math.abs(panXDiff) < 1 && Math.abs(panYDiff) < 1) {
-      zoomLevel.value = 1;
-      panX.value = 0;
-      panY.value = 0;
-      emit('zoom-changed', zoomLevel.value);
-      return;
-    }
-    
-    zoomLevel.value += zoomDiff * 0.15;
-    panX.value += panXDiff * 0.15;
-    panY.value += panYDiff * 0.15;
-    
-    emit('zoom-changed', zoomLevel.value);
-    requestAnimationFrame(animateReset);
-  };
-  
-  animateReset();
+  zoomLevel.value = 1;
+  panX.value = 0;
+  panY.value = 0;
+  emit('zoom-changed', zoomLevel.value);
 };
 
 // ============================================================================
@@ -949,24 +1057,30 @@ const resetView = () => {
 // ============================================================================
 
 const handleMouseDown = (event: MouseEvent) => {
+  // Check if clicking on background (SVG itself) vs interactive elements
   if (event.target === sessionsSvg.value) {
     isPanning.value = true;
     dragStartPos.value = { x: event.clientX, y: event.clientY };
     initialPanPos.value = { x: panX.value, y: panY.value };
     dragDistance.value = 0;
     
+    // Prevent default to avoid text selection
     event.preventDefault();
+    
+    // Add global event listeners for mouse move and up during drag
     document.addEventListener('mousemove', handleGlobalMouseMove);
     document.addEventListener('mouseup', handleGlobalMouseUp);
   }
 };
 
 const handleMouseMove = (event: MouseEvent) => {
+  // This handles mousemove within the SVG area
   if (isPanning.value) {
     updatePanPosition(event);
   }
 };
 
+// Global mouse move handler for smooth dragging outside SVG bounds
 const handleGlobalMouseMove = (event: MouseEvent) => {
   if (isPanning.value) {
     updatePanPosition(event);
@@ -976,86 +1090,33 @@ const handleGlobalMouseMove = (event: MouseEvent) => {
 const updatePanPosition = (event: MouseEvent) => {
   if (!isPanning.value) return;
   
-  const currentTime = performance.now();
   const deltaX = event.clientX - dragStartPos.value.x;
   const deltaY = event.clientY - dragStartPos.value.y;
   
+  // Calculate total drag distance for threshold check
   dragDistance.value = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
   
-  // Calculate velocity for momentum
-  if (lastPanTime.value > 0) {
-    const timeDelta = currentTime - lastPanTime.value;
-    if (timeDelta > 0) {
-      const velX = (event.clientX - lastPanPosition.value.x) / timeDelta;
-      const velY = (event.clientY - lastPanPosition.value.y) / timeDelta;
-      panVelocity.value = { x: velX * 16, y: velY * 16 }; // Scale for 60fps
-    }
-  }
-  
+  // Update pan position
   panX.value = initialPanPos.value.x + deltaX;
   panY.value = initialPanPos.value.y + deltaY;
-  
-  lastPanTime.value = currentTime;
-  lastPanPosition.value = { x: event.clientX, y: event.clientY };
 };
 
-const handleMouseUp = () => {
-  handleGlobalMouseUp();
+const handleMouseUp = (event: MouseEvent) => {
+  handleGlobalMouseUp(event);
 };
 
-const handleGlobalMouseUp = () => {
+// Global mouse up handler
+const handleGlobalMouseUp = (_event: MouseEvent) => {
   if (isPanning.value) {
     isPanning.value = false;
+    
+    // Clean up global event listeners
     document.removeEventListener('mousemove', handleGlobalMouseMove);
     document.removeEventListener('mouseup', handleGlobalMouseUp);
-    
-    // Start momentum animation if velocity is significant
-    const velocityMagnitude = Math.sqrt(
-      panVelocity.value.x * panVelocity.value.x + 
-      panVelocity.value.y * panVelocity.value.y
-    );
-    
-    if (velocityMagnitude > 0.5) {
-      startMomentumAnimation();
-    }
-    
-    // Reset tracking variables
-    lastPanTime.value = 0;
-    lastPanPosition.value = { x: 0, y: 0 };
   }
 };
 
-const startMomentumAnimation = () => {
-  if (momentumAnimationId) {
-    cancelAnimationFrame(momentumAnimationId);
-  }
-  
-  const animateMomentum = () => {
-    const velocityMagnitude = Math.sqrt(
-      panVelocity.value.x * panVelocity.value.x + 
-      panVelocity.value.y * panVelocity.value.y
-    );
-    
-    // Stop animation when velocity is very small
-    if (velocityMagnitude < 0.1) {
-      momentumAnimationId = null;
-      panVelocity.value = { x: 0, y: 0 };
-      return;
-    }
-    
-    // Apply velocity to pan position
-    panX.value += panVelocity.value.x;
-    panY.value += panVelocity.value.y;
-    
-    // Apply decay to velocity
-    panVelocity.value.x *= momentumDecay;
-    panVelocity.value.y *= momentumDecay;
-    
-    momentumAnimationId = requestAnimationFrame(animateMomentum);
-  };
-  
-  momentumAnimationId = requestAnimationFrame(animateMomentum);
-};
+// Removed complex momentum animation - now using direct pan
 
 const handleClickAndHideTooltip = (event: MouseEvent) => {
   if (dragDistance.value < PAN_THRESHOLD) {
@@ -1068,75 +1129,22 @@ const handleClickAndHideTooltip = (event: MouseEvent) => {
 
 const handleWheel = (event: WheelEvent) => {
   event.preventDefault();
-  
-  // Check for Ctrl key for zoom, otherwise pan
-  if (event.ctrlKey || event.metaKey) {
-    handleCursorCenteredZoom(event);
-  } else {
-    // Horizontal scroll for pan
-    const panSpeed = 2;
-    panX.value += event.deltaX * panSpeed;
-    panY.value += event.deltaY * panSpeed;
-  }
-};
-
-const handleCursorCenteredZoom = (event: WheelEvent) => {
-  const rect = sessionsContainer.value?.getBoundingClientRect();
-  if (!rect) return;
-  
-  // Calculate cursor position relative to container
-  const cursorX = event.clientX - rect.left;
-  const cursorY = event.clientY - rect.top;
-  
-  // Store zoom center point
-  zoomCenter.value = { x: cursorX, y: cursorY };
-  
-  // Calculate zoom factor
-  const zoomFactor = 1.15;
-  const oldZoom = zoomLevel.value;
-  
+  const zoomFactor = 1.1;
   if (event.deltaY < 0) {
-    targetZoom.value = Math.min(oldZoom * zoomFactor, 10);
+    zoomLevel.value = Math.min(zoomLevel.value * zoomFactor, 10);
   } else {
-    targetZoom.value = Math.max(oldZoom / zoomFactor, 0.1);
+    zoomLevel.value = Math.max(zoomLevel.value / zoomFactor, 0.1);
   }
-  
-  // Start smooth zoom animation
-  if (!zoomAnimationId) {
-    animateZoom();
-  }
-};
-
-const animateZoom = () => {
-  const currentZoom = zoomLevel.value;
-  const zoomDiff = targetZoom.value - currentZoom;
-  
-  if (Math.abs(zoomDiff) < 0.01) {
-    zoomLevel.value = targetZoom.value;
-    zoomAnimationId = null;
-    emit('zoom-changed', zoomLevel.value);
-    return;
-  }
-  
-  // Smooth zoom interpolation
-  const zoomStep = zoomDiff * 0.15;
-  zoomLevel.value += zoomStep;
-  
-  // Adjust pan to keep zoom center in same position
-  const zoomRatio = zoomLevel.value / currentZoom;
-  const centerX = zoomCenter.value.x - timelineMargins.left;
-  const centerY = zoomCenter.value.y - timelineMargins.top;
-  
-  panX.value = (panX.value + centerX) * zoomRatio - centerX;
-  panY.value = (panY.value + centerY) * zoomRatio - centerY;
-  
   emit('zoom-changed', zoomLevel.value);
-  
-  zoomAnimationId = requestAnimationFrame(animateZoom);
 };
 
+// Removed complex cursor-centered zoom animations - now using direct zoom
+
+// Mouse leave handler that combines tooltip hiding and pan cleanup
 const handleMouseLeave = () => {
   hideTooltip();
+  
+  // Clean up any ongoing pan operation when mouse leaves the timeline
   if (isPanning.value) {
     isPanning.value = false;
     document.removeEventListener('mousemove', handleGlobalMouseMove);
@@ -1170,11 +1178,13 @@ const showAgentTooltip = (agent: SessionAgent, session: SessionData, event: Mous
   tooltipShowTimer = window.setTimeout(() => {
     tooltip.value = {
       visible: true,
-      type: 'agent',
+      type: 'agent' as const,
       data: {
-        agent,
-        session,
-        color: getAgentColor(agent.type)
+        name: agent.name,
+        type: agent.type,
+        status: agent.status,
+        color: getAgentColor(agent.type),
+        duration: agent.endTime ? agent.endTime - agent.startTime : Date.now() - agent.startTime
       },
       position: { x: event.clientX, y: event.clientY }
     };
@@ -1185,17 +1195,20 @@ const showMessageTooltip = (message: SessionMessage, session: SessionData, event
   clearTooltipTimers();
   
   tooltipShowTimer = window.setTimeout(() => {
-    const preview = typeof message.content === 'string' 
-      ? message.content.substring(0, 50) + (message.content.length > 50 ? '...' : '')
+    const content = message.content || message.message || 'No content';
+    const preview = typeof content === 'string' 
+      ? content.substring(0, 100) + (content.length > 100 ? '...' : '')
       : 'Object message';
       
     tooltip.value = {
       visible: true,
-      type: 'message',
+      type: 'message' as const,
       data: {
-        message,
-        session,
-        preview
+        sender: message.sender,
+        created_at: message.timestamp,
+        preview,
+        sessionName: session.displayName,
+        fullContent: content
       },
       position: { x: event.clientX, y: event.clientY }
     };
@@ -1208,7 +1221,7 @@ const hideTooltip = () => {
   tooltipHideTimer = window.setTimeout(() => {
     tooltip.value = {
       visible: false,
-      type: 'session',
+      type: 'generic',
       data: null,
       position: { x: 0, y: 0 }
     };
@@ -1219,7 +1232,7 @@ const hideTooltipImmediate = () => {
   clearTooltipTimers();
   tooltip.value = {
     visible: false,
-    type: 'session',
+    type: 'generic',
     data: null,
     position: { x: 0, y: 0 }
   };
@@ -1286,9 +1299,13 @@ const loadPersistedFilters = () => {
 const updateDimensions = () => {
   if (sessionsContainer.value) {
     containerWidth.value = sessionsContainer.value.clientWidth;
+    
+    // Calculate total height based on dynamic session heights
+    const totalSessionsHeight = visibleSessions.value.length * sessionLaneHeight;
+    
     containerHeight.value = Math.max(
       props.height,
-      timelineMargins.top + (visibleSessions.value.length * sessionLaneHeight) + timelineMargins.bottom
+      timelineMargins.top + totalSessionsHeight + timelineMargins.bottom
     );
   }
 };
@@ -1298,6 +1315,12 @@ const handleKeydown = (event: KeyboardEvent) => {
   // Ignore keyboard events when user is typing in inputs
   if ((event.target as HTMLElement)?.tagName === 'INPUT' || 
       (event.target as HTMLElement)?.tagName === 'TEXTAREA') {
+    return;
+  }
+  
+  // Handle Escape key for detail panel
+  if (event.key === 'Escape' && detailPanel.value.visible) {
+    hideDetailPanel();
     return;
   }
   
@@ -1381,15 +1404,7 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', handleGlobalMouseMove);
   document.removeEventListener('mouseup', handleGlobalMouseUp);
   
-  // Clean up all animations
-  if (zoomAnimationId) {
-    cancelAnimationFrame(zoomAnimationId);
-    zoomAnimationId = null;
-  }
-  if (momentumAnimationId) {
-    cancelAnimationFrame(momentumAnimationId);
-    momentumAnimationId = null;
-  }
+  // Clean up time window transitions (keep this one for window switching)
   if (timeWindowTransitionId) {
     cancelAnimationFrame(timeWindowTransitionId);
     timeWindowTransitionId = null;
@@ -1397,7 +1412,6 @@ onUnmounted(() => {
   
   // Reset animation state
   isTimeWindowTransitioning.value = false;
-  panVelocity.value = { x: 0, y: 0 };
   
   clearTooltipTimers();
 });

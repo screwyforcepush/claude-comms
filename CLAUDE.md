@@ -86,14 +86,14 @@ Example:
 
 **Pattern 1: Parallel Implementation → Verification**
 ```
-Batch 1: [Engineer-1, Engineer-2, Engineer-3, Tester] (all work simultaneously)
+Batch 1: [Engineer-1, Engineer-2, Engineer-3, Designer, Architect] (all work simultaneously and collaborativly)
 Wait for completion
-Batch 2: [Code-Reviewer, Green-Verifier] (verify all Batch 1 work)
+Batch 2: [gatekeeper-1, gatekeeper-2] (verify all Batch 1 work)
 ```
 
 **Pattern 2: Design + Research → Implementation**
 ```
-Batch 1: [Architect, Deep-Researcher, Designer] (parallel discovery)
+Batch 1: [business-analyst, Architect, Deep-Researcher, Designer] (parallel discovery)
 Wait for completion
 Batch 2: [Engineer-1, Engineer-2, Engineer-3] (implement based on Batch 1 outputs)
 ```
@@ -116,11 +116,12 @@ Batch 1: Planning
 Batch 2: Implementation  
 - MikeChang: Engineer - Implement backend
 - LisaWong: Engineer - Implement frontend
-- TomBrown: Tester - Write tests
+- TomBrown: Engineer - Write tests
 
 Batch 3: Verification
-- AmyLee: Code-Reviewer - Review all changes
-- JohnDoe: Green-Verifier - Validate build/tests
+- AmyLee: gatekeeper - Review all changes
+- JohnDoe: gatekeeper - Validate build/tests
+- SinClair: gatekeeper - Script playsright to screenshot UI then visually inspect
 ```
 
 ### Large Feature (8-12 agents)
@@ -137,36 +138,37 @@ Batch 2: Massive Parallel Implementation (8 agents)
 - KevinWang: Engineer - Business logic
 - RachelGreen: Engineer - Frontend components
 - SteveMartin: Engineer - Integration layer
-- JenniferLee: Tester - Unit tests
-- MichaelScott: Tester - E2E tests
+- JenniferLee: Engineer - Unit tests
+- MichaelScott: Engineer - E2E tests
 - PaulAllen: Engineer - Documentation
 
 Batch 3: Comprehensive Verification (4 agents)
-- ChrisEvans: Code-Reviewer - Backend review
-- DianaPrice: Code-Reviewer - Frontend review
-- GeorgeKing: Green-Verifier - All checks
+- ChrisEvans: gatekeeper - Backend review
+- DianaPrice: gatekeeper - Frontend review
+- GeorgeKing: gatekeeper - All checks green
 - HelenCarter: Business-Analyst - Acceptance validation
 ```
 
 ### Bug Fix Workflow
 ```
 Batch 1: Investigation
-- AlexJohnson: Engineer - Reproduce and diagnose
+- AlexJohnson: Engineer - Collaborativly Reproduce and diagnose
+- BillStopson: Architect - Collaborativly Reproduce and diagnose
 
 Batch 2: Fix & Test (parallel)
 - BrianMiller: Engineer - Implement fix
-- CarolWhite: Tester - Write regression test
+- CarolWhite: Engineer - Write regression test
 
 Batch 3: Verification
-- DanielBrown: Code-Reviewer - Validate approach
-- EvaGarcia: Green-Verifier - Confirm all green
+- DanielBrown: Gatekeeper - Validate approach
+- EvaGarcia: Gatekeeper - Confirm all green
 ```
 
 ## Verification Gates & Quality Checkpoints
 
 ### Standard Verification Sequence
 1. Implementation batch completes
-2. Launch verification batch with Code-Reviewer + Green-Verifier + Tester
+2. Launch verification batch with gatekeepers
 3. ALL must pass for gate approval
 4. If ANY fail → Create fix batch with engineers
 
@@ -192,13 +194,13 @@ Read docs/project/phases/phase-1/wp-123.md for requirements.
 The API contract is defined in docs/api/auth.yaml. 
 Ensure all tests pass. SamWilson, broadcast your progress to the team."
 
-Tester Context:
+Engineer Context (Test suite scope):
 "Your name is JuliaDavis. Create comprehensive tests for the authentication feature.
 Read the implementation in src/auth/ directory.
 Acceptance criteria in docs/project/phases/phase-1/wp-123.md.
 JuliaDavis, ensure 80% code coverage minimum."
 
-Code-Reviewer Context:
+Gatekeeper Context:
 "Your name is MarkJohnson. Review all changes in the current git diff.
 Focus on security vulnerabilities in authentication code.
 Check compliance with coding standards in docs/project/guides/standards.md.
@@ -299,7 +301,7 @@ When to sequence:
 
 1. **Maximize Batch Size**: Include as many parallel agents as have independent work
 2. **Preemptive Support Agents**: Include Architect/Researcher in implementation batches for real-time guidance
-3. **Early Testing**: Include Testers in implementation batches for immediate test creation
+3. **Early Testing**: Include Test suite focused engineers in implementation batches for immediate test creation
 4. **Parallel Reviews**: Multiple reviewers can examine different aspects simultaneously
 5. **Broadcast Coordination**: Agents should announce decisions/discoveries immediately
 
@@ -339,13 +341,13 @@ Batch 3 - Implementation (5 agents, parallel):
   - JohnDoe: Engineer - Cart API endpoints
   - JaneSmith: Engineer - Cart state management
   - TomW: Engineer - Cart UI components
-  - LisaK: Tester - Cart API tests
-  - DaveM: Tester - Cart UI tests
+  - LisaK: Engineer - Cart API tests
+  - DaveM: Engineer - Cart UI tests
 
 Batch 4 - Verification (3 agents, parallel):
   Launch simultaneously:
-  - AmyC: Code-Reviewer - Review all cart code
-  - SteveP: Green-Verifier - Run all checks
+  - AmyC: Gatekeeper - Review all cart code
+  - SteveP: Gatekeeper - Run all checks
   - NancyR: Business-Analyst - Validate acceptance
 
 Batch 5 - Deployment (1 agent):
@@ -362,16 +364,14 @@ Batch 5 - Deployment (1 agent):
 - **business-analyst**: Maintains SoT requirements, validates acceptance criteria
 
 ### Design & Architecture
-- **architect**: Defines system shape, interfaces, technology decisions
+- **architect**: Defines system shape, interfaces, technology decisions, Designs test strategies
 - **designer**: Creates UI/UX specifications, component libraries
 
 ### Implementation
-- **engineer**: Implements features end-to-end with code, tests, and documentation
-- **tester**: Designs test strategies, writes comprehensive test suites
+- **engineer**: Implements features end-to-end with code, writes comprehensive test suites, and documentation
 
 ### Verification
-- **code-reviewer**: Reviews code for quality, security, and standards compliance
-- **green-verifier**: Ensures all builds, tests, and checks pass
+- **gatekeeper**: Reviews code for quality, security, and standards compliance. Ensures all builds, tests, and checks pass. Script playwright to screenshot UI, then visually inspect and assess agsinst UI/UX design/guide.
 
 ### Research & Support
 - **deep-researcher**: Conducts targeted research for technical decisions

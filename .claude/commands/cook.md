@@ -24,7 +24,7 @@ Ochestrate batches of agents to execute on the Assignment:
 - **Context Template for Agents**: Minimal but complete context
 - **Verification Gates** → Quality Enforcement (no shortcuts!)
 
-   agentd needs to be provided a list of filepath references for relevant artifacts (codefiles, testfiles, documentation, other repo files), along with a one sentence description of its relevance to the agent's task.
+   agents need to be provided a list of filepath references for relevant artifacts (codefiles, testfiles, documentation, other repo files), along with a one sentence description of its relevance to the agent's task.
    agents should be provided phase-id and docs/project/phases/<phase-id>/ dir when working at the phase or WP level (or if planner, tell them that its a new phase). Or they should be told they are working at the project level.
    Tell the agents how they should collaborate which team members they are supporting, the information they should communicate
 
