@@ -37,7 +37,8 @@
             <span class="text-green-400">● {{ activeSessions.length }} Active</span>
             <span class="text-gray-400">{{ totalSessions }} Total</span>
             <span class="text-blue-400">{{ totalAgents }} Agents</span>
-            <span class="text-purple-400">{{ Math.round(performanceMetrics.frameRate) }}fps</span>
+            <!-- FPS counter hidden for UI cleanup -->
+            <!-- <span class="text-purple-400">{{ Math.round(performanceMetrics.frameRate) }}fps</span> -->
             <span class="text-orange-400">{{ performanceMetrics.memoryUsage.toFixed(1) }}MB</span>
           </div>
         </div>

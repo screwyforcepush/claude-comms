@@ -15,10 +15,12 @@
       </div>
     </div>
 
-    <!-- Debug Info -->
+    <!-- Debug Info - Commented out for UI cleanup -->
+    <!--
     <div v-if="debug" class="bg-gray-800 p-2 text-xs text-gray-300">
       Debug: Loading={{ isLoading }}, Error={{ error }}, Sessions={{ visibleSessions.length }}, DataSource=REAL_DB
     </div>
+    -->
 
     <!-- Sessions Timeline Content -->
     <div class="sessions-timeline-container flex-1 overflow-hidden">

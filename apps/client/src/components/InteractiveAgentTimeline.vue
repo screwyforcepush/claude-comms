@@ -154,7 +154,7 @@
               :filter="agent.agentId === selectedAgent?.id?.toString() ? 'url(#agentGlow)' : ''"
               fill="none"
               style="will-change: transform; transform: translateZ(0);"
-              @click="selectAgentPath(agent)"
+              @click="showAgentDetails(agent, $event)"
               @mouseenter="showAgentTooltip(agent, $event)"
               @mouseleave="hideTooltip"
             />
@@ -170,7 +170,7 @@
               font-family="system-ui"
               class="cursor-pointer select-none drop-shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-opacity duration-200"
               :class="agent.agentId === selectedAgent?.id?.toString() ? 'opacity-100 font-bold' : 'opacity-80 hover:opacity-100'"
-              @click="selectAgentPath(agent)"
+              @click="showAgentDetails(agent, $event)"
               @mouseenter="showAgentTooltip(agent, $event)"
               @mouseleave="hideTooltip"
             >
@@ -246,7 +246,7 @@
               stroke-width="2"
               class="drop-shadow-[0_0_12px_#22c55e] cursor-pointer transition-all duration-300"
               opacity="0.9"
-              @click="selectAgentPath(agent)"
+              @click="showAgentDetails(agent, $event)"
             />
             <!-- Small indicator showing successful merge -->
             <path
@@ -269,7 +269,7 @@
               stroke-width="1"
               :class="getMessageClasses(message)"
               :filter="isMessageSelected(message) ? 'url(#messageGlow)' : ''"
-              @click="selectMessage(message)"
+              @click="showMessageDetails(message, $event)"
               @mouseenter="showMessageTooltip(message, $event)"
               @mouseleave="hideTooltip"
             />
@@ -348,6 +348,13 @@
         :tooltip-data="tooltip"
         @tooltip-mouse-enter="onTooltipMouseEnter"
         @tooltip-mouse-leave="onTooltipMouseLeave"
+      />
+      
+      <!-- Enhanced Detail Panel -->
+      <DetailPanel
+        :visible="detailPanel.visible"
+        :detail-data="detailPanel"
+        @close="hideDetailPanel"
       />
 
       <!-- Loading Overlay -->
@@ -437,6 +444,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import type { AgentStatus, SubagentMessage } from '../types';
 import TimelineTooltip from './TimelineTooltip.vue';
+import DetailPanel from './DetailPanel.vue';
 
 // Component Props
 const props = withDefaults(defineProps<{
@@ -514,6 +522,19 @@ const tooltip = ref<{
 }>({ 
   visible: false, 
   type: 'generic', 
+  data: null, 
+  position: { x: 0, y: 0 } 
+});
+
+// Detail panel state
+const detailPanel = ref<{
+  visible: boolean;
+  type: 'agent' | 'message';
+  data: any;
+  position: { x: number; y: number };
+}>({ 
+  visible: false, 
+  type: 'agent', 
   data: null, 
   position: { x: 0, y: 0 } 
 });
@@ -977,6 +998,19 @@ const getAgentMessages = (agent: AgentStatus) => {
   return visibleMessages.value.filter(msg => msg.sender === agent.name);
 };
 
+const getAgentResponses = (agent: any) => {
+  return visibleMessages.value.filter(msg => 
+    msg.recipients && msg.recipients.includes(agent.name)
+  );
+};
+
+const getBatchNumber = (agent: any): number | undefined => {
+  const batch = batches.value.find(b => 
+    b.agents.some(a => a.agentId === agent.agentId)
+  );
+  return batch?.batchNumber;
+};
+
 const createMessageFlowPath = (from: {x: number, y: number}, to: {x: number, y: number}): string => {
   const midX = (from.x + to.x) / 2;
   const midY = (from.y + to.y) / 2;
@@ -1086,11 +1120,67 @@ const selectMessage = (message: any) => {
   emit('selection-changed', { message });
 };
 
+const showMessageDetails = (message: any, event: MouseEvent) => {
+  hideTooltipImmediate(); // Hide any existing tooltips
+  
+  // Calculate read status for agent timeline
+  const notified = message.notified || [];
+  const relatedAgents = visibleAgents.value.filter(a => a.name !== message.sender);
+  const readCount = notified.filter(name => name !== message.sender).length;
+  
+  detailPanel.value = {
+    visible: true,
+    type: 'message',
+    data: {
+      sender: message.sender,
+      content: message.message || message.content || 'No content available',
+      timestamp: message.created_at || message.timestamp,
+      sessionName: props.sessionId || 'Current Session',
+      recipients: relatedAgents.map(a => a.name),
+      readStatus: {
+        readCount,
+        totalRecipients: relatedAgents.length
+      },
+      metadata: message.metadata || null
+    },
+    position: { x: event.clientX, y: event.clientY }
+  };
+  
+  // Also update selection
+  selectMessage(message);
+};
+
 const selectAgentPath = (agent: any) => {
   selectedAgent.value = agent;
   selectedMessage.value = null;
   emit('agent-path-clicked', agent);
   emit('selection-changed', { agent });
+};
+
+const showAgentDetails = (agent: any, event: MouseEvent) => {
+  hideTooltipImmediate(); // Hide any existing tooltips
+  
+  detailPanel.value = {
+    visible: true,
+    type: 'agent',
+    data: {
+      name: agent.name,
+      type: agent.type,
+      status: agent.status,
+      color: getAgentColor(agent.type),
+      duration: agent.endTime ? agent.endTime - agent.startTime : Date.now() - agent.startTime,
+      startTime: agent.startTime,
+      endTime: agent.endTime,
+      sessionName: props.sessionId || 'Current Session',
+      batchNumber: getBatchNumber(agent),
+      messageCount: getAgentMessages(agent).length,
+      responsesCount: getAgentResponses(agent).length
+    },
+    position: { x: event.clientX, y: event.clientY }
+  };
+  
+  // Also update selection
+  selectAgentPath(agent);
 };
 
 const selectBatch = (batch: any) => {
@@ -1123,7 +1213,17 @@ const highlightAgent = (agentId: number) => {
 const clearSelections = () => {
   selectedMessage.value = null;
   selectedAgent.value = null;
+  hideDetailPanel();
   emit('selection-changed', {});
+};
+
+const hideDetailPanel = () => {
+  detailPanel.value = {
+    visible: false,
+    type: 'agent',
+    data: null,
+    position: { x: 0, y: 0 }
+  };
 };
 
 const highlightMessage = (messageId: string) => {
@@ -1317,6 +1417,12 @@ const updateDimensions = () => {
 
 // Keyboard shortcuts
 const handleKeydown = (event: KeyboardEvent) => {
+  // Handle Escape key for detail panel first
+  if (event.key === 'Escape' && detailPanel.value.visible) {
+    hideDetailPanel();
+    return;
+  }
+  
   if (event.key === 'Escape') {
     clearSelections();
   }
