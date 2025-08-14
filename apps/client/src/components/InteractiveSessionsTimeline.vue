@@ -155,11 +155,12 @@
               :x="timelineMargins.left"
               :y="getSessionLaneY(sessionIndex)"
               :width="containerWidth - timelineMargins.left - timelineMargins.right"
-              :height="sessionLaneHeight"
+              :height="getSessionHeight(session)"
               :fill="sessionIndex % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)'"
               stroke="transparent"
               stroke-width="0"
               class="transition-all duration-200"
+              style="pointer-events: none;"
             />
             
             <!-- Session Orchestrator Line Enhanced (matching Agents tab style) -->
@@ -245,7 +246,7 @@
                 </text>
                 
                 <!-- Termination indicator for terminated agents -->
-                <g v-if="agent.status === 'terminated'" 
+                <g v-if="agent.status === 'error'" 
                    :transform="`translate(${getTimeX(agent.endTime || Date.now())}, ${getAgentLaneY(agent, sessionIndex)})`">
                   <!-- Red background circle -->
                   <circle 
@@ -610,8 +611,10 @@ const timelineMargins = {
   left: 120
 };
 
-const sessionLaneHeight = 80; // Height allocated per session
-const agentLaneHeight = 20;   // Height per agent lane within session
+const baseSessionLaneHeight = 28; // Base height allocated per session (aggressively reduced for density)
+const agentLaneHeight = 10;   // Height per agent lane within session (tighter spacing)
+const agentLaneBuffer = 3;    // Buffer space between agent lanes (minimal buffer)
+const sessionPadding = 8;     // Padding between sessions (compact separation)
 
 const timeWindows: TimeWindow[] = [
   { label: '15m', value: 15 * 60 * 1000 },
@@ -776,6 +779,63 @@ const timeTicks = computed(() => {
 });
 
 // ============================================================================
+// Session Spacing Calculation Functions
+// ============================================================================
+
+/**
+ * Calculate the maximum number of agents in any batch for a given session
+ */
+const getMaxAgentsInBatches = (session: SessionData): number => {
+  if (session.agents.length === 0) return 0;
+  
+  // Group agents by batch to find batch sizes
+  const batchAgentCounts = new Map<string, number>();
+  
+  session.agents.forEach(agent => {
+    // Use batch detection based on spawn timing (5 second threshold)
+    const batchKey = `batch_${Math.floor(agent.startTime / 5000)}`;
+    batchAgentCounts.set(batchKey, (batchAgentCounts.get(batchKey) || 0) + 1);
+  });
+  
+  // Return the maximum batch size for this session
+  return Math.max(...Array.from(batchAgentCounts.values()), 0);
+};
+
+/**
+ * Calculate dynamic session height based on maximum batch size
+ */
+const getSessionHeight = (session: SessionData): number => {
+  const maxAgentsInBatch = getMaxAgentsInBatches(session);
+  
+  // Calculate required height:
+  // - Base session height for orchestrator line and labels
+  // - Space for each agent lane (maxAgents * agentLaneHeight)
+  // - Buffer space between agent lanes
+  // - Padding for visual separation
+  const agentSpaceNeeded = maxAgentsInBatch * (agentLaneHeight + agentLaneBuffer);
+  const totalHeight = baseSessionLaneHeight + agentSpaceNeeded + sessionPadding;
+  
+  // Ensure minimum height for readability (compact layout)
+  return Math.max(totalHeight, 40);
+};
+
+/**
+ * Calculate cumulative Y offset for session positioning with variable spacing
+ */
+const getSessionCumulativeOffset = (sessionIndex: number): number => {
+  let cumulativeHeight = 0;
+  
+  // Sum up heights of all previous sessions
+  for (let i = 0; i < sessionIndex; i++) {
+    if (i < visibleSessions.value.length) {
+      cumulativeHeight += getSessionHeight(visibleSessions.value[i]);
+    }
+  }
+  
+  return cumulativeHeight;
+};
+
+// ============================================================================
 // Position Calculation Functions
 // ============================================================================
 
@@ -791,11 +851,14 @@ const getNowX = (): number => {
 };
 
 const getSessionLaneY = (sessionIndex: number): number => {
-  return timelineMargins.top + (sessionIndex * sessionLaneHeight);
+  const cumulativeOffset = getSessionCumulativeOffset(sessionIndex);
+  return timelineMargins.top + cumulativeOffset;
 };
 
 const getSessionOrchestratorY = (sessionIndex: number): number => {
-  return getSessionLaneY(sessionIndex) + sessionLaneHeight / 2;
+  const sessionY = getSessionLaneY(sessionIndex);
+  // Position orchestrator line in the middle of the base session area
+  return sessionY + baseSessionLaneHeight / 2;
 };
 
 const getAgentLaneY = (agent: SessionAgent, sessionIndex: number): number => {
@@ -902,7 +965,7 @@ const getAgentColor = (type: string): string => {
 const getAgentStrokeWidth = (status: string, isSelected: boolean): number => {
   let width = 2;
   if (status === 'in_progress') width = 3;
-  if (status === 'terminated') width = 2;
+  if (status === 'error') width = 2;
   if (isSelected) width += 1;
   return width;
 };
@@ -910,7 +973,7 @@ const getAgentStrokeWidth = (status: string, isSelected: boolean): number => {
 const getAgentPathClass = (status: string, isSelected: boolean): string => {
   let classes = 'transition-all duration-200';
   if (status === 'in_progress') classes += ' animate-pulse';
-  if (status === 'terminated') classes += ' opacity-75';
+  if (status === 'error') classes += ' opacity-75';
   if (isSelected) classes += ' drop-shadow-[0_0_8px_currentColor]';
   return classes;
 };
@@ -1490,7 +1553,9 @@ const updateDimensions = () => {
     containerWidth.value = sessionsContainer.value.clientWidth;
     
     // Calculate total height based on dynamic session heights
-    const totalSessionsHeight = visibleSessions.value.length * sessionLaneHeight;
+    const totalSessionsHeight = visibleSessions.value.reduce((sum, session) => {
+      return sum + getSessionHeight(session);
+    }, 0);
     
     containerHeight.value = Math.max(
       props.height,
