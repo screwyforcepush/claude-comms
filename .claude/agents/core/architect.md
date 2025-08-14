@@ -11,6 +11,7 @@ description: |
   When to use: "Define test architecture and coverage strategy for the platform"
   When to use: "Establish mock/stub patterns for external service testing"
   When to use: "Design performance testing approach for high-load scenarios"
+  When to use: "Support implementation team for new Feature"
   </example>
   
   <commentary>
