@@ -38,7 +38,7 @@
 
     <!-- Agent Detail Pane (matching Agents tab pattern) -->
     <AgentDetailPane
-      :visible="showAgentDetails"
+      :visible="showAgentDetails && activePane === 'agent'"
       :selected-agent="selectedAgent"
       :agents="allAgents"
       :messages="allMessages"
@@ -48,6 +48,17 @@
       @message-selected="handleMessageSelectedFromAgent"
       @highlight-timeline="handleHighlightAgentOnTimeline"
     />
+
+    <!-- Message Detail Pane (matching SubagentComms.vue pattern) -->
+    <MessageDetailPane
+      :visible="showMessageDetails && activePane === 'message'"
+      :selected-message="selectedMessage"
+      :agents="allAgents"
+      :session-id="selectedSessionId"
+      @close="handleMessageDetailClose"
+      @agent-selected="handleAgentSelectedFromMessage"
+      @highlight-timeline="handleHighlightMessageOnTimeline"
+    />
   </div>
 </template>
 
@@ -55,6 +66,7 @@
 import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue';
 import InteractiveSessionsTimeline from './InteractiveSessionsTimeline.vue';
 import AgentDetailPane from './AgentDetailPane.vue';
+import MessageDetailPane from './MessageDetailPane.vue';
 import { SessionDataAdapter, type SessionData, type SessionAgent, type SessionMessage } from '../utils/session-data-adapter';
 import { sessionDataService } from '../services/sessionDataService';
 import type { AgentStatus, SubagentMessage } from '../types';
@@ -80,6 +92,14 @@ let refreshInterval: number | null = null;
 const selectedAgent = ref<AgentStatus | null>(null);
 const selectedSessionId = ref<string>('');
 const showAgentDetails = ref(false);
+
+// Message detail pane state (matching SubagentComms.vue pattern)
+const selectedMessage = ref<SubagentMessage | null>(null);
+const showMessageDetails = ref(false);
+
+// Pane state management - ensure only one pane is open at a time
+type ActivePane = 'none' | 'agent' | 'message';
+const activePane = ref<ActivePane>('none');
 
 // Use real sessions data
 const visibleSessions = computed(() => {
@@ -219,7 +239,10 @@ const handleAgentSelected = (agent: SessionAgent, session: SessionData) => {
   };
   
   selectedSessionId.value = session.sessionId;
+  // Close message pane if open and show agent pane
+  closeAllPanes();
   showAgentDetails.value = true;
+  activePane.value = 'agent';
 };
 
 const handleSessionSelected = (session: SessionData) => {
@@ -231,13 +254,34 @@ const handleSessionSelected = (session: SessionData) => {
 const handleMessageSelected = (message: SessionMessage, session: SessionData) => {
   console.log('💬 AgentAlex: Message selected from:', message.sender);
   selectedSessionId.value = session.sessionId;
-  // Could potentially open message details in future
+  
+  // Convert SessionMessage to SubagentMessage format
+  selectedMessage.value = {
+    id: `${message.timestamp}-${message.sender}`,
+    sender: message.sender,
+    message: message.content,
+    created_at: message.timestamp,
+    notified: message.notified || []
+  };
+  
+  // Close agent pane if open and show message pane
+  closeAllPanes();
+  showMessageDetails.value = true;
+  activePane.value = 'message';
+};
+
+// Pane management helpers
+const closeAllPanes = () => {
+  showAgentDetails.value = false;
+  showMessageDetails.value = false;
+  activePane.value = 'none';
 };
 
 const handleAgentDetailClose = () => {
   console.log('✨ AgentAlex: Closing agent details');
   showAgentDetails.value = false;
   selectedAgent.value = null;
+  activePane.value = 'none';
 };
 
 const handleAgentDetailSelected = (agent: AgentStatus) => {
@@ -247,13 +291,39 @@ const handleAgentDetailSelected = (agent: AgentStatus) => {
 
 const handleMessageSelectedFromAgent = (message: SubagentMessage) => {
   console.log('💬 AgentAlex: Message selected from agent details:', message.sender);
-  // Could potentially open message details in future
+  selectedMessage.value = message;
+  // Switch from agent pane to message pane
+  closeAllPanes();
+  showMessageDetails.value = true;
+  activePane.value = 'message';
 };
 
 const handleHighlightAgentOnTimeline = (agentId: number) => {
   console.log('🎯 AgentAlex: Highlighting agent on timeline:', agentId);
   // The timeline already handles highlighting selected agents
   // This could trigger additional visual effects if needed
+};
+
+// Message detail pane event handlers
+const handleMessageDetailClose = () => {
+  console.log('✨ AgentAlex: Closing message details');
+  showMessageDetails.value = false;
+  selectedMessage.value = null;
+  activePane.value = 'none';
+};
+
+const handleAgentSelectedFromMessage = (agent: AgentStatus) => {
+  console.log('🤖 AgentAlex: Agent selected from message detail:', agent.name);
+  selectedAgent.value = agent;
+  // Switch from message pane to agent pane
+  closeAllPanes();
+  showAgentDetails.value = true;
+  activePane.value = 'agent';
+};
+
+const handleHighlightMessageOnTimeline = (messageId: string) => {
+  console.log('🎯 AgentAlex: Highlight message on timeline:', messageId);
+  // Future: Scroll to and highlight message on timeline
 };
 </script>
 

@@ -71,6 +71,7 @@ export interface AgentStatus {
 }
 
 export interface SubagentMessage {
+  id?: string;
   sender: string;
   message: any;
   created_at: number;

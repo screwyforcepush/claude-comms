@@ -11,7 +11,7 @@
       <div class="flex items-center justify-between">
         <h3 class="text-white font-bold text-lg">Sessions Timeline</h3>
         <div class="flex items-center space-x-4">
-          <!-- Enhanced Time Window Controls -->
+          <!-- Enhanced Time Window Controls with Auto-Pan -->
           <div class="flex items-center space-x-2 text-sm">
             <span class="text-gray-300">Window:</span>
             <button 
@@ -19,12 +19,22 @@
               :key="window.label"
               @click="setTimeWindow(window.value)"
               class="px-3 py-1 rounded text-xs font-medium transition-all duration-200 transform hover:scale-105"
-              :class="currentWindow === window.value 
-                ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400/50' 
-                : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'"
-              :title="`Switch to ${window.label} time window (Key: ${getWindowShortcut(window.value)})`"
+              :class="getTimeWindowButtonClass(window)"
+              :title="getTimeWindowButtonTitle(window)"
             >
               {{ window.label }}
+            </button>
+            <!-- Auto-Pan Toggle Button -->
+            <button 
+              @click="toggleAutoPan"
+              class="px-3 py-1 rounded text-xs font-medium transition-all duration-200 transform hover:scale-105 flex items-center space-x-1"
+              :class="autoPanEnabled 
+                ? 'bg-green-600 text-white shadow-lg ring-2 ring-green-400/50' 
+                : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'"
+              :title="autoPanEnabled ? 'Disable auto-pan (A)' : 'Enable auto-pan (A)'"
+            >
+              <span>{{ autoPanEnabled ? '⏸️' : '▶️' }}</span>
+              <span>Auto-Pan</span>
             </button>
             <!-- Time Window Transition Indicator -->
             <div v-if="isTimeWindowTransitioning" class="ml-2">
@@ -147,10 +157,9 @@
               :width="containerWidth - timelineMargins.left - timelineMargins.right"
               :height="sessionLaneHeight"
               :fill="sessionIndex % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)'"
-              :stroke="selectedSession?.sessionId === session.sessionId ? '#3b82f6' : 'transparent'"
-              :stroke-width="selectedSession?.sessionId === session.sessionId ? '2' : '0'"
-              class="cursor-pointer transition-all duration-200"
-              @click="selectSession(session)"
+              stroke="transparent"
+              stroke-width="0"
+              class="transition-all duration-200"
             />
             
             <!-- Session Orchestrator Line Enhanced (matching Agents tab style) -->
@@ -188,8 +197,7 @@
               font-size="12px"
               font-weight="600"
               font-family="system-ui"
-              class="cursor-pointer select-none"
-              @click="selectSession(session)"
+              class="select-none"
             >
               {{ session.displayName }}
             </text>
@@ -215,7 +223,7 @@
                   class="cursor-pointer transition-all duration-200"
                   :filter="isAgentSelected(agent) ? 'url(#agentGlow)' : ''"
                   fill="none"
-                  @click="showAgentDetails(agent, session, $event)"
+                  @click="selectAgent(agent, session)"
                   @mouseenter="showAgentTooltip(agent, session, $event)"
                   @mouseleave="hideTooltip"
                 />
@@ -231,7 +239,7 @@
                   font-family="system-ui"
                   class="cursor-pointer select-none"
                   :class="isAgentSelected(agent) ? 'opacity-100 font-semibold' : 'opacity-70 hover:opacity-90'"
-                  @click="showAgentDetails(agent, session, $event)"
+                  @click="selectAgent(agent, session)"
                 >
                   {{ agent.name }}
                 </text>
@@ -261,7 +269,7 @@
                   stroke-width="2"
                   :class="getMessageClasses(message)"
                   :filter="isMessageSelected(message) ? 'url(#messageGlow)' : ''"
-                  @click="showMessageDetails(message, session, $event)"
+                  @click="selectMessage(message, session)"
                   @mouseenter="showMessageTooltip(message, session, $event)"
                   @mouseleave="hideTooltip"
                 />
@@ -323,12 +331,6 @@
         @tooltip-mouse-leave="onTooltipMouseLeave"
       />
       
-      <!-- Enhanced Detail Panel -->
-      <DetailPanel
-        :visible="detailPanel.visible"
-        :detail-data="detailPanel"
-        @close="hideDetailPanel"
-      />
 
       <!-- Loading Overlay -->
       <div v-if="isLoading" class="absolute inset-0 bg-gray-800/50 flex items-center justify-center">
@@ -378,7 +380,7 @@
             @click="clearSelections" 
             class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
             title="Clear Selection (Esc)"
-            v-if="selectedSession || selectedAgent || selectedMessage"
+            v-if="selectedAgent || selectedMessage"
           >
             ✕ Clear Selection
           </button>
@@ -422,20 +424,12 @@
 
     <!-- Selection Info Bar -->
     <div 
-      v-if="selectedSession || selectedAgent || selectedMessage" 
+      v-if="selectedAgent || selectedMessage" 
       class="selection-info bg-blue-600/20 border-t border-blue-400/30 px-4 py-2 text-sm"
     >
-      <div v-if="selectedSession && !selectedAgent && !selectedMessage" class="flex items-center justify-between">
-        <span class="text-blue-400">
-          Selected Session: <strong>{{ selectedSession.displayName }}</strong>
-        </span>
-        <span class="text-gray-400">
-          {{ selectedSession.agents.length }} agents, {{ selectedSession.messages.length }} messages
-        </span>
-      </div>
-      <div v-else-if="selectedAgent" class="flex items-center justify-between">
+      <div v-if="selectedAgent" class="flex items-center justify-between">
         <span class="text-green-400">
-          Selected Agent: <strong>{{ selectedAgent.name }}</strong> in {{ selectedSession?.displayName }}
+          Selected Agent: <strong>{{ selectedAgent.name }}</strong>
         </span>
         <span class="text-gray-400">
           Type: {{ selectedAgent.type }}, Status: {{ selectedAgent.status }}
@@ -443,7 +437,7 @@
       </div>
       <div v-else-if="selectedMessage" class="flex items-center justify-between">
         <span class="text-yellow-400">
-          Selected Message from: <strong>{{ selectedMessage.sender }}</strong> in {{ selectedSession?.displayName }}
+          Selected Message from: <strong>{{ selectedMessage.sender }}</strong>
         </span>
         <span class="text-gray-400">
           {{ formatTimestamp(selectedMessage.timestamp) }}
@@ -456,8 +450,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import TimelineTooltip from './TimelineTooltip.vue';
-import SessionFilterPanel from './SessionFilterPanel.vue';
-import DetailPanel from './DetailPanel.vue';
+// import SessionFilterPanel from './SessionFilterPanel.vue'; // Unused
 import { SessionFilterUtils, DEFAULT_SESSION_FILTERS } from '../types/session-filters';
 import type { SessionFilterState } from '../types/session-filters';
 import { SessionDataAdapter } from '../utils/session-data-adapter';
@@ -523,7 +516,22 @@ const containerHeight = ref(600);
 const zoomLevel = ref(1);
 const panX = ref(0);
 const panY = ref(0);
-const currentWindow = ref(props.defaultWindow);
+const currentWindow = ref<number>(props.defaultWindow);
+
+// Auto-pan state management (unified)
+const autoPanEnabled = ref(true);
+const autoPanInterval = ref<number | null>(null);
+const autoPanAnimationId = ref<number | null>(null);
+const autoPanTargetX = ref(0);
+const lastUserInteractionTime = ref(0);
+const lastAutoPanTime = ref(0);
+
+// Auto-pan configuration
+const AUTO_PAN_UPDATE_INTERVAL = 1000; // Update every second
+const AUTO_PAN_INACTIVITY_THRESHOLD = 3000; // 3 seconds after user stops interacting
+const AUTO_PAN_SMOOTH_FACTOR = 0.1; // Smoothing factor for auto-pan animations
+const AUTO_PAN_EASING_FACTOR = 0.05; // RobertArch's smooth interpolation factor
+const AUTO_PAN_BUFFER = 100; // Keep NOW marker 100px from right edge
 
 // Enhanced interaction state
 const isPanning = ref(false);
@@ -532,14 +540,22 @@ const initialPanPos = ref({ x: 0, y: 0 });
 const dragDistance = ref(0);
 const PAN_THRESHOLD = 5;
 
+// User interaction detection flags
+const isUserInteracting = ref(false);
+const userInteractionType = ref<'zoom' | 'pan' | 'keyboard' | null>(null);
+const userInteractionFlag = ref(false); // Global flag for auto-pan coordination
+
 // Simplified interaction state - removed complex momentum animations
 
 // Time window transition state
 const isTimeWindowTransitioning = ref(false);
 let timeWindowTransitionId: number | null = null;
 
+// User interaction detection state (consolidated)
+const userInteractionTimeout = ref<number | null>(null);
+const USER_INTERACTION_COOLDOWN = 3000; // 3 seconds after interaction stops
+
 // Selection state
-const selectedSession = ref<SessionData | null>(null);
 const selectedAgent = ref<SessionAgent | null>(null);
 const selectedMessage = ref<SessionMessage | null>(null);
 const highlightedMessageId = ref<string>('');
@@ -560,18 +576,6 @@ const tooltip = ref<{
   position: { x: 0, y: 0 } 
 });
 
-// Detail panel state
-const detailPanel = ref<{
-  visible: boolean;
-  type: 'agent' | 'message';
-  data: any;
-  position: { x: number; y: number };
-}>({ 
-  visible: false, 
-  type: 'agent', 
-  data: null, 
-  position: { x: 0, y: 0 } 
-});
 
 // ============================================================================
 // Configuration
@@ -614,11 +618,41 @@ const agentColors: Record<string, string> = {
 };
 
 // ============================================================================
+// Auto-Pan Computed Properties
+// ============================================================================
+
+const isAutoPanActive = computed(() => {
+  return autoPanEnabled.value && !isUserInteracting.value;
+});
+
+const latestContentX = computed(() => {
+  if (visibleSessions.value.length === 0) return getNowX();
+  
+  // Find the rightmost (latest) content across all sessions
+  let latestTime = Date.now();
+  visibleSessions.value.forEach(session => {
+    // Check latest agent activity
+    session.agents.forEach(agent => {
+      const endTime = agent.endTime || Date.now();
+      if (endTime > latestTime) latestTime = endTime;
+    });
+    
+    // Check latest messages
+    session.messages.forEach(message => {
+      if (message.timestamp > latestTime) latestTime = message.timestamp;
+    });
+  });
+  
+  return getTimeX(latestTime);
+});
+
+// ============================================================================
 // Computed Properties
 // ============================================================================
 
 const timeRange = computed(() => {
   const now = Date.now();
+  
   return {
     start: now - currentWindow.value,
     end: now,
@@ -744,7 +778,10 @@ const getSessionOrchestratorY = (sessionIndex: number): number => {
 
 const getAgentLaneY = (agent: SessionAgent, sessionIndex: number): number => {
   const sessionCenterY = getSessionOrchestratorY(sessionIndex);
-  const laneOffset = (agent.laneIndex - 1) * agentLaneHeight;
+  // Ensure laneIndex is valid and normalize it
+  const normalizedLaneIndex = Math.max(1, agent.laneIndex || 1);
+  // Position ALL agents below orchestrator line (matching reference implementation)
+  const laneOffset = normalizedLaneIndex * agentLaneHeight;
   return sessionCenterY + laneOffset;
 };
 
@@ -754,26 +791,31 @@ const getSessionAgentPath = (agent: SessionAgent, sessionIndex: number): string 
   const orchestratorY = getSessionOrchestratorY(sessionIndex);
   const agentY = getAgentLaneY(agent, sessionIndex);
   
-  const branchOut = 15; // Distance to branch out from orchestrator
-  const mergeBack = 15; // Distance before merging back
+  // Ensure minimum distance for readable branches
+  const minBranchWidth = 30;
+  const actualWidth = Math.max(endX - startX, minBranchWidth);
+  
+  const branchOut = Math.min(20, actualWidth * 0.2); // Adaptive branch distance
+  const mergeBack = Math.min(20, actualWidth * 0.2); // Adaptive merge distance
+  
+  // Calculate control points for smooth curves
+  const cp1X = startX + branchOut;
+  const cp2X = startX + branchOut * 1.5;
+  const cp3X = endX - mergeBack * 1.5;
+  const cp4X = endX - mergeBack;
   
   if (agent.status === 'completed' && agent.endTime) {
-    // Complete path with merge back
-    return `M ${startX} ${orchestratorY} 
-            C ${startX + branchOut} ${orchestratorY} 
-              ${startX + branchOut} ${agentY} 
-              ${startX + branchOut * 1.5} ${agentY}
-            L ${endX - mergeBack * 1.5} ${agentY}
-            C ${endX - mergeBack} ${agentY}
-              ${endX - mergeBack} ${orchestratorY}
-              ${endX} ${orchestratorY}`;
+    // Complete path with merge back to orchestrator
+    return `M ${startX},${orchestratorY} 
+            C ${cp1X},${orchestratorY} ${cp1X},${agentY} ${cp2X},${agentY}
+            L ${cp3X},${agentY}
+            C ${cp4X},${agentY} ${cp4X},${orchestratorY} ${endX},${orchestratorY}`;
   } else {
-    // In-progress path
-    return `M ${startX} ${orchestratorY} 
-            C ${startX + branchOut} ${orchestratorY} 
-              ${startX + branchOut} ${agentY} 
-              ${startX + branchOut * 1.5} ${agentY}
-            L ${endX} ${agentY}`;
+    // In-progress path - branch out but don't merge back yet
+    const currentEndX = Math.max(endX, startX + minBranchWidth);
+    return `M ${startX},${orchestratorY} 
+            C ${cp1X},${orchestratorY} ${cp1X},${agentY} ${cp2X},${agentY}
+            L ${currentEndX},${agentY}`;
   }
 };
 
@@ -782,9 +824,19 @@ const getAgentLabelPosition = (agent: SessionAgent, sessionIndex: number) => {
   const endX = getTimeX(agent.endTime || Date.now());
   const agentY = getAgentLaneY(agent, sessionIndex);
   
+  // Ensure minimum distance for label positioning
+  const minBranchWidth = 30;
+  const actualEndX = Math.max(endX, startX + minBranchWidth);
+  
+  // Position label at the center of the agent's horizontal timeline
+  const centerX = (startX + actualEndX) / 2;
+  
+  // For in-progress agents, position label slightly forward
+  const labelX = agent.endTime ? centerX : centerX + 10;
+  
   return {
-    x: (startX + endX) / 2,
-    y: agentY - 5
+    x: labelX,
+    y: agentY - 5 // Slight offset above the branch line (matching reference)
   };
 };
 
@@ -886,97 +938,58 @@ const isAgentSelected = (agent: SessionAgent): boolean => {
   return selectedAgent.value?.agentId === agent.agentId;
 };
 
-const selectSession = (session: SessionData) => {
-  selectedSession.value = session;
-  selectedAgent.value = null;
-  selectedMessage.value = null;
-  emit('session-selected', session);
-};
 
 const selectAgent = (agent: SessionAgent, session: SessionData) => {
-  selectedSession.value = session;
   selectedAgent.value = agent;
   selectedMessage.value = null;
   emit('agent-selected', agent, session);
 };
 
-const showAgentDetails = (agent: SessionAgent, session: SessionData, event: MouseEvent) => {
-  hideTooltipImmediate(); // Hide any existing tooltips
-  
-  detailPanel.value = {
-    visible: true,
-    type: 'agent',
-    data: {
-      name: agent.name,
-      type: agent.type,
-      status: agent.status,
-      color: getAgentColor(agent.type),
-      duration: agent.endTime ? agent.endTime - agent.startTime : Date.now() - agent.startTime,
-      startTime: agent.startTime,
-      endTime: agent.endTime,
-      sessionName: session.displayName,
-      batchNumber: agent.batchNumber,
-      messageCount: session.messages.filter(m => m.sender === agent.name).length,
-      responsesCount: session.messages.filter(m => m.recipients && m.recipients.includes(agent.name)).length
-    },
-    position: { x: event.clientX, y: event.clientY }
-  };
-  
-  // Also update selection
-  selectAgent(agent, session);
-};
 
 const selectMessage = (message: SessionMessage, session: SessionData) => {
-  selectedSession.value = session;
   selectedMessage.value = message;
   selectedAgent.value = null;
   emit('message-selected', message, session);
 };
 
-const showMessageDetails = (message: SessionMessage, session: SessionData, event: MouseEvent) => {
-  hideTooltipImmediate(); // Hide any existing tooltips
-  
-  // Calculate read status
-  const notified = message.notified || [];
-  const relatedAgents = session.agents.filter(a => a.name !== message.sender);
-  const readCount = notified.filter(name => name !== message.sender).length;
-  
-  detailPanel.value = {
-    visible: true,
-    type: 'message',
-    data: {
-      sender: message.sender,
-      content: message.content,
-      timestamp: message.timestamp,
-      sessionName: session.displayName,
-      recipients: message.recipients || relatedAgents.map(a => a.name),
-      readStatus: {
-        readCount,
-        totalRecipients: relatedAgents.length
-      },
-      metadata: message.metadata || null
-    },
-    position: { x: event.clientX, y: event.clientY }
-  };
-  
-  // Also update selection
-  selectMessage(message, session);
-};
 
 const clearSelections = () => {
-  selectedSession.value = null;
   selectedAgent.value = null;
   selectedMessage.value = null;
-  hideDetailPanel();
 };
 
-const hideDetailPanel = () => {
-  detailPanel.value = {
-    visible: false,
-    type: 'agent',
-    data: null,
-    position: { x: 0, y: 0 }
-  };
+
+// ============================================================================
+// User Interaction Detection Functions
+// ============================================================================
+
+const disableAutoPanOnUserInteraction = (interactionType: 'zoom' | 'pan' | 'keyboard') => {
+  // Only disable autopan on user interaction, do NOT change time window
+  if (autoPanEnabled.value && isUserInteracting.value) {
+    console.log(`🎯 SarahToggle: User ${interactionType} detected, disabling autopan only (keeping time window)`);
+    autoPanEnabled.value = false;
+    stopAutoPan();
+  }
+};
+
+const startUserInteraction = (type: 'zoom' | 'pan' | 'keyboard') => {
+  isUserInteracting.value = true;
+  userInteractionType.value = type;
+  userInteractionFlag.value = true; // Set global flag for auto-pan coordination
+  
+  // Only disable autopan on user interaction - do NOT change time window
+  disableAutoPanOnUserInteraction(type);
+  
+  // Auto-reset flag after 3 seconds (as per RobertArch's architecture)
+  setTimeout(() => {
+    userInteractionFlag.value = false;
+  }, 3000);
+};
+
+const endUserInteraction = () => {
+  isUserInteracting.value = false;
+  userInteractionType.value = null;
+  // Keep userInteractionFlag for auto-pan coordination until timeout
 };
 
 // ============================================================================
@@ -988,9 +1001,28 @@ const setTimeWindow = (windowSize: number) => {
   
   if (oldWindow === windowSize) return;
   
+  // Mark this as a programmatic change, not user interaction
+  const wasUserInteracting = isUserInteracting.value;
+  isUserInteracting.value = false;
+  
+  // Reset view when switching time windows (zoom=1, pan=0)
+  zoomLevel.value = 1;
+  panX.value = 0;
+  panY.value = 0;
+  emit('zoom-changed', zoomLevel.value);
+  
+  // Re-enable auto-pan when switching time windows
+  autoPanEnabled.value = true;
+  startAutoPan();
+  
   isTimeWindowTransitioning.value = true;
   currentWindow.value = windowSize;
   emit('time-window-changed', windowSize);
+  
+  // Restore user interaction state after programmatic change
+  setTimeout(() => {
+    isUserInteracting.value = wasUserInteracting;
+  }, 0);
   
   // Smooth transition animation
   let transitionProgress = 0;
@@ -1032,25 +1064,140 @@ const getWindowShortcut = (windowValue: number): string => {
   return shortcuts[windowValue] || '';
 };
 
+// Button styling for time window buttons
+const getTimeWindowButtonClass = (window: TimeWindow): string => {
+  const isSelected = currentWindow.value === window.value;
+  
+  if (isSelected) {
+    return 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400/50';
+  }
+  
+  return 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white';
+};
+
+const getTimeWindowButtonTitle = (window: TimeWindow): string => {
+  const shortcut = getWindowShortcut(window.value);
+  const shortcutText = shortcut ? ` (Key: ${shortcut})` : '';
+  
+  return `Switch to ${window.label} time window${shortcutText}`;
+};
+
 // ============================================================================
 // Zoom and Pan Functions
 // ============================================================================
 
 const zoomIn = () => {
+  // Check if this is user-initiated (from button click, not wheel)
+  if (!isUserInteracting.value) {
+    startUserInteraction('zoom');
+  }
   zoomLevel.value = Math.min(zoomLevel.value * 1.25, 10);
   emit('zoom-changed', zoomLevel.value);
 };
 
 const zoomOut = () => {
+  // Check if this is user-initiated (from button click, not wheel)
+  if (!isUserInteracting.value) {
+    startUserInteraction('zoom');
+  }
   zoomLevel.value = Math.max(zoomLevel.value / 1.25, 0.1);
   emit('zoom-changed', zoomLevel.value);
 };
 
 const resetView = () => {
+  // Reset view is a programmatic action, don't trigger "off" mode
+  const wasUserInteracting = isUserInteracting.value;
+  isUserInteracting.value = false;
+  
   zoomLevel.value = 1;
   panX.value = 0;
   panY.value = 0;
   emit('zoom-changed', zoomLevel.value);
+  
+  // Restore user interaction state after reset
+  setTimeout(() => {
+    isUserInteracting.value = wasUserInteracting;
+  }, 0);
+  
+  // Re-enable auto-pan after view reset
+  autoPanEnabled.value = true;
+  startAutoPan();
+};
+
+// ============================================================================
+// Auto-Pan Functions
+// ============================================================================
+
+const calculateAutoPanTarget = (): number => {
+  // Calculate where the "NOW" marker should be positioned
+  // Keep it in the right 25% of the visible timeline for optimal viewing
+  const timelineWidth = containerWidth.value - timelineMargins.left - timelineMargins.right;
+  const targetRatio = 0.75; // Position NOW marker at 75% from left edge
+  const nowX = getNowX();
+  const idealNowX = timelineMargins.left + (timelineWidth * targetRatio);
+  
+  return panX.value + (idealNowX - nowX);
+};
+
+// Old auto-pan functions removed to avoid duplication
+
+const updateAutoPan = (currentTime: number) => {
+  if (!autoPanEnabled.value || isUserInteracting.value) {
+    return;
+  }
+  
+  // Calculate target position to keep NOW marker 100px from right edge
+  const nowX = getNowX();
+  const viewportWidth = containerWidth.value - timelineMargins.left - timelineMargins.right;
+  const targetPanX = -(nowX - (viewportWidth - AUTO_PAN_BUFFER));
+  
+  // Use smooth interpolation with easing factor
+  const diff = targetPanX - panX.value;
+  if (Math.abs(diff) > 1) { // Only update if significant difference
+    panX.value += diff * AUTO_PAN_EASING_FACTOR;
+    autoPanTargetX.value = targetPanX;
+  }
+  
+  lastAutoPanTime.value = currentTime;
+};
+
+const autoPanLoop = (currentTime: number) => {
+  updateAutoPan(currentTime);
+  
+  // Continue the animation loop if auto-pan is enabled
+  if (autoPanEnabled.value && !isUserInteracting.value) {
+    autoPanAnimationId.value = requestAnimationFrame(autoPanLoop);
+  } else {
+    autoPanAnimationId.value = null;
+  }
+};
+
+const startAutoPan = () => {
+  if (autoPanAnimationId.value) {
+    cancelAnimationFrame(autoPanAnimationId.value);
+  }
+  
+  lastAutoPanTime.value = performance.now();
+  autoPanAnimationId.value = requestAnimationFrame(autoPanLoop);
+};
+
+const stopAutoPan = () => {
+  if (autoPanAnimationId.value) {
+    cancelAnimationFrame(autoPanAnimationId.value);
+    autoPanAnimationId.value = null;
+  }
+};
+
+const toggleAutoPan = () => {
+  autoPanEnabled.value = !autoPanEnabled.value;
+  
+  if (autoPanEnabled.value) {
+    // Re-enable auto-pan and start timer
+    startAutoPan();
+  } else {
+    // Disable auto-pan and stop timer
+    stopAutoPan();
+  }
 };
 
 // ============================================================================
@@ -1060,6 +1207,9 @@ const resetView = () => {
 const handleMouseDown = (event: MouseEvent) => {
   // Check if clicking on background (SVG itself) vs interactive elements
   if (event.target === sessionsSvg.value) {
+    // Start user pan interaction
+    startUserInteraction('pan');
+    
     isPanning.value = true;
     dragStartPos.value = { x: event.clientX, y: event.clientY };
     initialPanPos.value = { x: panX.value, y: panY.value };
@@ -1111,6 +1261,9 @@ const handleGlobalMouseUp = (_event: MouseEvent) => {
   if (isPanning.value) {
     isPanning.value = false;
     
+    // End user interaction when panning stops
+    endUserInteraction();
+    
     // Clean up global event listeners
     document.removeEventListener('mousemove', handleGlobalMouseMove);
     document.removeEventListener('mouseup', handleGlobalMouseUp);
@@ -1130,6 +1283,10 @@ const handleClickAndHideTooltip = (event: MouseEvent) => {
 
 const handleWheel = (event: WheelEvent) => {
   event.preventDefault();
+  
+  // Start user zoom interaction
+  startUserInteraction('zoom');
+  
   const zoomFactor = 1.1;
   if (event.deltaY < 0) {
     zoomLevel.value = Math.min(zoomLevel.value * zoomFactor, 10);
@@ -1137,6 +1294,11 @@ const handleWheel = (event: WheelEvent) => {
     zoomLevel.value = Math.max(zoomLevel.value / zoomFactor, 0.1);
   }
   emit('zoom-changed', zoomLevel.value);
+  
+  // End zoom interaction after a short delay
+  setTimeout(() => {
+    endUserInteraction();
+  }, 100);
 };
 
 // Removed complex cursor-centered zoom animations - now using direct zoom
@@ -1148,6 +1310,7 @@ const handleMouseLeave = () => {
   // Clean up any ongoing pan operation when mouse leaves the timeline
   if (isPanning.value) {
     isPanning.value = false;
+    endUserInteraction();
     document.removeEventListener('mousemove', handleGlobalMouseMove);
     document.removeEventListener('mouseup', handleGlobalMouseUp);
   }
@@ -1196,7 +1359,7 @@ const showMessageTooltip = (message: SessionMessage, session: SessionData, event
   clearTooltipTimers();
   
   tooltipShowTimer = window.setTimeout(() => {
-    const content = message.content || message.message || 'No content';
+    const content = message.content || 'No content';
     const preview = typeof content === 'string' 
       ? content.substring(0, 100) + (content.length > 100 ? '...' : '')
       : 'Object message';
@@ -1319,11 +1482,6 @@ const handleKeydown = (event: KeyboardEvent) => {
     return;
   }
   
-  // Handle Escape key for detail panel
-  if (event.key === 'Escape' && detailPanel.value.visible) {
-    hideDetailPanel();
-    return;
-  }
   
   const panStep = 50;
   const zoomStep = 1.15;
@@ -1331,59 +1489,78 @@ const handleKeydown = (event: KeyboardEvent) => {
   switch (event.key) {
     case 'ArrowLeft':
       event.preventDefault();
+      startUserInteraction('keyboard');
       panX.value += panStep;
+      setTimeout(() => endUserInteraction(), 100);
       break;
     case 'ArrowRight':
       event.preventDefault();
+      startUserInteraction('keyboard');
       panX.value -= panStep;
+      setTimeout(() => endUserInteraction(), 100);
       break;
     case 'ArrowUp':
       event.preventDefault();
+      startUserInteraction('keyboard');
       panY.value += panStep;
+      setTimeout(() => endUserInteraction(), 100);
       break;
     case 'ArrowDown':
       event.preventDefault();
+      startUserInteraction('keyboard');
       panY.value -= panStep;
+      setTimeout(() => endUserInteraction(), 100);
       break;
     case '+':
     case '=':
       event.preventDefault();
+      startUserInteraction('keyboard');
       zoomIn();
+      setTimeout(() => endUserInteraction(), 100);
       break;
     case '-':
     case '_':
       event.preventDefault();
+      startUserInteraction('keyboard');
       zoomOut();
+      setTimeout(() => endUserInteraction(), 100);
       break;
     case 'r':
     case 'R':
       if (!event.ctrlKey && !event.metaKey) {
         event.preventDefault();
-        resetView();
+        resetView(); // Reset doesn't trigger "off" mode
       }
       break;
     case '1':
       if (!event.ctrlKey && !event.metaKey) {
         event.preventDefault();
-        setTimeWindow(15 * 60 * 1000); // 15 minutes
+        setTimeWindow(15 * 60 * 1000); // Programmatic window change
       }
       break;
     case '2':
       if (!event.ctrlKey && !event.metaKey) {
         event.preventDefault();
-        setTimeWindow(60 * 60 * 1000); // 1 hour
+        setTimeWindow(60 * 60 * 1000); // Programmatic window change
       }
       break;
     case '3':
       if (!event.ctrlKey && !event.metaKey) {
         event.preventDefault();
-        setTimeWindow(6 * 60 * 60 * 1000); // 6 hours
+        setTimeWindow(6 * 60 * 60 * 1000); // Programmatic window change
       }
       break;
     case '4':
       if (!event.ctrlKey && !event.metaKey) {
         event.preventDefault();
-        setTimeWindow(24 * 60 * 60 * 1000); // 24 hours
+        setTimeWindow(24 * 60 * 60 * 1000); // Programmatic window change
+      }
+      break;
+    case 'a':
+    case 'A':
+      if (!event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        toggleAutoPan();
       }
       break;
     case 'Escape':
@@ -1397,6 +1574,9 @@ onMounted(async () => {
   loadPersistedFilters();
   window.addEventListener('resize', updateDimensions);
   document.addEventListener('keydown', handleKeydown);
+  
+  // Start auto-pan when component mounts
+  startAutoPan();
 });
 
 onUnmounted(() => {
@@ -1404,6 +1584,9 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
   document.removeEventListener('mousemove', handleGlobalMouseMove);
   document.removeEventListener('mouseup', handleGlobalMouseUp);
+  
+  // Clean up auto-pan interval
+  stopAutoPan();
   
   // Clean up time window transitions (keep this one for window switching)
   if (timeWindowTransitionId) {

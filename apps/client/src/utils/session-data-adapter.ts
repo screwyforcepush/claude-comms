@@ -48,7 +48,7 @@ export class SessionDataAdapter {
       status: timelineData.status,
       agentCount: timelineData.agentPaths?.length || 0,
       
-      // Transform agentPaths to agents
+      // Transform agentPaths to agents with proper lane assignment
       agents: (timelineData.agentPaths || []).map((agentPath, index) => ({
         agentId: agentPath.agentId,
         name: agentPath.name,
@@ -56,7 +56,7 @@ export class SessionDataAdapter {
         startTime: agentPath.startTime,
         endTime: agentPath.endTime || undefined, // Convert null to undefined
         status: agentPath.status as 'pending' | 'in_progress' | 'completed' | 'error',
-        laneIndex: agentPath.laneIndex || index + 1
+        laneIndex: agentPath.laneIndex && agentPath.laneIndex > 0 ? agentPath.laneIndex : index + 1
       })),
       
       // Transform messages 
@@ -239,15 +239,21 @@ export class SessionDataAdapter {
         endTime: startTime + duration,
         status: ['active', 'completed', 'failed'][Math.floor(Math.random() * 3)] as any,
         agentCount,
-        agents: Array.from({ length: agentCount }, (_, j) => ({
-          agentId: `agent-${i + 1}-${j + 1}`,
-          name: `Agent${j + 1}`,
-          type: ['engineer', 'architect', 'tester', 'reviewer'][j % 4],
-          startTime: startTime + (j * 1000),
-          endTime: startTime + duration - (j * 1000),
-          status: ['pending', 'in_progress', 'completed', 'error'][Math.floor(Math.random() * 4)] as any,
-          laneIndex: j + 1
-        })),
+        agents: Array.from({ length: agentCount }, (_, j) => {
+          const agentStartTime = startTime + (j * 1000);
+          const agentDuration = Math.random() * (duration - (j * 1000));
+          const agentEndTime = Math.random() > 0.3 ? agentStartTime + agentDuration : undefined; // 30% chance of in-progress
+          
+          return {
+            agentId: `agent-${i + 1}-${j + 1}`,
+            name: `Agent${j + 1}`,
+            type: ['engineer', 'architect', 'tester', 'reviewer', 'planner', 'gatekeeper'][j % 6],
+            startTime: agentStartTime,
+            endTime: agentEndTime,
+            status: agentEndTime ? 'completed' : 'in_progress' as any,
+            laneIndex: j + 1
+          };
+        }),
         messages: []
       });
     }
