@@ -397,6 +397,7 @@ import { SessionFilterUtils, DEFAULT_SESSION_FILTERS } from '../types/session-fi
 import type { SessionFilterState } from '../types/session-filters';
 import { SessionDataAdapter } from '../utils/session-data-adapter';
 import type { SessionData, SessionAgent, SessionMessage } from '../utils/session-data-adapter';
+import { usePerformanceOptimizer } from '../composables/usePerformanceOptimizer';
 
 interface TimeWindow {
   label: string;
@@ -441,6 +442,9 @@ const emit = defineEmits<{
 // ============================================================================
 // Reactive State
 // ============================================================================
+
+// Initialize Performance Optimizer
+const { performanceMetrics } = usePerformanceOptimizer();
 
 // Container refs
 const sessionsContainer = ref<HTMLDivElement>();

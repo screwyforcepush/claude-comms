@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ValidatorViper - Console Validation</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .status.success { background: #065f46; color: #10b981; }
+        .status.error { background: #7f1d1d; color: #ef4444; }
+        .status.warning { background: #78350f; color: #f59e0b; }
+        .log-entry {
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: #2a2a2a;
+            border-left: 4px solid #3b82f6;
+        }
+        .log-entry.error {
+            border-left-color: #ef4444;
+            background: #2d1b1b;
+        }
+        .log-entry.warn {
+            border-left-color: #f59e0b;
+            background: #2d2419;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+        button:disabled { 
+            background: #4b5563; 
+            cursor: not-allowed; 
+        }
+        .iframe-container {
+            border: 2px solid #374151;
+            border-radius: 8px;
+            margin: 20px 0;
+            height: 600px;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .metric {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            color: #9ca3af;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 ValidatorViper - Console Validation Dashboard</h1>
+        
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="errorCount">0</div>
+                <div class="metric-label">Console Errors</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="warningCount">0</div>
+                <div class="metric-label">Console Warnings</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="vueWarningCount">0</div>
+                <div class="metric-label">Vue Warnings</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="testStatus">🔄</div>
+                <div class="metric-label">Test Status</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="startValidation()">🚀 Start Validation</button>
+            <button onclick="clearLogs()">🧹 Clear Logs</button>
+            <button onclick="openSessionsTab()">📑 Open Sessions Tab</button>
+            <button onclick="runInteractionTests()">⚡ Test Interactions</button>
+            <button onclick="generateReport()">📋 Generate Report</button>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="iframe-container">
+            <iframe id="appFrame" src="http://localhost:5173" title="Application Under Test"></iframe>
+        </div>
+
+        <div id="logs">
+            <h3>Console Logs</h3>
+            <div id="logContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // Console monitoring state
+        let logs = [];
+        let originalConsoleError, originalConsoleWarn;
+        let isMonitoring = false;
+
+        // Initialize console monitoring
+        function initializeMonitoring() {
+            originalConsoleError = console.error;
+            originalConsoleWarn = console.warn;
+
+            console.error = (...args) => {
+                logEntry('error', args);
+                originalConsoleError(...args);
+            };
+
+            console.warn = (...args) => {
+                logEntry('warn', args);
+                originalConsoleWarn(...args);
+            };
+
+            // Monitor iframe console
+            const iframe = document.getElementById('appFrame');
+            iframe.onload = () => {
+                try {
+                    const iframeWindow = iframe.contentWindow;
+                    const iframeConsole = iframeWindow.console;
+
+                    iframeWindow.console.error = (...args) => {
+                        logEntry('error', args, 'iframe');
+                        originalConsoleError(...args);
+                    };
+
+                    iframeWindow.console.warn = (...args) => {
+                        logEntry('warn', args, 'iframe');
+                        originalConsoleWarn(...args);
+                    };
+                } catch (e) {
+                    logEntry('error', ['Failed to monitor iframe console:', e.message]);
+                }
+            };
+
+            isMonitoring = true;
+            updateStatus('success', '✅ Console monitoring active');
+        }
+
+        function logEntry(type, args, source = 'parent') {
+            const entry = {
+                timestamp: Date.now(),
+                type,
+                args,
+                source,
+                stack: new Error().stack
+            };
+            logs.push(entry);
+            updateLogDisplay();
+            updateMetrics();
+        }
+
+        function updateLogDisplay() {
+            const container = document.getElementById('logContainer');
+            container.innerHTML = logs.map(log => {
+                const time = new Date(log.timestamp).toLocaleTimeString();
+                const argsText = log.args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                ).join(' ');
+                
+                return `<div class="log-entry ${log.type}">
+                    [${time}] [${log.source}] ${log.type.toUpperCase()}: ${argsText}
+                </div>`;
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateMetrics() {
+            const errors = logs.filter(log => log.type === 'error');
+            const warnings = logs.filter(log => log.type === 'warn');
+            const vueWarnings = logs.filter(log => 
+                log.args.some(arg => typeof arg === 'string' && arg.includes('[Vue warn]'))
+            );
+
+            document.getElementById('errorCount').textContent = errors.length;
+            document.getElementById('warningCount').textContent = warnings.length;
+            document.getElementById('vueWarningCount').textContent = vueWarnings.length;
+            
+            const status = errors.length === 0 ? '✅' : '❌';
+            document.getElementById('testStatus').textContent = status;
+        }
+
+        function updateStatus(type, message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+
+        function startValidation() {
+            if (!isMonitoring) {
+                initializeMonitoring();
+            }
+            
+            updateStatus('success', '🔍 Validation started - monitoring console output...');
+            
+            // Reload iframe to capture all initialization logs
+            const iframe = document.getElementById('appFrame');
+            iframe.src = iframe.src;
+        }
+
+        function clearLogs() {
+            logs = [];
+            updateLogDisplay();
+            updateMetrics();
+            updateStatus('success', '🧹 Logs cleared');
+        }
+
+        function openSessionsTab() {
+            const iframe = document.getElementById('appFrame');
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const sessionsTab = iframeDoc.querySelector('[role="tab"][aria-controls="sessions"]') ||
+                                   iframeDoc.querySelector('button:contains("Sessions")') ||
+                                   iframeDoc.querySelector('.tab');
+                
+                if (sessionsTab) {
+                    sessionsTab.click();
+                    updateStatus('success', '📑 Sessions tab clicked');
+                } else {
+                    updateStatus('warning', '⚠️ Sessions tab not found');
+                }
+            } catch (e) {
+                updateStatus('error', `❌ Failed to interact with iframe: ${e.message}`);
+            }
+        }
+
+        function runInteractionTests() {
+            updateStatus('success', '⚡ Running interaction tests...');
+            
+            const tests = [
+                () => openSessionsTab(),
+                () => simulateTimelineInteraction(),
+                () => simulateZoomControls(),
+                () => simulateKeyboardShortcuts()
+            ];
+
+            tests.forEach((test, index) => {
+                setTimeout(test, index * 1000);
+            });
+        }
+
+        function simulateTimelineInteraction() {
+            const iframe = document.getElementById('appFrame');
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const timeline = iframeDoc.querySelector('svg') || 
+                               iframeDoc.querySelector('.sessions-timeline-container');
+                
+                if (timeline) {
+                    // Simulate mouse events
+                    const event = new MouseEvent('click', { bubbles: true });
+                    timeline.dispatchEvent(event);
+                    updateStatus('success', '⚡ Timeline interaction simulated');
+                } else {
+                    updateStatus('warning', '⚠️ Timeline not found for interaction test');
+                }
+            } catch (e) {
+                logEntry('error', ['Timeline interaction failed:', e.message]);
+            }
+        }
+
+        function simulateZoomControls() {
+            const iframe = document.getElementById('appFrame');
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const zoomIn = iframeDoc.querySelector('button[title*="Zoom In"]');
+                const zoomOut = iframeDoc.querySelector('button[title*="Zoom Out"]');
+                
+                if (zoomIn && zoomOut) {
+                    zoomIn.click();
+                    setTimeout(() => zoomOut.click(), 500);
+                    updateStatus('success', '🔍 Zoom controls tested');
+                } else {
+                    updateStatus('warning', '⚠️ Zoom controls not found');
+                }
+            } catch (e) {
+                logEntry('error', ['Zoom control test failed:', e.message]);
+            }
+        }
+
+        function simulateKeyboardShortcuts() {
+            const iframe = document.getElementById('appFrame');
+            try {
+                const iframeWindow = iframe.contentWindow;
+                const event = new KeyboardEvent('keydown', { key: 'r' });
+                iframeWindow.document.dispatchEvent(event);
+                updateStatus('success', '⌨️ Keyboard shortcuts tested');
+            } catch (e) {
+                logEntry('error', ['Keyboard shortcut test failed:', e.message]);
+            }
+        }
+
+        function generateReport() {
+            const errors = logs.filter(log => log.type === 'error');
+            const warnings = logs.filter(log => log.type === 'warn');
+            const vueWarnings = logs.filter(log => 
+                log.args.some(arg => typeof arg === 'string' && arg.includes('[Vue warn]'))
+            );
+
+            const report = {
+                timestamp: new Date().toISOString(),
+                summary: {
+                    totalLogs: logs.length,
+                    errors: errors.length,
+                    warnings: warnings.length,
+                    vueWarnings: vueWarnings.length,
+                    status: errors.length === 0 ? 'PASS' : 'FAIL'
+                },
+                details: {
+                    errors: errors.map(log => ({
+                        time: new Date(log.timestamp).toISOString(),
+                        source: log.source,
+                        message: log.args.join(' ')
+                    })),
+                    warnings: warnings.map(log => ({
+                        time: new Date(log.timestamp).toISOString(),
+                        source: log.source,
+                        message: log.args.join(' ')
+                    }))
+                }
+            };
+
+            console.log('🔍 ValidatorViper Console Validation Report:', report);
+            
+            // Download report as JSON
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `console-validation-report-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            updateStatus('success', '📋 Report generated and downloaded');
+        }
+
+        // Initialize on page load
+        window.onload = () => {
+            updateStatus('success', '🔍 ValidatorViper initialized - click "Start Validation" to begin');
+        };
+    </script>
+</body>
+</html>

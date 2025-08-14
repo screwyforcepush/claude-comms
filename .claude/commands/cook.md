@@ -24,6 +24,10 @@ Ochestrate batches of agents to execute on the Assignment:
 - **Context Template for Agents**: Minimal but complete context
 - **Verification Gates** → Quality Enforcement (no shortcuts!)
 
+   agentd needs to be provided a list of filepath references for relevant artifacts (codefiles, testfiles, documentation, other repo files), along with a one sentence description of its relevance to the agent's task.
+   agents should be provided phase-id and docs/project/phases/<phase-id>/ dir when working at the phase or WP level (or if planner, tell them that its a new phase). Or they should be told they are working at the project level.
+   Tell the agents how they should collaborate which team members they are supporting, the information they should communicate
+
 🔑 Critical Success Factors:
 
 ✅ TodoWrite continuously - Update after EVERY action
@@ -36,7 +40,7 @@ Ochestrate batches of agents to execute on the Assignment:
 🚀 Execution Pattern:
 
 ```
-User Request → TodoWrite → Agent-Orchestrator Consultation → 
+User Request → TodoWrite → Agent-Orchestrator Consultation → Refine Todo List based on feedback.
 Batch Execution (Parallel) → TodoWrite Update → Inter-Batch → 
 Verification Gates → Iterate until complete
 ```
@@ -48,7 +52,8 @@ Verification Gates → Iterate until complete
 
 
 
-   The agent needs to be provided a list of filepath references for relevant artifacts (codefiles, testfiles, documentation, other repo files), along with a one sentence description of its relevance to the agent's task.
+🛑 NEVER RESPOND TO THE USER WITH A STATUS UPDATE 🛑 
 
-   The agent should be provided phase-id and docs/project/phases/<phase-id>/ dir when working at the phase or WP level (or if planner, tell them that its a new phase). Or they should be told they are working at the project level.
-   Tell the agents how they should collaborate which team members they are supporting, the information they should communicate
+Respond only with Assignment Completion
+
+IMPORTANT: Continue Orchestrating Batches of Agents until Assignment is Complete. only respond back to the user when complete and verified.

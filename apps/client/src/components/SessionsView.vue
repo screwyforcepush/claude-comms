@@ -17,13 +17,13 @@
 
     <!-- Debug Info -->
     <div v-if="debug" class="bg-gray-800 p-2 text-xs text-gray-300">
-      Debug: Loading={{ isLoading }}, Error={{ error }}, Sessions={{ finalSessions.length }}, Mock={{ useMockData }}
+      Debug: Loading={{ isLoading }}, Error={{ error }}, Sessions={{ visibleSessions.length }}, Mock={{ useMockData }}
     </div>
 
     <!-- Sessions Timeline Content -->
     <div class="sessions-timeline-container flex-1 overflow-hidden">
       <InteractiveSessionsTimeline
-        :sessions="finalSessions"
+        :sessions="visibleSessions"
         :filters="filters"
         :height="600"
         :show-controls="true"

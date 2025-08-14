@@ -1,4 +1,4 @@
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, readonly } from 'vue';
 
 /**
  * Performance Optimization Composable
