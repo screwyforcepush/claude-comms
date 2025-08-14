@@ -243,6 +243,28 @@
                 >
                   {{ agent.name }}
                 </text>
+                
+                <!-- Termination indicator for terminated agents -->
+                <g v-if="agent.status === 'terminated'" 
+                   :transform="`translate(${getTimeX(agent.endTime || Date.now())}, ${getAgentLaneY(agent, sessionIndex)})`">
+                  <!-- Red background circle -->
+                  <circle 
+                    cx="0" 
+                    cy="0"
+                    r="6" 
+                    fill="#ef4444"
+                    stroke="#ffffff"
+                    stroke-width="1.5"
+                    class="drop-shadow-[0_0_8px_#ef4444] cursor-pointer transition-all duration-300"
+                    opacity="0.9"
+                    @click="selectAgent(agent, session)"
+                  />
+                  <!-- Termination cross (✕) -->
+                  <g stroke="#ffffff" stroke-width="1.5" stroke-linecap="round">
+                    <line x1="-2" y1="-2" x2="2" y2="2" />
+                    <line x1="2" y1="-2" x2="-2" y2="2" />
+                  </g>
+                </g>
               </g>
             </g>
 
@@ -811,7 +833,8 @@ const getSessionAgentPath = (agent: SessionAgent, sessionIndex: number): string 
             L ${cp3X},${agentY}
             C ${cp4X},${agentY} ${cp4X},${orchestratorY} ${endX},${orchestratorY}`;
   } else {
-    // In-progress path - branch out but don't merge back yet
+    // In-progress, error, or terminated path - branch out but don't merge back
+    // Terminated agents end at their lane with no merge back to orchestrator
     const currentEndX = Math.max(endX, startX + minBranchWidth);
     return `M ${startX},${orchestratorY} 
             C ${cp1X},${orchestratorY} ${cp1X},${agentY} ${cp2X},${agentY}
@@ -879,6 +902,7 @@ const getAgentColor = (type: string): string => {
 const getAgentStrokeWidth = (status: string, isSelected: boolean): number => {
   let width = 2;
   if (status === 'in_progress') width = 3;
+  if (status === 'terminated') width = 2;
   if (isSelected) width += 1;
   return width;
 };
@@ -886,6 +910,7 @@ const getAgentStrokeWidth = (status: string, isSelected: boolean): number => {
 const getAgentPathClass = (status: string, isSelected: boolean): string => {
   let classes = 'transition-all duration-200';
   if (status === 'in_progress') classes += ' animate-pulse';
+  if (status === 'terminated') classes += ' opacity-75';
   if (isSelected) classes += ' drop-shadow-[0_0_8px_currentColor]';
   return classes;
 };

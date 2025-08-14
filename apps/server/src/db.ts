@@ -56,7 +56,7 @@ export function initDatabase(): void {
       subagent_type TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       completed_at INTEGER,
-      status TEXT DEFAULT 'pending',
+      status TEXT DEFAULT 'active',
       total_duration_ms INTEGER,
       total_tokens INTEGER,
       total_tool_use_count INTEGER,
@@ -76,7 +76,7 @@ export function initDatabase(): void {
       db.exec('ALTER TABLE subagent_registry ADD COLUMN completed_at INTEGER');
     }
     if (!columnNames.includes('status')) {
-      db.exec('ALTER TABLE subagent_registry ADD COLUMN status TEXT DEFAULT "pending"');
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN status TEXT DEFAULT "active"');
     }
     if (!columnNames.includes('total_duration_ms')) {
       db.exec('ALTER TABLE subagent_registry ADD COLUMN total_duration_ms INTEGER');
@@ -121,6 +121,9 @@ export function initDatabase(): void {
     if (!hasStatusColumn) {
       db.exec('ALTER TABLE subagent_registry ADD COLUMN status TEXT DEFAULT "active"');
     }
+    
+    // Migrate existing 'pending' status records to 'active' for backward compatibility
+    db.exec('UPDATE subagent_registry SET status = "active" WHERE status = "pending"');
     
     const hasCompletedAtColumn = subagentColumns.some((col: any) => col.name === 'completed_at');
     if (!hasCompletedAtColumn) {
@@ -211,10 +214,68 @@ export function getRecentEvents(limit: number = 100): HookEvent[] {
 }
 
 // Subagent communication functions
-export function registerSubagent(sessionId: string, name: string, subagentType: string): number {
+
+// Helper function to get last message interaction timestamp for an agent
+function getLastMessageInteraction(agentName: string): number | null {
   const stmt = db.prepare(`
-    INSERT INTO subagent_registry (session_id, name, subagent_type, created_at)
-    VALUES (?, ?, ?, ?)
+    SELECT MAX(created_at) as last_interaction
+    FROM subagent_messages 
+    WHERE sender = ? OR notified LIKE '%' || ? || '%'
+  `);
+  
+  const result = stmt.get(agentName, agentName) as any;
+  return result?.last_interaction || null;
+}
+
+// Function to handle agent termination cleanup
+function terminateInactiveAgents(currentSessionId: string): void {
+  const now = Date.now();
+  const oneMinuteAgo = now - (60 * 1000);
+  const sixtyMinutesAgo = now - (60 * 60 * 1000);
+  
+  // Find agents to terminate:
+  // 1. Same session agents with no completed_at and created_at > 1 minute ago
+  // 2. Any session agents with no completed_at and created_at > 60 minutes ago
+  const findAgentsStmt = db.prepare(`
+    SELECT id, name, created_at, session_id
+    FROM subagent_registry 
+    WHERE completed_at IS NULL 
+      AND status = 'active'
+      AND (
+        (session_id = ? AND created_at < ?) OR
+        (created_at < ?)
+      )
+  `);
+  
+  const agentsToTerminate = findAgentsStmt.all(currentSessionId, oneMinuteAgo, sixtyMinutesAgo) as any[];
+  
+  // Update each agent's status and completed_at timestamp
+  const updateStmt = db.prepare(`
+    UPDATE subagent_registry 
+    SET status = 'terminated', completed_at = ?
+    WHERE id = ?
+  `);
+  
+  agentsToTerminate.forEach(agent => {
+    // Try to get last message interaction, fallback to created_at + 10 seconds
+    const lastInteraction = getLastMessageInteraction(agent.name);
+    const completedAt = (lastInteraction || agent.created_at) + 10000;
+    
+    updateStmt.run(completedAt, agent.id);
+  });
+  
+  if (agentsToTerminate.length > 0) {
+    console.log(`Terminated ${agentsToTerminate.length} inactive agents`);
+  }
+}
+
+export function registerSubagent(sessionId: string, name: string, subagentType: string): number {
+  // First, run termination cleanup for inactive agents
+  terminateInactiveAgents(sessionId);
+  
+  const stmt = db.prepare(`
+    INSERT INTO subagent_registry (session_id, name, subagent_type, created_at, status)
+    VALUES (?, ?, ?, ?, 'active')
   `);
   
   const result = stmt.run(sessionId, name, subagentType, Date.now());

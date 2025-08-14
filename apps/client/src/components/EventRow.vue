@@ -1,8 +1,10 @@
 <template>
   <div 
-    class="group relative p-4 mobile:p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-700 hover:border-blue-500 bg-gradient-to-r from-gray-800 to-gray-700"
+    class="group relative p-4 mobile:p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-700 hover:border-blue-500 hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-600 bg-gradient-to-r from-gray-800 to-gray-700 transform hover:scale-[1.01] hover:translate-y-[-1px] min-h-[44px] touch-manipulation"
     :class="{ 'ring-2 ring-blue-500 border-blue-500 shadow-2xl': isExpanded }"
     @click="toggleExpanded"
+    title="Click to expand event details"
+    style="touch-action: manipulation;"
   >
     <!-- App color indicator -->
     <div 
@@ -108,7 +110,9 @@
             </h4>
             <button
               @click.stop="copyPayload"
-              class="px-3 py-1 mobile:px-2 mobile:py-0.5 text-sm mobile:text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-800 text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center space-x-1"
+              class="px-3 py-1 mobile:px-2 mobile:py-0.5 text-sm mobile:text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 cursor-pointer border border-blue-700 hover:border-blue-500 min-h-[44px] min-w-[44px] touch-manipulation"
+              title="Copy payload to clipboard"
+              style="touch-action: manipulation;"
             >
               <span>{{ copyButtonText }}</span>
             </button>
@@ -121,12 +125,14 @@
           <button
             @click.stop="!isMobile && (showChatModal = true)"
             :class="[
-              'px-4 py-2 mobile:px-3 mobile:py-1.5 font-bold rounded-lg transition-all duration-200 flex items-center space-x-1.5 shadow-md hover:shadow-lg',
+              'px-4 py-2 mobile:px-3 mobile:py-1.5 font-bold rounded-lg transition-all duration-200 flex items-center space-x-1.5 shadow-md hover:shadow-lg min-h-[44px] min-w-[44px] touch-manipulation',
               isMobile 
                 ? 'bg-gray-500 cursor-not-allowed opacity-50 text-gray-400 border border-gray-600' 
-                : 'bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-800 hover:to-blue-600 text-white border border-blue-800 transform hover:scale-105'
+                : 'bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500 text-white border border-blue-800 hover:border-blue-600 transform hover:scale-105 cursor-pointer'
             ]"
             :disabled="isMobile"
+            :title="isMobile ? 'Chat transcript not available on mobile' : `View chat transcript (${event.chat.length} messages)`"
+            style="touch-action: manipulation;"
           >
             <span class="text-base mobile:text-sm">💬</span>
             <span class="text-sm mobile:text-xs font-bold drop-shadow-sm">

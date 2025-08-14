@@ -205,7 +205,8 @@ export function useTimelineData(options: Partial<TimelineTransformOptions> = {})
           orchestratorEventId: `orchestrator_${batchId}`,
           parallelCount: batchAgents.length,
           status: batchAgents.every(a => a.status === 'completed') ? 'completed' : 
-                 batchAgents.some(a => a.status === 'in_progress') ? 'running' : 'spawning'
+                 batchAgents.some(a => a.status === 'in_progress') ? 'running' :
+                 batchAgents.some(a => a.status === 'error' || a.status === 'terminated') ? 'error' : 'spawning'
         };
         
         return batch;

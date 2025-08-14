@@ -7,7 +7,8 @@
         <select 
           v-model="selectedSessionId" 
           @change="loadSessionData"
-          class="px-3 py-1.5 bg-gray-800 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+          class="px-3 py-1.5 bg-gray-800 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none cursor-pointer transition-all duration-200 hover:border-gray-500 hover:bg-gray-700"
+          title="Select a session to view"
         >
           <option value="">Select a session...</option>
           <option v-for="session in sessions" :key="session.session_id" :value="session.session_id">
@@ -16,7 +17,8 @@
         </select>
         <button 
           @click="refreshSessions"
-          class="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          class="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 cursor-pointer border border-blue-700 hover:border-blue-500"
+          title="Refresh session list"
         >
           Refresh
         </button>
@@ -28,22 +30,24 @@
           <button
             @click="activeView = 'timeline'"
             :class="[
-              'px-4 py-2 font-semibold transition-all',
+              'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
               activeView === 'timeline' 
                 ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-white hover:bg-gray-600'
+                : 'text-gray-400 hover:text-white hover:bg-gray-600 transform hover:scale-105'
             ]"
+            title="Switch to timeline view"
           >
             📈 Timeline View
           </button>
           <button
             @click="activeView = 'list'"
             :class="[
-              'px-4 py-2 font-semibold transition-all',
+              'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
               activeView === 'list' 
                 ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-white hover:bg-gray-600'
+                : 'text-gray-400 hover:text-white hover:bg-gray-600 transform hover:scale-105'
             ]"
+            title="Switch to list view"
           >
             📋 List View
           </button>
@@ -83,18 +87,20 @@
               <div 
                 v-for="agent in subagents" 
                 :key="agent.id"
-                class="bg-gray-800 p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
+                class="bg-gray-800 p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] border border-gray-700 hover:border-gray-600"
                 @click="handleAgentSelected(agent)"
+                :title="`Click to view details for ${agent.name} (${agent.subagent_type})`"
               >
                 <div class="flex items-center justify-between mb-2">
                   <div class="text-white font-semibold">{{ agent.name }}</div>
                   <span 
                     :class="[
-                      'px-2 py-1 rounded-full text-xs font-medium',
+                      'px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1',
                       getStatusColor(agent.status)
                     ]"
                   >
-                    {{ agent.status || 'pending' }}
+                    <span v-if="agent.status === 'terminated'" class="text-red-200">✕</span>
+                    <span>{{ agent.status || 'pending' }}</span>
                   </span>
                 </div>
                 
@@ -279,6 +285,10 @@ const getStatusColor = (status?: string): string => {
       return 'bg-green-600 text-white';
     case 'in_progress':
       return 'bg-blue-600 text-white';
+    case 'error':
+      return 'bg-red-600 text-white';
+    case 'terminated':
+      return 'bg-red-800 text-white';
     case 'pending':
     default:
       return 'bg-gray-600 text-white';

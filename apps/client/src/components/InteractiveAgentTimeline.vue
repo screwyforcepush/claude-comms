@@ -144,38 +144,73 @@
         <!-- Agent Lanes with Curved Paths -->
         <g class="agent-lanes" style="z-index: 20;">
           <g v-for="(agent, index) in visibleAgents" :key="agent.agentId" class="agent-lane">
-            <!-- Curved Agent Path connecting to orchestrator -->
+            <!-- Invisible expanded click area for agent path -->
+            <path
+              :d="getAgentCurvePath(agent, index, getAgentLaneY(index, agent))"
+              stroke="transparent"
+              stroke-width="20"
+              fill="none"
+              class="cursor-pointer"
+              @click="showAgentDetails(agent, $event)"
+              @mouseenter="showAgentTooltip(agent, $event)"
+              @mouseleave="hideTooltip"
+            />
+            <!-- Visible agent path -->
             <path
               :d="getAgentCurvePath(agent, index, getAgentLaneY(index, agent))"
               :stroke="`url(#agentGradient-${agent.type})`"
               :stroke-width="getStrokeWidth(agent.status, agent.agentId === selectedAgent?.id?.toString())"
               :class="getAgentLineClass(agent.status, agent.agentId === selectedAgent?.id?.toString())"
-              class="cursor-pointer transition-all duration-200"
+              class="pointer-events-none transition-all duration-200"
               :filter="agent.agentId === selectedAgent?.id?.toString() ? 'url(#agentGlow)' : ''"
               fill="none"
               style="will-change: transform; transform: translateZ(0);"
+            />
+            <!-- Invisible hit area for better clicking - minimum 44x44px -->
+            <path
+              :d="getAgentCurvePath(agent, index, getAgentLaneY(index, agent))"
+              stroke="transparent"
+              stroke-width="44"
+              fill="none"
+              class="cursor-pointer"
+              style="pointer-events: all;"
               @click="showAgentDetails(agent, $event)"
               @mouseenter="showAgentTooltip(agent, $event)"
               @mouseleave="hideTooltip"
             />
             
             <!-- Agent Type-Name Label on Branch -->
-            <text 
-              :x="getAgentLabelX(agent, index)"
-              :y="getAgentLaneY(index, agent) - 5"
-              text-anchor="middle" 
-              :fill="getAgentColor(agent.type)"
-              font-size="10px"
-              font-weight="600"
-              font-family="system-ui"
-              class="cursor-pointer select-none drop-shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-opacity duration-200"
-              :class="agent.agentId === selectedAgent?.id?.toString() ? 'opacity-100 font-bold' : 'opacity-80 hover:opacity-100'"
-              @click="showAgentDetails(agent, $event)"
-              @mouseenter="showAgentTooltip(agent, $event)"
-              @mouseleave="hideTooltip"
-            >
-              {{ agent.type }}-{{ agent.name }}
-            </text>
+            <g>
+              <text 
+                :x="getAgentLabelX(agent, index)"
+                :y="getAgentLaneY(index, agent) - 5"
+                text-anchor="middle" 
+                :fill="getAgentColor(agent.type)"
+                font-size="10px"
+                font-weight="600"
+                font-family="system-ui"
+                class="cursor-pointer select-none drop-shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-opacity duration-200"
+                :class="agent.agentId === selectedAgent?.id?.toString() ? 'opacity-100 font-bold' : 'opacity-80 hover:opacity-100'"
+                @click="showAgentDetails(agent, $event)"
+                @mouseenter="showAgentTooltip(agent, $event)"
+                @mouseleave="hideTooltip"
+              >
+                {{ agent.type }}-{{ agent.name }}
+              </text>
+              <!-- Invisible hit area around label - minimum 44x44px -->
+              <rect
+                :x="getAgentLabelX(agent, index) - 22"
+                :y="getAgentLaneY(index, agent) - 27"
+                width="44"
+                height="44"
+                fill="transparent"
+                class="cursor-pointer"
+                style="pointer-events: all;"
+                @click="showAgentDetails(agent, $event)"
+                @mouseenter="showAgentTooltip(agent, $event)"
+                @mouseleave="hideTooltip"
+              />
+            </g>
 
             <!-- Direction indicator arrow - REMOVED -->
             
@@ -201,23 +236,50 @@
               @mouseenter="showBatchTooltip(batch, $event)"
               @mouseleave="hideTooltip"
             />
-            <!-- Pulse effect for spawn points removed (was causing floating circles) -->
-            <!-- Batch label with enhanced styling -->
-            <text 
-              :x="getTimeX(batch.spawnTimestamp)" 
-              :y="orchestratorY - 20"
-              text-anchor="middle" 
-              fill="#00d4ff" 
-              font-size="13px"
-              font-weight="700"
-              font-family="system-ui"
-              class="cursor-pointer select-none drop-shadow-[0_0_4px_currentColor]"
+            <!-- Invisible hit area for better clicking - minimum 44x44px -->
+            <circle 
+              :cx="getTimeX(batch.spawnTimestamp)" 
+              :cy="orchestratorY"
+              r="22" 
+              fill="transparent"
+              class="cursor-pointer"
+              style="pointer-events: all;"
               @click="selectBatch(batch)"
               @mouseenter="showBatchTooltip(batch, $event)"
               @mouseleave="hideTooltip"
-            >
-              BATCH {{ batch.batchNumber }}
-            </text>
+            />
+            <!-- Pulse effect for spawn points removed (was causing floating circles) -->
+            <!-- Batch label with enhanced styling -->
+            <g>
+              <text 
+                :x="getTimeX(batch.spawnTimestamp)" 
+                :y="orchestratorY - 20"
+                text-anchor="middle" 
+                fill="#00d4ff" 
+                font-size="13px"
+                font-weight="700"
+                font-family="system-ui"
+                class="cursor-pointer select-none drop-shadow-[0_0_4px_currentColor]"
+                @click="selectBatch(batch)"
+                @mouseenter="showBatchTooltip(batch, $event)"
+                @mouseleave="hideTooltip"
+              >
+                BATCH {{ batch.batchNumber }}
+              </text>
+              <!-- Invisible hit area around batch label - minimum 44x44px -->
+              <rect
+                :x="getTimeX(batch.spawnTimestamp) - 22"
+                :y="orchestratorY - 42"
+                width="44"
+                height="44"
+                fill="transparent"
+                class="cursor-pointer"
+                style="pointer-events: all;"
+                @click="selectBatch(batch)"
+                @mouseenter="showBatchTooltip(batch, $event)"
+                @mouseleave="hideTooltip"
+              />
+            </g>
             <!-- Agent count indicator -->
             <text 
               :x="getTimeX(batch.spawnTimestamp)" 
@@ -248,6 +310,16 @@
               opacity="0.9"
               @click="showAgentDetails(agent, $event)"
             />
+            <!-- Invisible hit area for better clicking - minimum 44x44px -->
+            <circle 
+              :cx="getAgentEndX(agent)" 
+              :cy="orchestratorY"
+              r="22" 
+              fill="transparent"
+              class="cursor-pointer"
+              style="pointer-events: all;"
+              @click="showAgentDetails(agent, $event)"
+            />
             <!-- Small indicator showing successful merge -->
             <path
               :d="`M ${getAgentEndX(agent) - 3} ${orchestratorY} L ${getAgentEndX(agent)} ${orchestratorY + 4} L ${getAgentEndX(agent) + 3} ${orchestratorY - 1} Z`"
@@ -257,9 +329,57 @@
           </g>
         </g>
 
+        <!-- Agent Termination Points -->
+        <g class="termination-points" style="z-index: 25;">
+          <g v-for="agent in terminatedAgents" :key="`terminated-${agent.agentId}`">
+            <!-- Termination indicator at the end of agent path (no merge back) -->
+            <g :transform="`translate(${getAgentEndX(agent)}, ${getAgentLaneY(visibleAgents.indexOf(agent), agent)})`">
+              <!-- Red background circle -->
+              <circle 
+                cx="0" 
+                cy="0"
+                r="8" 
+                fill="#ef4444"
+                stroke="#ffffff"
+                stroke-width="2"
+                class="drop-shadow-[0_0_12px_#ef4444] cursor-pointer transition-all duration-300"
+                opacity="0.9"
+                @click="showAgentDetails(agent, $event)"
+              />
+              <!-- Invisible hit area for better clicking - minimum 44x44px -->
+              <circle 
+                cx="0" 
+                cy="0"
+                r="22" 
+                fill="transparent"
+                class="cursor-pointer"
+                style="pointer-events: all;"
+                @click="showAgentDetails(agent, $event)"
+              />
+              <!-- Termination cross (✕) -->
+              <g stroke="#ffffff" stroke-width="2" stroke-linecap="round">
+                <line x1="-3" y1="-3" x2="3" y2="3" />
+                <line x1="3" y1="-3" x2="-3" y2="3" />
+              </g>
+            </g>
+          </g>
+        </g>
+
         <!-- Message Indicators -->
         <g class="message-indicators">
           <g v-for="message in visibleMessages" :key="message.id">
+            <!-- Invisible expanded click area for message -->
+            <circle 
+              :cx="message.position.x" 
+              :cy="message.position.y"
+              r="22"
+              fill="transparent"
+              class="cursor-pointer"
+              @click="showMessageDetails(message, $event)"
+              @mouseenter="showMessageTooltip(message, $event)"
+              @mouseleave="hideTooltip"
+            />
+            <!-- Visible message indicator -->
             <circle 
               :cx="message.position.x" 
               :cy="message.position.y"
@@ -267,8 +387,17 @@
               :fill="getMessageColor(message)"
               stroke="#ffffff"
               stroke-width="1"
-              :class="getMessageClasses(message)"
+              :class="getMessageClasses(message) + ' pointer-events-none'"
               :filter="isMessageSelected(message) ? 'url(#messageGlow)' : ''"
+            />
+            <!-- Invisible hit area for better clicking - minimum 44x44px -->
+            <circle 
+              :cx="message.position.x" 
+              :cy="message.position.y"
+              r="22"
+              fill="transparent"
+              class="cursor-pointer"
+              style="pointer-events: all;"
               @click="showMessageDetails(message, $event)"
               @mouseenter="showMessageTooltip(message, $event)"
               @mouseleave="hideTooltip"
@@ -306,6 +435,19 @@
         <!-- User Prompts -->
         <g class="user-prompts">
           <g v-for="prompt in userPrompts" :key="prompt.id">
+            <!-- Invisible expanded click area for user prompt -->
+            <rect
+              :x="getTimeX(prompt.timestamp) - 22"
+              :y="orchestratorY - 34"
+              width="44"
+              height="44"
+              fill="transparent"
+              class="cursor-pointer"
+              @click="selectPrompt(prompt)"
+              @mouseenter="showPromptTooltip(prompt, $event)"
+              @mouseleave="hideTooltip"
+            />
+            <!-- Visible user prompt indicator -->
             <rect
               :x="getTimeX(prompt.timestamp) - 8"
               :y="orchestratorY - 20"
@@ -316,7 +458,17 @@
               stroke-width="2"
               rx="3"
               ry="3"
-              class="cursor-pointer hover:opacity-80 transition-all"
+              class="pointer-events-none hover:opacity-80 transition-all"
+            />
+            <!-- Invisible hit area for better clicking - minimum 44x44px -->
+            <rect
+              :x="getTimeX(prompt.timestamp) - 22"
+              :y="orchestratorY - 42"
+              width="44"
+              height="44"
+              fill="transparent"
+              class="cursor-pointer"
+              style="pointer-events: all;"
               @click="selectPrompt(prompt)"
               @mouseenter="showPromptTooltip(prompt, $event)"
               @mouseleave="hideTooltip"
@@ -620,6 +772,11 @@ const completedAgents = computed(() => {
   return visibleAgents.value.filter(agent => agent.status === 'completed');
 });
 
+// Computed property for terminated agents
+const terminatedAgents = computed(() => {
+  return visibleAgents.value.filter(agent => agent.status === 'terminated');
+});
+
 const timeRange = computed(() => {
   if (visibleAgents.value.length === 0) {
     const now = Date.now();
@@ -875,7 +1032,7 @@ const getAgentCurvePath = (agent: any, index: number, agentY?: number): string =
   // 1. Start from orchestrator at spawn time
   // 2. Branch out with a curve to the agent lane
   // 3. Run horizontally along the agent lane
-  // 4. Merge back to orchestrator at completion time
+  // 4. Merge back to orchestrator at completion time (only for completed agents)
   
   if (agent.status === 'completed' && agent.endTime) {
     // Completed agents: full lifecycle with merge back
@@ -888,7 +1045,8 @@ const getAgentCurvePath = (agent: any, index: number, agentY?: number): string =
               ${endX - mergeBackDistance} ${orchestratorY}
               ${endX} ${orchestratorY}`;
   } else {
-    // In-progress or pending agents: branch out but don't merge back yet
+    // In-progress, pending, error, or terminated agents: branch out but don't merge back
+    // Terminated agents end at their lane with no merge back to orchestrator
     return `M ${startX} ${orchestratorY} 
             C ${startX + branchOutDistance} ${orchestratorY} 
               ${startX + branchOutDistance} ${laneY} 
@@ -906,6 +1064,7 @@ const getStrokeWidth = (status: string, isSelected: boolean = false): number => 
     case 'completed': width = 2; break;
     case 'in_progress': width = 3; break;
     case 'error': width = 3; break;
+    case 'terminated': width = 2; break;
     default: width = 2;
   }
   return isSelected ? width + 2 : width;
@@ -925,6 +1084,10 @@ const getAgentLineClass = (status: string, isSelected: boolean = false): string 
   
   if (status === 'completed') {
     classes += ' transition-opacity duration-500';
+  }
+  
+  if (status === 'terminated') {
+    classes += ' opacity-75';
   }
   
   return classes;
@@ -1634,6 +1797,19 @@ watch(() => props.height, (newHeight) => {
   .batch-spawn-points circle {
     cursor: pointer;
     touch-action: manipulation;
+  }
+  
+  /* Ensure all interactive elements have proper cursor indication */
+  .agent-lanes path,
+  .agent-lanes text,
+  .agent-lanes rect,
+  .batch-spawn-points circle,
+  .completion-points circle,
+  .termination-points circle,
+  .message-indicators circle,
+  .user-prompts rect,
+  .user-prompts text {
+    cursor: pointer;
   }
 }
 

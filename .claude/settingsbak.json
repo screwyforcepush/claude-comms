@@ -1,0 +1,20 @@
+{  
+  "env": {
+  "BASH_DEFAULT_TIMEOUT_MS": "1800000",
+  "BASH_MAX_TIMEOUT_MS": "7200000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash",
+      "mcp__perplexity-ask__perplexity_ask",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Update",
+      "Edit",
+      "Write",
+      "Read"
+    ],
+    "deny": [],
+    "defaultMode": "acceptEdits"
+  }
+}

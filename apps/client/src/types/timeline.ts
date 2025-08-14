@@ -87,7 +87,7 @@ export interface AgentPath {
   sessionId: string;
 }
 
-export type AgentStatus = 'pending' | 'in_progress' | 'completed' | 'error';
+export type AgentStatus = 'pending' | 'in_progress' | 'completed' | 'error' | 'terminated';
 
 export interface AgentMetrics {
   duration: number;
