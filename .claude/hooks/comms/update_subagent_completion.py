@@ -58,6 +58,31 @@ def main():
                     if 'cache_read_input_tokens' in usage:
                         completion_metadata['cache_read_input_tokens'] = usage['cache_read_input_tokens']
                 
+                # Extract the agent's final response content
+                # The response content is typically in the main tool_response as text
+                final_response = ''
+                if 'content' in tool_response:
+                    # If content is a list (standard Claude format)
+                    if isinstance(tool_response['content'], list):
+                        text_blocks = [block.get('text', '') for block in tool_response['content'] if block.get('type') == 'text']
+                        final_response = '\n'.join(text_blocks)
+                    # If content is a string
+                    elif isinstance(tool_response['content'], str):
+                        final_response = tool_response['content']
+                elif 'text' in tool_response:
+                    # Alternative field name
+                    final_response = tool_response['text']
+                elif 'response' in tool_response:
+                    # Another possible field name
+                    final_response = tool_response['response']
+                
+                # Extract tool calls if available
+                tool_calls_data = []
+                if 'tool_calls' in tool_response:
+                    tool_calls_data = tool_response['tool_calls']
+                elif 'toolCalls' in tool_response:
+                    tool_calls_data = tool_response['toolCalls']
+                
                 # Update subagent completion status
                 try:
                     response = requests.post(
@@ -67,7 +92,9 @@ def main():
                             'name': agent_name,
                             'status': 'completed',
                             'completed_at': None,  # Will be set to current time by server
-                            'completion_metadata': completion_metadata
+                            'completion_metadata': completion_metadata,
+                            'final_response': final_response,
+                            'tool_calls': tool_calls_data
                         },
                         timeout=2
                     )

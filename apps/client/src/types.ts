@@ -68,6 +68,9 @@ export interface AgentStatus {
   output_tokens?: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
+  // Prompt and response fields
+  initial_prompt?: string;
+  final_response?: string;
 }
 
 export interface SubagentMessage {

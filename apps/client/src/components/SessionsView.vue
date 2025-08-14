@@ -112,8 +112,11 @@ const visibleSessions = computed(() => {
 
 // Computed properties for agent detail pane (matching SubagentComms.vue pattern)
 const allAgents = computed((): AgentStatus[] => {
-  // Convert SessionAgents to AgentStatus format for AgentDetailPane
+  // Store fetched full agent data
   const agents: AgentStatus[] = [];
+  
+  // We'll fetch full data when agents are selected individually
+  // For now, provide basic data for the timeline
   sessionsData.value.forEach(session => {
     session.agents.forEach(agent => {
       agents.push({
@@ -124,11 +127,16 @@ const allAgents = computed((): AgentStatus[] => {
         created_at: agent.startTime,
         completion_timestamp: agent.endTime,
         total_duration_ms: agent.endTime ? agent.endTime - agent.startTime : undefined,
-        // Add placeholder values for missing fields
-        total_tokens: 0,
-        input_tokens: 0,
-        output_tokens: 0,
-        total_tool_use_count: 0
+        session_id: session.sessionId,
+        // These will be populated when agent is selected
+        total_tokens: undefined,
+        input_tokens: undefined,
+        output_tokens: undefined,
+        total_tool_use_count: undefined,
+        cache_creation_input_tokens: undefined,
+        cache_read_input_tokens: undefined,
+        initial_prompt: undefined,
+        final_response: undefined
       });
     });
   });
@@ -219,24 +227,51 @@ onUnmounted(() => {
 });
 
 // Agent detail pane event handlers (matching SubagentComms.vue pattern)
-const handleAgentSelected = (agent: SessionAgent, session: SessionData) => {
+const handleAgentSelected = async (agent: SessionAgent, session: SessionData) => {
   console.log('🤖 AgentAlex: Agent selected from timeline:', agent.name, 'in session:', session.sessionId);
   
-  // Convert SessionAgent to AgentStatus format
-  selectedAgent.value = {
-    id: parseInt(agent.agentId) || 0,
-    name: agent.name,
-    subagent_type: agent.type,
-    status: agent.status,
-    created_at: agent.startTime,
-    completion_timestamp: agent.endTime,
-    total_duration_ms: agent.endTime ? agent.endTime - agent.startTime : undefined,
-    // Add placeholder values for missing fields
-    total_tokens: 0,
-    input_tokens: 0,
-    output_tokens: 0,
-    total_tool_use_count: 0
-  };
+  // Fetch the full agent data from the server to get performance metrics and prompt/response
+  try {
+    const agents = await sessionDataService.fetchSessionAgents(session.sessionId);
+    const fullAgentData = agents.find(a => a.name === agent.name);
+    
+    if (fullAgentData) {
+      selectedAgent.value = fullAgentData;
+    } else {
+      // Fallback to basic conversion if full data not found
+      selectedAgent.value = {
+        id: parseInt(agent.agentId) || 0,
+        name: agent.name,
+        subagent_type: agent.type,
+        status: agent.status,
+        created_at: agent.startTime,
+        completion_timestamp: agent.endTime,
+        total_duration_ms: agent.endTime ? agent.endTime - agent.startTime : undefined,
+        // Add placeholder values for missing fields
+        total_tokens: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tool_use_count: 0
+      };
+    }
+  } catch (error) {
+    console.error('Failed to fetch full agent data:', error);
+    // Fallback to basic conversion on error
+    selectedAgent.value = {
+      id: parseInt(agent.agentId) || 0,
+      name: agent.name,
+      subagent_type: agent.type,
+      status: agent.status,
+      created_at: agent.startTime,
+      completion_timestamp: agent.endTime,
+      total_duration_ms: agent.endTime ? agent.endTime - agent.startTime : undefined,
+      // Add placeholder values for missing fields
+      total_tokens: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tool_use_count: 0
+    };
+  }
   
   selectedSessionId.value = session.sessionId;
   // Close message pane if open and show agent pane

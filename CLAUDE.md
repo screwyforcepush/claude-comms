@@ -272,7 +272,7 @@ PRO TIP: gatekeeper and agent-orchestrator agents can work in parallel, and both
 8. **Agent responses** - Process fully and feed to agent-orchestrator
 
 
-[/CRITICAL ORCHESTRATION WORKFLOW]
+[/CRITICAL ORCHESTRATION PROTOCOLS]
 
 
 ⚙️Remember: The key to effective orchestration is understanding which work can truly happen in parallel and launching those agents together, while respecting sequential dependencies between batches.⚙️

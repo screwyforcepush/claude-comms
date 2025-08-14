@@ -18,7 +18,33 @@ import type {
   OrchestratorEvent,
   AgentStatus
 } from '../../types/timeline';
-import type { HookEvent, Subagent, SubagentMessage } from '../../../server/src/types';
+// Local type definitions for mock data generation
+interface HookEvent {
+  id?: number;
+  source_app: string;
+  session_id: string;
+  hook_event_type: string;
+  payload: Record<string, any>;
+  timestamp?: number;
+}
+
+interface Subagent {
+  id?: number;
+  session_id: string;
+  name: string;
+  subagent_type: string;
+  created_at: number;
+  status?: string;
+  completed_at?: number;
+  total_duration_ms?: number;
+  total_tokens?: number;
+}
+
+interface SubagentMessage {
+  sender: string;
+  message: any;
+  created_at: number;
+}
 
 export class MockDataGenerator {
   private currentTime = Date.now();
@@ -117,11 +143,11 @@ export class MockDataGenerator {
         statusDistribution.active,
         statusDistribution.completed,
         statusDistribution.failed
-      ]);
+      ]) as 'active' | 'completed' | 'failed';
       
-      const complexity = complexityMix 
+      const complexity = (complexityMix 
         ? this.randomChoice(['simple', 'moderate', 'complex'])
-        : 'moderate';
+        : 'moderate') as 'simple' | 'moderate' | 'complex';
 
       const session = this.generateSession({
         startTimeOffset: timeOffset / (60 * 1000),
@@ -141,11 +167,13 @@ export class MockDataGenerator {
   generateMultiSessionData(sessionCount: number = 10): MultiSessionTimelineData {
     const sessions = this.generateMultipleSessions(sessionCount);
     
-    const allTimes = sessions.flatMap(s => [s.startTime, s.endTime].filter(Boolean));
+    const allTimes = sessions.flatMap(s => [s.startTime, s.endTime].filter((t): t is number => typeof t === 'number'));
+    const minTime = allTimes.length > 0 ? Math.min(...allTimes) : Date.now();
+    const maxTime = allTimes.length > 0 ? Math.max(...allTimes) : Date.now();
     const timeRange = {
-      start: Math.min(...allTimes),
-      end: Math.max(...allTimes),
-      duration: Math.max(...allTimes) - Math.min(...allTimes)
+      start: minTime,
+      end: maxTime,
+      duration: maxTime - minTime
     };
 
     // Add session lane offsets
@@ -352,7 +380,10 @@ export class MockDataGenerator {
 
     agentGroups.forEach((group, batchIndex) => {
       const batchStartTime = Math.min(...group.map(a => a.startTime));
-      const batchEndTime = endTime ? Math.min(endTime, Math.max(...group.map(a => a.endTime || endTime))) : undefined;
+      const groupEndTimes = group.map(a => a.endTime).filter((t): t is number => t !== null);
+      const batchEndTime = endTime && groupEndTimes.length > 0 
+        ? Math.min(endTime, Math.max(...groupEndTimes)) 
+        : endTime;
 
       batches.push({
         batchId: `batch-${batchIndex + 1}`,

@@ -1,6 +1,6 @@
 # Primary ⚙️Orchestrator Cook Command
 
-You are Primary ⚙️Orchestrator. ULTRATHINK about CRITICAL ORCHESTRATION WORKFLOW.
+You are Primary ⚙️Orchestrator. ULTRATHINK about your CRITICAL ORCHESTRATION PROTOCOLS.
 
 ## Assignment
 #$ARGUMENTS

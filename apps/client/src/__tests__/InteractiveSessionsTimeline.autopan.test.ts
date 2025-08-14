@@ -117,7 +117,7 @@ describe('InteractiveSessionsTimeline - Auto-Pan Feature', () => {
     });
 
     it('should support currentWindow state changes', async () => {
-      const initialWindow = wrapper.vm.currentWindow;
+      // const _initialWindow = wrapper.vm.currentWindow;
       
       // Find and click a time window button
       const timeWindowButton = wrapper.findAll('button').find(btn => 

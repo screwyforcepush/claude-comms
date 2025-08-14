@@ -3,7 +3,8 @@
  * TestTiger - HTTP API endpoint testing
  */
 
-import { expect, test, describe, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { expect, test, describe, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
+import { setupTestDatabase, teardownTestDatabase } from './test-setup';
 import type { 
   RegisterSubagentRequest,
   SendMessageRequest,
@@ -35,9 +36,12 @@ describe('Sessions HTTP API Endpoints', () => {
     }
   });
 
-  beforeEach(async () => {
-    // Clear test database before each test
-    // Note: Using separate test database
+  beforeEach(() => {
+    setupTestDatabase();
+  });
+
+  afterEach(() => {
+    teardownTestDatabase();
   });
 
   describe('POST /subagents/register', () => {

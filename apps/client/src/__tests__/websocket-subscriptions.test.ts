@@ -67,6 +67,18 @@ class MockWebSocket {
   }
 
   dispatchEvent(type: string, event: any) {
+    // Call the specific handler if it exists
+    if (type === 'message' && this.onmessage) {
+      this.onmessage(event);
+    } else if (type === 'open' && this.onopen) {
+      this.onopen(event);
+    } else if (type === 'close' && this.onclose) {
+      this.onclose(event);
+    } else if (type === 'error' && this.onerror) {
+      this.onerror(event);
+    }
+    
+    // Call addEventListener listeners
     if (this.listeners[type]) {
       this.listeners[type].forEach(listener => listener(event));
     }

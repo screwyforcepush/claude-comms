@@ -3,6 +3,15 @@ import type { HookEvent, FilterOptions, UpdateSubagentCompletionRequest, Session
 
 let db: Database;
 
+// Allow dependency injection for testing
+export function setDatabase(database: Database): void {
+  db = database;
+}
+
+export function getDatabase(): Database {
+  return db;
+}
+
 export function initDatabase(): void {
   db = new Database('events.db');
   
@@ -63,7 +72,9 @@ export function initDatabase(): void {
       input_tokens INTEGER,
       output_tokens INTEGER,
       cache_creation_input_tokens INTEGER,
-      cache_read_input_tokens INTEGER
+      cache_read_input_tokens INTEGER,
+      initial_prompt TEXT,
+      final_response TEXT
     )
   `);
   
@@ -98,6 +109,13 @@ export function initDatabase(): void {
     }
     if (!columnNames.includes('cache_read_input_tokens')) {
       db.exec('ALTER TABLE subagent_registry ADD COLUMN cache_read_input_tokens INTEGER');
+    }
+    // Add new prompt and response columns
+    if (!columnNames.includes('initial_prompt')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN initial_prompt TEXT');
+    }
+    if (!columnNames.includes('final_response')) {
+      db.exec('ALTER TABLE subagent_registry ADD COLUMN final_response TEXT');
     }
   } catch (error) {
     // If the table doesn't exist yet, the CREATE TABLE above will handle it
@@ -312,11 +330,11 @@ export function getUnreadMessages(subagentName: string): any[] {
     return [];
   }
   
-  // Get all messages created after this subagent was registered
+  // Get all messages created after or at the same time as this subagent was registered
   const messagesStmt = db.prepare(`
     SELECT id, sender, message, created_at, notified 
     FROM subagent_messages 
-    WHERE created_at > ?
+    WHERE created_at >= ?
     ORDER BY created_at ASC
   `);
   
@@ -352,9 +370,10 @@ export function getUnreadMessages(subagentName: string): any[] {
 
 export function getSubagents(sessionId: string) {
   const stmt = db.prepare(`
-    SELECT id, name, subagent_type, created_at, completed_at, status, 
+    SELECT id, session_id, name, subagent_type, created_at, completed_at, status, 
            total_duration_ms, total_tokens, total_tool_use_count, 
-           input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens
+           input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens,
+           initial_prompt, final_response
     FROM subagent_registry 
     WHERE session_id = ?
     ORDER BY created_at DESC
@@ -400,6 +419,8 @@ export function updateSubagentCompletion(
     output_tokens?: number;
     cache_creation_input_tokens?: number;
     cache_read_input_tokens?: number;
+    initial_prompt?: string;
+    final_response?: string;
   }
 ): boolean {
   const stmt = db.prepare(`
@@ -412,24 +433,60 @@ export function updateSubagentCompletion(
         input_tokens = COALESCE(?, input_tokens),
         output_tokens = COALESCE(?, output_tokens),
         cache_creation_input_tokens = COALESCE(?, cache_creation_input_tokens),
-        cache_read_input_tokens = COALESCE(?, cache_read_input_tokens)
+        cache_read_input_tokens = COALESCE(?, cache_read_input_tokens),
+        initial_prompt = COALESCE(?, initial_prompt),
+        final_response = COALESCE(?, final_response)
     WHERE session_id = ? AND name = ?
   `);
   
   const result = stmt.run(
-    completionData.completed_at || null,
-    completionData.status || null,
-    completionData.total_duration_ms || null,
-    completionData.total_tokens || null,
-    completionData.total_tool_use_count || null,
-    completionData.input_tokens || null,
-    completionData.output_tokens || null,
-    completionData.cache_creation_input_tokens || null,
-    completionData.cache_read_input_tokens || null,
+    completionData.completed_at !== undefined ? completionData.completed_at : null,
+    completionData.status !== undefined ? completionData.status : null,
+    completionData.total_duration_ms !== undefined ? completionData.total_duration_ms : null,
+    completionData.total_tokens !== undefined ? completionData.total_tokens : null,
+    completionData.total_tool_use_count !== undefined ? completionData.total_tool_use_count : null,
+    completionData.input_tokens !== undefined ? completionData.input_tokens : null,
+    completionData.output_tokens !== undefined ? completionData.output_tokens : null,
+    completionData.cache_creation_input_tokens !== undefined ? completionData.cache_creation_input_tokens : null,
+    completionData.cache_read_input_tokens !== undefined ? completionData.cache_read_input_tokens : null,
+    completionData.initial_prompt !== undefined ? completionData.initial_prompt : null,
+    completionData.final_response !== undefined ? completionData.final_response : null,
     sessionId,
     name
   );
   
+  return result.changes > 0;
+}
+
+// Function to update subagent initial prompt
+export function updateSubagentPrompt(
+  sessionId: string, 
+  name: string, 
+  prompt: string
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE subagent_registry 
+    SET initial_prompt = ?
+    WHERE session_id = ? AND name = ?
+  `);
+  
+  const result = stmt.run(prompt, sessionId, name);
+  return result.changes > 0;
+}
+
+// Function to update subagent final response  
+export function updateSubagentResponse(
+  sessionId: string, 
+  name: string, 
+  response: string
+): boolean {
+  const stmt = db.prepare(`
+    UPDATE subagent_registry 
+    SET final_response = ?
+    WHERE session_id = ? AND name = ?
+  `);
+  
+  const result = stmt.run(response, sessionId, name);
   return result.changes > 0;
 }
 
@@ -635,4 +692,39 @@ export function getSessionEvents(sessionId: string, eventTypes?: string[]): Hook
     summary: row.summary || undefined,
     timestamp: row.timestamp
   }));
+}
+
+// New functions for agent prompt/response storage
+
+export function storeAgentPrompt(sessionId: string, agentName: string, prompt: string): boolean {
+  const stmt = db.prepare(`
+    UPDATE subagent_registry 
+    SET initial_prompt = ?
+    WHERE session_id = ? AND name = ?
+  `);
+  
+  const result = stmt.run(prompt, sessionId, agentName);
+  return result.changes > 0;
+}
+
+export function storeAgentResponse(sessionId: string, agentName: string, response: string): boolean {
+  const stmt = db.prepare(`
+    UPDATE subagent_registry 
+    SET final_response = ?
+    WHERE session_id = ? AND name = ?
+  `);
+  
+  const result = stmt.run(response, sessionId, agentName);
+  return result.changes > 0;
+}
+
+export function getAgentPromptResponse(sessionId: string, agentName: string): { initial_prompt?: string; final_response?: string } | null {
+  const stmt = db.prepare(`
+    SELECT initial_prompt, final_response
+    FROM subagent_registry 
+    WHERE session_id = ? AND name = ?
+  `);
+  
+  const result = stmt.get(sessionId, agentName) as any;
+  return result || null;
 }

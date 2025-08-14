@@ -89,7 +89,7 @@ describe('Auto-Pan E2E User Experience', () => {
       // Simulate time passing and auto-pan keeping up
       vi.useFakeTimers();
       
-      const initialNowX = wrapper.vm.getNowX();
+      // const _initialNowX = wrapper.vm.getNowX();
       
       // Advance time to simulate real-time progression
       vi.advanceTimersByTime(30000); // 30 seconds
@@ -202,7 +202,7 @@ describe('Auto-Pan E2E User Experience', () => {
       vi.useFakeTimers();
       
       // Simulate a very long session (2 hours)
-      const longSessionStart = Date.now() - (2 * 60 * 60 * 1000);
+      // const _longSessionStart = Date.now() - (2 * 60 * 60 * 1000);
       
       // Auto-pan should not cause performance issues
       for (let i = 0; i < 10; i++) {

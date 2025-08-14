@@ -25,6 +25,8 @@ export interface Subagent {
   completed_at?: number;
   completion_timestamp?: number; // Mapped from completed_at for client compatibility
   completion_metadata?: any;
+  initial_prompt?: string; // Full prompt text sent to create the subagent
+  final_response?: string; // Final response/output from the subagent
 }
 
 export interface SubagentMessage {
@@ -49,6 +51,18 @@ export interface GetUnreadMessagesRequest {
   subagent_name: string;
 }
 
+export interface UpdateSubagentPromptRequest {
+  session_id: string;
+  name: string;
+  prompt: string;
+}
+
+export interface UpdateSubagentResponseRequest {
+  session_id: string;
+  name: string;
+  response: string;
+}
+
 export interface UpdateSubagentCompletionRequest {
   session_id: string;
   name: string;
@@ -62,6 +76,8 @@ export interface UpdateSubagentCompletionRequest {
   output_tokens?: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
+  initial_prompt?: string;
+  final_response?: string;
 }
 
 export interface SessionSummary {
@@ -133,4 +149,30 @@ export interface MultiSessionWebSocketMessage {
   action: 'subscribe' | 'unsubscribe';
   sessionIds?: string[];
   sessionId?: string;
+}
+
+// New interfaces for agent prompt/response API
+export interface UpdateAgentDataRequest {
+  initial_prompt?: string;
+  final_response?: string;
+  tool_calls?: any[];
+  metadata?: any;
+}
+
+export interface AgentPromptResponseData {
+  initial_prompt?: string;
+  final_response?: string;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+}
+
+export interface WebSocketHandler<T = any> {
+  open?: (ws: T) => void;
+  message?: (ws: T, message: string | Buffer) => void;
+  close?: (ws: T) => void;
+  error?: (ws: T, error: any) => void;
 }

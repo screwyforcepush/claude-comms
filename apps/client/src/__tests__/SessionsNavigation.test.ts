@@ -45,7 +45,7 @@ describe('Sessions Tab Navigation', () => {
   });
 
   it('should have Events tab active by default', () => {
-    const eventTab = wrapper.find('button:contains("Event Timeline")');
+    const eventTab = wrapper.find('[data-test="events-tab"]');
     expect(eventTab.classes()).toContain('bg-gray-900');
     expect(eventTab.classes()).toContain('text-blue-400');
     expect(eventTab.classes()).toContain('border-t-2');
@@ -62,7 +62,7 @@ describe('Sessions Tab Navigation', () => {
   });
 
   it('should show SessionsView component when Sessions tab is active', async () => {
-    const sessionsTab = wrapper.find('button:contains("Sessions")');
+    const sessionsTab = wrapper.find('[data-test="sessions-tab"]');
     
     await sessionsTab.trigger('click');
     
@@ -76,7 +76,7 @@ describe('Sessions Tab Navigation', () => {
     expect(filtersButton.exists()).toBe(true);
     
     // Switch to Sessions tab
-    const sessionsTab = wrapper.find('button:contains("Sessions")');
+    const sessionsTab = wrapper.find('[data-test="sessions-tab"]');
     await sessionsTab.trigger('click');
     
     // Check filters button still exists for Sessions
@@ -85,7 +85,7 @@ describe('Sessions Tab Navigation', () => {
   });
 
   it('should hide filters button for Agents tab', async () => {
-    const agentsTab = wrapper.find('button:contains("Agents")');
+    const agentsTab = wrapper.find('[data-test="agents-tab"]');
     await agentsTab.trigger('click');
     
     const filtersButton = wrapper.find('button[title*="filters"]');
@@ -100,7 +100,7 @@ describe('Sessions Tab Navigation', () => {
     expect(wrapper.vm.showFilters).toBe(true);
     
     // Switch to Sessions tab
-    const sessionsTab = wrapper.find('button:contains("Sessions")');
+    const sessionsTab = wrapper.find('[data-test="sessions-tab"]');
     await sessionsTab.trigger('click');
     
     // Filters should still be shown

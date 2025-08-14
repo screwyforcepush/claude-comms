@@ -3,6 +3,7 @@
     v-if="visible" 
     class="agent-detail-pane fixed right-0 top-0 h-full w-96 bg-gray-800 border-l border-gray-600 shadow-2xl transform transition-transform duration-300 ease-out z-50"
     :class="{ 'translate-x-full': !visible }"
+    data-testid="agent-detail-pane"
   >
     <!-- Header -->
     <div class="flex items-center justify-between bg-gradient-to-r from-gray-700 to-gray-600 px-4 py-3 border-b border-gray-600">
@@ -114,6 +115,97 @@
               <span class="text-yellow-400 text-sm">{{ selectedAgent.status === 'in_progress' ? 'Running...' : 'Waiting...' }}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Prompt & Response Section -->
+      <div v-if="hasPromptOrResponse()" class="mb-6">
+        <h4 class="text-white font-semibold mb-3 flex items-center">
+          <svg class="w-4 h-4 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+          </svg>
+          Prompt & Response
+        </h4>
+        
+        <!-- Initial Prompt -->
+        <div v-if="selectedAgent.initial_prompt" class="mb-4" data-testid="prompt-section">
+          <div class="bg-gray-700/50 rounded-lg p-3 border border-gray-600/50">
+            <div class="flex items-center justify-between mb-2">
+              <h5 class="text-green-400 font-medium text-sm flex items-center">
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Initial Prompt
+                <span class="ml-1 text-xs text-gray-400">({{ getWordCount(selectedAgent.initial_prompt) }} words)</span>
+              </h5>
+              <button
+                @click="copyPrompt"
+                class="text-gray-400 hover:text-white transition-colors text-xs"
+                title="Copy prompt"
+                data-testid="copy-prompt-btn"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="bg-gray-900/60 border border-gray-600 rounded p-2 max-h-32 overflow-y-auto max-h-96">
+              <pre 
+                class="text-gray-300 text-xs whitespace-pre-wrap font-mono leading-relaxed break-words"
+                data-testid="prompt-content"
+                role="textbox"
+                aria-readonly="true"
+              >{{ formatPromptPreview(selectedAgent.initial_prompt) }}</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Final Response -->
+        <div v-if="selectedAgent.final_response" class="mb-4" data-testid="response-section">
+          <div class="bg-gray-700/50 rounded-lg p-3 border border-gray-600/50">
+            <div class="flex items-center justify-between mb-2">
+              <h5 class="text-blue-400 font-medium text-sm flex items-center">
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                Final Response
+                <span class="ml-1 text-xs text-gray-400">({{ getWordCount(selectedAgent.final_response) }} words)</span>
+              </h5>
+              <button
+                @click="copyResponse"
+                class="text-gray-400 hover:text-white transition-colors text-xs"
+                title="Copy response"
+                data-testid="copy-response-btn"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="bg-gray-900/60 border border-gray-600 rounded p-2 max-h-32 overflow-y-auto max-h-96">
+              <pre 
+                class="text-gray-300 text-xs whitespace-pre-wrap font-mono leading-relaxed break-words"
+                data-testid="response-content"
+                role="textbox"
+                aria-readonly="true"
+              >{{ formatPromptPreview(selectedAgent.final_response) }}</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- View Full Button -->
+        <div class="flex justify-center">
+          <button
+            @click="openPromptResponseModal"
+            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center space-x-2"
+            data-testid="expand-prompt-response-btn"
+            title="View full prompt and response"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+            </svg>
+            <span>View Full Details</span>
+          </button>
         </div>
       </div>
 
@@ -229,6 +321,7 @@ const emit = defineEmits<{
   'agent-selected': [agent: AgentStatus];
   'message-selected': [message: SubagentMessage];
   'highlight-timeline': [agentId: number];
+  'open-prompt-response-modal': [agent: AgentStatus];
 }>();
 
 // Reactive state
@@ -395,6 +488,49 @@ const highlightOnTimeline = () => {
   if (!props.selectedAgent) return;
   
   emit('highlight-timeline', props.selectedAgent.id);
+};
+
+// Prompt & Response functions
+const hasPromptOrResponse = (): boolean => {
+  return !!(props.selectedAgent?.initial_prompt || props.selectedAgent?.final_response);
+};
+
+const getWordCount = (text?: string): number => {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+};
+
+const formatPromptPreview = (text?: string): string => {
+  if (!text) return '';
+  const maxLength = 300;
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+};
+
+const copyPrompt = async () => {
+  if (!props.selectedAgent?.initial_prompt) return;
+  
+  try {
+    await navigator.clipboard.writeText(props.selectedAgent.initial_prompt);
+    // TODO: Show toast notification
+  } catch (error) {
+    console.error('Failed to copy prompt:', error);
+  }
+};
+
+const copyResponse = async () => {
+  if (!props.selectedAgent?.final_response) return;
+  
+  try {
+    await navigator.clipboard.writeText(props.selectedAgent.final_response);
+    // TODO: Show toast notification
+  } catch (error) {
+    console.error('Failed to copy response:', error);
+  }
+};
+
+const openPromptResponseModal = () => {
+  if (!props.selectedAgent) return;
+  emit('open-prompt-response-modal', props.selectedAgent);
 };
 
 // Keyboard shortcuts

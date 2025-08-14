@@ -1360,11 +1360,11 @@ export function useMultiSessionData(
   };
   
   // ============================================================================
-  // Component Lifecycle Hooks
+  // Initialization Functions
   // ============================================================================
   
-  onMounted(async () => {
-    console.log('🚀 Multi-session composable mounted');
+  const initialize = async () => {
+    console.log('🚀 Multi-session composable initializing');
     
     // Connect to WebSocket for real-time updates with session subscription
     dataService.connectWebSocket(handleMultiSessionUpdate);
@@ -1382,16 +1382,25 @@ export function useMultiSessionData(
     if (options.autoRefresh !== false) {
       startAutoRefresh();
     }
-  });
+  };
   
-  onUnmounted(() => {
-    console.log('🔌 Multi-session composable unmounted');
+  const cleanup = () => {
+    console.log('🔌 Multi-session composable cleaning up');
     
     // Clean up resources
     stopAutoRefresh();
     dataService.disconnectWebSocket();
     dataService.clearCache();
-  });
+  };
+  
+  // Component Lifecycle Hooks (only when in component context)
+  try {
+    onMounted(initialize);
+    onUnmounted(cleanup);
+  } catch (error) {
+    // Not in component context - lifecycle hooks not available
+    // Tests or other non-component usage should call initialize() manually
+  }
   
   // ============================================================================
   // Watchers for Reactive Updates
@@ -1458,6 +1467,10 @@ export function useMultiSessionData(
     // Data fetching methods
     refreshSessions,
     fetchSessionsInWindow,
+    
+    // Manual lifecycle methods for tests
+    initialize,
+    cleanup,
     
     // Real-time update controls
     animatingSessionIds: readonly(animatingSessionIds),

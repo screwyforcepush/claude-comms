@@ -334,6 +334,34 @@ Vue 3 application with dual-purpose interface:
 | PreCompact   | 📦     | Context compaction    | Session-based | Compaction details |
 | UserPromptSubmit | 💬 | User prompt submission | Session-based | Prompt: _"user message"_ (italic) |
 
+## 📋 Agent Prompt & Response Capture
+
+**NEW FEATURE**: Complete visibility into agent creation and responses
+
+### What's Captured
+- **Full Prompts**: Complete instructions sent to create each subagent
+- **Complete Responses**: Full agent outputs including tool calls and results
+- **User Prompts**: Original prompts that initiate orchestrations
+- **Metadata**: Timestamps, word counts, and complexity analysis
+
+### How to Use
+1. **Sessions Tab**: Navigate to the Sessions tab in the dashboard
+2. **Agent Details**: Click any agent to see prompt/response data
+3. **Full Modal**: Double-click for detailed side-by-side or stacked view
+4. **User Prompts**: Click blue circular indicators to see user prompts
+
+### Key Features
+- **Copy Functions**: Easy copying of prompts/responses for reuse
+- **View Modes**: Side-by-side or stacked layout options
+- **Analysis Tools**: Word counts, complexity ratings, and metadata
+- **Real-time Updates**: Live capture of new agent creations
+- **Search & Filter**: Find specific agents and sessions quickly
+
+### Documentation
+- **User Guide**: [Prompt & Response Capture User Guide](docs/project/guides/prompt-response-capture-user-guide.md)
+- **Technical Architecture**: [Agent Prompt/Response Architecture](docs/project/guides/agent-prompt-response-architecture.md)  
+- **Troubleshooting**: [Troubleshooting Guide](docs/project/guides/prompt-response-capture-troubleshooting.md)
+
 
 ## 🧪 Testing
 

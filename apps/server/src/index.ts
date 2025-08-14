@@ -13,7 +13,10 @@ import {
   getSessionsInTimeWindow,
   getSessionDetails,
   getSessionComparison,
-  getSessionEvents
+  getSessionEvents,
+  storeAgentPrompt,
+  storeAgentResponse,
+  getAgentPromptResponse
 } from './db';
 import type { 
   HookEvent, 
@@ -25,7 +28,9 @@ import type {
   SessionBatchRequest,
   ComparisonRequest,
   MultiSessionWebSocketMessage,
-  MultiSessionUpdate
+  MultiSessionUpdate,
+  UpdateAgentDataRequest,
+  ValidationError
 } from './types';
 
 // Initialize database
@@ -57,7 +62,8 @@ const server = Bun.serve({
     // POST /events - Receive new events
     if (url.pathname === '/events' && req.method === 'POST') {
       try {
-        const event: HookEvent = await req.json();
+        const eventData = await req.json();
+        const event: HookEvent = eventData as HookEvent;
         
         // Validate required fields
         if (!event.source_app || !event.session_id || !event.hook_event_type || !event.payload) {
@@ -178,7 +184,8 @@ const server = Bun.serve({
     // POST /subagents/register - Register a new subagent
     if (url.pathname === '/subagents/register' && req.method === 'POST') {
       try {
-        const request: RegisterSubagentRequest = await req.json();
+        const requestData = await req.json();
+        const request: RegisterSubagentRequest = requestData as RegisterSubagentRequest;
         const id = registerSubagent(request.session_id, request.name, request.subagent_type);
         
         // Broadcast to WebSocket clients
@@ -225,7 +232,8 @@ const server = Bun.serve({
     // POST /subagents/message - Send a message from a subagent
     if (url.pathname === '/subagents/message' && req.method === 'POST') {
       try {
-        const request: SendMessageRequest = await req.json();
+        const requestData = await req.json();
+        const request: SendMessageRequest = requestData as SendMessageRequest;
         const id = sendSubagentMessage(request.sender, request.message);
         
         // Broadcast to WebSocket clients
@@ -269,7 +277,8 @@ const server = Bun.serve({
     // POST /subagents/unread - Get unread messages for a subagent
     if (url.pathname === '/subagents/unread' && req.method === 'POST') {
       try {
-        const request: GetUnreadMessagesRequest = await req.json();
+        const requestData = await req.json();
+        const request: GetUnreadMessagesRequest = requestData as GetUnreadMessagesRequest;
         const messages = getUnreadMessages(request.subagent_name);
         
         return new Response(JSON.stringify({ messages }), {
@@ -295,10 +304,20 @@ const server = Bun.serve({
     // POST /subagents/update-completion - Update subagent completion status
     if (url.pathname === '/subagents/update-completion' && req.method === 'POST') {
       try {
-        const request: UpdateSubagentCompletionRequest = await req.json();
+        const requestData = await req.json();
+        const request: UpdateSubagentCompletionRequest = requestData as UpdateSubagentCompletionRequest;
         const success = updateSubagentCompletion(request.session_id, request.name, {
           completed_at: request.completed_at || Date.now(),
           status: request.status,
+          total_duration_ms: request.total_duration_ms,
+          total_tokens: request.total_tokens,
+          total_tool_use_count: request.total_tool_use_count,
+          input_tokens: request.input_tokens,
+          output_tokens: request.output_tokens,
+          cache_creation_input_tokens: request.cache_creation_input_tokens,
+          cache_read_input_tokens: request.cache_read_input_tokens,
+          initial_prompt: request.initial_prompt,
+          final_response: request.final_response,
           ...(request.completion_metadata || {})
         });
         
@@ -366,6 +385,64 @@ const server = Bun.serve({
       }
     }
     
+    // GET /subagents/{sessionId}/{name}/full - Get complete agent data including large text fields (MUST come before general GET pattern)
+    if (url.pathname.startsWith('/subagents/') && url.pathname.endsWith('/full') && req.method === 'GET') {
+      try {
+        const pathParts = url.pathname.split('/');
+        if (pathParts.length !== 5 || pathParts[4] !== 'full') {
+          return new Response(JSON.stringify({ error: 'Invalid path format. Use /subagents/{sessionId}/{name}/full' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const sessionId = pathParts[2];
+        const agentName = pathParts[3];
+        
+        if (!sessionId || !agentName) {
+          return new Response(JSON.stringify({ error: 'sessionId and agentName are required' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Get basic agent info
+        const agents = getSubagents(sessionId);
+        const agent = agents.find(a => a.name === agentName);
+        
+        if (!agent) {
+          return new Response(JSON.stringify({ error: 'Agent not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Get prompt/response data (already included in getSubagents now)
+        const fullAgentData = {
+          ...agent,
+          prompt_length: agent.initial_prompt?.length || 0,
+          response_length: agent.final_response?.length || 0,
+          has_prompt: !!agent.initial_prompt,
+          has_response: !!agent.final_response
+        };
+        
+        return new Response(JSON.stringify(fullAgentData), {
+          headers: { 
+            ...headers, 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
+          }
+        });
+        
+      } catch (error) {
+        console.error('Error fetching full agent data:', error);
+        return new Response(JSON.stringify({ error: 'Failed to fetch agent data' }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // GET /subagents/:sessionId - Get all subagents for a session
     if (url.pathname.startsWith('/subagents/') && req.method === 'GET') {
       const sessionId = url.pathname.split('/')[2];
@@ -407,7 +484,8 @@ const server = Bun.serve({
     // POST /api/sessions/batch - Batch fetch session details with agents
     if (url.pathname === '/api/sessions/batch' && req.method === 'POST') {
       try {
-        const request: SessionBatchRequest = await req.json();
+        const requestData = await req.json();
+        const request: SessionBatchRequest = requestData as SessionBatchRequest;
         
         if (!request.sessionIds || !Array.isArray(request.sessionIds)) {
           return new Response(JSON.stringify({ error: 'Invalid sessionIds parameter' }), {
@@ -472,6 +550,135 @@ const server = Bun.serve({
         });
       }
     }
+
+    // PATCH /subagents/{sessionId}/{name} - Update agent prompt, response, or metadata
+    if (url.pathname.startsWith('/subagents/') && req.method === 'PATCH') {
+      try {
+        const pathParts = url.pathname.split('/');
+        if (pathParts.length !== 4) {
+          return new Response(JSON.stringify({ error: 'Invalid path format. Use /subagents/{sessionId}/{name}' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const sessionId = pathParts[2];
+        const agentName = pathParts[3];
+        
+        if (!sessionId || !agentName) {
+          return new Response(JSON.stringify({ error: 'sessionId and agentName are required' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const updateRequestData = await req.json();
+        const updateData: UpdateAgentDataRequest = updateRequestData as UpdateAgentDataRequest;
+        const errors: ValidationError[] = [];
+        
+        // Validate text field sizes (1MB limit each)
+        const MAX_TEXT_SIZE = 1024 * 1024; // 1MB
+        
+        if (updateData.initial_prompt && updateData.initial_prompt.length > MAX_TEXT_SIZE) {
+          errors.push({
+            field: 'initial_prompt',
+            message: `Prompt exceeds maximum size of ${MAX_TEXT_SIZE} characters`,
+            code: 'TEXT_TOO_LONG'
+          });
+        }
+        
+        if (updateData.final_response && updateData.final_response.length > MAX_TEXT_SIZE) {
+          errors.push({
+            field: 'final_response', 
+            message: `Response exceeds maximum size of ${MAX_TEXT_SIZE} characters`,
+            code: 'TEXT_TOO_LONG'
+          });
+        }
+        
+        if (errors.length > 0) {
+          return new Response(JSON.stringify({ 
+            error: 'Validation failed',
+            validation_errors: errors 
+          }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        let updatedFields: string[] = [];
+        let hasUpdates = false;
+        
+        // Store prompt if provided
+        if (updateData.initial_prompt !== undefined) {
+          const success = storeAgentPrompt(sessionId, agentName, updateData.initial_prompt);
+          if (success) {
+            updatedFields.push('initial_prompt');
+            hasUpdates = true;
+          }
+        }
+        
+        // Store response if provided
+        if (updateData.final_response !== undefined) {
+          const success = storeAgentResponse(sessionId, agentName, updateData.final_response);
+          if (success) {
+            updatedFields.push('final_response');
+            hasUpdates = true;
+          }
+        }
+        
+        if (!hasUpdates && (updateData.initial_prompt !== undefined || updateData.final_response !== undefined)) {
+          return new Response(JSON.stringify({ error: 'Agent not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Broadcast update to WebSocket clients if any fields were updated
+        if (hasUpdates) {
+          const updateMessage = JSON.stringify({ 
+            type: 'agent_data_updated', 
+            sessionId,
+            agentName,
+            updatedFields,
+            timestamp: Date.now()
+          });
+          
+          multiSessionClients.forEach((subscribedSessions, client) => {
+            if (subscribedSessions.has(sessionId)) {
+              try {
+                client.send(updateMessage);
+              } catch (err) {
+                multiSessionClients.delete(client);
+              }
+            }
+          });
+        }
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          updated_fields: updatedFields,
+          message: `Updated ${updatedFields.length} field(s) for agent ${agentName}`
+        }), {
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+        
+      } catch (error) {
+        console.error('Error updating agent data:', error);
+        
+        if (error instanceof SyntaxError) {
+          return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        return new Response(JSON.stringify({ error: 'Failed to update agent data' }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     
     // WebSocket upgrade - existing single-session stream
     if (url.pathname === '/stream') {
@@ -498,8 +705,8 @@ const server = Bun.serve({
   },
   
   websocket: {
-    open(ws) {
-      const isMultiSession = ws.data?.type === 'multi-session';
+    open(ws: any) {
+      const isMultiSession = (ws.data as any)?.type === 'multi-session';
       console.log(`WebSocket client connected: ${isMultiSession ? 'multi-session' : 'single-session'}`);
       
       if (isMultiSession) {
@@ -513,7 +720,7 @@ const server = Bun.serve({
       }
     },
     
-    message(ws, message) {
+    message(ws: any, message: any) {
       const isMultiSession = multiSessionClients.has(ws);
       
       if (isMultiSession) {
@@ -571,7 +778,7 @@ const server = Bun.serve({
       }
     },
     
-    close(ws) {
+    close(ws: any) {
       const isMultiSession = multiSessionClients.has(ws);
       console.log(`WebSocket client disconnected: ${isMultiSession ? 'multi-session' : 'single-session'}`);
       
@@ -580,19 +787,8 @@ const server = Bun.serve({
       } else {
         wsClients.delete(ws);
       }
-    },
-    
-    error(ws, error) {
-      console.error('WebSocket error:', error);
-      const isMultiSession = multiSessionClients.has(ws);
-      
-      if (isMultiSession) {
-        multiSessionClients.delete(ws);
-      } else {
-        wsClients.delete(ws);
-      }
     }
-  }
+  } as any
 });
 
 console.log(`🚀 Server running on http://localhost:${server.port}`);

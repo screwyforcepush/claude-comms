@@ -20,7 +20,10 @@ class MockWebSocket {
   onclose: ((event: CloseEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
   
-  constructor(public url: string) {
+  url: string;
+  
+  constructor(url: string) {
+    this.url = url;
     setTimeout(() => {
       if (this.onopen) {
         this.onopen(new Event('open'));
@@ -28,8 +31,8 @@ class MockWebSocket {
     }, 0);
   }
   
-  send(data: string) {
-    // Mock send
+  send(_data: string) {
+    // Mock send - data parameter prefixed with _ to indicate intentionally unused
   }
   
   close() {
@@ -133,7 +136,8 @@ describe('useMultiSessionData', () => {
     vi.useFakeTimers();
     
     // Setup default mock responses
-    mockFetch.mockImplementation((url: string | URL) => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       const urlString = url.toString();
       
       if (urlString.includes('/subagents/sessions')) {
@@ -707,14 +711,12 @@ describe('useMultiSessionData', () => {
 
   describe('Memory Management', () => {
     it('should clean up resources on unmount', async () => {
-      const { unmount } = useMultiSessionData(defaultTimeWindow);
+      const composable = useMultiSessionData(defaultTimeWindow);
       
       await vi.runAllTimersAsync();
       
-      // Mock unmount
-      if (typeof unmount === 'function') {
-        unmount();
-      }
+      // Mock unmount - composable doesn't expose unmount method
+      // Cleanup would happen via Vue's lifecycle hooks
       
       // Should not make additional API calls after unmount
       vi.clearAllMocks();
@@ -784,7 +786,8 @@ describe('useMultiSessionData Performance', () => {
       created_at: Date.now() - (i * 60000)
     }));
 
-    mockFetch.mockImplementation((url: string | URL) => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       if (url.toString().includes('/subagents/sessions')) {
         return Promise.resolve({
           ok: true,

@@ -44,37 +44,45 @@ export interface ExtendedTimelineMessage {
 
 // Helper function to convert AgentStatus to ExtendedAgentStatus
 export function extendAgentStatus(agent: any): ExtendedAgentStatus {
+  // Handle null/undefined gracefully
+  const safeAgent = agent || {};
+  
   return {
-    agentId: agent.id?.toString() || agent.agentId || `agent-${Date.now()}`,
-    type: agent.subagent_type || agent.type || 'general-purpose',
-    startTime: agent.created_at || Date.now(),
-    endTime: agent.completion_timestamp || null,
-    status: agent.status || 'pending',
-    laneIndex: agent.laneIndex || 0,
+    agentId: safeAgent.id?.toString() || safeAgent.agentId || `agent-${Date.now()}`,
+    type: safeAgent.subagent_type || safeAgent.type || 'general-purpose',
+    startTime: safeAgent.created_at || Date.now(),
+    endTime: safeAgent.completion_timestamp || null,
+    status: safeAgent.status || 'pending',
+    laneIndex: safeAgent.laneIndex || 0,
     isRecentlyUpdated: false,
-    id: agent.id,
-    name: agent.name,
-    subagent_type: agent.subagent_type,
-    created_at: agent.created_at,
-    duration: agent.duration,
-    token_count: agent.token_count,
-    tool_count: agent.tool_count,
-    completion_timestamp: agent.completion_timestamp,
-    session_id: agent.session_id
+    id: safeAgent.id || 0,
+    name: safeAgent.name || 'Unknown Agent',
+    subagent_type: safeAgent.subagent_type || 'general-purpose',
+    created_at: safeAgent.created_at || Date.now(),
+    duration: safeAgent.duration,
+    token_count: safeAgent.token_count,
+    tool_count: safeAgent.tool_count,
+    completion_timestamp: safeAgent.completion_timestamp,
+    session_id: safeAgent.session_id
   };
 }
 
 // Helper function to convert SubagentMessage to ExtendedTimelineMessage
 export function extendTimelineMessage(message: any, position: { x: number; y: number }): ExtendedTimelineMessage {
+  // Handle null/undefined gracefully
+  const safeMessage = message || {};
+  const safeCreatedAt = safeMessage.created_at || Date.now();
+  const safeSender = safeMessage.sender || 'Unknown';
+  
   return {
-    id: `msg-${message.created_at}-${message.sender}`,
+    id: `msg-${safeCreatedAt}-${safeSender}`,
     isRecentlyAdded: false,
-    timestamp: message.created_at,
+    timestamp: safeCreatedAt,
     position,
-    sender: message.sender,
-    message: message.message,
-    created_at: message.created_at,
-    notified: message.notified
+    sender: safeSender,
+    message: safeMessage.message || {},
+    created_at: safeCreatedAt,
+    notified: safeMessage.notified
   };
 }
 

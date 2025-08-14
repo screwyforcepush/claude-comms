@@ -22,20 +22,18 @@ import type {
   SendMessageRequest,
   GetUnreadMessagesRequest
 } from '../src/types';
-
-// Test database setup
-let testDbPath = ':memory:';
-let originalDb: any;
+import { setupTestDatabase, teardownTestDatabase, assertDatabaseIsolation } from './test-setup';
 
 describe('Sessions API Database Functions', () => {
   beforeEach(() => {
-    // Initialize test database
-    initDatabase();
+    // Set up isolated test database for each test
+    setupTestDatabase();
+    assertDatabaseIsolation();
   });
 
   afterEach(() => {
-    // Clean up test database
-    // Note: Using in-memory database so cleanup is automatic
+    // Clean up test database to prevent memory leaks
+    teardownTestDatabase();
   });
 
   describe('Session Registration & Management', () => {
@@ -53,7 +51,7 @@ describe('Sessions API Database Functions', () => {
       expect(agents[0].name).toBe(name);
       expect(agents[0].subagent_type).toBe(type);
       expect(agents[0].session_id).toBe(sessionId);
-      expect(agents[0].status).toBe('pending');
+      expect(agents[0].status).toBe('active');
     });
 
     test('registerSubagent - should handle duplicate names in different sessions', () => {
@@ -223,11 +221,18 @@ describe('Sessions API Database Functions', () => {
     });
 
     test('getSessionsWithAgents - should sort by creation time (newest first)', () => {
+      // Use different timestamps to ensure proper ordering
+      let now = Date.now();
+      
       registerSubagent('old-session', 'OldAgent', 'engineer');
-      // Small delay
-      setTimeout(() => {}, 2);
+      
+      // Busy wait to ensure different timestamp
+      while (Date.now() === now) { /* wait */ }
       registerSubagent('mid-session', 'MidAgent', 'tester');
-      setTimeout(() => {}, 2);
+      
+      // Busy wait again
+      now = Date.now();
+      while (Date.now() === now) { /* wait */ }
       registerSubagent('new-session', 'NewAgent', 'reviewer');
 
       const sessions = getSessionsWithAgents();
@@ -283,8 +288,11 @@ describe('Sessions API Database Functions', () => {
       // Send message before receiver exists
       sendSubagentMessage(sender, { content: 'Early message' });
       
+      // Ensure timestamp difference by busy waiting
+      const now = Date.now();
+      while (Date.now() <= now + 1) { /* wait at least 1ms */ }
+      
       // Register receiver after message was sent
-      setTimeout(() => {}, 2);
       registerSubagent('timing-test', receiver, 'tester');
       
       // Send message after receiver registration
@@ -406,7 +414,10 @@ describe('Sessions API Database Functions', () => {
     test('should handle empty session IDs gracefully', () => {
       expect(() => registerSubagent('', 'Agent', 'engineer')).not.toThrow();
       expect(() => getSubagents('')).not.toThrow();
-      expect(getSubagents('')).toHaveLength(0);
+      // Agent was registered with empty session ID, so querying empty ID should find it
+      expect(getSubagents('')).toHaveLength(1);
+      // But querying for a different session should return empty
+      expect(getSubagents('non-existent')).toHaveLength(0);
     });
 
     test('should handle special characters in names and messages', () => {

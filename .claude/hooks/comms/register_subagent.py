@@ -25,6 +25,7 @@ def main():
         if tool_name == 'Task':
             description = tool_input.get('description', '')
             subagent_type = tool_input.get('subagent_type', '')
+            initial_prompt = tool_input.get('prompt', '')
             
             # Extract nickname from description (part before colon)
             if ':' in description:
@@ -43,6 +44,16 @@ def main():
                     )
                     if response.status_code == 200:
                         print(f"Registered subagent: {nickname} ({subagent_type})", file=sys.stderr)
+                        
+                        # Now update with initial prompt using PATCH endpoint
+                        if initial_prompt:
+                            prompt_response = requests.patch(
+                                f'http://localhost:4000/subagents/{session_id}/{nickname}',
+                                json={'initial_prompt': initial_prompt},
+                                timeout=2
+                            )
+                            if prompt_response.status_code == 200:
+                                print(f"Stored initial prompt for subagent: {nickname}", file=sys.stderr)
                 except Exception as e:
                     # Silently fail if server is not available
                     pass

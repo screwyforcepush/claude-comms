@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
-import { ref, nextTick } from 'vue';
+// import { nextTick } from 'vue';
 import type { 
   SessionTimelineData,
   MultiSessionTimelineData,
@@ -185,19 +185,24 @@ describe('Multi-Session Data Management', () => {
         const startTime = Math.min(...agents.map(a => a.created_at));
         const endTime = Math.max(...agents.map(a => a.completed_at || Date.now()));
         
-        const agentPaths = agents.map(agent => ({
+        const agentPaths = agents.map((agent, index) => ({
           agentId: agent.id,
-          agentName: agent.name,
-          agentType: agent.subagent_type,
+          name: agent.name,
+          type: agent.subagent_type as any,
           startTime: agent.created_at,
           endTime: agent.completed_at,
           status: agent.status as any,
-          path: [], // Would be populated from events
-          metadata: {
-            totalDuration: agent.total_duration_ms,
-            totalTokens: agent.total_tokens,
-            inputTokens: agent.input_tokens,
-            outputTokens: agent.output_tokens
+          curveData: [], // Would be populated from events
+          laneIndex: index,
+          batchId: 'default-batch',
+          messages: [],
+          sessionId,
+          metrics: {
+            duration: agent.total_duration_ms || 0,
+            tokenCount: agent.total_tokens || 0,
+            toolUseCount: 0,
+            messageCount: 0,
+            completionRate: agent.status === 'completed' ? 1 : 0
           }
         }));
 
@@ -232,8 +237,8 @@ describe('Multi-Session Data Management', () => {
       
       expect(result.sessionId).toBe('transform-test');
       expect(result.agentPaths).toHaveLength(1);
-      expect(result.agentPaths[0].agentName).toBe('Engineer1');
-      expect(result.agentPaths[0].agentType).toBe('engineer');
+      expect(result.agentPaths[0].name).toBe('Engineer1');
+      expect(result.agentPaths[0].type).toBe('engineer');
       expect(result.metrics?.agentCount).toBe(1);
       expect(result.metrics?.completionRate).toBe(1);
       expect(result.status).toBe('completed');
@@ -309,11 +314,14 @@ describe('Multi-Session Data Management', () => {
           sessionLaneHeight: 120
         }));
 
-        const allTimes = sessions.flatMap(s => [s.startTime, s.endTime].filter(Boolean));
+        const allTimes = sessions.flatMap(s => [s.startTime, s.endTime].filter(t => typeof t === 'number'));
+        const minTime = allTimes.length > 0 ? Math.min(...allTimes) : Date.now();
+        const maxTime = allTimes.length > 0 ? Math.max(...allTimes) : Date.now();
         const timeRange = {
-          start: Math.min(...allTimes),
-          end: Math.max(...allTimes),
-          duration: Math.max(...allTimes) - Math.min(...allTimes)
+          start: minTime,
+          end: maxTime,
+          duration: maxTime - minTime,
+          pixelsPerMs: 0.01 // Default pixels per millisecond
         };
 
         return {

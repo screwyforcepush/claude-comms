@@ -151,7 +151,7 @@ describe('Performance Test Utilities', () => {
       const timeRange = { start: 0, end: 3000 };
       const path = (tester as any).generateMockSVGPath(agent, timeRange);
       
-      expect(path).toMatch(/^M \d+,\d+ Q \d+,\d+ \d+,\d+$/);
+      expect(path).toMatch(/^M [\d.]+,[\d.]+ Q [\d.]+,[\d.]+ [\d.]+,[\d.]+$/);
       expect(path).toContain('M'); // Move command
       expect(path).toContain('Q'); // Quadratic curve
     });
@@ -223,10 +223,10 @@ describe('Performance Test Utilities', () => {
       await runQuickPerformanceTest(5);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('50.00ms render time')
+        expect.stringContaining('50.00ms render time, 20.0 FPS')
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('20.0 FPS')
+        expect.stringContaining('Performance needs optimization')
       );
 
       startSpy.mockRestore();
@@ -293,7 +293,10 @@ describe('Performance Test Utilities', () => {
     });
 
     it('should handle missing DOM elements gracefully', () => {
-      document.querySelector = vi.fn(() => null);
+      Object.defineProperty(document, 'querySelector', {
+        value: vi.fn(() => null),
+        configurable: true
+      });
       
       const nodeCount = (tester as any).countTimelineDOMNodes();
       expect(nodeCount).toBe(0);
@@ -313,7 +316,7 @@ describe('Performance Test Utilities', () => {
       const path = (tester as any).generateMockSVGPath(agent, timeRange);
       
       expect(path).toBeDefined();
-      expect(path).toMatch(/^M \d+,\d+ Q \d+,\d+ \d+,\d+$/);
+      expect(path).toMatch(/^M [\d.]+,[\d.]+ Q [\d.]+,[\d.]+ [\d.]+,[\d.]+$/);
     });
   });
 });
