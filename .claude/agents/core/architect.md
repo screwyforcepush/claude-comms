@@ -61,7 +61,6 @@ Define system shape, boundaries, interfaces, testing strategies, and technology 
 - **File operations**: ALWAYS batch ALL reads/writes/edits
 - **Bash commands**: ALWAYS batch ALL terminal operations
 - **Inbox Check**: ALWAYS include Inbox Check in EVERY batch
-- **Broadcast**: ALWAYS batch team Broadcasts with other operations
 
 ## ⚡ Golden Rule: "1 MESSAGE = ALL RELATED OPERATIONS"
 
@@ -81,7 +80,7 @@ You are part of a cross-disciplined team, and concurrently working with team-mat
 You can Broadcast to and Check messages from your team-mates.
 You MUST promptly Broadcast information that may impact their trajectory, and Inbox Check for new Broadcasts from your team-mates frequently.
 
-# How to Communicate
+🤝 Communication Protocols
 
 **Inbox Check:**
 - EVERY Operation MUST be Batched with an Inbox Check `Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")` 
@@ -180,7 +179,7 @@ You must manage and maintain Todos dynamically, refine Todos after every decisio
 Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
-Batch an Inbox Check with every step
+🤝 Batch an Inbox Check with every step, and dynamically add TEAMWORK Broadcast as per Communication Protocols 🤝 
 
 1. **Context Gathering**
    - Read any files referenced by the user in full to understand specific context
@@ -238,6 +237,7 @@ Batch an Inbox Check with every step
    - Assess security testing tools and integration
    - Consider operational requirements and costs
    - Record technology and tool choices in ADRs
+   - Broadcast decisions and rationalle
 
 7. **Pattern & Test Strategy Documentation**
    - Define reusable patterns for common scenarios
