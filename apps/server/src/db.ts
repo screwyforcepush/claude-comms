@@ -143,6 +143,13 @@ export function initDatabase(): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_completed ON subagent_registry(completed_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_message_sender ON subagent_messages(sender)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_message_created ON subagent_messages(created_at)');
+  
+  // Additional indexes for multi-session API performance
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_session_created ON subagent_registry(session_id, created_at)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_session_status ON subagent_registry(session_id, status)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_created_completed ON subagent_registry(created_at, completed_at)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_events_session_timestamp ON events(session_id, timestamp)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_messages_created_sender ON subagent_messages(created_at, sender)');
 }
 
 export function insertEvent(event: HookEvent): HookEvent {
@@ -374,4 +381,165 @@ export function getSessionsWithAgents(): { session_id: string; created_at: numbe
   `);
   
   return stmt.all() as { session_id: string; created_at: number; agent_count: number }[];
+}
+
+// Multi-session API functions
+export function getSessionsInTimeWindow(start: number, end: number, limit: number = 50): SessionSummary[] {
+  const stmt = db.prepare(`
+    SELECT 
+      session_id, 
+      MAX(created_at) as created_at, 
+      COUNT(*) as agent_count,
+      MIN(created_at) as first_agent_time,
+      MAX(COALESCE(completed_at, created_at)) as last_activity
+    FROM subagent_registry 
+    WHERE created_at >= ? AND created_at <= ?
+    GROUP BY session_id 
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  
+  return stmt.all(start, end, limit) as SessionSummary[];
+}
+
+export function getSessionDetails(sessionIds: string[], includeAgents: boolean = false, includeMessages: boolean = false) {
+  const sessionDetails = [];
+  
+  for (const sessionId of sessionIds) {
+    // Get session summary
+    const sessionStmt = db.prepare(`
+      SELECT 
+        session_id,
+        MAX(created_at) as created_at,
+        COUNT(*) as agent_count,
+        MIN(created_at) as first_agent_time,
+        MAX(COALESCE(completed_at, created_at)) as last_activity,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) * 1.0 / COUNT(*) as completion_rate
+      FROM subagent_registry 
+      WHERE session_id = ?
+      GROUP BY session_id
+    `);
+    
+    const session = sessionStmt.get(sessionId) as any;
+    if (!session) continue;
+    
+    // Calculate session status
+    const statusStmt = db.prepare(`
+      SELECT status, COUNT(*) as count 
+      FROM subagent_registry 
+      WHERE session_id = ? 
+      GROUP BY status 
+      ORDER BY count DESC 
+      LIMIT 1
+    `);
+    const statusResult = statusStmt.get(sessionId) as any;
+    
+    // Determine overall session status
+    let status = 'pending';
+    if (statusResult) {
+      if (session.completion_rate === 1) status = 'completed';
+      else if (session.completion_rate > 0) status = 'active';
+      else status = statusResult.status || 'pending';
+    }
+    
+    const detail: any = {
+      session_id: session.session_id,
+      agent_count: session.agent_count,
+      created_at: session.created_at,
+      status,
+      duration: session.last_activity - session.first_agent_time,
+      last_activity: session.last_activity
+    };
+    
+    // Include agents if requested
+    if (includeAgents) {
+      detail.agents = getSubagents(sessionId);
+    }
+    
+    // Include messages if requested
+    if (includeMessages) {
+      const messageStmt = db.prepare(`
+        SELECT sender, message, created_at 
+        FROM subagent_messages 
+        WHERE created_at >= ? AND created_at <= ?
+        ORDER BY created_at ASC
+      `);
+      detail.messages = messageStmt.all(session.first_agent_time, session.last_activity)
+        .map((msg: any) => ({
+          sender: msg.sender,
+          message: JSON.parse(msg.message),
+          created_at: msg.created_at
+        }));
+    }
+    
+    sessionDetails.push(detail);
+  }
+  
+  return sessionDetails;
+}
+
+export function getSessionComparison(sessionIds: string[]) {
+  const sessionComparisons = [];
+  let totalAgents = 0;
+  let totalMessages = 0;
+  let totalDuration = 0;
+  let totalCompletions = 0;
+  
+  for (const sessionId of sessionIds) {
+    const sessionStmt = db.prepare(`
+      SELECT 
+        session_id,
+        COUNT(*) as agent_count,
+        MIN(created_at) as first_agent_time,
+        MAX(COALESCE(completed_at, created_at)) as last_activity,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) * 1.0 / COUNT(*) as completion_rate
+      FROM subagent_registry 
+      WHERE session_id = ?
+      GROUP BY session_id
+    `);
+    
+    const session = sessionStmt.get(sessionId) as any;
+    if (!session) continue;
+    
+    // Get message count for this session
+    const messageStmt = db.prepare(`
+      SELECT COUNT(*) as message_count
+      FROM subagent_messages 
+      WHERE created_at >= ? AND created_at <= ?
+    `);
+    const messageResult = messageStmt.get(session.first_agent_time, session.last_activity) as any;
+    
+    const duration = session.last_activity - session.first_agent_time;
+    
+    const comparison = {
+      session_id: session.session_id,
+      agent_count: session.agent_count,
+      message_count: messageResult?.message_count || 0,
+      duration,
+      status: session.completion_rate === 1 ? 'completed' : session.completion_rate > 0 ? 'active' : 'pending',
+      completion_rate: session.completion_rate,
+      created_at: session.first_agent_time
+    };
+    
+    sessionComparisons.push(comparison);
+    
+    // Accumulate totals for metrics
+    totalAgents += session.agent_count;
+    totalMessages += comparison.message_count;
+    totalDuration += duration;
+    totalCompletions += session.completion_rate;
+  }
+  
+  const metrics = {
+    total_sessions: sessionComparisons.length,
+    total_agents: totalAgents,
+    total_messages: totalMessages,
+    average_duration: sessionComparisons.length > 0 ? totalDuration / sessionComparisons.length : 0,
+    completion_rate: sessionComparisons.length > 0 ? totalCompletions / sessionComparisons.length : 0
+  };
+  
+  return {
+    sessions: sessionComparisons,
+    metrics
+  };
 }

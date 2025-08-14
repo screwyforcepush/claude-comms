@@ -55,10 +55,82 @@ export interface UpdateSubagentCompletionRequest {
   status: string;
   completed_at?: number;
   completion_metadata?: any;
+  total_duration_ms?: number;
+  total_tokens?: number;
+  total_tool_use_count?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
 }
 
 export interface SessionSummary {
   session_id: string;
   agent_count: number;
   created_at: number;
+}
+
+// Multi-session API types
+export interface SessionWindowRequest {
+  start: number;  // Unix timestamp
+  end: number;    // Unix timestamp
+  limit?: number; // Max sessions to return
+}
+
+export interface SessionBatchRequest {
+  sessionIds: string[];
+  includeAgents?: boolean;
+  includeMessages?: boolean;
+}
+
+export interface SessionDetail {
+  session_id: string;
+  agent_count: number;
+  created_at: number;
+  agents?: Subagent[];
+  messages?: SubagentMessage[];
+  status: 'active' | 'completed' | 'failed' | 'pending';
+  duration?: number;
+  last_activity?: number;
+}
+
+export interface ComparisonRequest {
+  sessionIds: string[];
+  metrics?: string[];
+}
+
+export interface ComparisonData {
+  sessions: SessionComparison[];
+  metrics: ComparisonMetrics;
+}
+
+export interface SessionComparison {
+  session_id: string;
+  agent_count: number;
+  message_count: number;
+  duration: number;
+  status: string;
+  completion_rate: number;
+  created_at: number;
+}
+
+export interface ComparisonMetrics {
+  total_sessions: number;
+  total_agents: number;
+  total_messages: number;
+  average_duration: number;
+  completion_rate: number;
+}
+
+export interface MultiSessionUpdate {
+  type: 'session_added' | 'session_updated' | 'session_removed' | 'batch_update';
+  sessionId: string;
+  data?: Partial<SessionDetail>;
+  timestamp: number;
+}
+
+export interface MultiSessionWebSocketMessage {
+  action: 'subscribe' | 'unsubscribe';
+  sessionIds?: string[];
+  sessionId?: string;
 }

@@ -35,7 +35,7 @@
           
           <!-- Filters Toggle Button -->
           <button
-            v-if="activeTab === 'events'"
+            v-if="activeTab === 'events' || activeTab === 'sessions'"
             @click="showFilters = !showFilters"
             class="p-3 mobile:p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 backdrop-blur-sm shadow-lg hover:shadow-xl"
             :title="showFilters ? 'Hide filters' : 'Show filters'"
@@ -71,6 +71,18 @@
           ]"
         >
           Agents
+        </button>
+        <button
+          @click="activeTab = 'sessions'"
+          :class="[
+            'px-4 py-2 rounded-t-lg font-semibold transition-all',
+            activeTab === 'sessions' 
+              ? 'bg-gray-900 text-blue-400 border-t-2 border-blue-400' 
+              : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
+          ]"
+          data-test="sessions-tab"
+        >
+          Sessions
         </button>
       </div>
     </div>
@@ -108,6 +120,22 @@
       <SubagentComms :ws-connection="wsConnection" />
     </template>
     
+    <template v-else-if="activeTab === 'sessions'">
+      <!-- Sessions Filters (can be expanded later with specific session filters) -->
+      <FilterPanel
+        v-if="showFilters"
+        :filters="filters"
+        @update:filters="filters = $event"
+        data-test="filter-panel"
+      />
+      
+      <SessionsView 
+        :ws-connection="wsConnection" 
+        :filters="filters" 
+        data-test="sessions-view"
+      />
+    </template>
+    
     <!-- Error message -->
     <div
       v-if="error"
@@ -127,6 +155,7 @@ import FilterPanel from './components/FilterPanel.vue';
 import StickScrollButton from './components/StickScrollButton.vue';
 import LivePulseChart from './components/LivePulseChart.vue';
 import SubagentComms from './components/SubagentComms.vue';
+import SessionsView from './components/SessionsView.vue';
 
 // WebSocket connection
 const { events, isConnected, error, ws: wsConnection } = useWebSocket('ws://localhost:4000/stream');

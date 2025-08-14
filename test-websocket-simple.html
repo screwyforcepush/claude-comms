@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Real-time Test</title>
+    <style>
+        body { font-family: system-ui; padding: 20px; background: #1f2937; color: white; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #065f46; border-left: 4px solid #10b981; }
+        .error { background: #7f1d1d; border-left: 4px solid #ef4444; }
+        .info { background: #1e3a8a; border-left: 4px solid #3b82f6; }
+        .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .metric { background: #374151; padding: 15px; border-radius: 8px; text-align: center; }
+        .metric-value { font-size: 2em; font-weight: bold; color: #10b981; }
+        .metric-label { font-size: 0.9em; color: #9ca3af; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #6b7280; cursor: not-allowed; }
+        #log { background: #111827; padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: scroll; font-family: monospace; margin: 20px 0; }
+        .test-section { border: 1px solid #374151; padding: 15px; margin: 15px 0; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 WebSocket Real-time Enhancement Test</h1>
+        <p>Testing the enhanced WebSocket functionality for multi-agent sessions</p>
+        
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="connectionStatus">❌</div>
+                <div class="metric-label">Connection Status</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="messageCount">0</div>
+                <div class="metric-label">Messages Received</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="reconnectCount">0</div>
+                <div class="metric-label">Reconnection Attempts</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="subscriptionCount">0</div>
+                <div class="metric-label">Active Subscriptions</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔌 Connection Tests</h3>
+            <button onclick="testConnection()">Test Connection</button>
+            <button onclick="testReconnection()">Test Reconnection</button>
+            <button onclick="disconnect()">Disconnect</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📡 Subscription Management</h3>
+            <button onclick="testSubscription()">Subscribe to Sessions</button>
+            <button onclick="testUnsubscribe()">Unsubscribe</button>
+            <button onclick="testHeartbeat()">Test Heartbeat</button>
+        </div>
+
+        <div class="test-section">
+            <h3>⚡ Performance Tests</h3>
+            <button onclick="testHighFrequency()">High-Frequency Updates</button>
+            <button onclick="testEventQueuing()">Event Queuing Test</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div id="log"></div>
+    </div>
+
+    <script>
+        class RealtimeWebSocketTester {
+            constructor() {
+                this.ws = null;
+                this.messageCount = 0;
+                this.reconnectCount = 0;
+                this.subscriptionCount = 0;
+                this.eventQueue = [];
+                this.isConnected = false;
+                this.reconnectTimeout = null;
+                this.maxReconnectAttempts = 5;
+                this.baseReconnectDelay = 1000;
+                this.subscribedSessions = new Set();
+            }
+
+            log(message, type = 'info') {
+                const logDiv = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+                logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            updateMetrics() {
+                document.getElementById('connectionStatus').textContent = this.isConnected ? '✅' : '❌';
+                document.getElementById('messageCount').textContent = this.messageCount;
+                document.getElementById('reconnectCount').textContent = this.reconnectCount;
+                document.getElementById('subscriptionCount').textContent = this.subscriptionCount;
+            }
+
+            connect() {
+                if (this.ws?.readyState === WebSocket.OPEN) {
+                    this.log('Already connected', 'info');
+                    return;
+                }
+
+                this.log('Connecting to multi-session WebSocket...', 'info');
+                this.ws = new WebSocket('ws://localhost:4000/api/sessions/multi-stream');
+
+                this.ws.onopen = () => {
+                    this.isConnected = true;
+                    this.reconnectCount = 0;
+                    this.log('✅ Connected to multi-session WebSocket', 'success');
+                    this.updateMetrics();
+                    
+                    // Process any queued events
+                    this.processEventQueue();
+                };
+
+                this.ws.onmessage = (event) => {
+                    this.messageCount++;
+                    this.updateMetrics();
+                    
+                    try {
+                        const message = JSON.parse(event.data);
+                        this.handleMessage(message);
+                    } catch (error) {
+                        this.log(`Error parsing message: ${error.message}`, 'error');
+                    }
+                };
+
+                this.ws.onclose = (event) => {
+                    this.isConnected = false;
+                    this.updateMetrics();
+                    this.log(`❌ Connection closed (code: ${event.code}, reason: ${event.reason})`, 'error');
+                    
+                    if (this.reconnectCount < this.maxReconnectAttempts) {
+                        this.scheduleReconnect();
+                    }
+                };
+
+                this.ws.onerror = (error) => {
+                    this.log(`❌ WebSocket error: ${error.message || 'Unknown error'}`, 'error');
+                };
+            }
+
+            handleMessage(message) {
+                switch (message.type) {
+                    case 'subscription_confirmed':
+                    case 'unsubscription_confirmed':
+                        this.log(`✅ ${message.type}: ${JSON.stringify(message.sessionIds || [message.sessionId])}`, 'success');
+                        break;
+                    case 'pong':
+                        this.log('💓 Heartbeat pong received', 'success');
+                        break;
+                    case 'session_event':
+                    case 'agent_registered':
+                    case 'agent_status_update':
+                    case 'agent_message':
+                        this.log(`📡 Real-time update: ${message.type} for session ${message.sessionId}`, 'info');
+                        break;
+                    default:
+                        this.log(`📨 Received: ${message.type}`, 'info');
+                }
+            }
+
+            scheduleReconnect() {
+                const delay = Math.min(
+                    this.baseReconnectDelay * Math.pow(2, this.reconnectCount),
+                    30000
+                ) + Math.random() * 1000;
+
+                this.log(`🔄 Scheduling reconnection attempt ${this.reconnectCount + 1} in ${Math.round(delay)}ms`, 'info');
+
+                this.reconnectTimeout = setTimeout(() => {
+                    this.reconnectCount++;
+                    this.updateMetrics();
+                    this.connect();
+                }, delay);
+            }
+
+            processEventQueue() {
+                if (this.eventQueue.length === 0) return;
+
+                this.log(`🔄 Processing ${this.eventQueue.length} queued events`, 'info');
+                
+                // Group events by session to avoid duplicates
+                const eventsBySession = new Map();
+                this.eventQueue.forEach(event => {
+                    const existing = eventsBySession.get(event.sessionId);
+                    if (!existing || event.timestamp > existing.timestamp) {
+                        eventsBySession.set(event.sessionId, event);
+                    }
+                });
+
+                this.log(`✅ Consolidated to ${eventsBySession.size} unique session updates`, 'success');
+                this.eventQueue = [];
+            }
+
+            subscribe(sessionIds) {
+                if (!this.isConnected) {
+                    this.log('❌ Not connected, cannot subscribe', 'error');
+                    return;
+                }
+
+                const message = {
+                    action: 'subscribe',
+                    sessionIds: sessionIds
+                };
+
+                this.ws.send(JSON.stringify(message));
+                sessionIds.forEach(id => this.subscribedSessions.add(id));
+                this.subscriptionCount = this.subscribedSessions.size;
+                this.updateMetrics();
+                this.log(`📡 Subscribed to sessions: ${sessionIds.join(', ')}`, 'info');
+            }
+
+            unsubscribe(sessionIds) {
+                if (!this.isConnected) {
+                    this.log('❌ Not connected, cannot unsubscribe', 'error');
+                    return;
+                }
+
+                const message = {
+                    action: 'unsubscribe',
+                    sessionIds: sessionIds
+                };
+
+                this.ws.send(JSON.stringify(message));
+                sessionIds.forEach(id => this.subscribedSessions.delete(id));
+                this.subscriptionCount = this.subscribedSessions.size;
+                this.updateMetrics();
+                this.log(`📡 Unsubscribed from sessions: ${sessionIds.join(', ')}`, 'info');
+            }
+
+            sendHeartbeat() {
+                if (!this.isConnected) {
+                    this.log('❌ Not connected, cannot send heartbeat', 'error');
+                    return;
+                }
+
+                this.ws.send(JSON.stringify({ action: 'ping' }));
+                this.log('💓 Heartbeat ping sent', 'info');
+            }
+
+            simulateHighFrequencyUpdates() {
+                this.log('⚡ Starting high-frequency update simulation (20 updates/sec for 10s)', 'info');
+                
+                let updateCount = 0;
+                const maxUpdates = 200;
+                const interval = setInterval(() => {
+                    if (updateCount >= maxUpdates || !this.isConnected) {
+                        clearInterval(interval);
+                        this.log(`✅ High-frequency test completed: ${updateCount} updates processed`, 'success');
+                        return;
+                    }
+
+                    // Queue mock update
+                    this.eventQueue.push({
+                        type: 'agent_status_update',
+                        sessionId: `session-${updateCount % 3 + 1}`,
+                        data: {
+                            name: `Agent-${updateCount}`,
+                            status: updateCount % 3 === 0 ? 'completed' : 'in_progress'
+                        },
+                        timestamp: Date.now()
+                    });
+
+                    updateCount++;
+                    
+                    if (updateCount % 50 === 0) {
+                        this.log(`⚡ Processed ${updateCount} updates...`, 'info');
+                    }
+                }, 50);
+            }
+
+            disconnect() {
+                if (this.reconnectTimeout) {
+                    clearTimeout(this.reconnectTimeout);
+                    this.reconnectTimeout = null;
+                }
+
+                if (this.ws) {
+                    this.ws.close(1000, 'Manual disconnect');
+                    this.ws = null;
+                }
+
+                this.isConnected = false;
+                this.subscribedSessions.clear();
+                this.subscriptionCount = 0;
+                this.updateMetrics();
+                this.log('🔌 Disconnected manually', 'info');
+            }
+        }
+
+        // Global test instance
+        const tester = new RealtimeWebSocketTester();
+
+        // Test functions called by buttons
+        function testConnection() {
+            tester.connect();
+        }
+
+        function testReconnection() {
+            tester.log('🔄 Testing reconnection by closing current connection...', 'info');
+            if (tester.ws) {
+                tester.ws.close();
+            } else {
+                tester.connect();
+            }
+        }
+
+        function disconnect() {
+            tester.disconnect();
+        }
+
+        function testSubscription() {
+            const sessionIds = ['session-test-1', 'session-test-2', 'session-test-3'];
+            tester.subscribe(sessionIds);
+        }
+
+        function testUnsubscribe() {
+            const sessionIds = ['session-test-1', 'session-test-2'];
+            tester.unsubscribe(sessionIds);
+        }
+
+        function testHeartbeat() {
+            tester.sendHeartbeat();
+        }
+
+        function testHighFrequency() {
+            tester.simulateHighFrequencyUpdates();
+        }
+
+        function testEventQueuing() {
+            // Add some events to queue while disconnected
+            for (let i = 0; i < 10; i++) {
+                tester.eventQueue.push({
+                    type: 'session_updated',
+                    sessionId: `session-${i % 3 + 1}`,
+                    data: { agent_count: i },
+                    timestamp: Date.now() + i
+                });
+            }
+            tester.log(`📦 Added ${tester.eventQueue.length} events to queue`, 'info');
+            tester.processEventQueue();
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-connect when page loads
+        window.addEventListener('load', () => {
+            tester.log('🚀 WebSocket Real-time Tester loaded', 'success');
+            tester.log('Click "Test Connection" to start testing...', 'info');
+        });
+    </script>
+</body>
+</html>
