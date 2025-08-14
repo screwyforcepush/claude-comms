@@ -604,3 +604,35 @@ export function getSessionComparison(sessionIds: string[]) {
     metrics
   };
 }
+
+export function getSessionEvents(sessionId: string, eventTypes?: string[]): HookEvent[] {
+  let query = `
+    SELECT id, source_app, session_id, hook_event_type, payload, chat, summary, timestamp
+    FROM events
+    WHERE session_id = ?
+  `;
+  
+  const params: any[] = [sessionId];
+  
+  if (eventTypes && eventTypes.length > 0) {
+    const placeholders = eventTypes.map(() => '?').join(',');
+    query += ` AND hook_event_type IN (${placeholders})`;
+    params.push(...eventTypes);
+  }
+  
+  query += ` ORDER BY timestamp ASC`;
+  
+  const stmt = db.prepare(query);
+  const rows = stmt.all(...params) as any[];
+  
+  return rows.map(row => ({
+    id: row.id,
+    source_app: row.source_app,
+    session_id: row.session_id,
+    hook_event_type: row.hook_event_type,
+    payload: JSON.parse(row.payload),
+    chat: row.chat ? JSON.parse(row.chat) : undefined,
+    summary: row.summary || undefined,
+    timestamp: row.timestamp
+  }));
+}

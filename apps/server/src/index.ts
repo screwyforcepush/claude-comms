@@ -12,7 +12,8 @@ import {
   getSessionsWithAgents,
   getSessionsInTimeWindow,
   getSessionDetails,
-  getSessionComparison
+  getSessionComparison,
+  getSessionEvents
 } from './db';
 import type { 
   HookEvent, 
@@ -123,6 +124,55 @@ const server = Bun.serve({
       return new Response(JSON.stringify(events), {
         headers: { ...headers, 'Content-Type': 'application/json' }
       });
+    }
+    
+    // GET /events/session/:sessionId - Get events for a specific session
+    if (url.pathname.startsWith('/events/session/') && req.method === 'GET') {
+      try {
+        const sessionId = url.pathname.split('/')[3];
+        if (!sessionId) {
+          return new Response(JSON.stringify({ error: 'Session ID is required' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Parse event types filter from query parameters
+        const typesParam = url.searchParams.get('types');
+        const eventTypes = typesParam ? typesParam.split(',').map(t => t.trim()) : undefined;
+        
+        // Validate event types if provided
+        if (eventTypes && eventTypes.length > 0) {
+          const validEventTypes = ['UserPromptSubmit', 'Notification', 'SubagentStart', 'SubagentComplete', 'ToolUse', 'Error'];
+          const invalidTypes = eventTypes.filter(type => !validEventTypes.includes(type));
+          if (invalidTypes.length > 0) {
+            return new Response(JSON.stringify({ 
+              error: `Invalid event types: ${invalidTypes.join(', ')}`,
+              validTypes: validEventTypes
+            }), {
+              status: 400,
+              headers: { ...headers, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        
+        const events = getSessionEvents(sessionId, eventTypes);
+        
+        return new Response(JSON.stringify({
+          sessionId,
+          eventTypes: eventTypes || ['all'],
+          events: events,
+          count: events.length
+        }), {
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error fetching session events:', error);
+        return new Response(JSON.stringify({ error: 'Failed to fetch session events' }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
     }
     
     // POST /subagents/register - Register a new subagent

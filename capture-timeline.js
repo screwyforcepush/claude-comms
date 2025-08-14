@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
   const page = await context.newPage();
   
   // Navigate to the dev server (using port 5180 as shown in output)
-  await page.goto('http://localhost:5180');
+  await page.goto('http://localhost:5173');
   await page.waitForLoadState('networkidle');
   
   // Click on Sessions tab

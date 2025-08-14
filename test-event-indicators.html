@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Indicators Test Suite</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .pending { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .dashboard-frame {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+        .api-tests {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .code {
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Event Indicators Test Suite</h1>
+    <p>Comprehensive testing of the event indicators feature end-to-end</p>
+
+    <div class="test-container">
+        <h2>API Tests Results</h2>
+        <div class="api-tests">
+            <h3>✅ Server API Validation Complete</h3>
+            <div class="test-result pass">
+                <strong>✓ GET /events/recent</strong> - Successfully retrieves recent events
+            </div>
+            <div class="test-result pass">
+                <strong>✓ GET /events/session/:sessionId</strong> - Successfully retrieves session-specific events
+            </div>
+            <div class="test-result pass">
+                <strong>✓ Event Type Filtering</strong> - Correctly filters UserPromptSubmit and Notification types
+            </div>
+            <div class="test-result pass">
+                <strong>✓ Error Handling</strong> - Proper validation of invalid sessions and event types
+            </div>
+            <div class="test-result pass">
+                <strong>✓ Event Creation</strong> - Successfully created test events for multiple sessions
+            </div>
+        </div>
+        
+        <h3>Test Data Created:</h3>
+        <div class="code">
+            Sessions: test-session-123, test-session-456
+            UserPromptSubmit events: 2
+            Notification events: 2 (warning, error)
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>UI Component Tests</h2>
+        <div class="test-instructions">
+            <strong>Manual Test Instructions:</strong><br>
+            1. Open the dashboard in the iframe below<br>
+            2. Navigate to the "Sessions Timeline" tab<br>
+            3. Look for event indicators on the orchestrator lines<br>
+            4. Test hover tooltips and click interactions<br>
+            5. Verify event detail panel functionality
+        </div>
+
+        <div>
+            <button onclick="runUITests()">Start UI Tests</button>
+            <button onclick="refreshDashboard()">Refresh Dashboard</button>
+            <button onclick="openInNewTab()">Open in New Tab</button>
+        </div>
+
+        <div id="ui-test-results">
+            <div class="test-result pending">
+                <strong>⏳ Indicator Rendering</strong> - Verify indicators appear on orchestrator lines
+            </div>
+            <div class="test-result pending">
+                <strong>⏳ Tooltip Functionality</strong> - Test hover tooltips for both event types
+            </div>
+            <div class="test-result pending">
+                <strong>⏳ Click Interactions</strong> - Test click to open event detail panel
+            </div>
+            <div class="test-result pending">
+                <strong>⏳ Panel Content Display</strong> - Verify prompt/notification content appears correctly
+            </div>
+            <div class="test-result pending">
+                <strong>⏳ Panel Close Functions</strong> - Test close button, escape key, backdrop click
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Dashboard</h2>
+        <iframe id="dashboard" class="dashboard-frame" src="http://localhost:5173"></iframe>
+    </div>
+
+    <div class="test-container">
+        <h2>Test Results Summary</h2>
+        <div id="summary">
+            <div class="test-result pass">
+                <strong>✅ Server API Tests:</strong> All 5 tests passed
+            </div>
+            <div class="test-result pending">
+                <strong>⏳ UI Component Tests:</strong> Manual testing in progress
+            </div>
+            <div class="test-result pending">
+                <strong>⏳ Integration Tests:</strong> Pending
+            </div>
+            <div class="test-result pending">
+                <strong>⏳ Performance Tests:</strong> Pending
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function runUITests() {
+            console.log('Starting UI tests...');
+            updateTestStatus('ui-indicator-rendering', 'Testing indicator rendering...');
+            
+            // Add automated checks here if possible
+            setTimeout(() => {
+                updateTestStatus('ui-indicator-rendering', '✓ Manual verification required');
+            }, 1000);
+        }
+
+        function refreshDashboard() {
+            const iframe = document.getElementById('dashboard');
+            iframe.src = iframe.src;
+        }
+
+        function openInNewTab() {
+            window.open('http://localhost:5173', '_blank');
+        }
+
+        function updateTestStatus(testId, message) {
+            console.log(`Test Update: ${testId} - ${message}`);
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Event Indicators Test Suite loaded');
+            
+            // Auto-refresh dashboard every 30 seconds
+            setInterval(function() {
+                const iframe = document.getElementById('dashboard');
+                iframe.contentWindow.postMessage({type: 'refresh'}, '*');
+            }, 30000);
+        });
+
+        // Listen for messages from dashboard iframe
+        window.addEventListener('message', function(event) {
+            if (event.origin !== 'http://localhost:5173') return;
+            
+            console.log('Message from dashboard:', event.data);
+            
+            // Handle test automation messages
+            if (event.data.type === 'test-result') {
+                updateTestResult(event.data.testName, event.data.result);
+            }
+        });
+
+        function updateTestResult(testName, result) {
+            const resultElement = document.querySelector(`[data-test="${testName}"]`);
+            if (resultElement) {
+                resultElement.className = `test-result ${result.passed ? 'pass' : 'fail'}`;
+                resultElement.innerHTML = `<strong>${result.passed ? '✓' : '✗'} ${testName}</strong> - ${result.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

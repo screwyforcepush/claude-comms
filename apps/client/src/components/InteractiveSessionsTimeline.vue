@@ -269,6 +269,99 @@
               </g>
             </g>
 
+            <!-- Event Indicators on Orchestrator Line -->
+            <g class="session-event-indicators" v-if="getSessionEventIndicators(session.sessionId).length > 0" style="pointer-events: all;">
+              <g v-for="indicator in getSessionEventIndicators(session.sessionId)" :key="indicator.eventId">
+                <!-- UserPromptSubmit indicators (blue circles) -->
+                <g v-if="indicator.eventType === 'UserPromptSubmit'">
+                  <!-- Glow effect -->
+                  <circle 
+                    :cx="getTimeX(indicator.timestamp)" 
+                    :cy="getSessionOrchestratorY(sessionIndex)"
+                    :r="eventIndicatorStyles.UserPromptSubmit.size + 2"
+                    :fill="eventIndicatorStyles.UserPromptSubmit.color"
+                    opacity="0.3"
+                    class="animate-pulse"
+                    style="pointer-events: none;"
+                  />
+                  <!-- Main indicator circle -->
+                  <circle 
+                    :cx="getTimeX(indicator.timestamp)" 
+                    :cy="getSessionOrchestratorY(sessionIndex)"
+                    :r="eventIndicatorStyles.UserPromptSubmit.size"
+                    :fill="isEventIndicatorSelected(indicator) ? eventIndicatorStyles.UserPromptSubmit.hoverColor : eventIndicatorStyles.UserPromptSubmit.color"
+                    stroke="#ffffff"
+                    :stroke-width="eventIndicatorStyles.UserPromptSubmit.strokeWidth"
+                    class="cursor-pointer transition-all duration-200 hover:drop-shadow-[0_0_8px_#3b82f6]"
+                    :class="isEventIndicatorSelected(indicator) ? 'drop-shadow-[0_0_16px_#3b82f6]' : ''"
+                    style="pointer-events: auto;"
+                    @click="selectEventIndicator(indicator, session)"
+                    @mouseenter="showEventIndicatorTooltip(indicator, $event)"
+                    @mouseleave="hideTooltip"
+                  />
+                  <!-- Selection ring -->
+                  <circle 
+                    v-if="isEventIndicatorSelected(indicator)"
+                    :cx="getTimeX(indicator.timestamp)" 
+                    :cy="getSessionOrchestratorY(sessionIndex)"
+                    :r="eventIndicatorStyles.UserPromptSubmit.size + 4"
+                    fill="none"
+                    :stroke="eventIndicatorStyles.UserPromptSubmit.color"
+                    stroke-width="2"
+                    opacity="0.6"
+                    class="animate-pulse"
+                  />
+                </g>
+                
+                <!-- Notification indicators (orange warning triangles) -->
+                <g v-if="indicator.eventType === 'Notification'" :transform="`translate(${getTimeX(indicator.timestamp)}, ${getSessionOrchestratorY(sessionIndex)})`" style="pointer-events: all;">
+                  <!-- Glow effect -->
+                  <path 
+                    d="M-10,-12 L10,-12 L0,6 Z"
+                    :fill="eventIndicatorStyles.Notification.color"
+                    opacity="0.3"
+                    class="animate-pulse"
+                    style="pointer-events: none;"
+                  />
+                  <!-- Main warning triangle -->
+                  <path 
+                    d="M-8,-10 L8,-10 L0,4 Z"
+                    :fill="isEventIndicatorSelected(indicator) ? eventIndicatorStyles.Notification.hoverColor : eventIndicatorStyles.Notification.color"
+                    stroke="#ffffff"
+                    :stroke-width="eventIndicatorStyles.Notification.strokeWidth"
+                    class="cursor-pointer transition-all duration-200 hover:drop-shadow-[0_0_8px_#f59e0b]"
+                    :class="isEventIndicatorSelected(indicator) ? 'drop-shadow-[0_0_16px_#f59e0b]' : ''"
+                    style="pointer-events: auto;"
+                    @click="selectEventIndicator(indicator, session)"
+                    @mouseenter="showEventIndicatorTooltip(indicator, $event)"
+                    @mouseleave="hideTooltip"
+                  />
+                  <!-- Exclamation mark -->
+                  <text 
+                    x="0" 
+                    y="-2" 
+                    text-anchor="middle"
+                    fill="#ffffff"
+                    font-size="8"
+                    font-weight="bold"
+                    style="pointer-events: none;"
+                  >!</text>
+                  <!-- Selection ring -->
+                  <circle 
+                    v-if="isEventIndicatorSelected(indicator)"
+                    cx="0" 
+                    cy="-3"
+                    r="12"
+                    fill="none"
+                    :stroke="eventIndicatorStyles.Notification.color"
+                    stroke-width="2"
+                    opacity="0.6"
+                    class="animate-pulse"
+                  />
+                </g>
+              </g>
+            </g>
+
             <!-- Session Messages Enhanced (matching Agents tab exactly) -->
             <g class="session-messages" v-if="session.messages.length > 0" style="z-index: 30;">
               <g v-for="message in session.messages" :key="message.id">
@@ -353,6 +446,15 @@
         @tooltip-mouse-enter="onTooltipMouseEnter"
         @tooltip-mouse-leave="onTooltipMouseLeave"
       />
+
+      <!-- Event Detail Panel -->
+      <EventDetailPanel
+        :visible="eventPanel.visible"
+        :event-data="eventPanel.selectedEvent"
+        :related-events="eventPanel.relatedEvents"
+        @close="closeEventPanel"
+        @event-selected="selectEvent"
+      />
       
 
       <!-- Loading Overlay -->
@@ -403,7 +505,7 @@
             @click="clearSelections" 
             class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
             title="Clear Selection (Esc)"
-            v-if="selectedAgent || selectedMessage"
+            v-if="selectedAgent || selectedMessage || selectedEventIndicator"
           >
             ✕ Clear Selection
           </button>
@@ -447,7 +549,7 @@
 
     <!-- Selection Info Bar -->
     <div 
-      v-if="selectedAgent || selectedMessage" 
+      v-if="selectedAgent || selectedMessage || selectedEventIndicator" 
       class="selection-info bg-blue-600/20 border-t border-blue-400/30 px-4 py-2 text-sm"
     >
       <div v-if="selectedAgent" class="flex items-center justify-between">
@@ -466,6 +568,14 @@
           {{ formatTimestamp(selectedMessage.timestamp) }}
         </span>
       </div>
+      <div v-else-if="selectedEventIndicator" class="flex items-center justify-between">
+        <span class="text-blue-400">
+          Selected {{ selectedEventIndicator.eventType === 'UserPromptSubmit' ? 'User Prompt' : 'Notification' }}
+        </span>
+        <span class="text-gray-400">
+          {{ formatTimestamp(selectedEventIndicator.timestamp) }} | Session: {{ selectedEventIndicator.sessionId.slice(-6) }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -473,12 +583,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import TimelineTooltip from './TimelineTooltip.vue';
+import EventDetailPanel from './EventDetailPanel.vue';
 // import SessionFilterPanel from './SessionFilterPanel.vue'; // Unused
 import { SessionFilterUtils, DEFAULT_SESSION_FILTERS } from '../types/session-filters';
 import type { SessionFilterState } from '../types/session-filters';
 import { SessionDataAdapter } from '../utils/session-data-adapter';
 import type { SessionData, SessionAgent, SessionMessage } from '../utils/session-data-adapter';
 import { usePerformanceOptimizer } from '../composables/usePerformanceOptimizer';
+import type { EventIndicator, EventIndicatorType } from '../types/event-indicators';
+import type { HookEvent } from '../types';
 
 interface TimeWindow {
   label: string;
@@ -518,6 +631,7 @@ const emit = defineEmits<{
     isActive: boolean;
     metrics: { filterTime: number; resultCount: number } | null;
   }];
+  'event-indicator-clicked': [event: EventIndicator];
 }>();
 
 // ============================================================================
@@ -583,6 +697,11 @@ const selectedAgent = ref<SessionAgent | null>(null);
 const selectedMessage = ref<SessionMessage | null>(null);
 const highlightedMessageId = ref<string>('');
 
+// Event indicators state
+const eventIndicators = ref<EventIndicator[]>([]);
+const selectedEventIndicator = ref<EventIndicator | null>(null);
+const isLoadingEvents = ref(false);
+
 // Loading state
 const isLoading = ref(false);
 
@@ -597,6 +716,17 @@ const tooltip = ref<{
   type: 'generic', 
   data: null, 
   position: { x: 0, y: 0 } 
+});
+
+// Event detail panel state
+const eventPanel = ref<{
+  visible: boolean;
+  selectedEvent: EventIndicator | null;
+  relatedEvents: EventIndicator[];
+}>({
+  visible: false,
+  selectedEvent: null,
+  relatedEvents: []
 });
 
 
@@ -622,6 +752,22 @@ const timeWindows: TimeWindow[] = [
   { label: '6h', value: 6 * 60 * 60 * 1000 },
   { label: '24h', value: 24 * 60 * 60 * 1000 }
 ];
+
+// Event indicator styles
+const eventIndicatorStyles = {
+  UserPromptSubmit: {
+    color: '#3b82f6',
+    hoverColor: '#1d4ed8',
+    size: 8,
+    strokeWidth: 2
+  },
+  Notification: {
+    color: '#f59e0b',
+    hoverColor: '#d97706',
+    size: 8,
+    strokeWidth: 2
+  }
+};
 
 // Agent colors (reuse from single timeline)
 const agentColors: Record<string, string> = {
@@ -706,6 +852,25 @@ const transformedSessions = computed((): SessionData[] => {
   // Generate mock data as fallback
   console.log('🎭 DataDragon: Generating mock sessions data');
   return SessionDataAdapter.createMockSessionData(5);
+});
+
+// Event indicators for visible sessions
+const visibleEventIndicators = computed((): EventIndicator[] => {
+  const { start, end } = timeRange.value;
+  
+  return eventIndicators.value.filter(indicator => {
+    // Filter by time range
+    if (indicator.timestamp < start || indicator.timestamp > end) {
+      return false;
+    }
+    
+    // Filter by visible sessions
+    const isSessionVisible = visibleSessions.value.some(
+      session => session.sessionId === indicator.sessionId
+    );
+    
+    return isSessionVisible;
+  });
 });
 
 const visibleSessions = computed((): SessionData[] => {
@@ -1044,8 +1209,141 @@ const selectMessage = (message: SessionMessage, session: SessionData) => {
 const clearSelections = () => {
   selectedAgent.value = null;
   selectedMessage.value = null;
+  selectedEventIndicator.value = null;
 };
 
+// ============================================================================
+// Event Indicator Functions
+// ============================================================================
+
+const fetchEventIndicators = async () => {
+  if (isLoadingEvents.value) return;
+  
+  isLoadingEvents.value = true;
+  
+  try {
+    console.log('🔍 Fetching event indicators from API...');
+    
+    const response = await fetch('http://localhost:4000/events/recent?limit=1000');
+    if (!response.ok) {
+      throw new Error('Failed to fetch events');
+    }
+    
+    const events: HookEvent[] = await response.json();
+    
+    // Transform events to indicators
+    const indicators: EventIndicator[] = events
+      .filter(event => 
+        event.hook_event_type === 'UserPromptSubmit' || 
+        event.hook_event_type === 'Notification'
+      )
+      .map(event => ({
+        eventId: event.id?.toString() || `${event.timestamp}-${event.hook_event_type}`,
+        eventType: event.hook_event_type as EventIndicatorType,
+        timestamp: event.timestamp || Date.now(),
+        sessionId: event.session_id,
+        content: extractEventContent(event),
+        position: { x: 0, y: 0 }, // Will be calculated during rendering
+        rawEvent: {
+          ...event,
+          payload: event.payload || {}
+        } as any, // Type cast to handle payload compatibility
+        metadata: extractEventMetadata(event)
+      }));
+    
+    eventIndicators.value = indicators;
+    console.log(`✅ Loaded ${indicators.length} event indicators`);
+    
+  } catch (error) {
+    console.error('❌ Failed to fetch event indicators:', error);
+  } finally {
+    isLoadingEvents.value = false;
+  }
+};
+
+const extractEventContent = (event: HookEvent): string => {
+  if (event.hook_event_type === 'UserPromptSubmit') {
+    return event.payload?.prompt || event.summary || 'User submitted a prompt';
+  } else if (event.hook_event_type === 'Notification') {
+    return event.payload?.message || event.summary || 'System notification';
+  }
+  return event.summary || 'Event';
+};
+
+const extractEventMetadata = (event: HookEvent) => {
+  const metadata: {
+    severity?: 'info' | 'warning' | 'error';
+    source?: string;
+    category?: string;
+    wordCount?: number;
+    complexity?: 'simple' | 'moderate' | 'complex';
+    responseTime?: number;
+    agentCount?: number;
+  } = {};
+  
+  if (event.hook_event_type === 'UserPromptSubmit') {
+    metadata.wordCount = event.payload?.prompt?.split(' ').length || 0;
+    metadata.complexity = metadata.wordCount > 100 ? 'complex' : metadata.wordCount > 20 ? 'moderate' : 'simple';
+  } else if (event.hook_event_type === 'Notification') {
+    const level = event.payload?.level;
+    metadata.severity = (level === 'info' || level === 'warning' || level === 'error') ? level : 'info';
+    metadata.source = event.payload?.source || 'system';
+  }
+  
+  return metadata;
+};
+
+const getSessionEventIndicators = (sessionId: string): EventIndicator[] => {
+  return visibleEventIndicators.value.filter(indicator => 
+    indicator.sessionId === sessionId
+  );
+};
+
+const isEventIndicatorSelected = (indicator: EventIndicator): boolean => {
+  return selectedEventIndicator.value?.eventId === indicator.eventId;
+};
+
+const selectEventIndicator = (indicator: EventIndicator, session: SessionData) => {
+  selectedEventIndicator.value = indicator;
+  selectedAgent.value = null;
+  selectedMessage.value = null;
+  
+  // Update indicator position for potential panel usage
+  const sessionIndex = visibleSessions.value.findIndex(s => s.sessionId === session.sessionId);
+  if (sessionIndex >= 0) {
+    indicator.position = {
+      x: getTimeX(indicator.timestamp),
+      y: getSessionOrchestratorY(sessionIndex)
+    };
+  }
+  
+  emit('event-indicator-clicked', indicator);
+  
+  console.log('🎯 Selected event indicator:', indicator);
+};
+
+const showEventIndicatorTooltip = (indicator: EventIndicator, event: MouseEvent) => {
+  clearTooltipTimers();
+  
+  tooltipShowTimer = window.setTimeout(() => {
+    const preview = indicator.content.substring(0, 100) + 
+      (indicator.content.length > 100 ? '...' : '');
+    
+    tooltip.value = {
+      visible: true,
+      type: indicator.eventType === 'UserPromptSubmit' ? 'prompt' : 'generic',
+      data: {
+        title: indicator.eventType === 'UserPromptSubmit' ? 'User Prompt' : 'Notification',
+        timestamp: formatTimestamp(indicator.timestamp),
+        preview,
+        sessionId: indicator.sessionId,
+        eventType: indicator.eventType,
+        metadata: indicator.metadata
+      },
+      position: { x: event.clientX, y: event.clientY }
+    };
+  }, TOOLTIP_SHOW_DELAY);
+};
 
 // ============================================================================
 // User Interaction Detection Functions
@@ -1499,6 +1797,58 @@ const onTooltipMouseLeave = () => {
 };
 
 // ============================================================================
+// Event Detail Panel Functions
+// ============================================================================
+
+const openEventPanel = (eventIndicator: EventIndicator) => {
+  // Find related events in the same session
+  const relatedEvents = findRelatedEvents(eventIndicator);
+  
+  eventPanel.value = {
+    visible: true,
+    selectedEvent: eventIndicator,
+    relatedEvents
+  };
+  
+  // Hide tooltip when opening panel
+  hideTooltipImmediate();
+  
+  // Emit event for external listeners
+  emit('event-indicator-clicked', eventIndicator);
+};
+
+const closeEventPanel = () => {
+  eventPanel.value = {
+    visible: false,
+    selectedEvent: null,
+    relatedEvents: []
+  };
+};
+
+const selectEvent = (eventIndicator: EventIndicator) => {
+  openEventPanel(eventIndicator);
+};
+
+const findRelatedEvents = (eventIndicator: EventIndicator): EventIndicator[] => {
+  // For now, return empty array. SarahFrontend will provide the related events logic
+  // when the event indicators are implemented
+  return [];
+};
+
+// Handler function that can be called from event indicators
+const handleEventIndicatorClick = (eventIndicator: EventIndicator, mouseEvent: MouseEvent) => {
+  mouseEvent.stopPropagation();
+  openEventPanel(eventIndicator);
+};
+
+// Expose the handler function to the template and parent components
+defineExpose({
+  handleEventIndicatorClick,
+  openEventPanel,
+  closeEventPanel
+});
+
+// ============================================================================
 // Filter Management
 // ============================================================================
 
@@ -1654,7 +2004,11 @@ const handleKeydown = (event: KeyboardEvent) => {
       }
       break;
     case 'Escape':
-      clearSelections();
+      if (eventPanel.value.visible) {
+        closeEventPanel();
+      } else {
+        clearSelections();
+      }
       break;
   }
 };
@@ -1664,6 +2018,9 @@ onMounted(async () => {
   loadPersistedFilters();
   window.addEventListener('resize', updateDimensions);
   document.addEventListener('keydown', handleKeydown);
+  
+  // Fetch event indicators
+  await fetchEventIndicators();
   
   // Start auto-pan when component mounts
   startAutoPan();
@@ -1697,6 +2054,11 @@ watch(() => visibleSessions.value.length, () => {
 watch(() => props.height, (newHeight) => {
   updateDimensions();
 });
+
+// Refetch event indicators when time window changes
+watch(() => timeRange.value, async () => {
+  await fetchEventIndicators();
+}, { deep: true });
 </script>
 
 <style scoped>
