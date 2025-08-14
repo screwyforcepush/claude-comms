@@ -454,8 +454,8 @@ export function getSessionsInTimeWindow(start: number, end: number, limit: numbe
       MIN(created_at) as first_agent_time,
       MAX(COALESCE(completed_at, created_at)) as last_activity
     FROM subagent_registry 
-    WHERE created_at >= ? AND created_at <= ?
     GROUP BY session_id 
+    HAVING MAX(created_at) >= ? AND MAX(created_at) <= ?
     ORDER BY created_at DESC
     LIMIT ?
   `);

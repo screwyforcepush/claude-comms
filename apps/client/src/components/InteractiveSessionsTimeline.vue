@@ -742,7 +742,7 @@ const timelineMargins = {
 };
 
 const baseSessionLaneHeight = 28; // Base height allocated per session (aggressively reduced for density)
-const agentLaneHeight = 10;   // Height per agent lane within session (tighter spacing)
+const agentLaneHeight = 20;   // Height per agent lane within session (doubled for better visual spacing)
 const agentLaneBuffer = 3;    // Buffer space between agent lanes (minimal buffer)
 const sessionPadding = 8;     // Padding between sessions (compact separation)
 
@@ -878,9 +878,15 @@ const visibleSessions = computed((): SessionData[] => {
   
   // First, apply time window filter
   let timeFilteredSessions = transformedSessions.value.filter(session => {
-    // Include session if it overlaps with time window
-    const sessionEnd = session.endTime || Date.now();
-    return session.startTime <= end && sessionEnd >= start;
+    // Include session if its most recent agent was created within the time window
+    // Find the most recent agent creation time
+    let mostRecentAgentTime = session.startTime;
+    if (session.agents && session.agents.length > 0) {
+      mostRecentAgentTime = Math.max(...session.agents.map(agent => agent.startTime));
+    }
+    
+    // Include session if the most recent agent was created within the time window
+    return mostRecentAgentTime >= start && mostRecentAgentTime <= end;
   });
   
   // Then apply session filters

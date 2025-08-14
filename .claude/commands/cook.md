@@ -98,15 +98,15 @@ SUCCESS CRITERIA: [Clear completion metrics]
 
 ### New Feature
 1. Research/Architect/BA → 2. Planner (new phase) → 3. Agent-Orch consult →
-4. Massive implementation batch → 5. Multi-gatekeeper verification → 6. Done
+4. Massive implementation batch → 5. Multi-gatekeeper verification → 6. Commit & Done
 
 ### Bug Fix  
 1. Engineer investigate → 2. Planner (existing phase) → 3. Agent-Orch consult →
-4. Fix batch (separate files) → 5. Gatekeeper verify → 6. Done
+4. Fix batch → 5. Gatekeeper verify → 6. Commit & Done
 
 ### Architecture Change
 1. Research/Architect → 2. Planner/BA → 3. Agent-Orch consult →
-4. Multi-engineer migration → 5. Multi-gatekeeper verify → 6. Done
+4. Multi-engineer migration → 5. Multi-gatekeeper verify w/ Agent-Orch consult → 6. Commit & Done
 
 ---
 

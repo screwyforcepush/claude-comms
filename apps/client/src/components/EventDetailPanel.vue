@@ -11,8 +11,9 @@
     <!-- Slide-in panel from right -->
     <div
       v-if="visible"
-      class="fixed top-0 right-0 h-full w-96 bg-gray-900 border-l border-gray-600 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out"
+      class="fixed top-0 right-0 w-96 bg-gray-900 border-l border-gray-600 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out"
       :class="{ 'translate-x-0': panelVisible, 'translate-x-full': !panelVisible }"
+      :style="{ height: '100vh', maxHeight: '100vh' }"
     >
       <!-- Panel Header -->
       <div class="bg-gradient-to-r from-gray-800 to-gray-700 px-6 py-4 border-b border-gray-600">
@@ -38,7 +39,15 @@
       </div>
 
       <!-- Panel Content -->
-      <div class="flex-1 overflow-y-auto p-6">
+      <div 
+        class="flex-1 p-6 scroll-container"
+        :style="{ 
+          maxHeight: 'calc(100vh - 140px)', 
+          overflowY: 'auto',
+          scrollBehavior: 'smooth'
+        }"
+        ref="panelContent"
+      >
         <div v-if="eventData" class="space-y-6">
           
           <!-- Event Metadata -->
@@ -76,8 +85,18 @@
             
             <!-- UserPromptSubmit Content -->
             <div v-if="eventData.eventType === 'UserPromptSubmit'" class="space-y-4">
-              <div class="bg-gray-900 rounded-lg p-4 border border-gray-600">
-                <pre class="text-gray-100 text-sm leading-relaxed whitespace-pre-wrap font-mono">{{ getPromptContent() }}</pre>
+              <div 
+                class="bg-gray-900 rounded-lg p-4 border border-gray-600 prompt-content-container"
+                :style="{
+                  maxHeight: 'calc(100vh - 300px)',
+                  overflowY: 'auto',
+                  scrollBehavior: 'smooth'
+                }"
+              >
+                <pre 
+                  class="text-gray-100 text-sm leading-relaxed whitespace-pre-wrap font-mono prompt-text"
+                  :style="{ paddingBottom: '1rem' }"
+                >{{ getPromptContent() }}</pre>
               </div>
               
               <!-- Prompt Analysis -->
@@ -99,8 +118,18 @@
 
             <!-- Notification Content -->
             <div v-if="eventData.eventType === 'Notification'" class="space-y-4">
-              <div class="bg-gray-900 rounded-lg p-4 border border-gray-600">
-                <div class="text-gray-100 text-sm leading-relaxed">{{ getNotificationContent() }}</div>
+              <div 
+                class="bg-gray-900 rounded-lg p-4 border border-gray-600 notification-content-container"
+                :style="{
+                  maxHeight: 'calc(100vh - 300px)',
+                  overflowY: 'auto',
+                  scrollBehavior: 'smooth'
+                }"
+              >
+                <div 
+                  class="text-gray-100 text-sm leading-relaxed notification-text"
+                  :style="{ paddingBottom: '1rem' }"
+                >{{ getNotificationContent() }}</div>
               </div>
               
               <!-- Notification Metadata -->
@@ -143,7 +172,19 @@
               v-if="showRawData"
               class="px-4 pb-4 border-t border-gray-700"
             >
-              <pre class="text-xs text-gray-400 bg-gray-900 rounded p-3 mt-3 overflow-x-auto font-mono">{{ JSON.stringify(eventData.rawEvent, null, 2) }}</pre>
+              <div 
+                class="raw-data-container"
+                :style="{
+                  maxHeight: 'calc(100vh - 400px)',
+                  overflowY: 'auto',
+                  scrollBehavior: 'smooth'
+                }"
+              >
+                <pre 
+                  class="text-xs text-gray-400 bg-gray-900 rounded p-3 mt-3 overflow-x-auto font-mono"
+                  :style="{ paddingBottom: '1rem' }"
+                >{{ JSON.stringify(eventData.rawEvent, null, 2) }}</pre>
+              </div>
             </div>
           </div>
 
@@ -219,6 +260,7 @@ const emit = defineEmits<{
 const panelVisible = ref(false);
 const showRawData = ref(false);
 const relatedEvents = computed(() => props.relatedEvents || []);
+const panelContent = ref<HTMLElement>();
 
 // ============================================================================
 // Panel Animation Management
@@ -230,12 +272,23 @@ watch(() => props.visible, async (newVisible) => {
     await nextTick();
     setTimeout(() => {
       panelVisible.value = true;
+      // Reset scroll position when opening new content
+      resetScrollPosition();
     }, 50);
   } else {
     // Hide panel immediately
     panelVisible.value = false;
   }
 });
+
+// Watch for event data changes to reset scroll position
+watch(() => props.eventData, async (newEventData, oldEventData) => {
+  // Only reset scroll if we have a new event (not just panel opening/closing)
+  if (newEventData && oldEventData && newEventData.eventId !== oldEventData.eventId) {
+    await nextTick();
+    resetScrollPosition();
+  }
+}, { deep: true });
 
 // ============================================================================
 // Content Extraction Functions
@@ -349,12 +402,56 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 };
 
+// Reset scroll position to top
+const resetScrollPosition = () => {
+  if (panelContent.value) {
+    panelContent.value.scrollTop = 0;
+  }
+  
+  // Also reset scroll for specific content containers
+  const containers = [
+    '.prompt-content-container',
+    '.notification-content-container', 
+    '.raw-data-container'
+  ];
+  
+  containers.forEach(selector => {
+    const element = document.querySelector(selector) as HTMLElement;
+    if (element) {
+      element.scrollTop = 0;
+    }
+  });
+};
+
+// Smooth scroll to element within panel
+const scrollToElement = (selector: string) => {
+  const element = document.querySelector(selector) as HTMLElement;
+  if (element && panelContent.value) {
+    element.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'start',
+      inline: 'nearest'
+    });
+  }
+};
+
+// Expose scroll functions for external use
+defineExpose({
+  resetScrollPosition,
+  scrollToElement
+});
+
 // ============================================================================
 // Lifecycle
 // ============================================================================
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeydown);
+  
+  // Ensure initial scroll position is at top
+  nextTick(() => {
+    resetScrollPosition();
+  });
 });
 
 onUnmounted(() => {
@@ -363,23 +460,51 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Custom scrollbar for better aesthetics */
+/* Enhanced scrollbar styling for dark theme */
+.scroll-container::-webkit-scrollbar,
+.prompt-content-container::-webkit-scrollbar,
+.notification-content-container::-webkit-scrollbar,
+.raw-data-container::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
+.scroll-container::-webkit-scrollbar-track,
+.prompt-content-container::-webkit-scrollbar-track,
+.notification-content-container::-webkit-scrollbar-track,
+.raw-data-container::-webkit-scrollbar-track,
 .overflow-y-auto::-webkit-scrollbar-track {
-  background: #374151;
-  border-radius: 3px;
+  background: rgba(55, 65, 81, 0.5);
+  border-radius: 4px;
+  margin: 2px;
 }
 
+.scroll-container::-webkit-scrollbar-thumb,
+.prompt-content-container::-webkit-scrollbar-thumb,
+.notification-content-container::-webkit-scrollbar-thumb,
+.raw-data-container::-webkit-scrollbar-thumb,
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #6b7280;
-  border-radius: 3px;
+  background: rgba(107, 114, 128, 0.8);
+  border-radius: 4px;
+  border: 1px solid rgba(55, 65, 81, 0.3);
+  transition: background-color 0.2s ease;
 }
 
+.scroll-container::-webkit-scrollbar-thumb:hover,
+.prompt-content-container::-webkit-scrollbar-thumb:hover,
+.notification-content-container::-webkit-scrollbar-thumb:hover,
+.raw-data-container::-webkit-scrollbar-thumb:hover,
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: rgba(156, 163, 175, 0.9);
+}
+
+/* Firefox scrollbar styling */
+.scroll-container,
+.prompt-content-container,
+.notification-content-container,
+.raw-data-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107, 114, 128, 0.8) rgba(55, 65, 81, 0.5);
 }
 
 /* Improved kbd styling */
