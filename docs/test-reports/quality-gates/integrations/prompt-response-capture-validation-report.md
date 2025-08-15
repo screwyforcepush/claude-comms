@@ -203,7 +203,7 @@ While the core implementation appears solid and follows good practices, the test
 ## Test Execution Evidence
 
 ### Attempted Feature Test
-Created comprehensive test script (`test-prompt-capture.js`) to validate:
+Created comprehensive test script (`scripts/tests/test-prompt-capture.js`) to validate:
 - Agent registration
 - Prompt storage
 - Response storage  
@@ -232,8 +232,8 @@ Created comprehensive test script (`test-prompt-capture.js`) to validate:
 
 ## Important Artifacts
 
-- `/test-prompt-capture.js` - API integration test script
-- `/playwright-ui-test.js` - UI automation test script
+- `/scripts/tests/test-prompt-capture.js` - API integration test script
+- `/scripts/tests/playwright/playwright-ui-test.js` - UI automation test script
 - `/quality-gate-report.md` - This comprehensive validation report
 - Test failure logs captured showing specific issues
 

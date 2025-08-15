@@ -154,7 +154,7 @@ Security Scan Results:
 
 ## Important Artifacts
 - `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/apps/client/src/components/InteractiveSessionsTimeline.vue` - Fixed component
-- `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/apps/client/playwright-visual-test.js` - Visual validation script
+- `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/apps/client/tests/playwright/playwright-visual-test.js` - Visual validation script
 - `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/apps/client/screenshots/` - Visual evidence directory
 - `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/apps/client/quality-gate-report.md` - This validation report
 

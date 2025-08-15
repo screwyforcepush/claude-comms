@@ -176,7 +176,7 @@ The implementation meets the functional requirements but has technical debt that
 
 ## Important Artifacts
 - `/docs/sessions-ui-quality-gate-report.md` - This comprehensive gate validation report
-- `/apps/client/sessions-ui-validation.js` - Visual validation test script
+- `/apps/client/tests/visual/sessions-ui-validation.js` - Visual validation test script
 - `/apps/client/screenshots/sessions-*.png` - Visual validation screenshots
 - Modified files:
   - `apps/client/src/components/SessionsView.vue` - Added MessageDetailPane integration

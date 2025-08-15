@@ -13,7 +13,29 @@ export function getDatabase(): Database {
 }
 
 export function initDatabase(): void {
-  db = new Database('events.db');
+  // CRITICAL: Prevent test environment from using production database
+  const isTestEnv = process.env.NODE_ENV === 'test' || 
+                    process.env.BUN_ENV === 'test' ||
+                    process.env.npm_lifecycle_event === 'test' ||
+                    process.argv.some(arg => arg.includes('test'));
+  
+  // Use in-memory database for tests, production database for production
+  const dbPath = isTestEnv ? ':memory:' : 'events.db';
+  
+  // Additional safety check: if running from test directory or test file, force memory
+  const stack = (new Error()).stack || '';
+  const isCalledFromTest = stack.includes('test') || stack.includes('spec');
+  
+  if (isCalledFromTest && !isTestEnv) {
+    console.warn('🚨 WARNING: Test code detected but not in test environment. Forcing memory database for safety.');
+    db = new Database(':memory:');
+  } else {
+    db = new Database(dbPath);
+  }
+  
+  if (isTestEnv || isCalledFromTest) {
+    console.log(`🧪 Test environment detected: Using ${db.filename} database for isolation`);
+  }
   
   // Enable WAL mode for better concurrent performance
   db.exec('PRAGMA journal_mode = WAL');

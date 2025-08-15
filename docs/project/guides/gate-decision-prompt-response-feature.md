@@ -194,7 +194,7 @@ None - Feature can be used immediately
 ## Important Artifacts
 
 - `/gate-decision-prompt-response-feature.md` - This gate validation report
-- `/test-prompt-response-ui.js` - Playwright visual validation script
+- `/scripts/tests/test-prompt-response-ui.js` - Playwright visual validation script
 - `/docs/project/guides/prompt-response-capture-user-guide.md` - User documentation
 - `/docs/project/guides/agent-prompt-response-architecture.md` - Technical architecture
 - `.claude/hooks/comms/register_subagent.py` - Prompt capture hook

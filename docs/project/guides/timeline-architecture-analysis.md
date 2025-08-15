@@ -1,4 +1,61 @@
-# Timeline Architecture Analysis for Multi-Session Implementation
+# Timeline Architecture Analysis
+
+## Event Order Reversal Analysis (2025-08-15)
+
+**Author:** MarcusVoid  
+**Date:** 2025-08-15  
+**Status:** Complete
+
+### Executive Summary
+The event timeline currently displays events chronologically with latest at BOTTOM. Requirement is to reverse to show latest at TOP. This is a pure presentation-layer change with minimal impact.
+
+### Current Implementation
+- **Data Flow:** Backend → WebSocket → useWebSocket.ts → App.vue → EventTimeline.vue → EventRow
+- **Current Order:** Events displayed in arrival order (oldest first, latest at bottom)
+- **No Sorting Applied:** Events render in the order they exist in the array
+
+### Required Changes
+
+#### Primary Modification
+**File:** `/apps/client/src/components/EventTimeline.vue` (Lines 65-78)
+
+```javascript
+// Current
+const filteredEvents = computed(() => {
+  return props.events.filter(event => { /* filters */ });
+});
+
+// Modified (Option 1 - Recommended)
+const filteredEvents = computed(() => {
+  return props.events.filter(event => { /* filters */ }).reverse();
+});
+
+// Modified (Option 2 - Explicit sort)
+const filteredEvents = computed(() => {
+  return props.events.filter(event => { /* filters */ })
+    .sort((a, b) => b.timestamp - a.timestamp);
+});
+```
+
+#### Supporting Changes
+1. **Scroll Behavior:** Change stickToBottom to stickToTop logic
+2. **CSS Animations:** Reverse entry/exit directions
+3. **Auto-pan:** Validate with reversed order
+
+### Risk Assessment
+- **Risk Level:** LOW - Pure presentation change
+- **No Backend Impact:** WebSocket continues as-is
+- **No Data Model Changes:** Events structure unchanged
+- **Performance:** No impact (same array, just reversed)
+
+### Implementation Validated By Team
+- **SarahQuantum:** Technical implementation confirmed
+- **EmmaFlux:** UX guidelines created for timeline order
+- **MarcusVoid:** Architecture analysis complete
+
+---
+
+## Multi-Session Implementation Analysis (Original)
 
 **Author:** MarcusAnalyst  
 **Date:** 2025-08-13  

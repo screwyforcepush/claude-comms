@@ -173,8 +173,8 @@ The fix correctly implements batch-specific spacing through three key functions:
 ## Important Artifacts
 
 - `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/apps/client/src/components/InteractiveSessionsTimeline.vue` - Component with fix
-- `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/test-batch-spacing.js` - Verification test script
-- `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/playwright-visual-test.js` - Visual validation script
+- `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/scripts/tests/test-batch-spacing.js` - Verification test script
+- `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/scripts/tests/playwright/playwright-visual-test.js` - Visual validation script
 - `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/GATE_VALIDATION_REPORT.md` - This report
 
 ## Conclusion

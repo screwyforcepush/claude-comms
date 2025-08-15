@@ -1,0 +1,373 @@
+/* Timeline Order Transition Animations */
+/* Smooth 60fps animations for timeline reordering and visual polish */
+
+/* Order Transition Wrapper */
+.timeline-reorder-transition {
+  transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, opacity;
+}
+
+/* Direction Change Animation */
+.timeline-order-changing {
+  animation: order-flip 600ms ease-out;
+}
+
+@keyframes order-flip {
+  0% { 
+    transform: rotateX(0deg); 
+    opacity: 1; 
+  }
+  50% { 
+    transform: rotateX(90deg); 
+    opacity: 0.3; 
+  }
+  100% { 
+    transform: rotateX(0deg); 
+    opacity: 1; 
+  }
+}
+
+/* Event Entry/Exit Animations - Dynamic based on order */
+.event-enter-active {
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.event-leave-active {
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Newest First Order - Events enter from top */
+.event-enter-from.newest-first {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+.event-leave-to.newest-first {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+}
+
+/* Oldest First Order - Events enter from bottom */
+.event-enter-from.oldest-first {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+}
+
+.event-leave-to.oldest-first {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+/* Timeline Direction Header Transitions */
+.direction-header-enter-active {
+  transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.direction-header-enter-from {
+  opacity: 0;
+  transform: translateY(-100%);
+  backdrop-filter: blur(0px);
+}
+
+.direction-header-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+  backdrop-filter: blur(8px);
+}
+
+/* Temporal Badge Animations */
+.badge-enter-active {
+  transition: all 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.badge-leave-active {
+  transition: all 200ms ease-in;
+}
+
+.badge-enter-from {
+  opacity: 0;
+  transform: scale(0.8) translateX(-10px);
+}
+
+.badge-leave-to {
+  opacity: 0;
+  transform: scale(0.6) translateX(10px);
+}
+
+/* Position Marker Animations */
+.marker-enter-active {
+  transition: all 300ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.marker-leave-active {
+  transition: all 200ms ease-in;
+}
+
+.marker-enter-from {
+  opacity: 0;
+  transform: scale(0);
+}
+
+.marker-leave-to {
+  opacity: 0;
+  transform: scale(0);
+}
+
+/* Timeline Flow Gradient Transitions */
+.flow-gradient-transition {
+  transition: background 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Smooth scroll behavior for order changes */
+.timeline-smooth-scroll {
+  scroll-behavior: smooth;
+  scroll-snap-type: y proximity;
+}
+
+.timeline-scroll-snap {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+}
+
+/* Stagger Animation for Multiple Events */
+.event-list-stagger .event-enter-active {
+  transition-delay: calc(var(--stagger-index, 0) * 50ms);
+}
+
+/* Hover Transitions for Interactive Elements */
+.timeline-interactive-hover {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.timeline-interactive-hover:hover {
+  transform: scale(1.02) translateY(-1px);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+/* Focus Transitions */
+.timeline-focus-ring {
+  transition: outline 150ms ease, box-shadow 150ms ease;
+}
+
+.timeline-focus-ring:focus-visible {
+  outline: 2px solid #00d4ff;
+  outline-offset: 2px;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+/* Loading State Animations */
+.timeline-loading-enter-active {
+  transition: opacity 300ms ease;
+}
+
+.timeline-loading-leave-active {
+  transition: opacity 200ms ease;
+}
+
+.timeline-loading-enter-from,
+.timeline-loading-leave-to {
+  opacity: 0;
+}
+
+/* Performance Optimizations */
+.timeline-gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform;
+}
+
+/* Order Toggle Button Transitions */
+.order-toggle-transition {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.order-toggle-transition:active {
+  transform: scale(0.95);
+  transition-duration: 100ms;
+}
+
+/* Timeline Container Reorder Animation */
+.timeline-container-reorder {
+  animation: container-reorder 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes container-reorder {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(0.98);
+  }
+  50% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Mobile Responsive Transitions */
+@media (max-width: 699px) {
+  .event-enter-active,
+  .event-leave-active {
+    transition-duration: 250ms;
+  }
+  
+  .event-enter-from.newest-first,
+  .event-enter-from.oldest-first {
+    transform: translateY(-15px) scale(0.96);
+  }
+  
+  .event-leave-to.newest-first,
+  .event-leave-to.oldest-first {
+    transform: translateY(15px) scale(0.96);
+  }
+  
+  .timeline-interactive-hover:hover {
+    transform: scale(1.01) translateY(-0.5px);
+  }
+  
+  .order-toggle-transition:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all animations except opacity */
+  .timeline-reorder-transition,
+  .timeline-order-changing,
+  .event-enter-active,
+  .event-leave-active,
+  .direction-header-enter-active,
+  .badge-enter-active,
+  .badge-leave-active,
+  .marker-enter-active,
+  .marker-leave-active,
+  .flow-gradient-transition,
+  .timeline-interactive-hover,
+  .timeline-focus-ring,
+  .order-toggle-transition,
+  .timeline-container-reorder {
+    animation: none !important;
+    transition: opacity 150ms ease !important;
+  }
+  
+  /* Keep essential transforms but remove animations */
+  .event-enter-from.newest-first,
+  .event-enter-from.oldest-first,
+  .event-leave-to.newest-first,
+  .event-leave-to.oldest-first {
+    transform: none;
+  }
+  
+  .timeline-interactive-hover:hover {
+    transform: none;
+    filter: brightness(1.05);
+  }
+  
+  .order-toggle-transition:active {
+    transform: none;
+    opacity: 0.8;
+  }
+  
+  /* Disable smooth scroll */
+  .timeline-smooth-scroll {
+    scroll-behavior: auto;
+  }
+}
+
+/* High Performance Mode for Lower-End Devices */
+@media (max-resolution: 1dppx) {
+  .timeline-gpu-accelerated {
+    will-change: auto;
+    transform: none;
+  }
+  
+  .event-enter-active,
+  .event-leave-active {
+    transition-duration: 200ms;
+  }
+  
+  .timeline-reorder-transition {
+    transition-duration: 300ms;
+  }
+}
+
+/* Print Media - Disable Animations */
+@media print {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Dark Mode Specific Transitions */
+@media (prefers-color-scheme: dark) {
+  .timeline-interactive-hover:hover {
+    filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.1));
+  }
+}
+
+/* Light Mode Specific Transitions */
+@media (prefers-color-scheme: light) {
+  .timeline-interactive-hover:hover {
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+  }
+  
+  .timeline-focus-ring:focus-visible {
+    box-shadow: 0 0 8px rgba(0, 120, 215, 0.3);
+  }
+}
+
+/* Utility Classes for Manual Animation Control */
+.timeline-animate-in {
+  animation: fadeInUp 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.timeline-animate-out {
+  animation: fadeOutDown 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutDown {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+/* Timeline Viewport Transitions */
+.timeline-viewport-transition {
+  transition: height 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Event Group Animations for Batch Updates */
+.event-group-enter-active {
+  transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.event-group-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.event-group-enter-to {
+  opacity: 1;
+  transform: scale(1);
+}

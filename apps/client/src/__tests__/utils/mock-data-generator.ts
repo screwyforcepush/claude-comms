@@ -16,7 +16,10 @@ import type {
   TimelineMessage,
   UserPrompt,
   OrchestratorEvent,
-  AgentStatus
+  AgentStatus,
+  AgentType,
+  CurvePoint,
+  TimeRange
 } from '../../types/timeline';
 // Local type definitions for mock data generation
 interface HookEvent {
@@ -173,7 +176,8 @@ export class MockDataGenerator {
     const timeRange = {
       start: minTime,
       end: maxTime,
-      duration: maxTime - minTime
+      duration: maxTime - minTime,
+      pixelsPerMs: 0.1
     };
 
     // Add session lane offsets
@@ -212,18 +216,23 @@ export class MockDataGenerator {
     // Always start with orchestrator
     const orchestratorDuration = sessionEnd ? sessionEnd - sessionStart : this.randomBetween(30, 120) * 60 * 1000;
     agents.push({
-      agentId: ++this.agentCounter,
-      agentName: 'Primary-Orchestrator',
-      agentType: 'orchestrator',
+      agentId: `agent-${++this.agentCounter}`,
+      name: 'Primary-Orchestrator',
+      type: 'agent-orchestrator',
       startTime: sessionStart,
       endTime: sessionEnd,
-      status: sessionEnd ? 'completed' : 'active',
-      path: this.generateAgentPath(sessionStart, sessionStart + orchestratorDuration, 'orchestrator'),
-      metadata: {
-        totalDuration: orchestratorDuration,
-        totalTokens: this.randomBetween(1000, 5000),
-        inputTokens: this.randomBetween(500, 2000),
-        outputTokens: this.randomBetween(500, 3000)
+      status: sessionEnd ? 'completed' : 'in_progress',
+      curveData: this.generateAgentPath(sessionStart, sessionStart + orchestratorDuration, 'orchestrator'),
+      laneIndex: 0,
+      batchId: 'batch-0',
+      messages: [],
+      sessionId,
+      metrics: {
+        duration: orchestratorDuration,
+        tokenCount: this.randomBetween(1000, 5000),
+        toolUseCount: this.randomBetween(10, 30),
+        messageCount: 0,
+        completionRate: sessionEnd ? 1 : 0.5
       }
     });
 
@@ -241,26 +250,29 @@ export class MockDataGenerator {
         : startTime + duration;
 
       const status: AgentStatus = includeFailures && Math.random() < 0.15
-        ? 'failed'
+        ? 'error'
         : endTime && endTime <= this.currentTime
         ? 'completed'
-        : 'active';
+        : 'in_progress';
 
       agents.push({
-        agentId: ++this.agentCounter,
-        agentName,
-        agentType,
+        agentId: `agent-${++this.agentCounter}`,
+        name: agentName,
+        type: agentType as AgentType,
         startTime,
-        endTime: status === 'active' ? undefined : endTime,
+        endTime: status === 'in_progress' ? null : (endTime || null),
         status,
-        path: this.generateAgentPath(startTime, endTime, agentType),
-        metadata: {
-          totalDuration: endTime ? endTime - startTime : undefined,
-          totalTokens: this.randomBetween(500, 3000),
-          inputTokens: this.randomBetween(200, 1500),
-          outputTokens: this.randomBetween(300, 1500),
+        curveData: this.generateAgentPath(startTime, endTime, agentType),
+        laneIndex: i,
+        batchId: `batch-${Math.floor(i / 4) + 1}`,
+        messages: [],
+        sessionId,
+        metrics: {
+          duration: endTime ? endTime - startTime : 0,
+          tokenCount: this.randomBetween(500, 3000),
           toolUseCount: this.randomBetween(5, 25),
-          errorCount: status === 'failed' ? this.randomBetween(1, 5) : 0
+          messageCount: 0,
+          completionRate: status === 'completed' ? 1 : status === 'error' ? 0 : 0.5
         }
       });
 
@@ -274,17 +286,17 @@ export class MockDataGenerator {
   /**
    * Generate realistic agent path coordinates
    */
-  private generateAgentPath(startTime: number, endTime: number | undefined, agentType: string): Array<{x: number; y: number}> {
+  private generateAgentPath(startTime: number, endTime: number | undefined, agentType: string): CurvePoint[] {
     const duration = endTime ? endTime - startTime : 60 * 60 * 1000; // Default 1 hour for active
     const pointCount = Math.max(5, Math.floor(duration / (5 * 60 * 1000))); // Point every 5 minutes
     
-    const path: Array<{x: number; y: number}> = [];
+    const path: CurvePoint[] = [];
     const baseY = this.getAgentTypeY(agentType);
     
     for (let i = 0; i <= pointCount; i++) {
       const x = startTime + (duration * i / pointCount);
       const y = baseY + (Math.sin(i * 0.5) * 10); // Slight variation
-      path.push({ x, y });
+      path.push({ x, y, type: 'line' });
     }
     
     return path;
@@ -304,10 +316,10 @@ export class MockDataGenerator {
     
     // Session start
     events.push({
-      eventId: ++this.eventCounter,
+      id: `event-${++this.eventCounter}`,
       timestamp: startTime,
-      eventType: 'session_start',
-      description: 'Multi-agent session initiated',
+      type: 'start',
+      sessionId,
       metadata: { plannedAgents: agentCount }
     });
 
@@ -315,21 +327,22 @@ export class MockDataGenerator {
     const batchCount = Math.ceil(agentCount / 4);
     for (let i = 0; i < batchCount; i++) {
       events.push({
-        eventId: ++this.eventCounter,
+        id: `event-${++this.eventCounter}`,
         timestamp: startTime + (duration * (i + 1) / (batchCount + 1)),
-        eventType: 'batch_launch',
-        description: `Agent batch ${i + 1} launched`,
-        metadata: { batchId: i + 1, agentCount: Math.min(4, agentCount - i * 4) }
+        type: 'spawn',
+        sessionId,
+        batchId: `batch-${i + 1}`,
+        metadata: { agentCount: Math.min(4, agentCount - i * 4) }
       });
     }
 
     // Session end (if completed)
     if (endTime) {
       events.push({
-        eventId: ++this.eventCounter,
+        id: `event-${++this.eventCounter}`,
         timestamp: endTime,
-        eventType: 'session_complete',
-        description: 'Multi-agent session completed',
+        type: 'complete',
+        sessionId,
         metadata: { totalAgents: agentCount, duration: endTime - startTime }
       });
     }
@@ -347,13 +360,13 @@ export class MockDataGenerator {
     for (let i = 0; i < promptCount; i++) {
       const timestamp = startTime + (Math.random() * (endTime ? endTime - startTime : 60 * 60 * 1000));
       prompts.push({
-        promptId: `prompt-${++this.eventCounter}`,
+        id: `prompt-${++this.eventCounter}`,
         timestamp,
         content: this.generateUserPromptText(i),
-        metadata: {
-          wordCount: this.randomBetween(50, 300),
-          complexity: this.randomChoice(['simple', 'moderate', 'complex'])
-        }
+        sessionId,
+        eventId: this.eventCounter,
+        responseTime: this.randomBetween(1000, 5000),
+        agentCount: this.randomBetween(3, 8)
       });
     }
 
@@ -386,15 +399,14 @@ export class MockDataGenerator {
         : endTime;
 
       batches.push({
-        batchId: `batch-${batchIndex + 1}`,
-        startTime: batchStartTime,
-        endTime: batchEndTime,
-        agents: group.map(a => a.agentId),
-        batchType: this.randomChoice(['parallel', 'sequential']),
-        metadata: {
-          agentCount: group.length,
-          purpose: this.generateBatchPurpose(batchIndex)
-        }
+        id: `batch-${batchIndex + 1}`,
+        spawnTimestamp: batchStartTime,
+        completionTimestamp: batchEndTime,
+        agents: group.map(a => ({ agentId: a.agentId, name: a.name, type: a.type, color: '#3B82F6' })),
+        batchNumber: batchIndex + 1,
+        orchestratorEventId: `event-${this.eventCounter}`,
+        parallelCount: group.length,
+        status: batchEndTime ? 'completed' : 'running'
       });
     });
 
@@ -415,20 +427,19 @@ export class MockDataGenerator {
     const duration = endTime ? endTime - startTime : 60 * 60 * 1000;
 
     for (let i = 0; i < messageCount; i++) {
-      const sender = this.randomChoice(agents.filter(a => a.agentName !== 'Primary-Orchestrator'));
+      const sender = this.randomChoice(agents.filter(a => a.name !== 'Primary-Orchestrator'));
       const timestamp = startTime + Math.random() * duration;
 
       messages.push({
-        messageId: ++this.messageCounter,
+        id: `message-${++this.messageCounter}`,
         timestamp,
-        sender: sender.agentName,
-        recipients: this.randomChoice(['broadcast', 'orchestrator', 'peer']),
-        content: this.generateMessageContent(sender.agentType, i),
-        messageType: this.randomChoice(['status_update', 'request_help', 'data_share', 'completion']),
-        metadata: {
-          urgency: this.randomChoice(['low', 'medium', 'high']),
-          category: this.randomChoice(['progress', 'blocker', 'discovery', 'coordination'])
-        }
+        sender: sender.name,
+        position: { x: timestamp, y: sender.laneIndex * 50 + 25 },
+        content: this.generateMessageContent(sender.type, i),
+        recipients: [this.randomChoice(['Primary-Orchestrator', 'all'])],
+        type: this.randomChoice(['broadcast', 'direct', 'status']),
+        agentId: sender.agentId,
+        sessionId
       });
     }
 
@@ -447,7 +458,7 @@ export class MockDataGenerator {
     const completedAgents = agents.filter(a => a.status === 'completed');
     const failedAgents = agents.filter(a => a.status === 'failed');
     const durations = agents
-      .map(a => a.metadata?.totalDuration)
+      .map(a => a.metrics?.duration)
       .filter(d => d !== undefined) as number[];
 
     return {
@@ -459,7 +470,7 @@ export class MockDataGenerator {
         ? durations.reduce((sum, d) => sum + d, 0) / durations.length 
         : 0,
       completionRate: agents.length > 0 ? completedAgents.length / agents.length : 0,
-      errorRate: agents.length > 0 ? failedAgents.length / agents.length : 0
+      errorRate: agents.length > 0 ? agents.filter(a => a.status === 'error').length / agents.length : 0
     };
   }
 
@@ -488,7 +499,7 @@ export class MockDataGenerator {
         hook_event_type: eventType,
         payload: this.generateEventPayload(eventType),
         timestamp,
-        chat: Math.random() < 0.3 ? this.generateChatHistory() : undefined,
+        // chat: Math.random() < 0.3 ? this.generateChatHistory() : undefined,
         summary: this.generateEventSummary(eventType)
       });
     }
@@ -515,7 +526,7 @@ export class MockDataGenerator {
         subagent_type: types[i % types.length],
         created_at: createdAt,
         completed_at: completedAt,
-        completion_timestamp: completedAt,
+        // completion_timestamp: completedAt,
         status: isCompleted ? 'completed' : 'active'
       });
     }
@@ -545,7 +556,7 @@ export class MockDataGenerator {
           }
         },
         created_at: createdAt,
-        notified: []
+        // notified: []
       });
     }
 
@@ -623,7 +634,7 @@ export class MockDataGenerator {
       'Architecture Review'
     ];
 
-    return `${this.randomChoice(prefixes[complexity])} ${this.randomChoice(tasks)} (${sessionId})`;
+    return `${this.randomChoice(prefixes[complexity as keyof typeof prefixes])} ${this.randomChoice(tasks)} (${sessionId})`;
   }
 
   private generateAgentName(type: string, index: number): string {
@@ -637,7 +648,7 @@ export class MockDataGenerator {
       orchestrator: ['Primary-Orchestrator', 'MasterOrch', 'Coordinator']
     };
 
-    const agentNames = names[type] || ['Agent'];
+    const agentNames = names[type as keyof typeof names] || ['Agent'];
     return `${this.randomChoice(agentNames)}${index}`;
   }
 
@@ -716,7 +727,7 @@ export class MockDataGenerator {
       ]
     };
 
-    const messages = templates[agentType] || [
+    const messages = templates[agentType as keyof typeof templates] || [
       "Status update from agent",
       "Task in progress",
       "Awaiting further instructions",
@@ -772,7 +783,7 @@ export class MockDataGenerator {
       error_occurred: 'Handled recoverable error condition'
     };
     
-    return summaries[eventType] || `${eventType} event occurred`;
+    return summaries[eventType as keyof typeof summaries] || `${eventType} event occurred`;
   }
 }
 

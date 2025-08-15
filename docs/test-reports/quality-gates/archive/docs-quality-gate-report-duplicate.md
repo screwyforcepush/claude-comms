@@ -277,7 +277,7 @@ This implementation appears to be in very early development stage and is not rea
 - `/docs/quality-gate-report.md` - This comprehensive gate validation report
 - `/apps/client/screenshots/sessions-initial-1920x1080.png` - Initial state screenshot
 - `/apps/client/screenshots/sessions-filters-open-1920x1080.png` - Filters panel screenshot
-- `/apps/client/playwright-sessions-test.js` - Visual validation test script
+- `/apps/client/tests/playwright/playwright-sessions-test.js` - Visual validation test script
 - `/docs/project/spec/sessions-tab-requirements.md` - Requirements specification
 - `/docs/project/spec/sessions-tab-traceability-matrix.md` - Traceability matrix showing 0% completion
 

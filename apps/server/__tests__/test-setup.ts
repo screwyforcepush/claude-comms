@@ -103,6 +103,13 @@ let testDatabases: Database[] = [];
  * Call this in beforeEach to ensure test isolation
  */
 export function setupTestDatabase(): Database {
+  // CRITICAL: Ensure we're in test environment before creating database
+  if (!process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
+    process.env.NODE_ENV = 'test';
+    process.env.BUN_ENV = 'test';
+    console.warn('🚨 SAFETY: Forcing test environment variables to prevent production DB access');
+  }
+  
   const testDb = createTestDatabase();
   testDatabases.push(testDb);
   
