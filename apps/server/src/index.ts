@@ -11,6 +11,7 @@ import {
   updateSubagentCompletion,
   getSessionsWithAgents,
   getSessionsInTimeWindow,
+  getSessionsWithEventsInWindow,
   getSessionDetails,
   getSessionComparison,
   getSessionEvents,
@@ -481,6 +482,32 @@ const server = Bun.serve({
       }
     }
     
+    // GET /api/sessions/events-window - Get sessions that have events within a time window
+    if (url.pathname === '/api/sessions/events-window' && req.method === 'GET') {
+      try {
+        const start = parseInt(url.searchParams.get('start') || '0');
+        const end = parseInt(url.searchParams.get('end') || Date.now().toString());
+        
+        if (!start || !end || start >= end) {
+          return new Response(JSON.stringify({ error: 'Invalid time window parameters' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const sessionIds = getSessionsWithEventsInWindow(start, end);
+        return new Response(JSON.stringify({ sessionIds, count: sessionIds.length }), {
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error fetching sessions with events in window:', error);
+        return new Response(JSON.stringify({ error: 'Failed to fetch sessions' }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
     // POST /api/sessions/batch - Batch fetch session details with agents
     if (url.pathname === '/api/sessions/batch' && req.method === 'POST') {
       try {
@@ -715,7 +742,7 @@ const server = Bun.serve({
         wsClients.add(ws);
         
         // Send recent events on connection for single-session clients
-        const events = getRecentEvents(50);
+        const events = getRecentEvents(parseInt(process.env.EVENT_INITIAL_LIMIT || '50'));
         ws.send(JSON.stringify({ type: 'initial', data: events }));
       }
     },

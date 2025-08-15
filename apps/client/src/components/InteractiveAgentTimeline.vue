@@ -635,6 +635,8 @@ const timelineSvg = ref<SVGElement>();
 const isLoading = ref(false);
 const containerWidth = ref(1200);
 const baseContainerHeight = ref(600);
+const sessionsWithEventsInWindow = ref<string[]>([]);
+const lastWindowFetch = ref(0);
 
 // Dynamic container height based on lane allocation
 const containerHeight = computed(() => {
@@ -741,6 +743,41 @@ const visibleAgents = computed(() => {
     status: agent.status || 'pending'
   }));
 
+  // Filter agents based on sessions that have events in the current window
+  // If we have session filtering data, use it
+  if (sessionsWithEventsInWindow.value.length > 0) {
+    // Filter agents to only include those from sessions with events in the window
+    const filteredAgents = allAgents.filter(agent => {
+      // Check if this agent's session has events in the current window
+      return sessionsWithEventsInWindow.value.includes(agent.session_id);
+    });
+    
+    // Performance optimization: Limit visible agents for smooth rendering
+    if (filteredAgents.length > 100) {
+      // Sort by creation time for temporal coherence
+      const sorted = filteredAgents.sort((a, b) => a.startTime - b.startTime);
+      
+      // Show recent agents + selection context
+      const recentCount = Math.min(50, sorted.length);
+      const recent = sorted.slice(-recentCount);
+      
+      // Add any selected agents that might be outside the recent window
+      const selectedSet = new Set();
+      if (selectedAgent.value) {
+        selectedSet.add(selectedAgent.value.id?.toString());
+      }
+      
+      const additionalSelected = sorted.filter(agent => 
+        selectedSet.has(agent.agentId) && !recent.some(r => r.agentId === agent.agentId)
+      );
+      
+      return [...recent, ...additionalSelected];
+    }
+    
+    return filteredAgents;
+  }
+  
+  // Fallback to original behavior if no session filtering
   // Performance optimization: Limit visible agents for smooth rendering
   // Virtual scrolling for large datasets
   if (allAgents.length > 100) {
@@ -885,6 +922,28 @@ const messageFlows = computed(() => {
   
   return flows;
 });
+
+// API Methods
+const fetchSessionsWithEventsInWindow = async () => {
+  const { start, end } = timeRange.value;
+  
+  // Throttle API calls - don't fetch more than once per second
+  const now = Date.now();
+  if (now - lastWindowFetch.value < 1000) {
+    return;
+  }
+  lastWindowFetch.value = now;
+  
+  try {
+    const response = await fetch(`http://localhost:4000/api/sessions/events-window?start=${Math.floor(start)}&end=${Math.ceil(end)}`);
+    if (response.ok) {
+      const data = await response.json();
+      sessionsWithEventsInWindow.value = data.sessionIds || [];
+    }
+  } catch (error) {
+    console.error('Failed to fetch sessions with events:', error);
+  }
+};
 
 // Helper Functions
 const getAgentColor = (type: string): string => {
@@ -1598,6 +1657,14 @@ onMounted(() => {
   updateDimensions();
   window.addEventListener('resize', updateDimensions);
   document.addEventListener('keydown', handleKeydown);
+  
+  // Initial fetch of sessions with events
+  fetchSessionsWithEventsInWindow();
+  
+  // Start auto-refresh if enabled
+  if (autoScroll.value) {
+    startSessionRefresh();
+  }
 });
 
 onUnmounted(() => {
@@ -1607,6 +1674,9 @@ onUnmounted(() => {
   // Clean up pan event listeners
   document.removeEventListener('mousemove', handleGlobalMouseMove);
   document.removeEventListener('mouseup', handleGlobalMouseUp);
+  
+  // Stop session refresh interval
+  stopSessionRefresh();
   
   // Memory leak prevention
   if (rafId !== null) {
@@ -1628,6 +1698,47 @@ onUnmounted(() => {
 watch(() => props.height, (newHeight) => {
   baseContainerHeight.value = newHeight;
 });
+
+// Watch for time range changes and fetch sessions with events
+watch(timeRange, () => {
+  fetchSessionsWithEventsInWindow();
+}, { immediate: false });
+
+// Watch for new agents to update session filtering
+watch(() => props.agents, () => {
+  // When agents change, refetch sessions with events
+  fetchSessionsWithEventsInWindow();
+}, { deep: true });
+
+// Watch autoScroll to control refresh interval
+watch(autoScroll, (enabled) => {
+  if (enabled) {
+    startSessionRefresh();
+  } else {
+    stopSessionRefresh();
+  }
+});
+
+// Set up auto-refresh for session filtering
+let sessionRefreshInterval: number | null = null;
+
+const startSessionRefresh = () => {
+  if (sessionRefreshInterval) return;
+  
+  // Refresh sessions every 3 seconds if auto-scroll is enabled
+  sessionRefreshInterval = window.setInterval(() => {
+    if (autoScroll.value) {
+      fetchSessionsWithEventsInWindow();
+    }
+  }, 3000);
+};
+
+const stopSessionRefresh = () => {
+  if (sessionRefreshInterval) {
+    clearInterval(sessionRefreshInterval);
+    sessionRefreshInterval = null;
+  }
+};
 </script>
 
 <style scoped>

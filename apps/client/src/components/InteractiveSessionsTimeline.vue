@@ -705,6 +705,10 @@ const isLoadingEvents = ref(false);
 // Loading state
 const isLoading = ref(false);
 
+// Event-based session filtering state
+const sessionsWithEventsInWindow = ref<string[]>([]);
+const lastWindowFetch = ref(0);
+
 // Tooltip state (matching Agents tab interface)
 const tooltip = ref<{
   visible: boolean;
@@ -876,23 +880,35 @@ const visibleEventIndicators = computed((): EventIndicator[] => {
 const visibleSessions = computed((): SessionData[] => {
   const { start, end } = timeRange.value;
   
-  // First, apply time window filter
-  let timeFilteredSessions = transformedSessions.value.filter(session => {
-    // Include session if its most recent agent was created within the time window
-    // Find the most recent agent creation time
-    let mostRecentAgentTime = session.startTime;
-    if (session.agents && session.agents.length > 0) {
-      mostRecentAgentTime = Math.max(...session.agents.map(agent => agent.startTime));
-    }
-    
-    // Include session if the most recent agent was created within the time window
-    return mostRecentAgentTime >= start && mostRecentAgentTime <= end;
-  });
+  // Filter based on sessions that have events in the current window
+  let filteredSessions = transformedSessions.value;
   
-  // Then apply session filters
+  // Apply event-based filtering if we have session data
+  if (sessionsWithEventsInWindow.value.length > 0) {
+    filteredSessions = transformedSessions.value.filter(session => {
+      // Check if this session has events in the current window
+      return sessionsWithEventsInWindow.value.includes(session.sessionId);
+    });
+    console.log(`🔍 SessionsTimeline: Filtered to ${filteredSessions.length} sessions with events in window`);
+  } else {
+    // Fallback to original time-based filtering
+    filteredSessions = transformedSessions.value.filter(session => {
+      // Include session if its most recent agent was created within the time window
+      // Find the most recent agent creation time
+      let mostRecentAgentTime = session.startTime;
+      if (session.agents && session.agents.length > 0) {
+        mostRecentAgentTime = Math.max(...session.agents.map(agent => agent.startTime));
+      }
+      
+      // Include session if the most recent agent was created within the time window
+      return mostRecentAgentTime >= start && mostRecentAgentTime <= end;
+    });
+  }
+  
+  // Then apply additional session filters
   if (SessionFilterUtils.isFilterActive(currentFilters.value)) {
-    const { filteredSessions, metrics } = SessionFilterUtils.applyFilters(
-      timeFilteredSessions, 
+    const { filteredSessions: additionalFiltered, metrics } = SessionFilterUtils.applyFilters(
+      filteredSessions, 
       currentFilters.value
     );
     
@@ -907,13 +923,13 @@ const visibleSessions = computed((): SessionData[] => {
       console.warn(`Session filter performance warning: ${metrics.filterApplicationTime}ms (target: <50ms)`);
     }
     
-    return filteredSessions.sort((a, b) => a.startTime - b.startTime);
+    return additionalFiltered.sort((a, b) => a.startTime - b.startTime);
   }
   
   // Reset performance metrics when no filters active
   filterPerformanceMetrics.value = null;
   
-  return timeFilteredSessions.sort((a, b) => a.startTime - b.startTime);
+  return filteredSessions.sort((a, b) => a.startTime - b.startTime);
 });
 
 const totalSessions = computed(() => visibleSessions.value.length);
@@ -1250,6 +1266,32 @@ const clearSelections = () => {
   selectedAgent.value = null;
   selectedMessage.value = null;
   selectedEventIndicator.value = null;
+};
+
+// ============================================================================
+// Event-Based Session Filtering Functions
+// ============================================================================
+
+const fetchSessionsWithEventsInWindow = async () => {
+  const { start, end } = timeRange.value;
+  
+  // Throttle API calls - don't fetch more than once per second
+  const now = Date.now();
+  if (now - lastWindowFetch.value < 1000) {
+    return;
+  }
+  lastWindowFetch.value = now;
+  
+  try {
+    const response = await fetch(`http://localhost:4000/api/sessions/events-window?start=${Math.floor(start)}&end=${Math.ceil(end)}`);
+    if (response.ok) {
+      const data = await response.json();
+      sessionsWithEventsInWindow.value = data.sessionIds || [];
+      console.log(`🔍 SessionsTimeline: Found ${data.sessionIds?.length || 0} sessions with events in window`);
+    }
+  } catch (error) {
+    console.error('Failed to fetch sessions with events:', error);
+  }
 };
 
 // ============================================================================
@@ -2062,11 +2104,17 @@ onMounted(async () => {
   window.addEventListener('resize', updateDimensions);
   document.addEventListener('keydown', handleKeydown);
   
-  // Fetch event indicators
+  // Fetch event indicators and sessions with events
   await fetchEventIndicators();
+  await fetchSessionsWithEventsInWindow();
   
   // Start auto-pan when component mounts
   startAutoPan();
+  
+  // Start session refresh if auto-pan is enabled
+  if (autoPanEnabled.value) {
+    startSessionRefresh();
+  }
 });
 
 onUnmounted(() => {
@@ -2077,6 +2125,9 @@ onUnmounted(() => {
   
   // Clean up auto-pan interval
   stopAutoPan();
+  
+  // Clean up session refresh interval
+  stopSessionRefresh();
   
   // Clean up time window transitions (keep this one for window switching)
   if (timeWindowTransitionId) {
@@ -2101,7 +2152,45 @@ watch(() => props.height, (newHeight) => {
 // Refetch event indicators when time window changes
 watch(() => timeRange.value, async () => {
   await fetchEventIndicators();
+  // Also fetch sessions with events in the new window
+  await fetchSessionsWithEventsInWindow();
 }, { deep: true });
+
+// Watch for new sessions to update event-based filtering
+watch(() => transformedSessions.value, () => {
+  // When sessions change, refetch sessions with events
+  fetchSessionsWithEventsInWindow();
+}, { deep: true });
+
+// Set up auto-refresh for event-based session filtering
+let sessionRefreshInterval: number | null = null;
+
+const startSessionRefresh = () => {
+  if (sessionRefreshInterval) return;
+  
+  // Refresh sessions every 3 seconds if auto-pan is enabled
+  sessionRefreshInterval = window.setInterval(() => {
+    if (autoPanEnabled.value) {
+      fetchSessionsWithEventsInWindow();
+    }
+  }, 3000);
+};
+
+const stopSessionRefresh = () => {
+  if (sessionRefreshInterval) {
+    clearInterval(sessionRefreshInterval);
+    sessionRefreshInterval = null;
+  }
+};
+
+// Watch autoPanEnabled to control refresh interval
+watch(autoPanEnabled, (enabled) => {
+  if (enabled) {
+    startSessionRefresh();
+  } else {
+    stopSessionRefresh();
+  }
+});
 </script>
 
 <style scoped>

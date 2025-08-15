@@ -1,0 +1,294 @@
+name: Publish Claude Comms Setup Installer
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'packages/setup-installer/**'
+      - '.github/workflows/publish-claude-comms.yml'
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: 'Dry run (skip actual publish)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  WORKING_DIR: 'packages/setup-installer'
+  PACKAGE_NAME: '@claude-code/setup-installer'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
+    outputs:
+      version: ${{ steps.version_info.outputs.version }}
+      published: ${{ steps.publish_check.outputs.published }}
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@claude-code'
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.WORKING_DIR }}/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles(format('{0}/package-lock.json', env.WORKING_DIR)) }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm ci --ignore-scripts
+          npm ls --depth=0
+
+      - name: Run security audit
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm audit --audit-level=moderate
+          echo "Security audit completed"
+
+      - name: Run linting
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm run lint
+          echo "Linting completed successfully"
+
+      - name: Run unit tests
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm run test:unit
+          echo "Unit tests completed"
+
+      - name: Run integration tests  
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm run test:integration
+          echo "Integration tests completed"
+
+      - name: Run test coverage
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm run test:coverage
+          echo "Coverage analysis completed"
+
+      - name: Build package
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm run build
+          echo "Build completed successfully"
+
+      - name: Get current version
+        id: current_version
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Determine version bump
+        id: version_bump
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BUMP_TYPE="${{ github.event.inputs.version_bump }}"
+          else
+            BUMP_TYPE="patch"
+          fi
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Version bump type: $BUMP_TYPE"
+
+      - name: Bump version
+        id: bump_version
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          BUMP_TYPE="${{ steps.version_bump.outputs.bump_type }}"
+          NEW_VERSION=$(npm version $BUMP_TYPE --no-git-tag-version)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumped version to: $NEW_VERSION"
+
+      - name: Update package-lock.json
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm install --package-lock-only
+          echo "Package lock updated"
+
+      - name: Get version info
+        id: version_info
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Final version: $VERSION"
+
+      - name: Check if dry run
+        id: dry_run_check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "is_dry_run=true" >> $GITHUB_OUTPUT
+            echo "This is a dry run - will skip publish"
+          else
+            echo "is_dry_run=false" >> $GITHUB_OUTPUT
+            echo "This is a live run - will publish"
+          fi
+
+      - name: Verify package integrity
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm pack --dry-run
+          npm run test:unit --passWithNoTests
+          echo "Package integrity verified"
+
+      - name: Publish to npm
+        id: publish_step
+        if: steps.dry_run_check.outputs.is_dry_run == 'false'
+        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Publishing ${{ env.PACKAGE_NAME }}@${{ steps.version_info.outputs.version }}"
+          npm publish --access public
+          echo "Package published successfully"
+          echo "published=true" >> $GITHUB_OUTPUT
+
+      - name: Skip publish (dry run)
+        if: steps.dry_run_check.outputs.is_dry_run == 'true'
+        run: |
+          echo "Dry run mode - skipping npm publish"
+          echo "Would publish: ${{ env.PACKAGE_NAME }}@${{ steps.version_info.outputs.version }}"
+
+      - name: Create git tag
+        if: steps.dry_run_check.outputs.is_dry_run == 'false'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          VERSION="${{ steps.version_info.outputs.version }}"
+          TAG_NAME="v$VERSION"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to $VERSION [skip ci]"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          echo "Created tag: $TAG_NAME"
+
+      - name: Push changes and tags
+        if: steps.dry_run_check.outputs.is_dry_run == 'false'
+        run: |
+          git push origin main
+          git push origin --tags
+          echo "Pushed changes and tags to repository"
+
+      - name: Set publish status
+        id: publish_check
+        run: |
+          if [ "${{ steps.dry_run_check.outputs.is_dry_run }}" = "true" ]; then
+            echo "published=dry_run" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.publish_step.outputs.published }}" = "true" ]; then
+            echo "published=true" >> $GITHUB_OUTPUT
+          else
+            echo "published=false" >> $GITHUB_OUTPUT
+          fi
+
+  notification:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Success notification
+        if: needs.publish.result == 'success' && needs.publish.outputs.published == 'true'
+        run: |
+          echo "✅ Successfully published ${{ env.PACKAGE_NAME }}@${{ needs.publish.outputs.version }}"
+          echo "📦 Package is now available on npm: https://www.npmjs.com/package/${{ env.PACKAGE_NAME }}"
+          echo "🏷️ Git tag created: v${{ needs.publish.outputs.version }}"
+
+      - name: Dry run notification
+        if: needs.publish.result == 'success' && needs.publish.outputs.published == 'dry_run'
+        run: |
+          echo "🧪 Dry run completed successfully"
+          echo "📦 Would publish: ${{ env.PACKAGE_NAME }}@${{ needs.publish.outputs.version }}"
+          echo "✅ All checks passed - ready for production publish"
+
+      - name: Failure notification
+        if: needs.publish.result == 'failure'
+        run: |
+          echo "❌ Publish workflow failed"
+          echo "🔍 Check the logs above for details"
+          echo "📋 Common issues:"
+          echo "  - Test failures"
+          echo "  - Linting errors"  
+          echo "  - Security audit issues"
+          echo "  - NPM_TOKEN not configured"
+          echo "  - Version already exists on registry"
+
+  post_publish_validation:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: needs.publish.outputs.published == 'true'
+    
+    steps:
+      - name: Wait for npm registry propagation
+        run: |
+          echo "Waiting 30 seconds for npm registry propagation..."
+          sleep 30
+
+      - name: Validate package on registry
+        run: |
+          PACKAGE_URL="https://registry.npmjs.org/${{ env.PACKAGE_NAME }}/${{ needs.publish.outputs.version }}"
+          echo "Validating package availability at: $PACKAGE_URL"
+          
+          # Check if package is available on registry
+          if curl -f -s "$PACKAGE_URL" > /dev/null; then
+            echo "✅ Package successfully available on npm registry"
+          else
+            echo "❌ Package not yet available on npm registry"
+            exit 1
+          fi
+
+      - name: Test installation
+        run: |
+          echo "Testing global installation of published package..."
+          npm install -g ${{ env.PACKAGE_NAME }}@${{ needs.publish.outputs.version }}
+          
+          # Verify binary is available
+          if command -v claude-setup >/dev/null 2>&1; then
+            echo "✅ Binary 'claude-setup' is available"
+            claude-setup --version
+          else
+            echo "❌ Binary 'claude-setup' not found in PATH"
+            exit 1
+          fi

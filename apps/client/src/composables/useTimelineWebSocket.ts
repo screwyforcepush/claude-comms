@@ -1,8 +1,9 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import type { AgentStatus, SubagentMessage } from '../types';
+import type { AgentStatus, SubagentMessage, HookEvent } from '../types';
+import { useMatrixMode } from './useMatrixMode';
 
 export interface TimelineWebSocketUpdate {
-  type: 'subagent_registered' | 'subagent_message' | 'agent_status_update';
+  type: 'subagent_registered' | 'subagent_message' | 'agent_status_update' | 'hook_event';
   data: any;
   sessionId?: string;
   timestamp: number;
@@ -29,6 +30,9 @@ export function useTimelineWebSocket(
   const pendingUpdates = ref<TimelineWebSocketUpdate[]>([]);
   const animationRequestId = ref<number | null>(null);
   
+  // Matrix Mode Integration
+  const matrixMode = useMatrixMode();
+  
   // Configuration
   const config = {
     duration: 300,
@@ -52,6 +56,7 @@ export function useTimelineWebSocket(
     const agentRegistrations = updates.filter(u => u.type === 'subagent_registered');
     const statusUpdates = updates.filter(u => u.type === 'agent_status_update');
     const messageUpdates = updates.filter(u => u.type === 'subagent_message');
+    const hookEvents = updates.filter(u => u.type === 'hook_event');
     
     // Process agent registrations
     agentRegistrations.forEach(update => {
@@ -142,6 +147,25 @@ export function useTimelineWebSocket(
       }
     });
     
+    // Process hook events for Matrix Mode
+    hookEvents.forEach(update => {
+      const eventData = update.data;
+      if (eventData && matrixMode.isEnabled.value) {
+        // Convert update data to HookEvent format
+        const hookEvent: HookEvent = {
+          id: eventData.id || Date.now(),
+          source_app: eventData.source_app || 'timeline',
+          session_id: eventData.session_id || sessionId || 'unknown',
+          hook_event_type: eventData.hook_event_type || 'unknown',
+          payload: eventData.payload || {},
+          timestamp: eventData.timestamp || Date.now()
+        };
+        
+        // Process through Matrix Mode
+        matrixMode.processEvent(hookEvent);
+      }
+    });
+    
     // Use requestAnimationFrame for smooth updates
     nextTick(() => {
       isUpdating.value = false;
@@ -169,7 +193,8 @@ export function useTimelineWebSocket(
       // Filter for timeline-relevant events
       if (data.type === 'subagent_registered' || 
           data.type === 'subagent_message' || 
-          data.type === 'agent_status_update') {
+          data.type === 'agent_status_update' ||
+          data.type === 'hook_event') {
         
         const update: TimelineWebSocketUpdate = {
           type: data.type,

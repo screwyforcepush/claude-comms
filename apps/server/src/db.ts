@@ -716,6 +716,19 @@ export function getSessionEvents(sessionId: string, eventTypes?: string[]): Hook
   }));
 }
 
+// New function to get sessions that have events within a time window
+export function getSessionsWithEventsInWindow(start: number, end: number): string[] {
+  const stmt = db.prepare(`
+    SELECT DISTINCT session_id
+    FROM events
+    WHERE timestamp >= ? AND timestamp <= ?
+    ORDER BY timestamp DESC
+  `);
+  
+  const rows = stmt.all(start, end) as { session_id: string }[];
+  return rows.map(row => row.session_id);
+}
+
 // New functions for agent prompt/response storage
 
 export function storeAgentPrompt(sessionId: string, agentName: string, prompt: string): boolean {
