@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
-import type { HookEvent, FilterOptions, UpdateSubagentCompletionRequest, SessionSummary } from './types';
+import type { HookEvent, FilterOptions, UpdateSubagentCompletionRequest, SessionSummary, PriorityEventConfig, PriorityEventMetrics } from './types';
+import { PRIORITY_EVENT_TYPES } from './types';
 
 let db: Database;
 
@@ -68,6 +69,25 @@ export function initDatabase(): void {
     if (!hasSummaryColumn) {
       db.exec('ALTER TABLE events ADD COLUMN summary TEXT');
     }
+    
+    // Priority event bucket migration - add priority columns
+    const hasPriorityColumn = columns.some((col: any) => col.name === 'priority');
+    if (!hasPriorityColumn) {
+      console.log('🔄 Adding priority column to events table...');
+      db.exec('ALTER TABLE events ADD COLUMN priority INTEGER DEFAULT 0');
+    }
+    
+    const hasPriorityMetadataColumn = columns.some((col: any) => col.name === 'priority_metadata');
+    if (!hasPriorityMetadataColumn) {
+      console.log('🔄 Adding priority_metadata column to events table...');
+      db.exec('ALTER TABLE events ADD COLUMN priority_metadata TEXT');
+    }
+    
+    // Backfill priority values for existing events if priority column was just added
+    if (!hasPriorityColumn) {
+      console.log('🔄 Backfilling priority values for existing events...');
+      migratePriorityData();
+    }
   } catch (error) {
     // If the table doesn't exist yet, the CREATE TABLE above will handle it
   }
@@ -77,6 +97,13 @@ export function initDatabase(): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_session_id ON events(session_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_hook_event_type ON events(hook_event_type)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp)');
+  
+  // Priority-based indexes for optimal priority event bucket performance
+  db.exec('CREATE INDEX IF NOT EXISTS idx_events_priority_timestamp ON events(priority DESC, timestamp DESC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_events_session_priority_timestamp ON events(session_id, priority DESC, timestamp DESC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_events_type_priority_timestamp ON events(hook_event_type, priority DESC, timestamp DESC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_events_timestamp_priority ON events(timestamp ASC, priority ASC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_events_session_type_priority ON events(session_id, hook_event_type, priority DESC, timestamp DESC)');
   
   // Create subagent registry table
   db.exec(`
@@ -193,30 +220,111 @@ export function initDatabase(): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_subagent_created_completed ON subagent_registry(created_at, completed_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_events_session_timestamp ON events(session_id, timestamp)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_created_sender ON subagent_messages(created_at, sender)');
+  
+  // Add priority columns and indexes if they don't exist (migration support)
+  try {
+    const columns = db.prepare("PRAGMA table_info(events)").all() as any[];
+    const hasPriorityColumn = columns.some((col: any) => col.name === 'priority');
+    const hasPriorityMetadataColumn = columns.some((col: any) => col.name === 'priority_metadata');
+    
+    if (!hasPriorityColumn) {
+      db.exec('ALTER TABLE events ADD COLUMN priority INTEGER DEFAULT 0');
+    }
+    
+    if (!hasPriorityMetadataColumn) {
+      db.exec('ALTER TABLE events ADD COLUMN priority_metadata TEXT');
+    }
+    
+    // Create priority-optimized indexes
+    db.exec('CREATE INDEX IF NOT EXISTS idx_events_priority_timestamp ON events(priority DESC, timestamp DESC)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_events_session_priority_timestamp ON events(session_id, priority DESC, timestamp DESC)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_events_type_priority_timestamp ON events(hook_event_type, priority DESC, timestamp DESC)');
+  } catch (error) {
+    // Tables might not exist yet or migration already applied
+  }
+}
+
+// Priority Event Classification (imported from types.ts)
+
+export function calculateEventPriority(eventType: string, payload?: any): number {
+  // Base priority from event type
+  const basePriority = PRIORITY_EVENT_TYPES[eventType as keyof typeof PRIORITY_EVENT_TYPES] || 0;
+  
+  // Future: Add payload-based priority modifiers
+  // if (payload?.urgency === 'critical') return Math.max(basePriority, 2);
+  
+  return basePriority;
 }
 
 export function insertEvent(event: HookEvent): HookEvent {
-  const stmt = db.prepare(`
-    INSERT INTO events (source_app, session_id, hook_event_type, payload, chat, summary, timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+  // Calculate priority for the event
+  const priority = calculateEventPriority(event.hook_event_type, event.payload);
+  const priorityMetadata = priority > 0 ? JSON.stringify({
+    classified_at: Date.now(),
+    classification_reason: 'automatic',
+    retention_policy: priority === 1 ? 'extended' : 'standard'
+  }) : null;
+  
+  // Check if priority columns exist
+  let hasPriorityColumns = false;
+  try {
+    const columns = db.prepare("PRAGMA table_info(events)").all() as any[];
+    hasPriorityColumns = columns.some((col: any) => col.name === 'priority');
+  } catch (error) {
+    // Table might not exist yet
+  }
   
   const timestamp = event.timestamp || Date.now();
-  const result = stmt.run(
-    event.source_app,
-    event.session_id,
-    event.hook_event_type,
-    JSON.stringify(event.payload),
-    event.chat ? JSON.stringify(event.chat) : null,
-    event.summary || null,
-    timestamp
-  );
   
-  return {
-    ...event,
-    id: result.lastInsertRowid as number,
-    timestamp
-  };
+  if (hasPriorityColumns) {
+    // Use enhanced insert with priority
+    const stmt = db.prepare(`
+      INSERT INTO events (source_app, session_id, hook_event_type, payload, chat, summary, timestamp, priority, priority_metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      event.source_app,
+      event.session_id,
+      event.hook_event_type,
+      JSON.stringify(event.payload),
+      event.chat ? JSON.stringify(event.chat) : null,
+      event.summary || null,
+      timestamp,
+      priority,
+      priorityMetadata
+    );
+    
+    return {
+      ...event,
+      id: result.lastInsertRowid as number,
+      timestamp,
+      priority,
+      priority_metadata: priorityMetadata ? JSON.parse(priorityMetadata) : undefined
+    };
+  } else {
+    // Fallback to original insert for backward compatibility
+    const stmt = db.prepare(`
+      INSERT INTO events (source_app, session_id, hook_event_type, payload, chat, summary, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      event.source_app,
+      event.session_id,
+      event.hook_event_type,
+      JSON.stringify(event.payload),
+      event.chat ? JSON.stringify(event.chat) : null,
+      event.summary || null,
+      timestamp
+    );
+    
+    return {
+      ...event,
+      id: result.lastInsertRowid as number,
+      timestamp
+    };
+  }
 }
 
 export function getFilterOptions(): FilterOptions {
@@ -729,6 +837,230 @@ export function getSessionsWithEventsInWindow(start: number, end: number): strin
   return rows.map(row => row.session_id);
 }
 
+// Priority Event Bucket System Implementation
+
+// Migration function to backfill priority values for existing events
+function migratePriorityData(): void {
+  const priorityEventTypes = Object.keys(PRIORITY_EVENT_TYPES);
+  let totalUpdated = 0;
+  
+  for (const eventType of priorityEventTypes) {
+    const priority = PRIORITY_EVENT_TYPES[eventType as keyof typeof PRIORITY_EVENT_TYPES];
+    const metadata = JSON.stringify({
+      classified_at: Date.now(),
+      classification_reason: 'migration_backfill',
+      retention_policy: 'extended'
+    });
+    
+    const updateStmt = db.prepare(`
+      UPDATE events SET priority = ?, priority_metadata = ?
+      WHERE hook_event_type = ? AND priority = 0
+    `);
+    
+    try {
+      const result = updateStmt.run(priority, metadata, eventType);
+      totalUpdated += result.changes;
+      console.log(`✓ Updated ${result.changes} ${eventType} events to priority ${priority}`);
+    } catch (error) {
+      console.error(`✗ Error updating ${eventType} events:`, error);
+    }
+  }
+  
+  console.log(`🎯 Migration completed: ${totalUpdated} events updated with priority classification`);
+}
+
+// Default priority configuration from environment variables
+function getDefaultPriorityConfig(): PriorityEventConfig {
+  return {
+    totalLimit: parseInt(process.env.EVENT_TOTAL_INITIAL_LIMIT || '150'),
+    priorityLimit: parseInt(process.env.EVENT_PRIORITY_INITIAL_LIMIT || '100'),
+    regularLimit: parseInt(process.env.EVENT_REGULAR_INITIAL_LIMIT || '50'),
+    priorityRetentionHours: parseInt(process.env.EVENT_PRIORITY_RETENTION_HOURS || '24'),
+    regularRetentionHours: parseInt(process.env.EVENT_REGULAR_RETENTION_HOURS || '4')
+  };
+}
+
+// Intelligent event limiting that preserves priority events
+function intelligentEventLimiting(events: HookEvent[], totalLimit: number): HookEvent[] {
+  if (events.length <= totalLimit) return events;
+  
+  // Separate priority and regular events
+  const priorityEvents = events.filter(e => (e as any).priority > 0);
+  const regularEvents = events.filter(e => (e as any).priority === 0);
+  
+  // Always preserve priority events within reason (70% allocation)
+  const maxPriorityPreserve = Math.floor(totalLimit * 0.7);
+  const preservedPriority = priorityEvents.slice(-maxPriorityPreserve);
+  
+  // Fill remaining space with regular events
+  const remainingSpace = totalLimit - preservedPriority.length;
+  const preservedRegular = regularEvents.slice(-remainingSpace);
+  
+  return [...preservedPriority, ...preservedRegular]
+    .sort((a, b) => a.timestamp! - b.timestamp!);
+}
+
+// Map database row to HookEvent with priority fields
+function mapDatabaseEventToHookEvent(row: any): HookEvent {
+  return {
+    id: row.id,
+    source_app: row.source_app,
+    session_id: row.session_id,
+    hook_event_type: row.hook_event_type,
+    payload: JSON.parse(row.payload),
+    chat: row.chat ? JSON.parse(row.chat) : undefined,
+    summary: row.summary || undefined,
+    timestamp: row.timestamp,
+    priority: row.priority,
+    priority_metadata: row.priority_metadata ? JSON.parse(row.priority_metadata) : undefined
+  };
+}
+
+// Enhanced insertEvent function with automatic priority classification
+export function insertEventWithPriority(event: HookEvent): HookEvent {
+  const priority = calculateEventPriority(event.hook_event_type, event.payload);
+  const priorityMetadata = priority > 0 ? JSON.stringify({
+    classified_at: Date.now(),
+    classification_reason: 'automatic',
+    retention_policy: priority === 1 ? 'extended' : 'standard'
+  }) : null;
+  
+  const stmt = db.prepare(`
+    INSERT INTO events (
+      source_app, session_id, hook_event_type, payload, 
+      chat, summary, timestamp, priority, priority_metadata
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  const timestamp = event.timestamp || Date.now();
+  const result = stmt.run(
+    event.source_app,
+    event.session_id,
+    event.hook_event_type,
+    JSON.stringify(event.payload),
+    event.chat ? JSON.stringify(event.chat) : null,
+    event.summary || null,
+    timestamp,
+    priority,
+    priorityMetadata
+  );
+  
+  return {
+    ...event,
+    id: result.lastInsertRowid as number,
+    timestamp,
+    priority,
+    priority_metadata: priorityMetadata ? JSON.parse(priorityMetadata) : undefined
+  };
+}
+
+// Core dual-bucket priority event retrieval function
+export function getRecentEventsWithPriority(
+  config: Partial<PriorityEventConfig> = {}
+): HookEvent[] {
+  const fullConfig = { ...getDefaultPriorityConfig(), ...config };
+  const now = Date.now();
+  const priorityCutoff = now - (fullConfig.priorityRetentionHours * 60 * 60 * 1000);
+  const regularCutoff = now - (fullConfig.regularRetentionHours * 60 * 60 * 1000);
+  
+  // Get priority events with extended retention
+  const priorityStmt = db.prepare(`
+    SELECT id, source_app, session_id, hook_event_type, payload, 
+           chat, summary, timestamp, priority, priority_metadata
+    FROM events
+    WHERE priority > 0 AND timestamp >= ?
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `);
+  
+  // Get regular events with standard retention
+  const regularStmt = db.prepare(`
+    SELECT id, source_app, session_id, hook_event_type, payload, 
+           chat, summary, timestamp, priority, priority_metadata
+    FROM events
+    WHERE priority = 0 AND timestamp >= ?
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `);
+  
+  const priorityEvents = priorityStmt.all(priorityCutoff, fullConfig.priorityLimit) as any[];
+  const regularEvents = regularStmt.all(regularCutoff, fullConfig.regularLimit) as any[];
+  
+  // Merge and sort by timestamp, respecting total limit
+  const allEvents = [...priorityEvents, ...regularEvents]
+    .map(mapDatabaseEventToHookEvent)
+    .sort((a, b) => a.timestamp! - b.timestamp!);
+  
+  // Apply intelligent limiting that preserves priority events
+  return intelligentEventLimiting(allEvents, fullConfig.totalLimit);
+}
+
+// Session-specific priority event queries
+export function getSessionEventsWithPriority(
+  sessionId: string, 
+  eventTypes?: string[],
+  priorityConfig?: Partial<PriorityEventConfig>
+): HookEvent[] {
+  const config = { ...getDefaultPriorityConfig(), ...priorityConfig };
+  
+  let baseQuery = `
+    SELECT id, source_app, session_id, hook_event_type, payload, 
+           chat, summary, timestamp, priority, priority_metadata
+    FROM events
+    WHERE session_id = ?
+  `;
+  
+  const params: any[] = [sessionId];
+  
+  if (eventTypes && eventTypes.length > 0) {
+    const placeholders = eventTypes.map(() => '?').join(',');
+    baseQuery += ` AND hook_event_type IN (${placeholders})`;
+    params.push(...eventTypes);
+  }
+  
+  // Apply retention windows for priority vs regular events
+  const now = Date.now();
+  const priorityCutoff = now - (config.priorityRetentionHours * 60 * 60 * 1000);
+  const regularCutoff = now - (config.regularRetentionHours * 60 * 60 * 1000);
+  
+  baseQuery += ` 
+    AND (
+      (priority > 0 AND timestamp >= ?) OR 
+      (priority = 0 AND timestamp >= ?)
+    )
+    ORDER BY timestamp ASC
+  `;
+  
+  params.push(priorityCutoff, regularCutoff);
+  
+  const stmt = db.prepare(baseQuery);
+  const rows = stmt.all(...params) as any[];
+  
+  return rows.map(mapDatabaseEventToHookEvent);
+}
+
+// Backward-compatible wrapper that falls back to original implementation
+export function getRecentEventsWithFallback(limit: number = 100): HookEvent[] {
+  try {
+    // Check if priority columns exist by attempting a priority query
+    const testStmt = db.prepare('SELECT priority FROM events LIMIT 1');
+    testStmt.get();
+    
+    // If we get here, priority columns exist - use priority implementation
+    return getRecentEventsWithPriority({
+      totalLimit: limit,
+      priorityLimit: Math.floor(limit * 0.7),
+      regularLimit: Math.floor(limit * 0.3),
+      priorityRetentionHours: 24,
+      regularRetentionHours: 4
+    });
+  } catch (error) {
+    // Fallback to original implementation if priority columns don't exist
+    console.warn('Priority columns not found, falling back to original implementation');
+    return getRecentEvents(limit);
+  }
+}
+
 // New functions for agent prompt/response storage
 
 export function storeAgentPrompt(sessionId: string, agentName: string, prompt: string): boolean {
@@ -762,4 +1094,333 @@ export function getAgentPromptResponse(sessionId: string, agentName: string): { 
   
   const result = stmt.get(sessionId, agentName) as any;
   return result || null;
+}
+
+// Priority Event System Validation and Migration Functions
+
+export interface ValidationResult {
+  valid: boolean;
+  issues: string[];
+  stats: any;
+}
+
+export interface PerformanceResult {
+  performant: boolean;
+  issues: string[];
+  metrics: any;
+}
+
+// Validate priority implementation integrity
+export function validatePriorityImplementation(): ValidationResult {
+  const issues: string[] = [];
+  let stats: any = {};
+  
+  try {
+    // Check schema structure
+    const columns = db.prepare("PRAGMA table_info(events)").all() as any[];
+    const hasPriority = columns.some((col: any) => col.name === 'priority');
+    const hasPriorityMetadata = columns.some((col: any) => col.name === 'priority_metadata');
+    
+    if (!hasPriority) issues.push('Missing priority column');
+    if (!hasPriorityMetadata) issues.push('Missing priority_metadata column');
+    
+    // Check indexes
+    const indexes = db.prepare("PRAGMA index_list(events)").all() as any[];
+    const priorityIndexExists = indexes.some((idx: any) => 
+      idx.name === 'idx_events_priority_timestamp'
+    );
+    
+    if (!priorityIndexExists) issues.push('Missing priority timestamp index');
+    
+    // Validate data integrity
+    const priorityStats = db.prepare(`
+      SELECT 
+        COUNT(*) as total_events,
+        COUNT(CASE WHEN priority > 0 THEN 1 END) as priority_events,
+        COUNT(CASE WHEN priority = 0 THEN 1 END) as regular_events,
+        AVG(CASE WHEN priority > 0 THEN 1.0 ELSE 0.0 END) as priority_ratio
+      FROM events
+    `).get() as any;
+    
+    stats = priorityStats;
+    
+    if (priorityStats && priorityStats.total_events > 0 && priorityStats.priority_events === 0) {
+      issues.push('No priority events found - classification may not be working');
+    }
+    
+    // Check for orphaned priority metadata
+    const orphanedMetadata = db.prepare(`
+      SELECT COUNT(*) as orphaned_count
+      FROM events
+      WHERE priority = 0 AND priority_metadata IS NOT NULL
+    `).get() as any;
+    
+    if (orphanedMetadata && orphanedMetadata.orphaned_count > 0) {
+      issues.push(`Found ${orphanedMetadata.orphaned_count} regular events with priority metadata`);
+    }
+    
+  } catch (error: any) {
+    issues.push(`Validation error: ${error.message}`);
+  }
+  
+  return {
+    valid: issues.length === 0,
+    issues,
+    stats
+  };
+}
+
+// Validate performance of priority queries
+export function validatePriorityPerformance(): PerformanceResult {
+  const results: any = {};
+  const performanceIssues: string[] = [];
+  
+  try {
+    // Test priority query performance
+    const startTime = Date.now();
+    const events = getRecentEventsWithPriority({
+      totalLimit: 100,
+      priorityLimit: 70,
+      regularLimit: 30,
+      priorityRetentionHours: 24,
+      regularRetentionHours: 4
+    });
+    const queryTime = Date.now() - startTime;
+    
+    results.queryTime = queryTime;
+    results.eventCount = events.length;
+    results.priorityCount = events.filter(e => (e as any).priority > 0).length;
+    
+    // Performance criteria
+    const maxAcceptableQueryTime = 100; // 100ms
+    
+    if (queryTime > maxAcceptableQueryTime) {
+      performanceIssues.push(`Query time ${queryTime}ms exceeds ${maxAcceptableQueryTime}ms limit`);
+    }
+    
+    // Test session-specific query performance
+    const sessionStartTime = Date.now();
+    const sessionEvents = getSessionEventsWithPriority('test-session', ['UserPromptSubmit', 'Notification']);
+    const sessionQueryTime = Date.now() - sessionStartTime;
+    
+    results.sessionQueryTime = sessionQueryTime;
+    results.sessionEventCount = sessionEvents.length;
+    
+    if (sessionQueryTime > maxAcceptableQueryTime) {
+      performanceIssues.push(`Session query time ${sessionQueryTime}ms exceeds ${maxAcceptableQueryTime}ms limit`);
+    }
+    
+  } catch (error: any) {
+    performanceIssues.push(`Performance test error: ${error.message}`);
+  }
+  
+  return {
+    performant: performanceIssues.length === 0,
+    issues: performanceIssues,
+    metrics: results
+  };
+}
+
+// Rollback priority schema changes (for emergency use)
+export function rollbackPriorityMigration(): { success: boolean; message: string; backupCount?: number } {
+  try {
+    console.log('🔄 Starting priority schema rollback...');
+    
+    // First, backup existing data with priority information
+    const backupStmt = db.prepare(`
+      SELECT id, priority, priority_metadata
+      FROM events
+      WHERE priority > 0 OR priority_metadata IS NOT NULL
+    `);
+    const priorityData = backupStmt.all();
+    
+    console.log(`📦 Backing up ${priorityData.length} events with priority data...`);
+    
+    // Store backup in a temporary table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS priority_backup (
+        event_id INTEGER,
+        priority INTEGER,
+        priority_metadata TEXT,
+        backed_up_at INTEGER
+      )
+    `);
+    
+    const insertBackupStmt = db.prepare(`
+      INSERT INTO priority_backup (event_id, priority, priority_metadata, backed_up_at)
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    const backupTime = Date.now();
+    for (const row of priorityData) {
+      insertBackupStmt.run((row as any).id, (row as any).priority, (row as any).priority_metadata, backupTime);
+    }
+    
+    // Drop priority-specific indexes
+    const priorityIndexes = [
+      'idx_events_priority_timestamp',
+      'idx_events_session_priority_timestamp', 
+      'idx_events_type_priority_timestamp',
+      'idx_events_timestamp_priority',
+      'idx_events_session_type_priority'
+    ];
+    
+    for (const indexName of priorityIndexes) {
+      try {
+        db.exec(`DROP INDEX IF EXISTS ${indexName}`);
+        console.log(`✓ Dropped index: ${indexName}`);
+      } catch (error) {
+        console.warn(`⚠️ Could not drop index ${indexName}:`, error);
+      }
+    }
+    
+    // Note: SQLite doesn't support dropping columns directly
+    // In production, you would need to recreate the table without priority columns
+    // For now, we'll just set all priority values to 0 and clear metadata
+    db.exec(`
+      UPDATE events 
+      SET priority = 0, priority_metadata = NULL
+      WHERE priority > 0 OR priority_metadata IS NOT NULL
+    `);
+    
+    console.log('🎯 Priority schema rollback completed successfully');
+    
+    return {
+      success: true,
+      message: `Rollback completed. ${priorityData.length} priority events backed up to priority_backup table.`,
+      backupCount: priorityData.length
+    };
+    
+  } catch (error: any) {
+    console.error('✗ Priority rollback failed:', error);
+    return {
+      success: false,
+      message: `Rollback failed: ${error.message}`
+    };
+  }
+}
+
+// Restore priority data from backup (in case rollback needs to be undone)
+export function restorePriorityFromBackup(): { success: boolean; message: string; restoredCount?: number } {
+  try {
+    console.log('🔄 Starting priority data restoration from backup...');
+    
+    // Check if backup table exists
+    const tableExists = db.prepare(`
+      SELECT name FROM sqlite_master 
+      WHERE type='table' AND name='priority_backup'
+    `).get();
+    
+    if (!tableExists) {
+      return {
+        success: false,
+        message: 'No backup table found. Cannot restore priority data.'
+      };
+    }
+    
+    // Get all backup data
+    const backupData = db.prepare(`
+      SELECT event_id, priority, priority_metadata
+      FROM priority_backup
+      ORDER BY backed_up_at DESC
+    `).all() as any[];
+    
+    if (backupData.length === 0) {
+      return {
+        success: false,
+        message: 'Backup table is empty. No data to restore.'
+      };
+    }
+    
+    // Restore priority data
+    const restoreStmt = db.prepare(`
+      UPDATE events 
+      SET priority = ?, priority_metadata = ?
+      WHERE id = ?
+    `);
+    
+    let restoredCount = 0;
+    for (const backup of backupData) {
+      try {
+        const result = restoreStmt.run(backup.priority, backup.priority_metadata, backup.event_id);
+        if (result.changes > 0) {
+          restoredCount++;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to restore event ${backup.event_id}:`, error);
+      }
+    }
+    
+    // Recreate priority indexes
+    db.exec('CREATE INDEX IF NOT EXISTS idx_events_priority_timestamp ON events(priority DESC, timestamp DESC)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_events_session_priority_timestamp ON events(session_id, priority DESC, timestamp DESC)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_events_type_priority_timestamp ON events(hook_event_type, priority DESC, timestamp DESC)');
+    
+    console.log(`🎯 Priority data restoration completed: ${restoredCount} events restored`);
+    
+    return {
+      success: true,
+      message: `Restoration completed. ${restoredCount} events restored from backup.`,
+      restoredCount
+    };
+    
+  } catch (error: any) {
+    console.error('✗ Priority restoration failed:', error);
+    return {
+      success: false,
+      message: `Restoration failed: ${error.message}`
+    };
+  }
+}
+
+// Priority event metrics for monitoring (interface imported from types.ts)
+
+export function collectPriorityMetrics(): PriorityEventMetrics {
+  const now = Date.now();
+  const oneDayAgo = now - (24 * 60 * 60 * 1000);
+  const fourHoursAgo = now - (4 * 60 * 60 * 1000);
+  
+  const stats = db.prepare(`
+    SELECT 
+      COUNT(*) as total_events,
+      COUNT(CASE WHEN priority > 0 THEN 1 END) as priority_events,
+      COUNT(CASE WHEN priority = 0 THEN 1 END) as regular_events,
+      COUNT(CASE WHEN priority > 0 AND timestamp >= ? THEN 1 END) as priority_retained,
+      COUNT(CASE WHEN priority = 0 AND timestamp >= ? THEN 1 END) as regular_retained
+    FROM events
+  `).get(oneDayAgo, fourHoursAgo) as any;
+  
+  // Check classification accuracy by looking at known priority event types
+  const classificationStats = db.prepare(`
+    SELECT 
+      COUNT(*) as total_classified,
+      COUNT(CASE 
+        WHEN (hook_event_type IN ('UserPromptSubmit', 'Notification', 'Stop', 'SubagentStop', 'SubagentComplete') AND priority > 0)
+          OR (hook_event_type NOT IN ('UserPromptSubmit', 'Notification', 'Stop', 'SubagentStop', 'SubagentComplete') AND priority = 0)
+        THEN 1 
+      END) as correctly_classified
+    FROM events
+  `).get() as any;
+  
+  return {
+    totalEvents: stats?.total_events || 0,
+    priorityEvents: stats?.priority_events || 0,
+    regularEvents: stats?.regular_events || 0,
+    priorityPercentage: stats?.total_events > 0 ? (stats.priority_events / stats.total_events) * 100 : 0,
+    bucketDistribution: {
+      priority: stats?.priority_events || 0,
+      regular: stats?.regular_events || 0
+    },
+    retentionEffectiveness: {
+      priorityRetained: stats?.priority_retained || 0,
+      regularRetained: stats?.regular_retained || 0
+    },
+    classificationAccuracy: {
+      correctlyClassified: classificationStats?.correctly_classified || 0,
+      totalClassified: classificationStats?.total_classified || 0,
+      accuracy: classificationStats?.total_classified > 0 
+        ? (classificationStats.correctly_classified / classificationStats.total_classified) * 100 
+        : 0
+    }
+  };
 }

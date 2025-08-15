@@ -7,6 +7,12 @@ export interface HookEvent {
   chat?: any[];
   summary?: string;
   timestamp?: number;
+  priority?: number;
+  priority_metadata?: {
+    classified_at: number;
+    classification_reason: string;
+    retention_policy: string;
+  };
 }
 
 export interface FilterOptions {
@@ -143,12 +149,19 @@ export interface MultiSessionUpdate {
   sessionId: string;
   data?: Partial<SessionDetail>;
   timestamp: number;
+  priority_info?: {
+    event_priority: number;
+    retention_hint: 'standard' | 'extended';
+    classification: 'automatic' | 'manual';
+    bucket: 'priority' | 'regular';
+  };
 }
 
 export interface MultiSessionWebSocketMessage {
   action: 'subscribe' | 'unsubscribe';
   sessionIds?: string[];
   sessionId?: string;
+  priority_aware?: boolean; // Client capability flag
 }
 
 // New interfaces for agent prompt/response API
@@ -176,3 +189,67 @@ export interface WebSocketHandler<T = any> {
   close?: (ws: T) => void;
   error?: (ws: T, error: any) => void;
 }
+
+// Priority Event System Types
+export interface PriorityEventConfig {
+  totalLimit: number;
+  priorityLimit: number;
+  regularLimit: number;
+  priorityRetentionHours: number;
+  regularRetentionHours: number;
+}
+
+export interface PriorityWebSocketMessage {
+  type: 'initial' | 'event' | 'priority_event' | 'session_event' | 'priority_session_event';
+  data: HookEvent | HookEvent[];
+  sessionId?: string; // For multi-session support
+  priority_info?: {
+    total_events: number;
+    priority_events: number;
+    regular_events: number;
+    retention_window: {
+      priority_hours: number;
+      regular_hours: number;
+    };
+    protocol_version?: string;
+  };
+}
+
+export interface PriorityEventMetrics {
+  totalEvents: number;
+  priorityEvents: number;
+  regularEvents: number;
+  priorityPercentage: number;
+  avgQueryTime?: number;
+  bucketDistribution: {
+    priority: number;
+    regular: number;
+  };
+  retentionEffectiveness: {
+    priorityRetained: number;
+    regularRetained: number;
+  };
+  classificationAccuracy: {
+    correctlyClassified: number;
+    totalClassified: number;
+    accuracy: number;
+  };
+}
+
+// Priority classification constants  
+export const PRIORITY_EVENT_TYPES = {
+  'UserPromptSubmit': 1,
+  'Notification': 1,
+  'Stop': 1
+} as const;
+
+export const DEFAULT_PRIORITY_CONFIG: PriorityEventConfig = {
+  totalLimit: 150,
+  priorityLimit: 100,
+  regularLimit: 50,
+  priorityRetentionHours: 24,
+  regularRetentionHours: 4
+};
+
+// Protocol versioning
+export const PRIORITY_PROTOCOL_VERSION = '1.0.0';

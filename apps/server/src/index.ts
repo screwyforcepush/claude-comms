@@ -3,6 +3,10 @@ import {
   insertEvent, 
   getFilterOptions, 
   getRecentEvents,
+  getRecentEventsWithPriority,
+  getSessionEventsWithPriority,
+  calculateEventPriority,
+  collectPriorityMetrics,
   registerSubagent,
   sendSubagentMessage,
   getUnreadMessages,
@@ -31,7 +35,14 @@ import type {
   MultiSessionWebSocketMessage,
   MultiSessionUpdate,
   UpdateAgentDataRequest,
-  ValidationError
+  ValidationError,
+  PriorityEventConfig,
+  PriorityWebSocketMessage
+} from './types';
+import { 
+  PRIORITY_EVENT_TYPES,
+  DEFAULT_PRIORITY_CONFIG,
+  PRIORITY_PROTOCOL_VERSION
 } from './types';
 
 // Initialize database
@@ -40,6 +51,58 @@ initDatabase();
 // Store WebSocket clients
 const wsClients = new Set<any>();
 const multiSessionClients = new Map<any, Set<string>>(); // WebSocket -> subscribed session IDs
+
+// Priority Event Broadcasting (using existing classification from BellaServer/AdamMigrate)
+
+function broadcastEventWithPriority(savedEvent: HookEvent) {
+  const isPriorityEvent = (savedEvent.priority || 0) > 0;
+  
+  // Create priority-aware message
+  const priorityMessage: PriorityWebSocketMessage = {
+    type: isPriorityEvent ? 'priority_event' : 'event',
+    data: savedEvent,
+    priority_info: isPriorityEvent ? {
+      total_events: 0, // Will be populated by actual count if needed
+      priority_events: 0,
+      regular_events: 0,
+      retention_window: {
+        priority_hours: DEFAULT_PRIORITY_CONFIG.priorityRetentionHours,
+        regular_hours: DEFAULT_PRIORITY_CONFIG.regularRetentionHours
+      },
+      protocol_version: PRIORITY_PROTOCOL_VERSION
+    } : undefined
+  };
+  
+  // Create backward-compatible message for legacy clients
+  const legacyMessage = JSON.stringify({ type: 'event', data: savedEvent });
+  const priorityMessageStr = JSON.stringify(priorityMessage);
+  
+  // Broadcast to single-session clients (use priority-aware format)
+  wsClients.forEach(client => {
+    try {
+      client.send(priorityMessageStr);
+    } catch (err) {
+      wsClients.delete(client);
+    }
+  });
+  
+  // Broadcast to multi-session clients with session context
+  const multiSessionMessage: PriorityWebSocketMessage = {
+    ...priorityMessage,
+    type: isPriorityEvent ? 'priority_session_event' : 'session_event',
+    sessionId: savedEvent.session_id
+  };
+  
+  multiSessionClients.forEach((subscribedSessions, client) => {
+    if (subscribedSessions.has(savedEvent.session_id)) {
+      try {
+        client.send(JSON.stringify(multiSessionMessage));
+      } catch (err) {
+        multiSessionClients.delete(client);
+      }
+    }
+  });
+}
 
 // Create Bun server with HTTP and WebSocket support
 const server = Bun.serve({
@@ -77,32 +140,8 @@ const server = Bun.serve({
         // Insert event into database
         const savedEvent = insertEvent(event);
         
-        // Broadcast to all WebSocket clients
-        const message = JSON.stringify({ type: 'event', data: savedEvent });
-        wsClients.forEach(client => {
-          try {
-            client.send(message);
-          } catch (err) {
-            // Client disconnected, remove from set
-            wsClients.delete(client);
-          }
-        });
-        
-        // Broadcast to multi-session clients if they're subscribed to this session
-        const multiSessionMessage = JSON.stringify({ 
-          type: 'session_event', 
-          sessionId: savedEvent.session_id,
-          data: savedEvent 
-        });
-        multiSessionClients.forEach((subscribedSessions, client) => {
-          if (subscribedSessions.has(savedEvent.session_id)) {
-            try {
-              client.send(multiSessionMessage);
-            } catch (err) {
-              multiSessionClients.delete(client);
-            }
-          }
-        });
+        // Broadcast event with priority-aware protocol
+        broadcastEventWithPriority(savedEvent);
         
         return new Response(JSON.stringify(savedEvent), {
           headers: { ...headers, 'Content-Type': 'application/json' }
@@ -124,13 +163,37 @@ const server = Bun.serve({
       });
     }
     
-    // GET /events/recent - Get recent events
+    // GET /events/recent - Get recent events (with priority support)
     if (url.pathname === '/events/recent' && req.method === 'GET') {
       const limit = parseInt(url.searchParams.get('limit') || '100');
-      const events = getRecentEvents(limit);
+      const usePriority = url.searchParams.get('priority') === 'true';
+      
+      let events;
+      if (usePriority) {
+        events = getRecentEventsWithPriority({ totalLimit: limit });
+      } else {
+        events = getRecentEvents(limit);
+      }
+      
       return new Response(JSON.stringify(events), {
         headers: { ...headers, 'Content-Type': 'application/json' }
       });
+    }
+    
+    // GET /events/priority-metrics - Get priority event statistics
+    if (url.pathname === '/events/priority-metrics' && req.method === 'GET') {
+      try {
+        const metrics = collectPriorityMetrics();
+        return new Response(JSON.stringify(metrics), {
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error collecting priority metrics:', error);
+        return new Response(JSON.stringify({ error: 'Failed to collect metrics' }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
     }
     
     // GET /events/session/:sessionId - Get events for a specific session
@@ -741,9 +804,33 @@ const server = Bun.serve({
       } else {
         wsClients.add(ws);
         
-        // Send recent events on connection for single-session clients
-        const events = getRecentEvents(parseInt(process.env.EVENT_INITIAL_LIMIT || '50'));
-        ws.send(JSON.stringify({ type: 'initial', data: events }));
+        // Send priority-aware initial events on connection for single-session clients
+        const config: PriorityEventConfig = {
+          totalLimit: parseInt(process.env.EVENT_TOTAL_INITIAL_LIMIT || '150'),
+          priorityLimit: parseInt(process.env.EVENT_PRIORITY_INITIAL_LIMIT || '100'),
+          regularLimit: parseInt(process.env.EVENT_REGULAR_INITIAL_LIMIT || '50'),
+          priorityRetentionHours: parseInt(process.env.EVENT_PRIORITY_RETENTION_HOURS || '24'),
+          regularRetentionHours: parseInt(process.env.EVENT_REGULAR_RETENTION_HOURS || '4')
+        };
+        
+        const events = getRecentEventsWithPriority(config);
+        
+        const initialMessage: PriorityWebSocketMessage = {
+          type: 'initial',
+          data: events,
+          priority_info: {
+            total_events: events.length,
+            priority_events: events.filter(e => (e.priority || 0) > 0).length,
+            regular_events: events.filter(e => (e.priority || 0) === 0).length,
+            retention_window: {
+              priority_hours: config.priorityRetentionHours,
+              regular_hours: config.regularRetentionHours
+            },
+            protocol_version: PRIORITY_PROTOCOL_VERSION
+          }
+        };
+        
+        ws.send(JSON.stringify(initialMessage));
       }
     },
     
@@ -762,14 +849,18 @@ const server = Bun.serve({
                 parsed.sessionIds.forEach(id => subscribedSessions.add(id));
                 ws.send(JSON.stringify({ 
                   type: 'subscription_confirmed', 
-                  sessionIds: parsed.sessionIds 
+                  sessionIds: parsed.sessionIds,
+                  priority_protocol_supported: true,
+                  protocol_version: PRIORITY_PROTOCOL_VERSION
                 }));
               } else if (parsed.sessionId) {
                 // Subscribe to single session
                 subscribedSessions.add(parsed.sessionId);
                 ws.send(JSON.stringify({ 
                   type: 'subscription_confirmed', 
-                  sessionId: parsed.sessionId 
+                  sessionId: parsed.sessionId,
+                  priority_protocol_supported: true,
+                  protocol_version: PRIORITY_PROTOCOL_VERSION
                 }));
               }
               break;

@@ -1,7 +1,7 @@
 <template>
   <div class="event-timestamp-indicator">
     <span 
-      v-if="temporalPosition !== 'neutral'"
+      v-if="position !== 'neutral'"
       :class="badgeClasses"
       :aria-label="badgeAriaLabel"
     >
