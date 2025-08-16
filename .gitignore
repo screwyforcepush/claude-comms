@@ -223,7 +223,6 @@ credentials/
 
 # Dependency directories
 vendor/
-packages/
 
 # Output directories
 output/
