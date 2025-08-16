@@ -7,6 +7,12 @@ export interface HookEvent {
   chat?: any[];
   summary?: string;
   timestamp?: number;
+  priority?: number;
+  priority_metadata?: {
+    classified_at: number;
+    classification_reason: string;
+    retention_policy: string;
+  };
 }
 
 export interface FilterOptions {
@@ -18,6 +24,31 @@ export interface FilterOptions {
 export interface WebSocketMessage {
   type: 'initial' | 'event';
   data: HookEvent | HookEvent[];
+}
+
+// Priority WebSocket Protocol Types
+export interface PriorityWebSocketMessage {
+  type: 'initial' | 'event' | 'priority_event' | 'session_event' | 'priority_session_event';
+  data: HookEvent | HookEvent[];
+  sessionId?: string; // For multi-session support
+  priority_info?: {
+    total_events: number;
+    priority_events: number;
+    regular_events: number;
+    retention_window: {
+      priority_hours: number;
+      regular_hours: number;
+    };
+    protocol_version?: string;
+  };
+}
+
+export interface PriorityBucketConfig {
+  maxPriorityEvents: number;
+  maxRegularEvents: number;
+  totalDisplayLimit: number;
+  priorityOverflowStrategy: 'remove_oldest_regular' | 'remove_oldest_priority' | 'strict_limits';
+  enablePriorityIndicators: boolean;
 }
 
 export type TimeRange = '1m' | '3m' | '5m';

@@ -149,7 +149,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useWebSocket } from './composables/useWebSocket';
+import { useWebSocketWithPriority } from './composables/useWebSocketWithPriority';
 import EventTimeline from './components/EventTimeline.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import StickScrollButton from './components/StickScrollButton.vue';
@@ -158,7 +158,7 @@ import SubagentComms from './components/SubagentComms.vue';
 import SessionsView from './components/SessionsView.vue';
 
 // WebSocket connection
-const { events, isConnected, error, ws: wsConnection } = useWebSocket('ws://localhost:4000/stream');
+const { allEvents: events, isConnected, error, ws: wsConnection } = useWebSocketWithPriority('ws://localhost:4000/stream');
 
 // Tab state
 const activeTab = ref('events');

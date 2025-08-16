@@ -79,10 +79,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/context/repo_map.py"
-          },
-          {
-            "type": "command",
             "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type UserPromptSubmit --summarize"
           }
         ]
