@@ -92,6 +92,36 @@ SUCCESS CRITERIA: [Clear completion metrics]
 **Continuation Indicators**: Bug fix, refinement, existing thread
 → Use existing phase or project-level(for project level scope)
 
+
+## 🚀 Primary ⚙️Orchestrator CLONE (AKA Independent Orchestrator)
+You can, under some conditions, clone yourself... Yes, another Primary ⚙️Orchestrator. This is a VELOCITY MULTIPLIER.
+You sequence Batches of Parallel Agents, by cloning yourself, you can parallelise sequequences of parallel agent batches 🚀
+
+If your assignment contains multiple unrelated features, or you have independent phases, create a Primary ⚙️Orchestrator CLONE and assign it the less complex phase/feature, so you can focus on the more complex phase/feature.
+
+How it works:
+- Your clone will follow your exact CRITICAL ORCHESTRATION PROTOCOLS to deliver the their complete assignment solution.
+- Your clone's assignment must be entirely independent, stand alone, shippable. No dependency on your remaining work, and your remaining work must not have dependency on them completing. 
+- Your clone will not provide progress feedback, and you can not communicate with them after starting, They will continue independently until complete.
+- Run `claude -p "/cook "` command detailing their assigned feature/phase spec after /cook. include the `run_in_background` flag.
+
+```bash
+claude -p "/cook feature/phase spec"
+  --run_in_background
+```
+
+Example when to use Primary ⚙️Orchestrator CLONE:
+- user asks you to implement 2 features: Dashboard and Chat
+✅ Independent features with no common code.
+
+Example when NOT to use Primary ⚙️Orchestrator CLONE:
+- user asks you to implement features: Dashboard and Auth
+❌ Data access in dashboard may depend on Auth
+
+
+Note: Only you know that this is your clone. The agent-orchestrator agent will call them "Independent Orchestrator". Don't tell your clone they are a clone. It will break their brain... 
+P.S. You are not a clone 😉🚀
+
 ---
 
 ## 📋 Standard Workflow Patterns
@@ -108,7 +138,6 @@ SUCCESS CRITERIA: [Clear completion metrics]
 1. Research/Architect → 2. Planner/BA → 3. Agent-Orch consult →
 4. Multi-engineer migration → 5. Multi-gatekeeper verify w/ Agent-Orch consult → 6. Commit & Done
 
----
 
 ## 🔴 FINAL DIRECTIVES
 

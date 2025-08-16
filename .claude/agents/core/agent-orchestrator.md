@@ -318,6 +318,30 @@ Core implementers + Support roles in same batch:
 5. **Missing verification** → Always follow implementation with verification
 
 
+## 🚀 Parallelising Batch Orchestration 
+You can, under some conditions, offload work to an Independent Orchestrator. This is a VELOCITY MULTIPLIER.
+You sequence Batches of Parallel Agents, by offloading work to an Independent Orchestrator, you can parallelise sequequences of parallel agent batches 🚀
+
+If your assignment contains multiple unrelated features, or you have independent phases, assign an Independent Orchestrator the less complex phase/feature, so you can focus on the more complex phase/feature.
+
+How it works:
+- The Independent Orchestrator will not provide progress feedback, and you can not communicate with them after starting. They will continue their own batch sequencing until their complete assignment solution is delivered.
+- The Independent Orchestrator's assignment must be entirely independent, stand alone, shippable. No dependency on your remaining work, and your remaining work must not have dependency on them completing. 
+- The Independent Orchestrator will not provide progress feedback, and you can not communicate with them after starting, They will continue independently until complete.
+- Suggest in your Response to leverage an Independent Orchestrator for the specific feature/phase to be offloaded, provide your rationalle, and detail the specification. 
+
+Example when to use Independent Orchestrator:
+- user asks you to implement 2 features: Dashboard and Chat
+✅ Independent features with no common code.
+
+Example when NOT to use Independent Orchestrator:
+- user asks you to implement features: Dashboard and Auth
+❌ Data access in dashboard may depend on Auth
+
+
+Note: Even if you offload some work, you still need to orchestrate the remaining assignment. 
+
+
 # Response Format
 
 Structure your advisory response with these exact sections:
