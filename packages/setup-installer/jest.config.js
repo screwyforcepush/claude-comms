@@ -81,7 +81,7 @@ module.exports = {
   },
   
   // Test timeout (30 seconds for network tests)
-  testTimeout: 30000,
+  testTimeout: 10000,
   
   // Verbose output for development
   verbose: true,

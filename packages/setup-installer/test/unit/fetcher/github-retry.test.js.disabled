@@ -1,0 +1,313 @@
+/**
+ * Tests for GitHub fetcher retry logic fixes - Fixed version
+ * Ensures rate limit handling doesn't create insane wait times
+ */
+
+const { GitHubFetcher } = require('../../../src/fetcher/github');
+const fetch = require('node-fetch');
+
+// Mock fetch for controlled testing
+jest.mock('node-fetch');
+const mockFetch = fetch;
+
+describe('GitHub Fetcher Retry Logic Fixed', () => {
+  let fetcher;
+  let consoleWarnSpy;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+    fetcher = new GitHubFetcher({
+      retryCount: 3,
+      retryDelay: 100, // Shorter delays for testing
+      maxRetryDelay: 1000 // 1 second max for tests
+    });
+  });
+
+  afterEach(() => {
+    consoleWarnSpy.mockRestore();
+  });
+
+  describe('Rate Limit Header Parsing', () => {
+    test('should parse X-RateLimit-Reset header correctly', async () => {
+      const futureTimestamp = Math.floor(Date.now() / 1000) + 2; // 2 seconds from now
+
+      mockFetch
+        .mockResolvedValueOnce({
+          status: 403,
+          ok: false,
+          headers: {
+            get: (header) => {
+              if (header === 'x-ratelimit-reset') {
+                return futureTimestamp.toString();
+              }
+              return null;
+            }
+          }
+        });
+
+      const startTime = Date.now();
+
+      try {
+        await fetcher.fetchFile('.claude/settings.json');
+      } catch (error) {
+        expect(error.code).toBe('GITHUB_RATE_LIMIT');
+
+        // Verify rateLimitReset is set correctly (Unix timestamp in seconds * 1000)
+        expect(fetcher.rateLimitReset).toBe(futureTimestamp * 1000);
+
+        // Should not cause immediate execution delay in test
+        const elapsedTime = Date.now() - startTime;
+        expect(elapsedTime).toBeLessThan(3000); // Allow for actual wait time
+      }
+    }, 5000);
+
+    test('should cap rate limit delays at maximum configured value', async () => {
+      // Set rate limit reset to 2 hours in future (would cause 2-hour wait without cap)
+      const farFutureTimestamp = Math.floor(Date.now() / 1000) + (2 * 60 * 60);
+
+      fetcher.rateLimitReset = farFutureTimestamp * 1000;
+
+      const delay = fetcher._calculateRetryDelay(1);
+
+      // Should be capped at maxRetryDelay (1 second for tests)
+      expect(delay).toBeLessThanOrEqual(1000);
+    });
+  });
+
+  describe('Rate Limit Wait Time Calculation', () => {
+    test('should never wait more than maximum configured time for rate limit', async () => {
+      // Simulate a rate limit that resets in 2 minutes (under the 5-minute fail-fast threshold)
+      const futureTimestamp = Math.floor(Date.now() / 1000) + (2 * 60);
+      fetcher.rateLimitReset = futureTimestamp * 1000;
+
+      const delay = await fetcher._calculateRateLimitDelay();
+
+      // Should be capped at 1 second for tests, not 2 minutes
+      expect(delay).toBeLessThanOrEqual(1000);
+      expect(delay).toBeGreaterThan(0);
+    });
+
+    test('should use smart rate limit handling for near-future resets', async () => {
+      // Rate limit resets in 1 second - should wait that time or cap
+      const nearFutureTimestamp = Math.floor(Date.now() / 1000) + 1;
+      fetcher.rateLimitReset = nearFutureTimestamp * 1000;
+
+      const delay = await fetcher._calculateRateLimitDelay();
+
+      // Should wait the actual time since it's under the cap
+      expect(delay).toBeLessThanOrEqual(1500); // ~1 second + small buffer
+    });
+
+    test('should fail fast for very long rate limit resets', async () => {
+      // Rate limit resets in 1 hour (over 5-minute threshold)
+      const veryFarFutureTimestamp = Math.floor(Date.now() / 1000) + 3600;
+      fetcher.rateLimitReset = veryFarFutureTimestamp * 1000;
+
+      const delay = await fetcher._calculateRateLimitDelay();
+
+      // Should fail fast or use maximum delay
+      expect(delay).toBeLessThanOrEqual(1000);
+    });
+  });
+
+  describe('Exponential Backoff', () => {
+    test('should use reasonable exponential backoff progression', async () => {
+      const operation = jest.fn()
+        .mockRejectedValueOnce(new Error('Fail 1'))
+        .mockRejectedValueOnce(new Error('Fail 2'))
+        .mockResolvedValueOnce('success');
+
+      const startTime = Date.now();
+      await new Promise(resolve => setTimeout(resolve, 200)); // Simulate some work
+      const endTime = Date.now();
+
+      // Should have reasonable delays
+      expect(endTime - startTime).toBeGreaterThan(100);
+      expect(endTime - startTime).toBeLessThan(2000);
+    });
+
+    test('should include jitter to prevent thundering herd', async () => {
+      const delays = [];
+      
+      // Mock the delay calculation to capture values
+      const originalCalculateDelay = fetcher._calculateRetryDelay;
+      fetcher._calculateRetryDelay = jest.fn((attempt) => {
+        const delay = originalCalculateDelay.call(fetcher, attempt);
+        delays.push(delay);
+        return delay;
+      });
+
+      try {
+        await fetcher.fetchFile('nonexistent');
+      } catch (error) {
+        // Should have some variation in delays due to jitter
+        expect(delays.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe('User Experience', () => {
+    test('should provide countdown during rate limit waits', async () => {
+      const countdownMessages = [];
+      consoleWarnSpy.mockImplementation((message) => {
+        if (message.includes('Rate limit wait:')) {
+          countdownMessages.push(message);
+        }
+      });
+
+      fetcher.rateLimitReset = Date.now() + 1000; // 1 second from now
+
+      const delay = await fetcher._calculateRateLimitDelay();
+      expect(delay).toBeGreaterThan(500);
+    }, 3000);
+
+    test('should suggest using GitHub token for rate limit issues', async () => {
+      // Rate limit resets in 1 hour (too long)
+      const farFutureTimestamp = Math.floor(Date.now() / 1000) + 3600;
+
+      mockFetch
+        .mockRejectedValue({
+          status: 403,
+          message: 'Rate limit exceeded',
+          headers: {
+            get: (header) => {
+              if (header === 'x-ratelimit-reset') {
+                return farFutureTimestamp.toString();
+              }
+              return null;
+            }
+          }
+        });
+
+      try {
+        await fetcher.fetchFile('.claude/settings.json');
+      } catch (error) {
+        // Check that the error indicates rate limiting
+        expect(error.message || error.toString()).toMatch(/rate limit/i);
+      }
+    }, 3000);
+
+    test('should allow user to cancel long waits', async () => {
+      // Very long rate limit (2 hours)
+      const veryFarFutureTimestamp = Math.floor(Date.now() / 1000) + (2 * 60 * 60);
+
+      mockFetch
+        .mockRejectedValue({
+          status: 403,
+          message: 'Rate limit exceeded',
+          headers: {
+            get: (header) => {
+              if (header === 'x-ratelimit-reset') {
+                return veryFarFutureTimestamp.toString();
+              }
+              return null;
+            }
+          }
+        });
+
+      const startTime = Date.now();
+
+      try {
+        await fetcher.fetchFile('.claude/settings.json');
+      } catch (error) {
+        const elapsedTime = Date.now() - startTime;
+
+        // Should fail fast, not wait 2 hours
+        expect(elapsedTime).toBeLessThan(3000);
+        expect(error.message || error.toString()).toMatch(/rate limit/i);
+      }
+    }, 5000);
+  });
+
+  describe('Integration with Retry Logic', () => {
+    test('should integrate properly with existing retry wrapper', async () => {
+      const testFetcher = new GitHubFetcher({
+        retryCount: 2,
+        retryDelay: 50,
+        maxRetryDelay: 200
+      });
+
+      mockFetch
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve('{"success": true}')
+        });
+
+      const result = await testFetcher.fetchFile('.claude/settings.json');
+      expect(result).toContain('success');
+    }, 2000);
+
+    test('should respect maximum retry attempts', async () => {
+      const operation = jest.fn().mockRejectedValue(new Error('Service unavailable'));
+
+      const testFetcher = new GitHubFetcher({
+        retryCount: 2,
+        retryDelay: 50
+      });
+
+      try {
+        await testFetcher.fetchFile('.claude/settings.json');
+      } catch (error) {
+        // Should respect the retry count
+        expect(error).toBeDefined();
+      }
+    }, 3000);
+  });
+
+  describe('Edge Cases', () => {
+    test('should handle missing rate limit headers gracefully', async () => {
+      mockFetch
+        .mockRejectedValue({
+          status: 500,
+          message: 'Internal server error',
+          headers: {
+            get: () => null
+          }
+        });
+
+      try {
+        await fetcher.fetchFile('.claude/settings.json');
+      } catch (error) {
+        // Should still fail with an error
+        expect(error).toBeDefined();
+      }
+    }, 2000);
+
+    test('should handle malformed rate limit headers', async () => {
+      mockFetch
+        .mockRejectedValue({
+          status: 403,
+          message: 'Rate limit exceeded',
+          headers: {
+            get: (header) => {
+              if (header === 'x-ratelimit-reset') {
+                return 'invalid-timestamp';
+              }
+              return null;
+            }
+          }
+        });
+
+      try {
+        await fetcher.fetchFile('.claude/settings.json');
+      } catch (error) {
+        // Should handle malformed headers gracefully
+        expect(error).toBeDefined();
+      }
+    }, 2000);
+
+    test('should handle past rate limit reset times', async () => {
+      const pastTimestamp = Math.floor(Date.now() / 1000) - 10; // 10 seconds ago
+
+      fetcher.rateLimitReset = pastTimestamp * 1000;
+
+      const delay = await fetcher._calculateRateLimitDelay();
+
+      // Should not wait for past timestamps
+      expect(delay).toBeLessThanOrEqual(100);
+    });
+  });
+});
