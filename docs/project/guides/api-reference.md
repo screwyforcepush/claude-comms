@@ -846,7 +846,7 @@ uv run .claude/hooks/comms/update_subagent_completion.py \
 ---
 
 For implementation examples and integration guides, see:
-- [Installation Guide](installation.md)
-- [Hook System Documentation](hook-events.md)
-- [Agent Communication Guide](agent-communication.md)
-- [Development Setup](development.md)
+- [Setup Guide](setup-guide.md)
+- [Integration Guide](integration-guide.md)
+- [Orchestration Guide](orchestration-guide.md)
+- [Development Guide](development-guide.md)

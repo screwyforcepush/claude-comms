@@ -68,26 +68,21 @@ Claude Agents → Hook Scripts → HTTP POST → Bun Server → SQLite → WebSo
 ## 📚 Documentation Hub
 
 ### Getting Started
-- [Installation Guide](docs/project/guides/installation-guide.md) - Complete setup instructions
-- [Configuration Guide](docs/project/guides/configuration.md) - Environment and API setup
-- [Integration Guide](docs/project/guides/integration.md) - Adding to your projects
+- [Setup Guide](docs/project/guides/setup-guide.md) - Installation and quick start (< 5 minutes)
+- [Integration Guide](docs/project/guides/integration-guide.md) - Adding to your projects
 
 ### Technical Reference
-- [Architecture Documentation](docs/project/guides/architecture/) - System design and components
+- [Architecture Guide](docs/project/guides/architecture-guide.md) - System design and components
 - [API Reference](docs/project/guides/api-reference.md) - Complete endpoint documentation
-- [Hook Events Guide](docs/project/guides/hook-events.md) - Event types and configuration
-- [Multi-Agent Communication](docs/project/guides/agent-communication.md) - Messaging patterns
+- [Design System Guide](docs/project/guides/design-system-guide.md) - UI components and patterns
 
-### Advanced Topics
-- [Agent Prompt & Response Capture](docs/project/guides/prompt-response-capture-user-guide.md) - Session analysis
-- [Timeline Visualization](docs/project/guides/design-system/timeline-component-guide.md) - UI components
-- [Performance Optimization](docs/project/guides/performance-optimization.md) - Scaling and tuning
+### Multi-Agent Development
+- [Orchestration Guide](docs/project/guides/orchestration-guide.md) - Multi-agent coordination patterns
+- [Development Guide](docs/project/guides/development-guide.md) - Contributing and local setup
+- [Troubleshooting Guide](docs/project/guides/troubleshooting-guide.md) - Common issues and solutions
 
-### Development
-- [Contributing Guide](CONTRIBUTING.md) - How to contribute
-- [Development Setup](docs/project/guides/development.md) - Local development
-- [Testing Guide](docs/project/guides/testing.md) - Test strategies
-- [Troubleshooting](docs/project/guides/troubleshooting.md) - Common issues
+### Archive
+- [Legacy Documentation](docs/project/guides-archive/) - Archived guides and historical technical documentation
 
 ## 🔌 API Quick Reference
 
