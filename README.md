@@ -1,7 +1,5 @@
 # Claude Code Multi-Agent Observability & Communication System
 
-A comprehensive platform for monitoring, visualizing, and enabling communication between Claude Code agents through advanced hook event tracking and inter-agent messaging. You can watch the [full breakdown here](https://youtu.be/9ijnN985O_c).
-
 ## 🎯 What This Does
 
 This dual-purpose system provides:
@@ -10,21 +8,35 @@ This dual-purpose system provides:
 2. **Multi-Agent Communication**: Infrastructure for subagents to discover, message, and coordinate with each other
 3. **Interactive Dashboard**: Timeline visualization and real-time event streaming
 
-<img src="images/app.png" alt="Multi-Agent Observability Dashboard" style="max-width: 800px; width: 100%;">
-
 ## 🚀 Quick Start
 
 ```bash
-# 1. Start the system
+# 1. Clone this repo and start the system
 ./scripts/start-system.sh
+# If this fails you probably need to bun install or whatever. Just ask claude code to sort it out.
 
-# 2. Open http://localhost:5173 in your browser
 
-# 3. Copy .claude directory to your projects
-cp -R .claude /path/to/your/project/
+# 2. Use it in your project
+npx claude-comms # in your project root.
+# or copy CLAUDE.md and .claude directory to your projects
 
-# 4. Watch events stream as you use Claude Code
+# 3. Launch claude code in your project. --dangerously-skip-permissions if you like.
+
+# 4. prompt claude to get cookin: /cook <what you want to build, requirements spec, etc>
+"/cook make a dashboard that for the real time event stream but style it like the matrix and populate the matrix characters with the event stream data"
 ```
+
+### Level Up
+1. Observe `http://localhost:5173/`
+./scripts/restart-system.sh restarts everything and can clear the db
+
+2. Install perplexity mcp. it will make your claude code cap last 20% longer. I've used $5 in a month and I'm a HEAVY user.
+`claude mcp add perplexity-ask -- npx -y server-perplexity-ask -e PERPLEXITY_API_KEY=pplx-xxxx`
+You can still be a wizzard without this, but its the difference between being Dumbledore and being Gandalf.
+
+3. In this project prompt claude with `/learn`
+My man Deckard Cain will teach you everything I know.
+
 
 ## 🏗️ Architecture Overview
 
