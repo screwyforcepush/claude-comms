@@ -26,7 +26,7 @@ on:
 env:
   NODE_VERSION: '18'
   WORKING_DIR: 'packages/setup-installer'
-  PACKAGE_NAME: '@claude-code/setup-installer'
+  PACKAGE_NAME: 'claude-comms'
 
 jobs:
   publish:
@@ -53,7 +53,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
-          scope: '@claude-code'
+          scope: ''
 
       - name: Configure Git
         run: |

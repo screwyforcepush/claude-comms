@@ -77,7 +77,9 @@
     "src/",
     "templates/",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    ".claude/",
+    "CLAUDE.md"
   ],
   "publishConfig": {
     "access": "public"
