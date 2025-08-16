@@ -244,7 +244,7 @@ class Installer extends EventEmitter {
       // Try tarball approach first if fetcher supports it
       if (this.fetcher.fetchAsTarball) {
         this.logger.info('Using optimized tarball fetch strategy');
-        
+
         try {
           const fetchedFiles = await this.fetcher.fetchAsTarball({
             version: this.options.version,
@@ -257,7 +257,7 @@ class Installer extends EventEmitter {
 
           this.logger.info(`Fetched ${this.progress.total} files successfully via tarball`);
           return fetchedFiles;
-          
+
         } catch (tarballError) {
           this.logger.warn(`Tarball fetch failed: ${tarballError.message}`);
           this.logger.info('Falling back to individual file fetch strategy');
@@ -266,7 +266,7 @@ class Installer extends EventEmitter {
 
       // Fallback to individual file fetching
       this.logger.info('Using individual file fetch strategy');
-      
+
       // Fetch .claude directory structure
       const claudeFiles = await this.fetcher.fetchDirectory('.claude', {
         version: this.options.version,

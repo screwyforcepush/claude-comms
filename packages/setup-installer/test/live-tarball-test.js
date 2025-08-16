@@ -15,7 +15,7 @@ const MAX_REQUESTS_TARGET = 3; // Should be 1 for tarball, maybe 2-3 for fallbac
 async function runLiveValidation() {
   console.log('🧪 Starting Live Tarball Validation');
   console.log('======================================');
-  
+
   const results = {
     passed: 0,
     failed: 0,
@@ -34,7 +34,7 @@ async function runLiveValidation() {
 
     let requestCount = 0;
     const originalMakeRequest = fetcher._makeRequest;
-    fetcher._makeRequest = function(...args) {
+    fetcher._makeRequest = function (...args) {
       requestCount++;
       const url = args[0];
       console.log(`  Request ${requestCount}: ${url.replace('https://api.github.com/repos/screwyforcepush/claude-code-subagent-bus', '')}`);
@@ -73,7 +73,7 @@ async function runLiveValidation() {
   // Test 2: Repository Fetch Performance
   await runTest('Repository Fetch Performance', async () => {
     let requestCount = 0;
-    
+
     // Mock to track requests without modifying the actual fetcher
     const originalFetch = require('node-fetch');
     const trackingFetch = (url, options) => {
@@ -83,12 +83,12 @@ async function runLiveValidation() {
       }
       return originalFetch(url, options);
     };
-    
+
     // Temporarily replace fetch
     require.cache[require.resolve('node-fetch')].exports = trackingFetch;
 
     const startTime = performance.now();
-    
+
     try {
       const result = await fetchRepository('main');
       const duration = performance.now() - startTime;
@@ -108,7 +108,7 @@ async function runLiveValidation() {
       }
 
       return { duration, requestCount, fileCount: result.files.length };
-      
+
     } finally {
       // Restore original fetch
       require.cache[require.resolve('node-fetch')].exports = originalFetch;
@@ -118,17 +118,17 @@ async function runLiveValidation() {
   // Test 3: Retry Logic Validation
   await runTest('Retry Logic Validation', async () => {
     const fetcher = new GitHubFetcher();
-    
+
     // Test delay calculation
     const delays = [];
-    
+
     // Test various scenarios
     fetcher.rateLimitReset = Date.now() + 45000; // 45 seconds
     delays.push(fetcher._calculateRateLimitDelay());
-    
+
     fetcher.rateLimitReset = Date.now() + 10000; // 10 seconds
     delays.push(fetcher._calculateRateLimitDelay());
-    
+
     fetcher.rateLimitReset = Date.now() + 60000; // 60 seconds
     delays.push(fetcher._calculateRateLimitDelay());
 
@@ -158,7 +158,7 @@ async function runLiveValidation() {
   // Test 4: File Structure Validation
   await runTest('File Structure Validation', async () => {
     const result = await fetchRepository('main');
-    
+
     const expectedFiles = [
       'settings.json',
       'send_message.py',
@@ -207,21 +207,21 @@ async function runLiveValidation() {
 async function runTest(name, testFn, results) {
   console.log(`\n🧪 Test: ${name}`);
   console.log('-'.repeat(50));
-  
+
   try {
     const startTime = performance.now();
     const testResult = await testFn();
     const duration = performance.now() - startTime;
-    
+
     results.passed++;
     results.tests.push({ name, status: 'passed', duration, result: testResult });
-    
+
     console.log(`✅ PASSED (${Math.round(duration)}ms)`);
-    
+
   } catch (error) {
     results.failed++;
     results.tests.push({ name, status: 'failed', error: error.message });
-    
+
     console.log(`❌ FAILED: ${error.message}`);
   }
 }

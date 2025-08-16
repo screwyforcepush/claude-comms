@@ -153,7 +153,7 @@ class GitHubFetcher extends EventEmitter {
    */
   async fetchAsTarball(options = {}) {
     const fetchOptions = this._prepareFetchOptions(options);
-    
+
     this.emit('progress', {
       task: 'fetch_tarball',
       current: 0,
@@ -164,9 +164,9 @@ class GitHubFetcher extends EventEmitter {
     try {
       // Download tarball from GitHub
       const tarballBuffer = await this._downloadTarball(fetchOptions);
-      
+
       this.emit('progress', {
-        task: 'fetch_tarball', 
+        task: 'fetch_tarball',
         current: 50,
         message: 'Extracting files from tarball...',
         status: 'running'
@@ -591,17 +591,17 @@ class GitHubFetcher extends EventEmitter {
       if (error.code === 'GITHUB_RATE_LIMIT') {
         // Check if we should fail fast
         this._shouldFailFastOnRateLimit();
-        
+
         // Calculate smart rate limit delay
         const delay = this._calculateRateLimitDelay();
-        
+
         if (delay > 0) {
           console.warn(`Rate limit exceeded. Waiting ${Math.round(delay / 1000)}s before retry ${attempt + 1}/${this.config.retryCount}`);
-          
+
           if (!this.config.token) {
             console.warn('💡 Tip: Set GITHUB_TOKEN environment variable to increase rate limits (5,000/hour vs 60/hour)');
           }
-          
+
           // Show countdown for longer waits
           if (delay > 5000) {
             await this._waitWithCountdown(delay);
@@ -656,8 +656,8 @@ class GitHubFetcher extends EventEmitter {
     if (timeUntilReset > 5 * 60 * 1000) {
       throw new GitHubAPIError(
         `Rate limit reset time too far in future (${Math.round(timeUntilReset / 1000)}s). Consider using a GitHub token or try again later.`,
-        { 
-          resetTime: this.rateLimitReset, 
+        {
+          resetTime: this.rateLimitReset,
           delaySeconds: Math.round(timeUntilReset / 1000),
           suggestion: 'Use GITHUB_TOKEN environment variable to increase rate limits'
         }
@@ -677,13 +677,13 @@ class GitHubFetcher extends EventEmitter {
     }
 
     const timeUntilReset = this.rateLimitReset - Date.now();
-    
+
     // Fail fast if rate limit won't reset for more than 5 minutes
     if (timeUntilReset > 5 * 60 * 1000) {
       throw new GitHubAPIError(
         `Rate limit reset time too far in future (${Math.round(timeUntilReset / 1000)}s). Installation cancelled.`,
-        { 
-          resetTime: this.rateLimitReset, 
+        {
+          resetTime: this.rateLimitReset,
           delaySeconds: Math.round(timeUntilReset / 1000),
           suggestion: 'Use GITHUB_TOKEN environment variable or try again later'
         }
@@ -701,17 +701,17 @@ class GitHubFetcher extends EventEmitter {
     if (this.rateLimitReset && Date.now() < this.rateLimitReset) {
       // Use smart rate limit delay calculation
       const delay = this._calculateRateLimitDelay();
-      
+
       if (delay > 0) {
         console.warn(`Rate limit active, waiting ${Math.round(delay / 1000)}s`);
-        
+
         if (delay > 5000) {
           await this._waitWithCountdown(delay);
         } else {
           await this._sleep(delay);
         }
       }
-      
+
       this.rateLimitReset = null;
     }
   }
@@ -741,16 +741,16 @@ class GitHubFetcher extends EventEmitter {
   async _waitWithCountdown(totalMs) {
     const intervalMs = 1000; // Update every second
     let remainingMs = totalMs;
-    
+
     while (remainingMs > 0) {
       const remainingSeconds = Math.ceil(remainingMs / 1000);
       process.stdout.write(`\r⏳ Rate limit wait: ${remainingSeconds}s remaining...`);
-      
+
       const sleepTime = Math.min(intervalMs, remainingMs);
       await this._sleep(sleepTime);
       remainingMs -= sleepTime;
     }
-    
+
     process.stdout.write('\r✅ Rate limit wait complete.\n');
   }
 
@@ -760,10 +760,10 @@ class GitHubFetcher extends EventEmitter {
    */
   async _waitForRateLimit() {
     const delay = this._calculateRateLimitDelay();
-    
+
     if (delay > 0) {
       console.warn(`Rate limit active, waiting ${Math.round(delay / 1000)}s`);
-      
+
       if (delay > 5000) {
         await this._waitWithCountdown(delay);
       } else {
@@ -834,7 +834,7 @@ class GitHubFetcher extends EventEmitter {
     const url = `${this.config.baseUrl}/repos/${this.repository.owner}/${this.repository.repo}/tarball/${version}`;
 
     const response = await this._makeRequest(url);
-    
+
     if (!response.ok) {
       throw new GitHubAPIError(
         `Failed to download tarball: ${response.status} ${response.statusText}`,
@@ -844,7 +844,7 @@ class GitHubFetcher extends EventEmitter {
 
     // Download tarball as buffer
     const buffer = await response.buffer();
-    
+
     if (buffer.length === 0) {
       throw new GitHubAPIError(
         'Downloaded tarball is empty',
@@ -872,7 +872,7 @@ class GitHubFetcher extends EventEmitter {
 
       // Create temporary directory for extraction
       const tempDir = path.join(os.tmpdir(), `claude-extract-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-      
+
       // Track files we want to keep
       const wantedFiles = new Map();
       let rootDirName = null;
@@ -882,7 +882,7 @@ class GitHubFetcher extends EventEmitter {
         filter: (filePath, entry) => {
           // Debug logging
           console.log(`DEBUG: Processing ${filePath} (type: ${entry.type})`);
-          
+
           // Auto-detect root directory from first file/directory path
           if (!rootDirName) {
             // GitHub tarballs typically have format: "owner-repo-hash/path/to/file"
@@ -894,26 +894,26 @@ class GitHubFetcher extends EventEmitter {
           }
 
           // Remove root directory prefix to get actual file path
-          const actualPath = rootDirName && filePath.startsWith(rootDirName + '/') ? 
+          const actualPath = rootDirName && filePath.startsWith(rootDirName + '/') ?
             filePath.slice(rootDirName.length + 1) : filePath;
-          
+
           // Only extract files we care about
           const isClaudeFile = actualPath.startsWith('.claude/') || actualPath === '.claude';
           const isClaudeMd = actualPath === 'CLAUDE.md';
-          
+
           console.log(`DEBUG: ${actualPath} -> claude: ${isClaudeFile}, md: ${isClaudeMd}, type: ${entry.type}`);
-          
+
           if ((isClaudeFile || isClaudeMd) && entry.type === 'File') {
             wantedFiles.set(filePath, actualPath);
             console.log(`DEBUG: Will extract: ${filePath} -> ${actualPath}`);
             return true;
           }
-          
+
           // Also allow .claude directories to be processed for their children
           if (isClaudeFile && entry.type === 'Directory') {
             return true;
           }
-          
+
           return false;
         }
       });
@@ -928,18 +928,18 @@ class GitHubFetcher extends EventEmitter {
       extractStream.on('finish', async () => {
         try {
           console.log(`DEBUG: Processing ${wantedFiles.size} extracted files`);
-          
+
           // Process extracted files
           for (const [extractedPath, actualPath] of wantedFiles) {
             const fullPath = path.join(tempDir, extractedPath);
-            
+
             try {
               const stats = await fs.promises.stat(fullPath);
-              
+
               if (stats.isFile()) {
                 const content = await fs.promises.readFile(fullPath, 'utf-8');
                 console.log(`DEBUG: Read ${actualPath} (${content.length} bytes)`);
-                
+
                 if (actualPath === 'CLAUDE.md') {
                   const claudeMdFileObj = {
                     path: 'CLAUDE.md',
@@ -948,7 +948,7 @@ class GitHubFetcher extends EventEmitter {
                     type: 'file'
                   };
                   extractedFiles['CLAUDE.md'] = claudeMdFileObj;
-                  console.log(`DEBUG: Added CLAUDE.md to result`);
+                  console.log('DEBUG: Added CLAUDE.md to result');
                 } else if (actualPath.startsWith('.claude/')) {
                   // Add to .claude files
                   const fileObj = {
@@ -957,10 +957,10 @@ class GitHubFetcher extends EventEmitter {
                     encoding: 'utf-8',
                     type: 'file'
                   };
-                  
+
                   extractedFiles['.claude'].files.push(fileObj);
                   console.log(`DEBUG: Added ${actualPath} to .claude files (${extractedFiles['.claude'].files.length} total)`);
-                  
+
                   // Build directory structure for compatibility
                   const relativePath = actualPath.slice('.claude/'.length);
                   this._addToDirectoryStructure(extractedFiles['.claude'], relativePath, fileObj);
@@ -983,7 +983,7 @@ class GitHubFetcher extends EventEmitter {
           }
 
           resolve(extractedFiles);
-          
+
         } catch (processingError) {
           reject(new GitHubAPIError(
             `File processing failed: ${processingError.message}`,
@@ -1010,15 +1010,15 @@ class GitHubFetcher extends EventEmitter {
    * Add file to directory structure for compatibility with existing code
    * @private
    */
-  _addToDirectoryStructure(claudeDir, relativePath, fileObj) {
+  _addToDirectoryStructure(claudeDir, relativePath, _fileObj) {
     const parts = relativePath.split('/');
     let currentLevel = claudeDir.children;
     let currentPath = '.claude';
-    
+
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       currentPath = `${currentPath}/${part}`;
-      
+
       if (i === parts.length - 1) {
         // This is the file
         currentLevel.push({
@@ -1056,17 +1056,17 @@ async function fetchRepository(gitRef = 'main', options = {}) {
     // Strategy 1: Tarball approach (fastest, single request)
     console.log('Attempting tarball fetch strategy...');
     const tarballFiles = await fetcher.fetchAsTarball({ version: gitRef });
-    
+
     return {
       claudeDirectory: tarballFiles['.claude'],
       claudeFile: tarballFiles['CLAUDE.md'],
       files: [...(tarballFiles['.claude'].files || []), tarballFiles['CLAUDE.md']]
     };
-    
+
   } catch (tarballError) {
     console.warn(`Tarball fetch failed: ${tarballError.message}`);
     console.log('Falling back to individual file fetch strategy...');
-    
+
     try {
       // Strategy 2: Individual file fetch (fallback)
       const [claudeDir, claudeMd] = await Promise.all([
@@ -1079,7 +1079,7 @@ async function fetchRepository(gitRef = 'main', options = {}) {
         claudeFile: claudeMd,
         files: [...(claudeDir.files || []), claudeMd]
       };
-      
+
     } catch (fallbackError) {
       console.error('Both tarball and individual fetch strategies failed');
       throw new Error(
