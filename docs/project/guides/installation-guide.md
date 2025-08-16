@@ -19,15 +19,7 @@ Before getting started, ensure you have the following installed on your system:
 - **Node.js** - Required for client development
 - **Python 3.8+** - Required for hook scripts
 
-### Required API Keys
-- **Anthropic API Key** - Set as `ANTHROPIC_API_KEY` environment variable (required)
-
-### Optional API Keys
-- **OpenAI API Key** - For multi-model support with just-prompt MCP tool
-- **ElevenLabs API Key** - For audio features and TTS notifications
-- **Google Gemini API Key** - For additional AI model support
-
-### Platform Support
+# Platform Support
 This system supports:
 - **macOS** (recommended)
 - **Linux** (Ubuntu, Debian, CentOS, etc.)

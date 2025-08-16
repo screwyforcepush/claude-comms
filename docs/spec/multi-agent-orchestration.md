@@ -550,3 +550,28 @@ This blueprint provides a complete framework for parallel multi-agent software d
 
 
 
+# V2.1 Changes
+its changed a bit since then. eg. I merged tester into Engineer (and Architect for some high level test framework/scenario planning), and combined code-reviewer and green verifier into a new "gatekeeper" for validation.
+* The Primary Orchestrator has reference context CLAUDE.md file attached. This is guidance that is not always strictly followed, but it is always in context for reference. everything above Project Overview (specific to a code repo) is relevant for this assignment. 
+* The Primary Orchestrator is given strict Cook Command instructions that ARE followed. These instructions refer to the reference context, and have an injectable arg when used.  
+* There can be some overlap between reference context and cook command, but its better to keep the Command Briefer and leverage references to the CLAUDE.md context.
+* agent-orchestrator is a advisor to the Primary Orchestrator. advises on team composition, batch sequencing, etc. To inform next steps for Primary Orchestrator
+* todos is the sequence of done and next actions the Primary Orchestrator will perform
+
+Additional thoughts
+* Specific agent naming, Task tool patterns, batching, etc are important. the Language is used with purpose
+* CLAUDE.md needs to be more concise, less duplication, while remaining unambiguous and authoritative.
+* The Primary Orchestrator is missing the mark with dependency mapping, batching a gatekeeper with the implementation team of engineers... gatekeeper depends on implementation complete! 
+* The planner is not being used at the moment. I dont know why. the planner would help with dependency mapping. similar to gatekeeper, the planner needs something to plan, should follow a research-architect batch.
+* agent orchestrator is not getting used much. perhaps this agent would help with the batch dependencies.
+* agents within a batch should not be editing the same file! this is part of the dependency mapping; not just functional/architectural but also codebase. sure they can collaborate on a single file but only one of them should be editing it.
+* When the user prompts Primary Orchestrator, it should decide if new feature or continuation of previous feature (long thread) new feature means the orchestrator needs to create a phase-id dir, or ask the planner to do it. 
+* when  Primary Orchestrator is tasking agents, they should be told their role in the team and how they should be collaborating, supporting, leveraging team members.
+* multiple agents of the same type can be in a batch, tasked with a different collaboration role, focus area, etc. eg. there can be two gatekeepers, one for code pattern quality, one for visual inspection of ui. 
+* more agents in a batch are better. Work should be broken down into smallest parallisable chunks, and assigned (implem). + supporting roles.
+* Most Primary orchestrator workflows should look something like: user prompts Aassignment (Cook Command with arg) -> research/arch/BA(depending on complexity, new feature yes, bug fix no)->plan w/ existing(bug fix scenario), or new(new feature scenario) phase-id-> consult agent-orch -> Itterate untill agent-orch approves DONE:(Think hard about agent-orch reco, dependencies, sequencing -> repopulate/rework/refine todos -> agent team batch -> collate Assignment, agent team outputs,  and consult agent-orch)
+
+* CLAUDE.md and Cook Command are for Primary Orchestrator
+* CLAUDE.md is knowledge and guidance reference context, Cook Command is the instruction. Cook Command can use keywords from CLAUDE.md to trigger attention to that knowledge.
+* agent-orchestrator is the unbiased consultant, and will have a lot of overlap with Primary Orchestrator
+
