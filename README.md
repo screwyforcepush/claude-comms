@@ -1,12 +1,28 @@
-# Claude Code Multi-Agent Observability & Communication System
+# 🧙‍♂️ Multi-Agent Orchestration for Claude Code
 
-## 🎯 What This Does
+> *"Stay awhile and listen... Transform one Claude into an infinite swarm."*
 
-This dual-purpose system provides:
+**Run 10+ specialized agents in parallel. Build at the speed of thought.**
 
-1. **Complete Observability**: Real-time monitoring and visualization of Claude Code agent behavior
-2. **Multi-Agent Communication**: Infrastructure for subagents to discover, message, and coordinate with each other
-3. **Interactive Dashboard**: Timeline visualization and real-time event streaming
+## The Ancient Knowledge
+
+You've been using Claude Code like a single warrior. This system awakens the **swarm**:
+
+- **Engineers** building different modules simultaneously
+- **Architects** designing while others implement
+- **Researchers** gathering wisdom as code flows
+- **Gatekeepers** ensuring perfection in parallel
+- **Recursive Orchestration**: Infinite orchestrators managing infinite squads
+
+Watch your legion work through the real-time dashboard. Feel the power.
+
+## Token Efficiency Mastery
+
+Context-engineered for extended battles without bankruptcy:
+- Minimal context per agent (they share memory through SQLite)
+- File references, not contents (massive token savings)
+- **From the Maker**: I rarely hit my claude usage cap, even with 3-5 concurrent sessions running all day.
+
 
 ## 🚀 Quick Start
 
