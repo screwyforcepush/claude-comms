@@ -24,3 +24,4 @@ Value/Token Ratio. signal to noise. Give the model FOCUS.
 - Why waste token say lot word when few word do trick?
 - Leverage vocab for maximal compression while remaining unambiguous to the model.
 - Feedback loops. agents need internal feedback loops, orchestrators need agentic feedback loops
+- CLAUDE.md is more of a reference file, in context but not always followed organically. The commands are the true prompts and can linkback to CLAUDE.md with attention mechanisms.
