@@ -197,17 +197,21 @@ jobs:
           cd ${{ env.WORKING_DIR }}
           VERSION="${{ steps.version_info.outputs.version }}"
           TAG_NAME="v$VERSION"
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to $VERSION [skip ci]"
+          # Commented out git operations to avoid protected branch conflicts
+          # The version bump is already done locally and npm publish will use it
+          # git add package.json package-lock.json
+          # git commit -m "chore: bump version to $VERSION [skip ci]"
           git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          echo "Created tag: $TAG_NAME"
+          echo "Created tag: $TAG_NAME (local only)"
 
       - name: Push changes and tags
         if: steps.dry_run_check.outputs.is_dry_run == 'false'
         run: |
-          git push origin main
-          git push origin --tags
-          echo "Pushed changes and tags to repository"
+          # Commented out git push operations to avoid protected branch conflicts
+          # git push origin main
+          # git push origin --tags
+          echo "Git push operations disabled due to protected branch restrictions"
+          echo "Version bump completed locally for npm publish"
 
       - name: Set publish status
         id: publish_check
