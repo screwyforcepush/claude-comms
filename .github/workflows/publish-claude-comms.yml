@@ -3,9 +3,6 @@ name: Publish Claude Comms Setup Installer
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'packages/setup-installer/**'
-      - '.github/workflows/publish-claude-comms.yml'
   workflow_dispatch:
     inputs:
       version_bump:
@@ -30,6 +27,7 @@ env:
 
 jobs:
   publish:
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     
     permissions:
@@ -57,8 +55,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
 
       - name: Cache dependencies
         uses: actions/cache@v3
@@ -197,21 +195,16 @@ jobs:
           cd ${{ env.WORKING_DIR }}
           VERSION="${{ steps.version_info.outputs.version }}"
           TAG_NAME="v$VERSION"
-          # Commented out git operations to avoid protected branch conflicts
-          # The version bump is already done locally and npm publish will use it
-          # git add package.json package-lock.json
-          # git commit -m "chore: bump version to $VERSION [skip ci]"
+          git add package.json package-lock.json
+          git commit -m "chore(release): $VERSION [skip ci]"
           git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          echo "Created tag: $TAG_NAME (local only)"
+          echo "Created tag: $TAG_NAME"
 
       - name: Push changes and tags
         if: steps.dry_run_check.outputs.is_dry_run == 'false'
         run: |
-          # Commented out git push operations to avoid protected branch conflicts
-          # git push origin main
-          # git push origin --tags
-          echo "Git push operations disabled due to protected branch restrictions"
-          echo "Version bump completed locally for npm publish"
+          git push origin main --follow-tags
+          echo "Version bump and tags pushed to main"
 
       - name: Set publish status
         id: publish_check

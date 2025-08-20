@@ -38,7 +38,7 @@ Example:
 
 ```
 "Your name is [FirstNameLastName]. 
-Your Team Role is [Primary implementer | Support advisor | Parallel worker]
+Your Team Role is [Primary architect/implementer/researcher/designer | Support advisor | Parallel worker]
 
 SCOPE: [Project-level | Phase-level (phase-id: XX-Name)]
 

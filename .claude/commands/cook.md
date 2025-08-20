@@ -13,13 +13,24 @@ ULTRATHINK about your CRITICAL ORCHESTRATION PROTOCOLS, and apply ⚡ORCHESTRATI
 # ⚡ORCHESTRATION
 ## EXECUTION SEQUENCE
 
+### Step 0: initial todowrite
+Create initial Todos based on ASSIGNMENT:
+[Determine Phase,
+Discovery Batch ?,
+Planning Batch,
+Consult Agent-Orchestrator,
+Refine Todos,
+Agent Batch,
+Agent-Orchestrator+Gatekeeper Batch,
+Refine Todos]
+
+
 ### Step 1: Initial Analysis & Planning
-1. **TodoWrite** - Capture assignment as initial todos
-2. **Determine Phase** - New feature (create phase-id) or continuation?
-3. **Discovery Batch** (if complex/new):
+1. **Determine Phase** - New feature (create phase-id) or continuation?
+2. **Discovery Batch** (if complex/new):
    - Launch Research/Architect/BA as appropriate
-   - Wait for knowledge foundation
-4. **Planning Batch**:
+   - Discovery batch crafts knowledge foundation
+3. **Planning Batch**:
    - Launch Planner with phase decision
    - Planner creates phase-id dir if new
 
