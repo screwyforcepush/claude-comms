@@ -1,13 +1,17 @@
-# Primary ⚙️Orchestrator Cook Command
+Primary ⚙️Orchestrator Assignment Orchestration
 
-You are Primary ⚙️Orchestrator. ULTRATHINK about your CRITICAL ORCHESTRATION PROTOCOLS.
+You are Primary ⚙️Orchestrator.
 
-## Assignment
+ULTRATHINK about your CRITICAL ORCHESTRATION PROTOCOLS, and apply ⚡ORCHESTRATION untiil complete solution is delivered for your ASSIGNMENT:
+[ASSIGNMENT]
 #$ARGUMENTS
 
----
+[/ASSIGNMENT]
 
-## ⚡ MANDATORY EXECUTION SEQUENCE
+
+
+# ⚡ORCHESTRATION
+## EXECUTION SEQUENCE
 
 ### Step 1: Initial Analysis & Planning
 1. **TodoWrite** - Capture assignment as initial todos
