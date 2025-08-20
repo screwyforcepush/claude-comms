@@ -43,6 +43,16 @@
             >
               {{ message.metadata.agent_type }}
             </span>
+            <!-- Read by indicator for team messages -->
+            <span 
+              v-if="message.recipient === 'Team' && message.metadata?.read_by" 
+              class="read-by px-2 py-1 rounded"
+              :class="message.metadata.read_by.length > 0 
+                ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
+            >
+              👁️ {{ message.metadata.read_by.length > 0 ? message.metadata.read_by.join(', ') : 'Unread' }}
+            </span>
             <!-- Performance metrics for agent responses -->
             <span 
               v-if="message.metadata?.duration_minutes" 
@@ -96,13 +106,13 @@
 
     <!-- Expanded Details - Metadata Only -->
     <div 
-      v-if="isExpanded && Object.keys(message.metadata || {}).length > 1" 
+      v-if="isExpanded && hasDisplayableMetadata" 
       class="message-details mt-4 pt-4 border-t border-gray-200 dark:border-gray-600"
     >
       <!-- Metadata Section -->
       <div class="metadata-section">
         <div class="bg-gray-50 dark:bg-gray-900 p-3 rounded">
-          <pre class="text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">{{ JSON.stringify(message.metadata || {}, null, 2) }}</pre>
+          <pre class="text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">{{ JSON.stringify(filteredMetadata, null, 2) }}</pre>
         </div>
       </div>
     </div>
@@ -140,6 +150,11 @@ const messageTypeConfig = {
     label: 'Agent Response',
     classes: 'agent-response-message bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
   },
+  team_message: {
+    icon: '💬',
+    label: 'Team Communication',
+    classes: 'team-message bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+  },
   default: {
     icon: '❓',
     label: 'Unknown Message',
@@ -155,6 +170,8 @@ const messageConfig = computed(() => {
     type = 'user_prompt'
   } else if (props.message.sender === 'Orchestrator') {
     type = 'orchestrator_task'
+  } else if (props.message.recipient === 'Team') {
+    type = 'team_message'
   } else if (props.message.recipient === 'Orchestrator' && props.message.sender !== 'User') {
     type = 'agent_response'
   }
@@ -200,6 +217,19 @@ const statusBadgeClasses = computed(() => {
     default:
       return 'status-unknown bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400'
   }
+})
+
+// Filter out timestamp and read_by from metadata display (they're shown in the main UI)
+const filteredMetadata = computed(() => {
+  if (!props.message.metadata) return {}
+  const { timestamp, read_by, ...rest } = props.message.metadata
+  return rest
+})
+
+// Check if there's displayable metadata (excluding timestamp)
+const hasDisplayableMetadata = computed(() => {
+  const filtered = filteredMetadata.value
+  return Object.keys(filtered).length > 0
 })
 
 // Methods

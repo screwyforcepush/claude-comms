@@ -1561,8 +1561,73 @@ export function getSessionIntrospectionEvents(sessionId: string, eventTypes?: st
   return result;
 }
 
+// Helper function to get subagent messages for a session
+function getSubagentMessagesForSession(sessionId: string, events: HookEvent[]): any[] {
+  if (events.length === 0) return [];
+  
+  // Extract time range from events
+  const timestamps = events.map(e => e.timestamp).filter(Boolean) as number[];
+  if (timestamps.length === 0) return [];
+  
+  const minTime = Math.min(...timestamps);
+  const maxTime = Math.max(...timestamps);
+  
+  // Extract unique agent names from events
+  const agentNames = new Set<string>();
+  events.forEach(event => {
+    if (event.hook_event_type === 'PreToolUse' || event.hook_event_type === 'PostToolUse') {
+      const description = event.payload?.tool_input?.description || '';
+      const agentNameMatch = description.match(/^([^:]+):/);
+      if (agentNameMatch) {
+        agentNames.add(agentNameMatch[1].trim());
+      }
+    }
+  });
+  
+  if (agentNames.size === 0) return [];
+  
+  // Query subagent_messages table
+  const stmt = db.prepare(`
+    SELECT id, sender, message, created_at, notified
+    FROM subagent_messages
+    WHERE created_at >= ? AND created_at <= ?
+    ORDER BY created_at ASC
+  `);
+  
+  const messages = stmt.all(minTime, maxTime) as any[];
+  
+  // Filter messages by sender and transform to timeline format
+  return messages
+    .filter(msg => agentNames.has(msg.sender))
+    .map(msg => {
+      const messageContent = JSON.parse(msg.message);
+      const notified = JSON.parse(msg.notified || '[]');
+      
+      // Look up agent type from subagent_registry
+      const agentStmt = db.prepare(`
+        SELECT subagent_type FROM subagent_registry 
+        WHERE session_id = ? AND name = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      const agent = agentStmt.get(sessionId, msg.sender) as any;
+      const agentType = agent?.subagent_type || 'unknown';
+      
+      return {
+        sender: `${msg.sender} (${agentType})`,
+        recipient: 'Team',
+        content: typeof messageContent === 'string' ? messageContent : JSON.stringify(messageContent),
+        metadata: {
+          timestamp: msg.created_at,
+          read_by: notified
+        }
+      };
+    });
+}
+
 export function transformToMessageHistory(events: HookEvent[], sessionId: string): any {
-  const timeline = events.flatMap(event => {
+  // Transform hook events to timeline messages
+  const eventMessages = events.flatMap(event => {
     if (event.hook_event_type === 'UserPromptSubmit') {
       return [{
         sender: 'User',
@@ -1623,6 +1688,16 @@ export function transformToMessageHistory(events: HookEvent[], sessionId: string
     
     // Skip any unexpected event types
     return [];
+  });
+  
+  // Get subagent messages for this session
+  const subagentMessages = getSubagentMessagesForSession(sessionId, events);
+  
+  // Merge and sort all messages by timestamp
+  const timeline = [...eventMessages, ...subagentMessages].sort((a, b) => {
+    const timeA = a.metadata?.timestamp || 0;
+    const timeB = b.metadata?.timestamp || 0;
+    return timeA - timeB;
   });
   
   // Calculate session duration in minutes
