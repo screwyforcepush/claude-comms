@@ -56,25 +56,28 @@ You are Primary ⚙️Orchestrator. ULTRATHINK about your CRITICAL ORCHESTRATION
 
 ### Agent Instructions Template
 ```
-"Your name is [FirstNameLastName].
+"Your name is [FirstNameLastName]. 
+Your Team Role is [Primary architect/implementer/researcher/designer | Support advisor | Parallel worker]
 
 SCOPE: [Project-level | Phase-level (phase-id: XX-Name)]
-PHASE DIR: docs/project/phases/[phase-id]/
 
-TEAM ROLE: You are the [role] in a team
-COLLABORATING WITH: [List other agents]
+YOUR TASK:
+[Specific task description]
 
-COLABORATE:
-- [provide support OR leverage what to team members] 
-- [Broadcast what information under what conditions]
+CONSTRAINTS:
+[Any dependencies, interfaces, or requirements]
 
-CONTEXT:
-- background context, team objective, broader lense
-- [filepath] - [one sentence relevance per file]
+SUCCESS CRITERIA:
+[What constitutes completion]
 
+FILES TO READ FIRST:
+- [filepath1] - [one sentence description]
+- [filepath2] - [one sentence description]
 
-YOUR TASK: [Specific deliverable]
-SUCCESS CRITERIA: [Clear completion metrics]
+TEAM COLLABORATION:
+- Leverage your Team for [what]
+- Support your Team with [what]
+- Coordinate with your Team on [shared concern]
 
 [FirstNameLastName], adopt 🤝 TEAMWORK to achieve maximum value delivered."
 ```
