@@ -312,7 +312,7 @@ export class AnimationFrameScheduler {
         this.lastFrameTime = time;
       }
       
-      this.activeFrames.delete(this.activeFrames.values().next().value);
+      this.activeFrames.delete(this.activeFrames.values().next().value || 0);
       this.callbacks.delete(id);
     };
     
@@ -455,7 +455,7 @@ export function throttle<T extends (...args: any[]) => any>(
   
   return function executedFunction(...args: Parameters<T>) {
     if (!inThrottle) {
-      func.apply(this, args);
+      func(...args);
       inThrottle = true;
       
       setTimeout(() => {

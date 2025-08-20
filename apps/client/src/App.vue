@@ -158,7 +158,7 @@ import SubagentComms from './components/SubagentComms.vue';
 import SessionsView from './components/SessionsView.vue';
 
 // WebSocket connection
-const { allEvents: events, isConnected, error, ws: wsConnection } = useWebSocketWithPriority('ws://localhost:4000/stream');
+const { allEvents: events, isConnected, error } = useWebSocketWithPriority('ws://localhost:4000/stream');
 
 // Tab state
 const activeTab = ref('events');

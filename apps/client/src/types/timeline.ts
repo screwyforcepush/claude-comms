@@ -410,6 +410,38 @@ export interface TimelineAgent {
   laneIndex: number;
   batchId: string;
   sessionId: string;
+  path?: string;
+  metadata?: {
+    created_at?: number;
+    completed_at?: number;
+    completion_timestamp?: number;
+    [key: string]: any;
+  };
+}
+
+export interface TimelineScale {
+  timeToX: (timestamp: number) => number;
+  xToTime: (x: number) => number;
+  range: {
+    start: number;
+    end: number;
+    width: number;
+  };
+  domain: {
+    start: number;
+    end: number;
+    duration: number;
+  };
+}
+
+export interface TimelineBatch {
+  id: string;
+  agents: any[];
+  spawn_time: number;
+  position?: {
+    y: number;
+    height: number;
+  };
 }
 
 // ============================================================================

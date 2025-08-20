@@ -111,3 +111,64 @@ export interface SubagentMessage {
   created_at: number;
   notified?: string[];
 }
+
+// Session Introspection Types
+export interface SessionIntrospectionData {
+  session_id: string;
+  events: IntrospectionEvent[];
+  message_history: TimelineMessage[];
+  session_metadata: {
+    created_at: string;
+    total_events: number;
+    event_types: string[];
+    agents_involved: string[];
+  };
+}
+
+export interface IntrospectionEvent {
+  id: number;
+  session_id: string;
+  event_type: string;
+  timestamp: number;
+  payload: Record<string, any>;
+  source_app: string;
+}
+
+export interface TimelineMessage {
+  id: number;
+  type: 'user_prompt' | 'orchestrator_task' | 'agent_response' | string;
+  timestamp?: number;
+  content: string;
+  metadata?: {
+    session_id?: string;
+    agent_name?: string;
+    task_id?: string;
+    status?: string;
+    user_id?: string;
+    hook_event_type?: string;
+    agent_type?: string;
+    [key: string]: any;
+  };
+}
+
+// Session Introspection Response Types
+export interface SessionIntrospectionResponse {
+  sessionId: string;
+  timeline: SessionTimelineMessage[];
+  messageCount: number;
+  timeRange: {
+    start: number;
+    end: number;
+  } | null;
+}
+
+export interface SessionTimelineMessage {
+  id: number;
+  type: 'user_message' | 'orchestrator_message' | 'agent_message' | string;
+  timestamp?: number;
+  content?: Record<string, any>;
+  source_event?: {
+    hook_event_type: string;
+    [key: string]: any;
+  };
+}
