@@ -63,7 +63,6 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Review database query patterns and N+1 problems
    - Check for memory leaks and resource management
    - Evaluate caching strategies and cache invalidation
-   - Assess API response times and payload sizes
    - Consider horizontal scaling implications
    - Review async/await patterns and promise handling
    - Check for blocking operations in critical paths
