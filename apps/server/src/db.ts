@@ -1565,15 +1565,11 @@ export function transformToMessageHistory(events: HookEvent[], sessionId: string
   const timeline = events.flatMap(event => {
     if (event.hook_event_type === 'UserPromptSubmit') {
       return [{
-        id: event.id!,
-        type: 'user_prompt',
-        role: 'User',
-        timestamp: event.timestamp!,
+        sender: 'User',
+        recipient: 'Orchestrator',
         content: event.payload?.prompt || '',
         metadata: {
-          session_id: sessionId,
-          user_id: event.payload?.user_id || 'unknown',
-          hook_event_type: event.hook_event_type
+          timestamp: event.timestamp!
         }
       }];
     } else if (event.hook_event_type === 'PreToolUse' && event.payload?.tool_name === 'Task') {
@@ -1587,17 +1583,12 @@ export function transformToMessageHistory(events: HookEvent[], sessionId: string
       const agentName = agentNameMatch ? agentNameMatch[1].trim() : 'Unknown Agent';
       
       return [{
-        id: event.id!,
-        type: 'orchestrator_task',
-        role: 'Orchestrator',
-        timestamp: event.timestamp!, // This is the actual task assignment time
+        sender: 'Orchestrator',
+        recipient: `${agentName} (${agentType})`,
         content: prompt, // The full prompt is the message body
         metadata: {
-          session_id: sessionId,
-          agent_name: agentName,
-          agent_type: agentType,
-          task_description: description,
-          hook_event_type: 'orchestrator_task'
+          timestamp: event.timestamp!, // This is the actual task assignment time
+          task_description: description
         }
       }];
     } else if (event.hook_event_type === 'PostToolUse' && event.payload?.tool_name === 'Task') {
@@ -1616,56 +1607,37 @@ export function transformToMessageHistory(events: HookEvent[], sessionId: string
         const totalToolUseCount = event.payload.tool_response.totalToolUseCount || 0;
         
         return [{
-          id: event.id!,
-          type: 'agent_response',
-          role: 'Agent',
-          timestamp: event.timestamp!, // This is the actual task completion time
+          sender: `${agentName} (${agentType})`,
+          recipient: 'Orchestrator',
           content: responseText, // The response text is the message body
           metadata: {
-            session_id: sessionId,
-            agent_name: agentName,
-            agent_type: agentType,
+            timestamp: event.timestamp!, // This is the actual task completion time
             duration_minutes: Math.round(totalDurationMs / 60000 * 10) / 10, // Round to 1 decimal
             cost: Math.round(totalTokens / 1000), // Tokens/1000 rounded
-            effort: totalToolUseCount,
-            hook_event_type: 'agent_response'
+            effort: totalToolUseCount
           }
         }];
       }
       return []; // No response content, skip this event
     }
     
-    // Fallback for any unexpected event types
-    return [{
-      id: event.id!,
-      type: 'agent_response',
-      role: 'System',
-      timestamp: event.timestamp!,
-      content: JSON.stringify(event.payload || {}),
-      metadata: {
-        session_id: sessionId,
-        hook_event_type: event.hook_event_type
-      }
-    }];
+    // Skip any unexpected event types
+    return [];
   });
   
-  // Calculate time range
-  let timeRange = null;
+  // Calculate session duration in minutes
+  let sessionDurationMinutes = 0;
   if (timeline.length > 0) {
-    const timestamps = timeline.map(msg => msg.timestamp).sort((a, b) => a - b);
+    const timestamps = timeline.map(msg => msg.metadata.timestamp).sort((a, b) => a - b);
     const start = timestamps[0];
     const end = timestamps[timestamps.length - 1];
-    timeRange = {
-      start,
-      end,
-      duration: end - start
-    };
+    sessionDurationMinutes = Math.round((end - start) / 60000 * 10) / 10; // Round to 1 decimal
   }
   
   return {
     sessionId,
     timeline,
     messageCount: timeline.length,
-    timeRange
+    sessionDurationMinutes
   };
 }

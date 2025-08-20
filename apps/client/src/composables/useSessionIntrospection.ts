@@ -223,7 +223,7 @@ export function useSessionIntrospection(
     sessionId: '',
     timeline: [],
     messageCount: 0,
-    timeRange: null
+    sessionDurationMinutes: 0
   }
   
   const data = ref<SessionIntrospectionResponse>({ ...defaultResponse })
@@ -232,15 +232,8 @@ export function useSessionIntrospection(
    * Transform SessionTimelineMessage to frontend TimelineMessage format
    */
   const transformMessage = (message: SessionTimelineMessage): TimelineMessage => {
-    // The backend already provides the correct type, content, and metadata
-    // Just pass it through with minimal transformation
-    return {
-      id: message.id,
-      type: message.type || 'user_prompt',
-      timestamp: message.timestamp,
-      content: message.content || 'No content available',
-      metadata: message.metadata || {}
-    }
+    // The backend already provides the correct format, just pass it through
+    return message
   }
 
   /**
@@ -288,7 +281,7 @@ export function useSessionIntrospection(
         ...responseData,
         timeline: responseData.timeline
           .map(transformMessage)
-          .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+          .sort((a, b) => (a.metadata?.timestamp || 0) - (b.metadata?.timestamp || 0))
       }
       
       const transformTime = performance.now() - transformStartTime

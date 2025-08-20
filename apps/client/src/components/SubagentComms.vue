@@ -67,7 +67,7 @@
       </div>
 
       <!-- Content Area -->
-      <div v-if="selectedSessionId" class="flex-grow">
+      <div v-if="selectedSessionId" class="flex-grow overflow-hidden flex flex-col">
         
         <!-- Timeline View -->
         <div v-if="activeView === 'timeline'" class="h-full">
@@ -91,14 +91,12 @@
         </div>
 
         <!-- Orchestration View -->
-        <div v-else-if="activeView === 'orchestration'" class="h-full">
+        <div v-else-if="activeView === 'orchestration'" class="h-full overflow-hidden">
           <!-- Orchestration Timeline -->
-          <div class="flex-grow h-full">
-            <OrchestrationTimeline
-              :messages="introspectionMessages"
-              :session-id="selectedSessionId"
-            />
-          </div>
+          <OrchestrationTimeline
+            :messages="introspectionMessages"
+            :session-id="selectedSessionId"
+          />
         </div>
 
         <!-- List View (Original Layout) -->

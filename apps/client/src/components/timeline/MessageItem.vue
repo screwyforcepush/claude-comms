@@ -3,8 +3,6 @@
     class="message-item p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 transition-colors"
     :class="messageTypeClasses"
     :data-testid="'message-item'"
-    :data-message-id="message.id"
-    :data-message-type="message.type"
     role="article"
     tabindex="0"
     @click="handleMessageClick"
@@ -27,7 +25,7 @@
           </div>
         </div>
         
-        <!-- Message Content Preview -->
+        <!-- Message Content -->
         <div class="flex-1 min-w-0">
           <div class="message-content text-gray-800 dark:text-gray-100 text-sm leading-relaxed">
             <p class="truncate" v-if="!isExpanded">{{ contentPreview }}</p>
@@ -36,8 +34,8 @@
           
           <!-- Metadata Row -->
           <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-            <span class="message-timestamp" v-if="message.timestamp">
-              {{ formatTimestamp(message.timestamp) }}
+            <span class="message-timestamp" v-if="message.metadata?.timestamp">
+              {{ formatTimestamp(message.metadata.timestamp) }}
             </span>
             <span 
               v-if="message.metadata?.agent_type" 
@@ -96,22 +94,13 @@
       </div>
     </div>
 
-    <!-- Expanded Details -->
+    <!-- Expanded Details - Metadata Only -->
     <div 
-      v-if="isExpanded" 
+      v-if="isExpanded && Object.keys(message.metadata || {}).length > 1" 
       class="message-details mt-4 pt-4 border-t border-gray-200 dark:border-gray-600"
     >
-      <!-- Full Content -->
-      <div class="mb-4">
-        <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Content</h4>
-        <div class="bg-gray-50 dark:bg-gray-900 p-3 rounded text-sm whitespace-pre-wrap">
-          {{ message.content }}
-        </div>
-      </div>
-      
       <!-- Metadata Section -->
       <div class="metadata-section">
-        <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Metadata</h4>
         <div class="bg-gray-50 dark:bg-gray-900 p-3 rounded">
           <pre class="text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">{{ JSON.stringify(message.metadata || {}, null, 2) }}</pre>
         </div>
@@ -130,7 +119,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'toggle-expand': [messageId: number]
+  'toggle-expand': [messageKey: string]
   'copy-content': [content: string]
 }>()
 
@@ -160,7 +149,17 @@ const messageTypeConfig = {
 
 // Computed properties
 const messageConfig = computed(() => {
-  return messageTypeConfig[props.message.type as keyof typeof messageTypeConfig] || 
+  // Determine type based on sender/recipient
+  let type = 'default'
+  if (props.message.sender === 'User') {
+    type = 'user_prompt'
+  } else if (props.message.sender === 'Orchestrator') {
+    type = 'orchestrator_task'
+  } else if (props.message.recipient === 'Orchestrator' && props.message.sender !== 'User') {
+    type = 'agent_response'
+  }
+  
+  return messageTypeConfig[type as keyof typeof messageTypeConfig] || 
          messageTypeConfig.default
 })
 
@@ -171,31 +170,13 @@ const messageTypeClasses = computed(() => messageConfig.value.classes)
 // Format sender and recipient based on message type
 const formattedSender = computed(() => {
   // Debug log
-  console.log('MessageItem type:', props.message.type, 'metadata:', props.message.metadata);
+  console.log('MessageItem sender:', props.message.sender, 'recipient:', props.message.recipient);
   
-  if (props.message.type === 'user_prompt') {
-    return 'User'
-  } else if (props.message.type === 'orchestrator_task') {
-    return 'Orchestrator'
-  } else if (props.message.type === 'agent_response') {
-    const agentName = props.message.metadata?.agent_name || 'Agent'
-    const agentType = props.message.metadata?.agent_type || ''
-    return agentType ? `${agentName} (${agentType})` : agentName
-  }
-  return 'System'
+  return props.message.sender || 'Unknown'
 })
 
 const formattedRecipient = computed(() => {
-  if (props.message.type === 'user_prompt') {
-    return '→ Orchestrator'
-  } else if (props.message.type === 'orchestrator_task') {
-    const agentName = props.message.metadata?.agent_name || 'Agent'
-    const agentType = props.message.metadata?.agent_type || ''
-    return agentType ? `→ ${agentName} (${agentType})` : `→ ${agentName}`
-  } else if (props.message.type === 'agent_response') {
-    return '→ Orchestrator'
-  }
-  return ''
+  return props.message.recipient ? `→ ${props.message.recipient}` : ''
 })
 
 // Create a preview of the content (first line or truncated)
@@ -232,7 +213,9 @@ const formatTimestamp = (timestamp: number): string => {
 }
 
 const handleMessageClick = () => {
-  emit('toggle-expand', props.message.id)
+  // Use a hash of sender+recipient+timestamp as unique identifier
+  const messageKey = `${props.message.sender}-${props.message.recipient}-${props.message.metadata?.timestamp}`
+  emit('toggle-expand', messageKey)
 }
 
 const copyContent = async () => {

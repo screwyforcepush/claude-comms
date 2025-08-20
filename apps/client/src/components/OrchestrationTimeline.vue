@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="orchestration-timeline h-full flex flex-col bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600"
+    class="orchestration-timeline h-full flex flex-col bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 min-h-0"
     role="log"
     aria-live="polite"
     :aria-label="`Orchestration timeline for session ${sessionId || 'all sessions'}`"
@@ -8,7 +8,7 @@
   >
     <!-- Header -->
     <div 
-      class="timeline-header px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-700 text-white rounded-t-lg"
+      class="timeline-header flex-shrink-0 px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-700 text-white rounded-t-lg"
       data-testid="timeline-header"
     >
       <div class="flex items-center justify-between">
@@ -32,7 +32,7 @@
     </div>
 
     <!-- Timeline Content -->
-    <div class="flex-1 overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <!-- Empty State -->
       <div 
         v-if="filteredMessages.length === 0" 
@@ -56,10 +56,10 @@
         @scroll="handleScroll"
       >
         <MessageItem
-          v-for="message in filteredMessages"
-          :key="message.id"
+          v-for="(message, index) in filteredMessages"
+          :key="`${message.sender}-${message.recipient}-${message.metadata?.timestamp}-${index}`"
           :message="message"
-          :is-expanded="expandedMessages.has(message.id)"
+          :is-expanded="expandedMessages.has(`${message.sender}-${message.recipient}-${message.metadata?.timestamp}`)"
           @toggle-expand="toggleMessageExpansion"
           @copy-content="copyMessageContent"
         />
@@ -88,7 +88,7 @@ const props = defineProps<{
 }>()
 
 // Component state with performance optimizations
-const expandedMessages = ref<Set<number>>(new Set())
+const expandedMessages = ref<Set<string>>(new Set())
 // Virtual scrolling removed - incompatible with Vue 3
 const regularScrollContainer = ref<HTMLElement>()
 const screenReaderAnnouncement = ref<string>('')
@@ -134,8 +134,8 @@ const filteredMessages = computed(() => {
   const sorted = filtered
     .slice() // Avoid mutating original array
     .sort((a, b) => {
-      const timeA = a.timestamp || 0
-      const timeB = b.timestamp || 0
+      const timeA = a.metadata?.timestamp || 0
+      const timeB = b.metadata?.timestamp || 0
       return timeA - timeB
     })
   
@@ -162,7 +162,7 @@ const timeRange = computed(() => {
   if (filteredMessages.value.length === 0) return ''
   
   const timestamps = filteredMessages.value
-    .map(m => m.timestamp)
+    .map(m => m.metadata?.timestamp)
     .filter(Boolean)
     .sort((a, b) => a! - b!)
   
@@ -193,11 +193,11 @@ const shouldAutoScroll = computed(() => {
 })
 
 // Methods
-const toggleMessageExpansion = (messageId: number) => {
-  if (expandedMessages.value.has(messageId)) {
-    expandedMessages.value.delete(messageId)
+const toggleMessageExpansion = (messageKey: string) => {
+  if (expandedMessages.value.has(messageKey)) {
+    expandedMessages.value.delete(messageKey)
   } else {
-    expandedMessages.value.add(messageId)
+    expandedMessages.value.add(messageKey)
   }
   // Force reactivity
   expandedMessages.value = new Set(expandedMessages.value)
@@ -241,13 +241,15 @@ const handleScroll = () => {
 }
 
 const announceNewMessage = (message: TimelineMessage) => {
-  const typeLabels = {
-    user_prompt: 'user prompt',
-    orchestrator_task: 'orchestrator task',
-    agent_response: 'agent response'
+  let messageType = 'message'
+  if (message.sender === 'User') {
+    messageType = 'user prompt'
+  } else if (message.sender === 'Orchestrator') {
+    messageType = 'orchestrator task'
+  } else if (message.recipient === 'Orchestrator') {
+    messageType = 'agent response'
   }
   
-  const messageType = typeLabels[message.type as keyof typeof typeLabels] || 'message'
   screenReaderAnnouncement.value = `New ${messageType} received`
   
   // Clear announcement after screen reader has time to read it

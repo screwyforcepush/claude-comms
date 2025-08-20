@@ -135,18 +135,15 @@ export interface IntrospectionEvent {
 }
 
 export interface TimelineMessage {
-  id: number;
-  type: 'user_prompt' | 'orchestrator_task' | 'agent_response' | string;
-  timestamp?: number;
+  sender: string;
+  recipient: string;
   content: string;
-  metadata?: {
-    session_id?: string;
-    agent_name?: string;
-    task_id?: string;
-    status?: string;
-    user_id?: string;
-    hook_event_type?: string;
-    agent_type?: string;
+  metadata: {
+    timestamp: number;
+    task_description?: string;
+    duration_minutes?: number;
+    cost?: number;
+    effort?: number;
     [key: string]: any;
   };
 }
@@ -154,21 +151,11 @@ export interface TimelineMessage {
 // Session Introspection Response Types
 export interface SessionIntrospectionResponse {
   sessionId: string;
-  timeline: SessionTimelineMessage[];
+  timeline: TimelineMessage[];
   messageCount: number;
-  timeRange: {
-    start: number;
-    end: number;
-  } | null;
+  sessionDurationMinutes: number;
 }
 
-export interface SessionTimelineMessage {
-  id: number;
-  type: 'user_message' | 'orchestrator_message' | 'agent_message' | string;
-  timestamp?: number;
-  content?: Record<string, any>;
-  source_event?: {
-    hook_event_type: string;
-    [key: string]: any;
-  };
+export interface SessionTimelineMessage extends TimelineMessage {
+  // Alias for TimelineMessage for backward compatibility
 }
