@@ -156,14 +156,13 @@ function _displaySuccessMessage(result, options) {
   }
 
   console.log(chalk.blue('\n📋 Next Steps:'));
-  console.log(chalk.gray('1. Review .claude/settings.local.json for configuration'));
-  console.log(chalk.gray('2. Ensure Python and uv are installed for hooks functionality'));
-  console.log(chalk.gray('3. Start the observability server (optional)'));
-  console.log(chalk.gray('4. Open your project in Claude Code'));
+  console.log(chalk.gray('1. Ensure Python and uv are installed for hooks functionality'));
+  console.log(chalk.gray('2. Ensure claude-comms server is running'));
+  console.log(chalk.gray('3. Run Claude Code in your project'));
+  console.log(chalk.gray('4. /cook'));
 
   console.log(chalk.blue('\n🔗 Resources:'));
-  console.log(chalk.gray('• Documentation: .claude/README.md'));
-  console.log(chalk.gray('• Troubleshooting: Check .claude/logs/ for details'));
+  console.log(chalk.gray('• /learn in claude-comms server repo'));
   console.log(chalk.gray('• GitHub: https://github.com/alexsavage/claude-code-hooks-multi-agent-observability'));
 
   console.log(chalk.cyan('\nHappy coding with Claude! 🤖\n'));
