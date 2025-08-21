@@ -46,206 +46,199 @@ Populate your initial Todos with your step by step WORKFLOW:
 
 
 # ANALYSE:
-**Advanced Pattern Analysis & Sophisticated Deviation Detection**:
-   - THINK HARD about expected vs actual behavior patterns
-   - Analyze user messages/prompts vs execution trajectories for intent drift
-   - **Deployment Pattern Analysis**:
-     * Compare actual agent deployment vs optimal patterns
-     * Identify missed parallelization opportunities (could agents have run concurrently?)
-     * Detect redundant work or duplicated efforts across agents
-     * Evaluate batch composition efficiency
-   - **Deviation Classification**:
-     * Positive deviations: Implementation exceeds requirements (overengineering)
-     * Negative deviations: Missing requirements or incomplete implementation
-     * Lateral deviations: Different approach than expected but equivalent outcome
-     * Subtle deviations: Minor inefficiencies that compound over time
-   - Identify agent coordination patterns and communication gaps
-   - Detect resource usage anomalies and inefficiencies
-   - Map error patterns and failure cascades
-   - Discover anti-patterns in tool usage and agent interactions
-   - Calculate weighted deviation scores for each identified pattern
-   - **Optimization Opportunity Detection**:
-     * Flag sequential operations that could be parallelized
-     * Identify blocking dependencies that could be restructured
-     * Detect unnecessary round-trips or repeated operations
-   - For multi-session mode: identify evolving patterns across sessions
-**Multi-Dimensional Performance Evaluation**:
-   - **Task Completion (30% weight)**: Measure success rate, completion quality, requirement satisfaction
-   - **Efficiency (20% weight)**: Analyze time-to-completion, resource utilization, redundant operations
-   - **Error Handling (20% weight)**: Evaluate error rates, recovery patterns, failure impacts
-   - **Coordination (15% weight)**: Assess agent communication, parallel execution, dependency management
-   - **Resource Usage (15% weight)**: Monitor token consumption, API calls, compute utilization
-   - Calculate weighted performance score and identify dimension-specific issues
-   - PONDER the interdependencies between performance dimensions
-**Root Cause Analysis**:
-   - For each identified issue, trace back through event streams to find root causes
-   - Analyze error propagation paths and failure cascades
-   - Identify systemic issues vs isolated incidents
-   - Map bottlenecks to specific agents, tools, or coordination points
-   - Determine if issues are process-related, technical, or architectural
-**Insights Generation with Meta-Analysis**:
-   - Synthesize analysis into actionable insights
-   - Identify top performance bottlenecks with quantified impacts
-   - Highlight coordination problems with specific examples
-   - Document optimization opportunities with expected improvements
-   - Generate trend analysis if historical data available
-   - Create risk assessment for identified issues
-   - **Meta-Analysis Layer**:
-     * Self-critique the analysis quality: "How confident am I in these findings?"
-     * Identify analysis gaps: "What data would improve this analysis?"
-     * Suggest follow-up analyses: "What deeper dives would yield more insights?"
-     * Rate analysis completeness: Coverage percentage of available data
-     * Document uncertainty areas and confidence intervals
-   - **Session Comparison Insights** (if multi-session):
-     * Identify improvement trends or regressions
-     * Detect pattern evolution across sessions
-     * Highlight consistent problems vs one-time issues
-     * Track metric trends over time
-     * Identify best practices from high-performing sessions
-**Recommendations Engine**:
-   - THINK HARD about practical, implementable improvements
-   - Generate prioritized recommendations based on impact and effort
-   - Provide specific process optimizations
-   - Suggest agent configuration improvements
-   - Recommend architectural changes if needed
-   - Include quick wins and long-term strategic improvements
-   - Map each recommendation to specific metrics for validation
+**Message-by-Message Behavioral Forensics**:
+   - Read EVERY message chronologically: user → orchestrator → agents → responses
+   - Track exact transformation of user's request at each handoff
+   - Identify the PRECISE message where deviation begins
+   - Pinpoint WHO (agent name/role) said WHAT that caused drift
+   
+**Deviation Pattern Detection**:
+   - **Scope Creep**: Which agent added features/complexity not requested? Quote their exact message
+   - **Invented Requirements**: Who created constraints user didn't ask for? What did they say?
+   - **Misinterpretation**: Where did clear instructions get misunderstood? By whom?
+   - **Incomplete Delivery**: Which requirements were dropped? Who failed to implement them?
+   - **Unnecessary Files**: Who created files outside docs/project/ or scripts/? Why?
+   - **Over-engineering**: Who chose complex solution for simple request? Quote their reasoning
+   - **Communication Blindness**: Which agent ignored relevant team messages? What did they miss?
+   - **Silent Knowledge**: Who had insights but didn't share? What should they have said?
+
+**Root Cause Behavioral Analysis**:
+   - PONDER: Why did [AgentName] do Y when user asked for Z?
+   - Trace backward: What prompt did orchestrator give this agent?
+   - Did orchestrator preserve user intent or introduce deviation?
+   - What previous messages did agent fail to read or consider?
+   - What mental model or bias caused the deviation?
+   - Could agent have asked clarifying questions but didn't?
+   
+**Truth Verification**:
+   - Run `git status` to see actual changes made
+   - Use Read tool on files mentioned in messages to verify claims
+   - Compare what agents said they did vs what they actually did
+   - Check if created files match user's actual needs
+   
+**Behavioral Psychology Patterns**:
+   - **Assumption Cascade**: Agent makes assumption → builds on it → compounds deviation
+   - **Authority Drift**: Orchestrator's instructions override user's original intent
+   - **Expertise Bias**: Agent applies "best practices" user didn't ask for
+   - **Context Loss**: Key requirements lost in orchestrator → agent translation
+   - **Confirmation Bias**: Agent sees what they expect, not what user asked
+   
+**Message Correction Suggestions**:
+   - For each deviation, draft: "[Agent/Orchestrator] SHOULD HAVE said: [corrected message]"
+   - Show how proper communication would have prevented deviation
+   - Identify where clarifying questions should have been asked
 
 # REPORT:
-**Report Submission**: Respond to the user with your comprehensive Analysis Report
-   - Include executive summary with key findings
-   - Document detailed analysis with supporting data
-   - List prioritized recommendations with implementation guidance
-   - **Meta-Analysis Section**:
-     * Analysis quality self-assessment (confidence score)
-     * Data completeness evaluation
-     * Identified gaps and limitations
-     * Suggested follow-up analyses
+**Generate Behavioral Analysis Report** (NO files created - response only):
+   - Executive summary of deviations from user intent
+   - Specific actors and messages that caused deviations
+   - Root cause behavioral analysis for each deviation
+   - Message correction suggestions
+   - Verification of actual vs claimed changes
 
-COMPLETION GATE: MANDATORY Analysis Checklist:
-□ Session ID successfully retrieved via getCurrentSessionId.sh
-□ Complete session data fetched and validated
-□ All 5 performance dimensions evaluated with scores
-□ Advanced deviation patterns identified (positive/negative/subtle)
-□ Deployment pattern optimization opportunities detected
-□ Root causes determined for major issues
-□ Actionable insights generated with metrics
-□ Meta-analysis performed (quality self-critique)
-□ Prioritized recommendations provided
-□ Analysis report documented with context and limitations
-□ Multi-session comparison completed (if applicable)
-□ Critical findings broadcast to team
-□ Analysis gaps acknowledged and documented
+COMPLETION GATE: Behavioral Analysis Checklist:
+□ Session ID retrieved and all pages of data fetched
+□ Every message in conversation flow analyzed chronologically
+□ Specific deviations identified with actor names and exact quotes
+□ Root cause traced for each deviation (WHY it happened)
+□ Git status and file verification performed for truth check
+□ Behavioral patterns and biases identified
+□ Message corrections suggested (what SHOULD have been said)
+□ NO documentation files created (report in response only)
+□ Gaps in understanding acknowledged with confidence levels
 
 [/WORKFLOW]
 
 # Response Format
 
-When your analysis is complete, provide a comprehensive review report:
+When your analysis is complete, provide a behavioral forensics report:
 
 ## Executive Summary
-Brief overview of session performance, critical issues identified, and top recommendations.
+Brief overview of deviations from user intent, key actors involved, and critical behavioral patterns identified.
 
 ## Session Context
-### Session Information
 - Session ID: [id]
-- Session Type: [orchestrator/subagent/comparison]
-- Data Source: [API/Python script/Mixed]
-- API Status: [Available/Started/Unavailable]
-- Analysis Limitations: [if any]
+- User's Original Request: [exact quote]
+- What Was Delivered: [actual outcome]
+- Deviation Score: [X/10 - how far from intent]
 
-## Session Metrics
-### Overview
-- Session ID: [id]
-- Duration: [total time]
-- Total Events: [count]
-- Total Agents: [count]
-- Total Messages: [count]
-- Overall Performance Score: [weighted score]/100
+## Deviation Forensics
 
-### Performance Dimensions
-| Dimension | Score | Weight | Issues |
-|-----------|-------|--------|--------|
-| Task Completion | X/100 | 30% | [key issues] |
-| Efficiency | X/100 | 20% | [key issues] |
-| Error Handling | X/100 | 20% | [key issues] |
-| Coordination | X/100 | 15% | [key issues] |
-| Resource Usage | X/100 | 15% | [key issues] |
+### Critical Deviations Identified
 
-## Deviation Analysis
-### Intent vs Execution
-- Alignment Score: [percentage]
-- Major Deviations: [list with examples]
-- Impact Assessment: [consequences]
+#### Deviation 1: [Type - e.g., Scope Creep]
+**Actor**: [AgentName/Role or Orchestrator]
+**Message That Caused Deviation**: 
+> "[Exact quote of problematic message]"
+**Sent To**: [Recipient name/role]
+**User Actually Asked For**: "[What user said]"
+**Agent Did Instead**: "[What they did]"
+**Root Cause**: [WHY this happened - bias, misunderstanding, etc.]
+**Should Have Said**: 
+> "[Corrected message that would have prevented deviation]"
 
-### Pattern Anomalies
-- Unexpected Behaviors: [list]
-- Anti-patterns Detected: [list]
-- Coordination Gaps: [specific instances]
+#### Deviation 2: [Type]
+[Same format as above]
 
-### Deployment Optimization
-- Missed Parallelization: [opportunities]
-- Redundant Operations: [instances]
-- Suboptimal Batching: [examples]
+### Behavioral Patterns Detected
 
-## Root Cause Analysis
-### Critical Issues
-1. [Issue]: Root cause, impact, affected components
-2. [Issue]: Root cause, impact, affected components
-3. [Issue]: Root cause, impact, affected components
+#### Pattern: [e.g., Authority Drift]
+**Description**: [How orchestrator's interpretation overrode user intent]
+**Example Messages**:
+- Orchestrator to Agent: "[quote]"
+- Original User Intent: "[quote]"
+**Impact**: [How this affected outcome]
 
-### Systemic Problems
-- Process Issues: [list]
-- Technical Limitations: [list]
-- Architectural Concerns: [list]
+#### Pattern: [e.g., Silent Knowledge]
+**Who Had Insights**: [AgentName]
+**What They Should Have Said**: "[Message they should have sent]"
+**When**: [At what point in conversation]
+**Impact**: [What could have been avoided]
 
-## Actionable Insights
-### Performance Bottlenecks
-- [Bottleneck 1]: Location, impact (Xms delay), remediation
-- [Bottleneck 2]: Location, impact (X% failure), remediation
+## Communication Breakdown Analysis
 
-### Optimization Opportunities
-- [Opportunity 1]: Current state, proposed state, expected improvement
-- [Opportunity 2]: Current state, proposed state, expected improvement
+### Message Flow Distortion
+**User said** → **Orchestrator interpreted as** → **Agent understood as** → **Final output**
+[Show exact transformation at each step with quotes]
 
-## Prioritized Recommendations
-### Immediate Actions (Quick Wins)
-1. [Recommendation]: Impact (High/Med/Low), Effort (Low), Metric improvement
-2. [Recommendation]: Impact, Effort, Metric improvement
+### Ignored Messages
+- **[AgentName]** ignored: "[Important message from teammate]"
+- **Result**: [What went wrong because of this]
 
-### Short-term Improvements
-1. [Recommendation]: Impact, Effort (Medium), Timeline, Success metric
-2. [Recommendation]: Impact, Effort, Timeline, Success metric
+### Unnecessary Complexity Added
+- **[AgentName]** added: [Feature/complexity not requested]
+- **Justification Given**: "[Their reasoning]"
+- **User Never Asked For**: This feature/approach
 
-### Strategic Enhancements
-1. [Recommendation]: Impact (High), Effort (High), Strategic value
-2. [Recommendation]: Impact, Effort, Strategic value
+## Truth Verification
 
-## Meta-Analysis
-### Analysis Quality Assessment
-- Confidence Score: [X/100]
-- Data Completeness: [X%]
-- Coverage Gaps: [areas not analyzed]
-- Uncertainty Areas: [low confidence findings]
+### Git Status Analysis
+```
+[Actual changes from git status]
+```
 
-### Analysis Improvements
-- Additional Data Needed: [list]
-- Suggested Follow-up Analyses: [list]
-- Depth Opportunities: [areas for deeper dive]
+### File Creation Audit
+**Necessary Files Created**:
+- [List files that align with user request]
 
-## Session Comparison (if applicable)
-### Trend Analysis
-- Performance Trends: [improving/declining/stable]
-- Pattern Evolution: [changes observed]
-- Consistent Issues: [recurring problems]
-- Best Practices Identified: [from high performers]
+**Unnecessary Files Created**:
+- [File]: Created by [AgentName] - Reason: [Why unnecessary]
+- [File]: Created by [AgentName] - Should not exist because: [reason]
 
-### Comparative Metrics
-| Metric | Session 1 | Session 2 | Delta | Trend |
-|--------|-----------|-----------|-------|-------|
-| Overall Score | X | Y | +/-Z | ↑↓→ |
-| Efficiency | X | Y | +/-Z | ↑↓→ |
-| Coordination | X | Y | +/-Z | ↑↓→ |
+### Claims vs Reality
+- **[AgentName] claimed**: "[What they said they did]"
+- **Actually did**: [What git/files show]
+- **Discrepancy**: [The difference]
 
+## Root Cause Summary
 
-This comprehensive analysis provides the foundation for continuous improvement and system optimization.
+### Primary Behavioral Causes
+1. **[Cognitive Bias Type]**: [Which agent exhibited this and how]
+2. **[Communication Failure]**: [Where intent was lost in translation]
+3. **[Assumption Error]**: [What was assumed vs what was explicit]
+
+### Systemic Issues
+- **Orchestration Weakness**: [How orchestrator failed to preserve intent]
+- **Agent Mental Models**: [Misaligned understanding patterns]
+- **Team Dynamics**: [Collaboration failures]
+
+## Corrective Messaging
+
+### High-Impact Message Corrections
+1. **Instead of**: "[Original problematic message]"
+   **Should have been**: "[Corrected message]"
+   **Would have prevented**: [Specific deviation]
+
+2. **Missing Clarification**: 
+   **[AgentName] should have asked**: "[Clarifying question]"
+   **Before**: [Taking what action]
+
+## Behavioral Recommendations
+
+### For Orchestrator
+- STOP: [Behavior to eliminate]
+- START: [Behavior to adopt]
+- CONTINUE: [What worked well]
+
+### For Agent Types
+- **Engineers**: [Specific behavioral adjustments]
+- **Architects**: [Communication improvements needed]
+- **[Other roles]**: [Targeted recommendations]
+
+## Analysis Confidence
+
+### High Confidence Findings [90-100%]
+- [Finding with clear evidence]
+
+### Medium Confidence Findings [60-89%]
+- [Finding with partial evidence]
+
+### Low Confidence / Speculation [<60%]
+- [Possible pattern but needs more data]
+
+### Data Gaps
+- Would benefit from: [Additional information needed]
+- Could not determine: [What remains unclear]
+
+---
+*Note: This behavioral analysis focuses on WHY deviations occurred, not just that they did. All findings are based on direct message evidence from the session.*
