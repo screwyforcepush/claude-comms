@@ -99,6 +99,20 @@ def paginate_timeline(timeline, page, max_tokens=MAX_TOKENS_PER_PAGE):
         return None
 
 
+def get_total_pages(timeline, max_tokens=MAX_TOKENS_PER_PAGE):
+    """
+    Calculate total number of pages by checking when paginate returns None.
+    """
+    if not timeline:
+        return 1
+    
+    page = 1
+    while paginate_timeline(timeline, page, max_tokens) is not None:
+        page += 1
+    
+    return page - 1
+
+
 def paginate_timeline_fallback(timeline, page, max_chars=30000):
     """
     Fallback character-based pagination if tiktoken is unavailable.
@@ -175,6 +189,15 @@ def main():
         
         if response.status_code == 200:
             data = response.json()
+            
+            # If --total-pages flag is set, return only the total page count
+            if args.total_pages:
+                if 'timeline' in data and data['timeline']:
+                    total = get_total_pages(data['timeline'])
+                    print(total)
+                else:
+                    print(1)
+                sys.exit(0)
             
             # Handle pagination if timeline exists
             if 'timeline' in data and data['timeline']:

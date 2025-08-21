@@ -32,16 +32,21 @@ Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
 
-1. **Get Session ID**:
-  Execute `./getCurrentSessionId.sh` via Bash tool
+# INGEST:
+1. **Get session_id**:
+  Execute `Bash(./getCurrentSessionId.sh)`
    - Note: This command will appear error/blocked, but you'll receive the session ID in the error message in the format "Session ID: <session_id>"
    
-2. **Get Communication Flow Data**:
-  Execute 20 prarallel bash tools, one bash for each page 1-20 using the page flag: 
-  eg page 1: Bash `uv run .claude/hooks/session-data/get_session_data.py --session-id 07a6fb4c-50e9-41a7-924d-140daa1a3e68 --page 1`
-  - 
+2. **Get TotalPageCount**:
+  Execute `Bash(uv run .claude/hooks/session-data/get_session_data.py --session-id <session_id> --total-pages)`
+   
+3. **Get Communication Flow Data**:
+  Execute <TotalPageCount> Bash tools, one bash for each page 1-<TotalPageCount> using the page flag: 
+    eg. page 1: Bash `uv run .claude/hooks/session-data/get_session_data.py --session-id <session_id> --page 1`
 
-3. **Advanced Pattern Analysis & Sophisticated Deviation Detection**:
+
+# ANALYSE:
+**Advanced Pattern Analysis & Sophisticated Deviation Detection**:
    - THINK HARD about expected vs actual behavior patterns
    - Analyze user messages/prompts vs execution trajectories for intent drift
    - **Deployment Pattern Analysis**:
@@ -64,8 +69,7 @@ Populate your initial Todos with your step by step WORKFLOW:
      * Identify blocking dependencies that could be restructured
      * Detect unnecessary round-trips or repeated operations
    - For multi-session mode: identify evolving patterns across sessions
-
-4. **Multi-Dimensional Performance Evaluation**:
+**Multi-Dimensional Performance Evaluation**:
    - **Task Completion (30% weight)**: Measure success rate, completion quality, requirement satisfaction
    - **Efficiency (20% weight)**: Analyze time-to-completion, resource utilization, redundant operations
    - **Error Handling (20% weight)**: Evaluate error rates, recovery patterns, failure impacts
@@ -73,15 +77,13 @@ Populate your initial Todos with your step by step WORKFLOW:
    - **Resource Usage (15% weight)**: Monitor token consumption, API calls, compute utilization
    - Calculate weighted performance score and identify dimension-specific issues
    - PONDER the interdependencies between performance dimensions
-
-5. **Root Cause Analysis**:
+**Root Cause Analysis**:
    - For each identified issue, trace back through event streams to find root causes
    - Analyze error propagation paths and failure cascades
    - Identify systemic issues vs isolated incidents
    - Map bottlenecks to specific agents, tools, or coordination points
    - Determine if issues are process-related, technical, or architectural
-
-6. **Insights Generation with Meta-Analysis**:
+**Insights Generation with Meta-Analysis**:
    - Synthesize analysis into actionable insights
    - Identify top performance bottlenecks with quantified impacts
    - Highlight coordination problems with specific examples
@@ -100,8 +102,7 @@ Populate your initial Todos with your step by step WORKFLOW:
      * Highlight consistent problems vs one-time issues
      * Track metric trends over time
      * Identify best practices from high-performing sessions
-
-7. **Recommendations Engine**:
+**Recommendations Engine**:
    - THINK HARD about practical, implementable improvements
    - Generate prioritized recommendations based on impact and effort
    - Provide specific process optimizations
@@ -110,7 +111,8 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Include quick wins and long-term strategic improvements
    - Map each recommendation to specific metrics for validation
 
-8. **Report Submission**: Respond to the user with your comprehensive Analysis Report
+# REPORT:
+**Report Submission**: Respond to the user with your comprehensive Analysis Report
    - Include executive summary with key findings
    - Document detailed analysis with supporting data
    - List prioritized recommendations with implementation guidance
