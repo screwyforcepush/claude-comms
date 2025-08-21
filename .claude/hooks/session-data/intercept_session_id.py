@@ -48,10 +48,6 @@ def main():
             # Block the execution and return session ID via stderr (exit 2 pattern)
             session_message = f"Session ID: {session_id}"
             
-            # Log the interception for debugging (optional)
-            debug_message = f"[DEBUG] Intercepted getCurrentSessionId.sh call, returning session: {session_id}"
-            print(debug_message, file=sys.stderr)
-            
             # Exit with code 2 to block the tool call and provide the session ID
             # According to the hook documentation, exit code 2 feeds stderr back to Claude
             print(session_message, file=sys.stderr)
