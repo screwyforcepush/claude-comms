@@ -31,6 +31,7 @@ You must manage and maintain Todos dynamically, refine Todos after every decisio
 Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
+INGEST -> ANALYSE -> REPORT
 
 # INGEST:
 1. **Get session_id**:
