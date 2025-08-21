@@ -382,8 +382,419 @@ function redactSensitiveData(text: string): string {
    - Average session analysis time > 5 minutes
    - Positive feedback score > 4.5/5
 
+## Session Review Agent Integration
+
+### Hook-Based Session Interception Architecture
+
+This section defines the architecture for intercepting `getCurrentSessionId.sh` calls and enabling AI-powered session review through a dedicated review agent.
+
+#### Architectural Decision Records (ADRs)
+
+##### ADR-004: Command Interception via PATH Manipulation
+
+**Decision**: Use PATH manipulation to intercept `getCurrentSessionId.sh` calls
+**Rationale**:
+- Non-invasive - no modification to Claude Code or original scripts
+- Transparent to the calling process
+- Easy to enable/disable via environment configuration
+- Allows injection of review logic without breaking existing functionality
+**Trade-offs**:
+- Requires careful PATH management
+- Must ensure wrapper script maintains original behavior
+
+##### ADR-005: Event-Driven Review Triggering
+
+**Decision**: Trigger session reviews based on configurable event patterns
+**Rationale**:
+- Flexible review criteria (time-based, event count, error detection)
+- Asynchronous processing doesn't block main workflow
+- Supports both automatic and manual review triggers
+**Trade-offs**:
+- Requires event correlation logic
+- May introduce slight delay in review availability
+
+##### ADR-006: Dedicated Review Agent with Specialized Prompts
+
+**Decision**: Create a specialized review agent type with structured analysis prompts
+**Rationale**:
+- Focused analysis capabilities
+- Consistent review output format
+- Reusable across different session types
+- Integrates with existing agent infrastructure
+**Trade-offs**:
+- Requires new agent type definition
+- Prompt engineering complexity
+
+### Implementation Architecture
+
+#### 1. Command Interception Layer
+
+```bash
+# ~/.claude/hooks/wrappers/getCurrentSessionId.sh
+#!/bin/bash
+# Wrapper script for getCurrentSessionId.sh interception
+
+# Store original session ID retrieval
+ORIGINAL_SESSION_ID=$(/usr/bin/env bash -c 'echo $CLAUDE_SESSION_ID')
+
+# Trigger session review if conditions met
+python3 $CLAUDE_PROJECT_DIR/.claude/hooks/review/check_review_trigger.py \
+  --session-id "$ORIGINAL_SESSION_ID" &
+
+# Return original session ID to maintain compatibility
+echo "$ORIGINAL_SESSION_ID"
+```
+
+#### 2. Review Trigger Logic
+
+```python
+# .claude/hooks/review/check_review_trigger.py
+class ReviewTriggerService:
+    def should_trigger_review(self, session_id: str) -> bool:
+        """
+        Determine if session should be reviewed based on:
+        - Time since last review
+        - Event count threshold
+        - Error/warning patterns
+        - Manual review request
+        """
+        session_data = self.fetch_session_metrics(session_id)
+        
+        triggers = [
+            self.check_time_threshold(session_data),
+            self.check_event_count(session_data),
+            self.check_error_patterns(session_data),
+            self.check_manual_flag(session_id)
+        ]
+        
+        return any(triggers)
+    
+    def trigger_review(self, session_id: str):
+        # Queue review request
+        review_request = {
+            'session_id': session_id,
+            'trigger_time': datetime.now(),
+            'trigger_reason': self.get_trigger_reason(),
+            'priority': self.calculate_priority()
+        }
+        
+        # Send to review queue or spawn review agent
+        self.queue_review(review_request)
+```
+
+#### 3. Session Data Fetching Architecture
+
+```typescript
+// API endpoint for comprehensive session data
+interface SessionReviewAPI {
+  // Fetch complete session data for review
+  GET '/api/sessions/review/:sessionId': {
+    response: {
+      metadata: SessionMetadata;
+      events: HookEvent[];
+      agents: SubagentData[];
+      messages: AgentMessage[];
+      timeline: TimelineSegment[];
+      metrics: SessionMetrics;
+    };
+    cache: '5m';
+  };
+  
+  // Stream session transcript for AI processing
+  GET '/api/sessions/review/:sessionId/transcript': {
+    query: {
+      format: 'json' | 'markdown' | 'structured';
+      include_system?: boolean;
+      redact_sensitive?: boolean;
+    };
+    response: SessionTranscript;
+  };
+  
+  // Post review results
+  POST '/api/sessions/review/:sessionId/results': {
+    body: ReviewResults;
+    response: { success: boolean; review_id: string };
+  };
+}
+```
+
+#### 4. Review Agent Architecture
+
+```typescript
+// Review agent configuration
+interface ReviewAgent {
+  type: 'session-reviewer';
+  
+  capabilities: {
+    analyze_patterns: boolean;
+    detect_anomalies: boolean;
+    generate_insights: boolean;
+    score_performance: boolean;
+    recommend_improvements: boolean;
+  };
+  
+  prompts: {
+    initial_analysis: string;
+    deep_dive: string;
+    pattern_detection: string;
+    recommendation_generation: string;
+  };
+  
+  output_format: {
+    summary: string;
+    scores: Record<string, number>;
+    insights: Insight[];
+    recommendations: Recommendation[];
+    anomalies: Anomaly[];
+  };
+}
+```
+
+#### 5. Review Prompt Engineering
+
+```typescript
+const REVIEW_PROMPTS = {
+  initial_analysis: `
+You are analyzing a Claude Code session with ID: {session_id}
+
+Session Context:
+- Duration: {duration}
+- Agent Count: {agent_count}
+- Event Count: {event_count}
+- Error Count: {error_count}
+
+Your analysis should cover:
+1. Overall session effectiveness
+2. Agent coordination quality
+3. Error handling and recovery
+4. Performance bottlenecks
+5. Communication patterns
+
+Provide structured output with:
+- Executive summary (2-3 sentences)
+- Key metrics and scores
+- Top 3 insights
+- Top 3 recommendations
+`,
+
+  pattern_detection: `
+Analyze the following session timeline for patterns:
+
+{timeline_data}
+
+Identify:
+1. Recurring error patterns
+2. Inefficient agent batching
+3. Communication bottlenecks
+4. Unnecessary retries or loops
+5. Optimization opportunities
+
+For each pattern found, provide:
+- Pattern description
+- Frequency/impact
+- Root cause hypothesis
+- Recommended solution
+`,
+
+  scoring_rubric: `
+Score the session on these dimensions (0-100):
+
+1. Task Completion: Did the session achieve its objectives?
+2. Efficiency: Was the task completed with minimal steps?
+3. Error Handling: Were errors handled gracefully?
+4. Agent Coordination: Did agents work well together?
+5. Resource Usage: Was the session resource-efficient?
+
+Provide scores with brief justifications.
+`
+};
+```
+
+### Integration Points
+
+#### 1. Hook Configuration Extension
+
+```json
+{
+  "hooks": {
+    "SessionReview": [
+      {
+        "triggers": {
+          "time_interval": "30m",
+          "event_count": 100,
+          "error_threshold": 5,
+          "patterns": ["SubagentStop", "Error"]
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/review/trigger_review.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### 2. Database Schema Extensions for Reviews
+
+```sql
+-- Session review results storage
+CREATE TABLE IF NOT EXISTS session_reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  review_timestamp INTEGER NOT NULL,
+  trigger_reason TEXT,
+  reviewer_agent TEXT,
+  
+  -- Scores
+  score_completion REAL,
+  score_efficiency REAL,
+  score_error_handling REAL,
+  score_coordination REAL,
+  score_resources REAL,
+  overall_score REAL,
+  
+  -- Analysis results
+  summary TEXT,
+  insights JSON,
+  recommendations JSON,
+  patterns JSON,
+  anomalies JSON,
+  
+  -- Metadata
+  processing_time_ms INTEGER,
+  model_used TEXT,
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  
+  FOREIGN KEY (session_id) REFERENCES events(session_id),
+  INDEX idx_reviews_session (session_id),
+  INDEX idx_reviews_timestamp (review_timestamp)
+);
+
+-- Review trigger history
+CREATE TABLE IF NOT EXISTS review_triggers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  trigger_time INTEGER NOT NULL,
+  trigger_type TEXT NOT NULL,
+  trigger_metadata JSON,
+  review_id INTEGER,
+  
+  FOREIGN KEY (review_id) REFERENCES session_reviews(id),
+  INDEX idx_triggers_session (session_id)
+);
+```
+
+#### 3. UI Components for Review Display
+
+```vue
+<!-- SessionReviewPanel.vue -->
+<template>
+  <div class="session-review-panel">
+    <div class="review-header">
+      <h3>Session Review: {{ sessionId }}</h3>
+      <div class="review-scores">
+        <ScoreCard 
+          v-for="score in reviewScores"
+          :key="score.name"
+          :score="score"
+        />
+      </div>
+    </div>
+    
+    <div class="review-content">
+      <TabView>
+        <TabPanel header="Summary">
+          <ReviewSummary :data="reviewData.summary" />
+        </TabPanel>
+        
+        <TabPanel header="Insights">
+          <InsightsList :insights="reviewData.insights" />
+        </TabPanel>
+        
+        <TabPanel header="Recommendations">
+          <RecommendationsList 
+            :recommendations="reviewData.recommendations" 
+          />
+        </TabPanel>
+        
+        <TabPanel header="Patterns">
+          <PatternAnalysis :patterns="reviewData.patterns" />
+        </TabPanel>
+        
+        <TabPanel header="Timeline">
+          <ReviewTimeline 
+            :events="sessionEvents"
+            :annotations="reviewData.annotations"
+          />
+        </TabPanel>
+      </TabView>
+    </div>
+  </div>
+</template>
+```
+
+### Performance Considerations
+
+1. **Asynchronous Review Processing**
+   - Reviews run in background without blocking main workflow
+   - Queue-based processing for multiple review requests
+   - Configurable concurrency limits
+
+2. **Caching Strategy**
+   - Cache review results for 24 hours
+   - Incremental review updates for long sessions
+   - Compressed storage for large transcripts
+
+3. **Resource Management**
+   - Token usage tracking and limits
+   - Automatic transcript summarization for large sessions
+   - Selective data inclusion based on review type
+
+### Security & Privacy
+
+1. **Data Redaction**
+   - Automatic PII detection and redaction
+   - Configurable sensitive pattern matching
+   - Audit trail for redacted content
+
+2. **Access Control**
+   - Review results access based on session ownership
+   - Configurable review visibility levels
+   - Audit logging for review access
+
+### Testing Strategy
+
+1. **Unit Tests**
+   - Command wrapper functionality
+   - Trigger logic evaluation
+   - Prompt generation
+   - Score calculation
+
+2. **Integration Tests**
+   - End-to-end review flow
+   - API endpoint validation
+   - Database operations
+   - WebSocket notifications
+
+3. **Performance Tests**
+   - Review processing latency
+   - Concurrent review handling
+   - Large session analysis
+   - Memory usage monitoring
+
 ## Conclusion
 
-The Session Introspection View architecture leverages existing infrastructure while introducing targeted enhancements for historical analysis. The design prioritizes performance through lazy loading and caching, ensures data privacy through redaction, and provides rich visualization options for comprehensive session understanding.
+The Session Introspection View architecture, enhanced with the Session Review Agent integration, provides a comprehensive solution for both real-time monitoring and intelligent session analysis. The hook-based interception mechanism enables seamless integration without modifying core Claude Code functionality, while the review agent architecture leverages AI to provide actionable insights and recommendations.
 
-The modular architecture allows for incremental implementation and future extensibility, positioning the system for advanced features like pattern detection, anomaly analysis, and cross-session comparisons.
+The design prioritizes:
+- **Non-invasive integration** through PATH manipulation and hook scripts
+- **Scalable analysis** with asynchronous processing and intelligent caching
+- **Actionable insights** through structured AI analysis and scoring
+- **Privacy preservation** with configurable redaction and access controls
+- **Extensibility** for future enhancements and custom review criteria
+
+This modular architecture allows for incremental implementation and positions the system for advanced features like pattern detection, anomaly analysis, cross-session comparisons, and automated optimization recommendations.

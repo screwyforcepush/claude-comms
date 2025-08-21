@@ -3,7 +3,7 @@
 
 import json
 import sys
-
+# NOTE: this ONLY works for userPromptSubmit hook, no other hooks are supported.
 def main():
     try:
         # Read JSON input from stdin
