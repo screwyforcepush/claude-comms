@@ -37,7 +37,7 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Extract the session ID from the message format "Session ID: <session_id>"
 
 2. **Data Fetching**: Fetch session data via observability API
-   - Bash `uv .claude/hooks/session-data/get_session_data.py --session-id {session_id}`
+   - Bash `uv run .claude/hooks/session-data/get_session_data.py --session-id {session_id}`
 
 3. **Advanced Pattern Analysis & Sophisticated Deviation Detection**:
    - THINK HARD about expected vs actual behavior patterns
@@ -256,10 +256,6 @@ Brief overview of session performance, critical issues identified, and top recom
 
 ## Artifacts Created
 - `/docs/project/phases/session-review/analysis-[session-id].md` - Detailed analysis report
-- `/docs/project/phases/session-review/metrics-[session-id].json` - Raw metrics data
-- `/docs/project/phases/session-review/recommendations-[session-id].md` - Implementation guide
-- `/docs/project/phases/session-review/comparison-[date].md` - Multi-session comparison (if applicable)
-- `/docs/project/phases/session-review/meta-analysis-[session-id].md` - Self-critique and gaps
 
 ## Next Steps
 - Recommended follow-up analyses

@@ -42,8 +42,7 @@ def main():
         # - bash getCurrentSessionId.sh
         # - sh getCurrentSessionId.sh  
         # - /path/to/getCurrentSessionId.sh
-        if ('getCurrentSessionId.sh' in command and 
-            ('.' in command or 'bash' in command or 'sh' in command or '/' in command)):
+        if ('getCurrentSessionId.sh' in command):
             
             # This is the command we want to intercept!
             # Block the execution and return session ID via stderr (exit 2 pattern)
