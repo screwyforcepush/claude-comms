@@ -21,7 +21,9 @@ import {
   getSessionEvents,
   storeAgentPrompt,
   storeAgentResponse,
-  getAgentPromptResponse
+  getAgentPromptResponse,
+  getSessionIntrospectionEvents,
+  transformToMessageHistory
 } from './db';
 import type { 
   HookEvent, 
@@ -37,7 +39,8 @@ import type {
   UpdateAgentDataRequest,
   ValidationError,
   PriorityEventConfig,
-  PriorityWebSocketMessage
+  PriorityWebSocketMessage,
+  SessionIntrospectionResponse
 } from './types';
 import { 
   PRIORITY_EVENT_TYPES,
@@ -635,6 +638,132 @@ const server = Bun.serve({
       } catch (error) {
         console.error('Error comparing sessions:', error);
         return new Response(JSON.stringify({ error: 'Failed to compare sessions' }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // GET /api/sessions/:sessionId/introspect - Main session introspection endpoint (WP1)
+    if (url.pathname.startsWith('/api/sessions/') && url.pathname.endsWith('/introspect') && req.method === 'GET') {
+      try {
+        const pathParts = url.pathname.split('/');
+        if (pathParts.length !== 5 || pathParts[4] !== 'introspect') {
+          return new Response(JSON.stringify({ error: 'Invalid path format. Use /api/sessions/{sessionId}/introspect' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const sessionId = pathParts[3];
+        
+        if (!sessionId || sessionId.trim() === '') {
+          return new Response(JSON.stringify({ error: 'sessionId is required' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Parse optional event types filter from query parameters
+        const typesParam = url.searchParams.get('types');
+        const eventTypes = typesParam ? typesParam.split(',').map(t => t.trim()).filter(t => t) : undefined;
+        
+        // Validate event types if provided
+        if (eventTypes && eventTypes.length > 0) {
+          const validEventTypes = ['UserPromptSubmit', 'PostToolUse'];
+          const invalidTypes = eventTypes.filter(type => !validEventTypes.includes(type));
+          if (invalidTypes.length > 0) {
+            return new Response(JSON.stringify({ 
+              error: `Invalid event types: ${invalidTypes.join(', ')}`,
+              validTypes: validEventTypes
+            }), {
+              status: 400,
+              headers: { ...headers, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        
+        // Query and transform events
+        const events = getSessionIntrospectionEvents(sessionId, eventTypes);
+        const response: SessionIntrospectionResponse = transformToMessageHistory(events, sessionId);
+        
+        return new Response(JSON.stringify(response), {
+          headers: { 
+            ...headers, 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300' // Cache for 5 minutes as suggested by HenryQuark
+          }
+        });
+        
+      } catch (error) {
+        console.error('Error in session introspection endpoint:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to fetch session introspection data',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }), {
+          status: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // GET /api/sessions/introspect/:sessionId/timeline - Session introspection endpoint (WP1) - Legacy/Alternative route
+    if (url.pathname.startsWith('/api/sessions/introspect/') && url.pathname.endsWith('/timeline') && req.method === 'GET') {
+      try {
+        const pathParts = url.pathname.split('/');
+        if (pathParts.length !== 6 || pathParts[5] !== 'timeline') {
+          return new Response(JSON.stringify({ error: 'Invalid path format. Use /api/sessions/introspect/{sessionId}/timeline' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const sessionId = pathParts[4];
+        
+        if (!sessionId || sessionId.trim() === '') {
+          return new Response(JSON.stringify({ error: 'sessionId is required' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Parse optional event types filter from query parameters
+        const typesParam = url.searchParams.get('types');
+        const eventTypes = typesParam ? typesParam.split(',').map(t => t.trim()).filter(t => t) : undefined;
+        
+        // Validate event types if provided
+        if (eventTypes && eventTypes.length > 0) {
+          const validEventTypes = ['UserPromptSubmit', 'PostToolUse'];
+          const invalidTypes = eventTypes.filter(type => !validEventTypes.includes(type));
+          if (invalidTypes.length > 0) {
+            return new Response(JSON.stringify({ 
+              error: `Invalid event types: ${invalidTypes.join(', ')}`,
+              validTypes: validEventTypes
+            }), {
+              status: 400,
+              headers: { ...headers, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        
+        // Query and transform events
+        const events = getSessionIntrospectionEvents(sessionId, eventTypes);
+        const response: SessionIntrospectionResponse = transformToMessageHistory(events, sessionId);
+        
+        return new Response(JSON.stringify(response), {
+          headers: { 
+            ...headers, 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
+          }
+        });
+        
+      } catch (error) {
+        console.error('Error in session introspection endpoint:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to fetch session timeline',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }), {
           status: 500,
           headers: { ...headers, 'Content-Type': 'application/json' }
         });

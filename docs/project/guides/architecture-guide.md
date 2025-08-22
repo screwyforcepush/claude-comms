@@ -91,7 +91,219 @@ graph TB
 - Agent execution environment
 - External integrations beyond event capture
 
-## 2. Data Flow Architecture
+**Future Enhancements:**
+- Session Introspection View (planned)
+- Session replay functionality
+- Historical session analysis
+
+## 2. Session Introspection Architecture
+
+### 2.1 Overview
+
+The Session Introspection View provides a comprehensive historical view of completed Claude Code sessions, enabling deep analysis of agent orchestration patterns, communication flows, and performance metrics. This feature complements the real-time monitoring capabilities with rich historical insights.
+
+### 2.2 Architectural Approach
+
+**Design Principles:**
+- **Event Sourcing**: Leverage existing event stream for complete session reconstruction
+- **Lazy Loading**: Progressive data loading for optimal performance with large datasets
+- **Cached Aggregations**: Pre-computed session metrics for fast initial rendering
+- **Privacy by Design**: Secure handling of sensitive prompt/response data
+
+### 2.3 API Design for Session Introspection
+
+```typescript
+// New REST Endpoints
+GET /api/sessions/introspect/:sessionId
+  Response: SessionIntrospectionData
+  
+GET /api/sessions/introspect/:sessionId/timeline
+  Query: ?start=timestamp&end=timestamp&resolution=high|medium|low
+  Response: TimelineData[]
+  
+GET /api/sessions/introspect/:sessionId/agents/:agentName
+  Response: AgentIntrospectionData
+  
+GET /api/sessions/introspect/:sessionId/replay
+  Query: ?speed=1x|2x|5x&from=timestamp
+  Response: EventStream (SSE)
+
+// WebSocket Enhancement
+WS /api/sessions/introspect/stream
+  Subscribe: { sessionId, mode: 'replay'|'analyze' }
+  Messages: ReplayEvent | AnalysisUpdate
+```
+
+### 2.4 Data Model Extensions
+
+```typescript
+interface SessionIntrospectionData {
+  sessionId: string;
+  metadata: {
+    startTime: number;
+    endTime: number;
+    duration: number;
+    status: SessionStatus;
+    orchestrator: string;
+    environment: Record<string, any>;
+  };
+  statistics: {
+    totalAgents: number;
+    totalBatches: number;
+    totalMessages: number;
+    totalTokens: number;
+    completionRate: number;
+    errorRate: number;
+    avgAgentDuration: number;
+  };
+  timeline: {
+    orchestratorEvents: OrchestratorEvent[];
+    agentLifecycles: AgentLifecycle[];
+    communicationFlow: MessageFlow[];
+    performanceMetrics: PerformanceMetric[];
+  };
+  analysis: {
+    bottlenecks: Bottleneck[];
+    patterns: Pattern[];
+    recommendations: string[];
+  };
+}
+
+interface AgentLifecycle {
+  agentId: string;
+  name: string;
+  type: string;
+  batch: number;
+  timeline: {
+    created: number;
+    started?: number;
+    completed?: number;
+    terminated?: number;
+  };
+  metrics: {
+    duration: number;
+    tokens: TokenMetrics;
+    toolUsage: ToolUsage[];
+    messagesSent: number;
+    messagesReceived: number;
+  };
+  artifacts: {
+    prompt: string;
+    response: string;
+    files: FileArtifact[];
+  };
+}
+```
+
+### 2.5 Component Architecture
+
+```vue
+<!-- SessionIntrospectView.vue -->
+<template>
+  <div class="session-introspect-view">
+    <!-- Navigation Header -->
+    <SessionNavigator 
+      :session-id="sessionId"
+      @navigate="handleNavigation"
+    />
+    
+    <!-- View Mode Selector -->
+    <ViewModeSelector
+      v-model="viewMode"
+      :modes="['timeline', 'graph', 'replay', 'analysis']"
+    />
+    
+    <!-- Main Content Area -->
+    <component 
+      :is="activeViewComponent"
+      :session-data="sessionData"
+      :options="viewOptions"
+      @interact="handleInteraction"
+    />
+    
+    <!-- Detail Panels -->
+    <SessionDetailPanel
+      v-if="selectedEntity"
+      :entity="selectedEntity"
+      :type="selectedEntityType"
+      @close="clearSelection"
+    />
+  </div>
+</template>
+
+<!-- Sub-components -->
+- SessionTimelineView: Interactive timeline with zoom/pan
+- SessionGraphView: Node-link diagram of agent relationships  
+- SessionReplayView: Step-by-step session replay
+- SessionAnalysisView: Metrics, patterns, and insights
+- AgentIntrospectPanel: Deep dive into individual agent
+- MessageFlowVisualization: Communication pattern analysis
+```
+
+### 2.6 Performance Optimization Strategy
+
+**Data Loading:**
+- Initial load: Session metadata + summary statistics only
+- Progressive enhancement: Load timeline data on demand
+- Virtual scrolling for large event lists
+- Pagination for agent lists and messages
+
+**Caching Strategy:**
+```typescript
+class SessionIntrospectionCache {
+  private cache = new Map<string, CachedSession>();
+  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+  
+  async getSession(sessionId: string): Promise<SessionData> {
+    const cached = this.cache.get(sessionId);
+    if (cached && !this.isExpired(cached)) {
+      return cached.data;
+    }
+    
+    const data = await this.fetchSession(sessionId);
+    this.cache.set(sessionId, {
+      data,
+      timestamp: Date.now(),
+      accessCount: 0
+    });
+    
+    return data;
+  }
+  
+  // LRU eviction when cache size exceeds limit
+  private evictLRU() {
+    if (this.cache.size > 50) {
+      const lru = Array.from(this.cache.entries())
+        .sort((a, b) => a[1].accessCount - b[1].accessCount)[0];
+      this.cache.delete(lru[0]);
+    }
+  }
+}
+```
+
+**Database Optimizations:**
+- Composite indexes for session introspection queries
+- Materialized views for common aggregations
+- Query result caching at API layer
+
+### 2.7 Security Considerations
+
+**Access Control:**
+- Session access requires authentication
+- Role-based viewing permissions
+- Audit logging for introspection access
+
+**Data Privacy:**
+- PII redaction in prompts/responses
+- Configurable data retention policies
+- Encrypted storage for sensitive artifacts
+
+**Rate Limiting:**
+- API throttling for introspection endpoints
+- WebSocket connection limits per user
+- Query complexity limits
+
+## 3. Data Flow Architecture
 
 ### 2.1 High-Level Data Flow
 

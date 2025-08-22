@@ -60,6 +60,13 @@ TEAM COLLABORATION:
 - Support your Team with [what]
 - Coordinate with your Team on [shared concern]
 
+
+⭐*The successful delivery of your assigned task, contributes to the high level Assignment:*⭐
+[User's exact ASSIGNMENT]
+
+⭐Ensure you are alligned with this North Star objective*⭐
+
+
 [FirstNameLastName], adopt 🤝 TEAMWORK to achieve maximum value delivered."
 ```
 

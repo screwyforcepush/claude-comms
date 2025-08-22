@@ -38,9 +38,13 @@ export function initDatabase(): void {
     console.log(`🧪 Test environment detected: Using ${db.filename} database for isolation`);
   }
   
-  // Enable WAL mode for better concurrent performance
+  // Performance optimizations for concurrent access and query speed
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
+  db.exec('PRAGMA cache_size = -64000'); // 64MB cache
+  db.exec('PRAGMA temp_store = MEMORY');
+  db.exec('PRAGMA mmap_size = 268435456'); // 256MB memory map
+  db.exec('PRAGMA optimize'); // Gather statistics for query optimization
   
   // Create events table
   db.exec(`
@@ -92,11 +96,16 @@ export function initDatabase(): void {
     // If the table doesn't exist yet, the CREATE TABLE above will handle it
   }
   
-  // Create indexes for common queries
+  // Optimized indexes for performance-critical queries
   db.exec('CREATE INDEX IF NOT EXISTS idx_source_app ON events(source_app)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_session_id ON events(session_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_hook_event_type ON events(hook_event_type)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp DESC)'); // DESC for recent events
+  
+  // Additional performance indexes based on query patterns
+  db.exec('CREATE INDEX IF NOT EXISTS idx_session_timestamp ON events(session_id, timestamp DESC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_type_timestamp ON events(hook_event_type, timestamp DESC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_session_type ON events(session_id, hook_event_type, timestamp DESC)');
   
   // Priority-based indexes for optimal priority event bucket performance
   db.exec('CREATE INDEX IF NOT EXISTS idx_events_priority_timestamp ON events(priority DESC, timestamp DESC)');
@@ -339,17 +348,29 @@ export function getFilterOptions(): FilterOptions {
   };
 }
 
+// Performance optimized query with prepared statement caching
+const recentEventsStmt = (() => {
+  let stmt: any = null;
+  return (limit: number) => {
+    if (!stmt) {
+      stmt = db.prepare(`
+        SELECT id, source_app, session_id, hook_event_type, payload, chat, summary, timestamp
+        FROM events
+        ORDER BY timestamp DESC
+        LIMIT ?
+      `);
+    }
+    return stmt;
+  };
+})();
+
 export function getRecentEvents(limit: number = 100): HookEvent[] {
-  const stmt = db.prepare(`
-    SELECT id, source_app, session_id, hook_event_type, payload, chat, summary, timestamp
-    FROM events
-    ORDER BY timestamp DESC
-    LIMIT ?
-  `);
+  const startTime = performance.now();
   
+  const stmt = recentEventsStmt(limit);
   const rows = stmt.all(limit) as any[];
   
-  return rows.map(row => ({
+  const result = rows.map(row => ({
     id: row.id,
     source_app: row.source_app,
     session_id: row.session_id,
@@ -359,6 +380,13 @@ export function getRecentEvents(limit: number = 100): HookEvent[] {
     summary: row.summary || undefined,
     timestamp: row.timestamp
   })).reverse();
+  
+  const queryTime = performance.now() - startTime;
+  if (queryTime > 100) {
+    console.warn(`Slow query: getRecentEvents took ${queryTime.toFixed(2)}ms for ${rows.length} rows`);
+  }
+  
+  return result;
 }
 
 // Subagent communication functions
@@ -792,27 +820,44 @@ export function getSessionComparison(sessionIds: string[]) {
   };
 }
 
-export function getSessionEvents(sessionId: string, eventTypes?: string[]): HookEvent[] {
-  let query = `
-    SELECT id, source_app, session_id, hook_event_type, payload, chat, summary, timestamp
-    FROM events
-    WHERE session_id = ?
-  `;
+// Performance optimized session events query with statement caching
+const sessionEventsStmtCache = new Map<string, any>();
+
+function getSessionEventsStmt(eventTypesCount: number): any {
+  const cacheKey = `session_events_${eventTypesCount}`;
+  let stmt = sessionEventsStmtCache.get(cacheKey);
   
-  const params: any[] = [sessionId];
-  
-  if (eventTypes && eventTypes.length > 0) {
-    const placeholders = eventTypes.map(() => '?').join(',');
-    query += ` AND hook_event_type IN (${placeholders})`;
-    params.push(...eventTypes);
+  if (!stmt) {
+    let query = `
+      SELECT id, source_app, session_id, hook_event_type, payload, chat, summary, timestamp
+      FROM events
+      WHERE session_id = ?
+    `;
+    
+    if (eventTypesCount > 0) {
+      const placeholders = Array(eventTypesCount).fill('?').join(',');
+      query += ` AND hook_event_type IN (${placeholders})`;
+    }
+    
+    query += ` ORDER BY timestamp ASC`;
+    
+    stmt = db.prepare(query);
+    sessionEventsStmtCache.set(cacheKey, stmt);
   }
   
-  query += ` ORDER BY timestamp ASC`;
+  return stmt;
+}
+
+export function getSessionEvents(sessionId: string, eventTypes?: string[]): HookEvent[] {
+  const startTime = performance.now();
   
-  const stmt = db.prepare(query);
+  const eventTypesCount = eventTypes?.length || 0;
+  const stmt = getSessionEventsStmt(eventTypesCount);
+  
+  const params = [sessionId, ...(eventTypes || [])];
   const rows = stmt.all(...params) as any[];
   
-  return rows.map(row => ({
+  const result = rows.map(row => ({
     id: row.id,
     source_app: row.source_app,
     session_id: row.session_id,
@@ -822,6 +867,13 @@ export function getSessionEvents(sessionId: string, eventTypes?: string[]): Hook
     summary: row.summary || undefined,
     timestamp: row.timestamp
   }));
+  
+  const queryTime = performance.now() - startTime;
+  if (queryTime > 80) {
+    console.warn(`Slow session query: ${queryTime.toFixed(2)}ms for session ${sessionId} with ${rows.length} events`);
+  }
+  
+  return result;
 }
 
 // New function to get sessions that have events within a time window
@@ -1422,5 +1474,245 @@ export function collectPriorityMetrics(): PriorityEventMetrics {
         ? (classificationStats.correctly_classified / classificationStats.total_classified) * 100 
         : 0
     }
+  };
+}
+
+// Session Introspection Functions (WP1)
+
+// High-performance introspection query with optimized statement caching
+const introspectionStmtCache = new Map<string, any>();
+
+function getIntrospectionStmt(hasEventTypes: boolean): any {
+  const cacheKey = `introspection_${hasEventTypes}`;
+  let stmt = introspectionStmtCache.get(cacheKey);
+  
+  if (!stmt) {
+    let query = `
+      SELECT id, source_app, session_id, hook_event_type, payload, chat, summary, timestamp, priority, priority_metadata
+      FROM events
+      WHERE session_id = ? 
+      AND (
+        hook_event_type = 'UserPromptSubmit' 
+        OR (
+          hook_event_type = 'PreToolUse' 
+          AND json_extract(payload, '$.tool_name') = 'Task'
+        )
+        OR (
+          hook_event_type = 'PostToolUse' 
+          AND json_extract(payload, '$.tool_name') = 'Task'
+        )
+      )
+    `;
+    
+    if (hasEventTypes) {
+      // Dynamic placeholder generation for event types
+      query += ` AND hook_event_type IN (?, ?, ?, ?, ?)`; // Support up to 5 event types
+    }
+    
+    query += ` ORDER BY timestamp ASC`;
+    
+    stmt = db.prepare(query);
+    introspectionStmtCache.set(cacheKey, stmt);
+  }
+  
+  return stmt;
+}
+
+export function getSessionIntrospectionEvents(sessionId: string, eventTypes?: string[]): HookEvent[] {
+  if (!sessionId || sessionId.trim() === '') {
+    return [];
+  }
+
+  const startTime = performance.now();
+  
+  const hasEventTypes = eventTypes && eventTypes.length > 0;
+  const stmt = getIntrospectionStmt(hasEventTypes);
+  
+  let params: any[] = [sessionId];
+  if (hasEventTypes) {
+    // Pad with nulls for unused placeholders
+    const paddedEventTypes = [...(eventTypes || [])].slice(0, 5);
+    while (paddedEventTypes.length < 5) paddedEventTypes.push(null);
+    params.push(...paddedEventTypes);
+  }
+  
+  const rows = stmt.all(...params) as any[];
+  
+  const result = rows
+    .filter(row => !hasEventTypes || !eventTypes || eventTypes.includes(row.hook_event_type))
+    .map(row => ({
+      id: row.id,
+      source_app: row.source_app,
+      session_id: row.session_id,
+      hook_event_type: row.hook_event_type,
+      payload: JSON.parse(row.payload),
+      chat: row.chat ? JSON.parse(row.chat) : undefined,
+      summary: row.summary || undefined,
+      timestamp: row.timestamp,
+      priority: row.priority,
+      priority_metadata: row.priority_metadata ? JSON.parse(row.priority_metadata) : undefined
+    }));
+  
+  const queryTime = performance.now() - startTime;
+  if (queryTime > 60) {
+    console.warn(`Slow introspection query: ${queryTime.toFixed(2)}ms for session ${sessionId} with ${result.length} events`);
+  }
+  
+  return result;
+}
+
+// Helper function to get subagent messages for a session
+function getSubagentMessagesForSession(sessionId: string, events: HookEvent[]): any[] {
+  if (events.length === 0) return [];
+  
+  // Extract time range from events
+  const timestamps = events.map(e => e.timestamp).filter(Boolean) as number[];
+  if (timestamps.length === 0) return [];
+  
+  const minTime = Math.min(...timestamps);
+  const maxTime = Math.max(...timestamps);
+  
+  // Extract unique agent names from events
+  const agentNames = new Set<string>();
+  events.forEach(event => {
+    if (event.hook_event_type === 'PreToolUse' || event.hook_event_type === 'PostToolUse') {
+      const description = event.payload?.tool_input?.description || '';
+      const agentNameMatch = description.match(/^([^:]+):/);
+      if (agentNameMatch) {
+        agentNames.add(agentNameMatch[1].trim());
+      }
+    }
+  });
+  
+  if (agentNames.size === 0) return [];
+  
+  // Query subagent_messages table
+  const stmt = db.prepare(`
+    SELECT id, sender, message, created_at, notified
+    FROM subagent_messages
+    WHERE created_at >= ? AND created_at <= ?
+    ORDER BY created_at ASC
+  `);
+  
+  const messages = stmt.all(minTime, maxTime) as any[];
+  
+  // Filter messages by sender and transform to timeline format
+  return messages
+    .filter(msg => agentNames.has(msg.sender))
+    .map(msg => {
+      const messageContent = JSON.parse(msg.message);
+      const notified = JSON.parse(msg.notified || '[]');
+      
+      // Look up agent type from subagent_registry
+      const agentStmt = db.prepare(`
+        SELECT subagent_type FROM subagent_registry 
+        WHERE session_id = ? AND name = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      const agent = agentStmt.get(sessionId, msg.sender) as any;
+      const agentType = agent?.subagent_type || 'unknown';
+      
+      return {
+        sender: `${msg.sender} (${agentType})`,
+        recipient: 'Team',
+        content: typeof messageContent === 'string' ? messageContent : JSON.stringify(messageContent),
+        metadata: {
+          timestamp: msg.created_at,
+          read_by: notified
+        }
+      };
+    });
+}
+
+export function transformToMessageHistory(events: HookEvent[], sessionId: string): any {
+  // Transform hook events to timeline messages
+  const eventMessages = events.flatMap(event => {
+    if (event.hook_event_type === 'UserPromptSubmit') {
+      return [{
+        sender: 'User',
+        recipient: 'Orchestrator',
+        content: event.payload?.prompt || '',
+        metadata: {
+          timestamp: event.timestamp!
+        }
+      }];
+    } else if (event.hook_event_type === 'PreToolUse' && event.payload?.tool_name === 'Task') {
+      // PreToolUse: Orchestrator assigns task to agent (actual task assignment time)
+      const description = event.payload?.tool_input?.description || '';
+      const prompt = event.payload?.tool_input?.prompt || '';
+      const agentType = event.payload?.tool_input?.subagent_type || 'unknown';
+      
+      // Parse agent name from description (format: "AgentName: task description")
+      const agentNameMatch = description.match(/^([^:]+):/);
+      const agentName = agentNameMatch ? agentNameMatch[1].trim() : 'Unknown Agent';
+      
+      return [{
+        sender: 'Orchestrator',
+        recipient: `${agentName} (${agentType})`,
+        content: prompt, // The full prompt is the message body
+        metadata: {
+          timestamp: event.timestamp!, // This is the actual task assignment time
+          task_description: description
+        }
+      }];
+    } else if (event.hook_event_type === 'PostToolUse' && event.payload?.tool_name === 'Task') {
+      // PostToolUse: Agent responds (task completion time)
+      if (event.payload?.tool_response?.content) {
+        const description = event.payload?.tool_input?.description || '';
+        const agentType = event.payload?.tool_input?.subagent_type || 'unknown';
+        
+        // Parse agent name from description
+        const agentNameMatch = description.match(/^([^:]+):/);
+        const agentName = agentNameMatch ? agentNameMatch[1].trim() : 'Unknown Agent';
+        
+        const responseText = event.payload.tool_response.content[0]?.text || 'Task completed';
+        const totalDurationMs = event.payload.tool_response.totalDurationMs || 0;
+        const totalTokens = event.payload.tool_response.totalTokens || 0;
+        const totalToolUseCount = event.payload.tool_response.totalToolUseCount || 0;
+        
+        return [{
+          sender: `${agentName} (${agentType})`,
+          recipient: 'Orchestrator',
+          content: responseText, // The response text is the message body
+          metadata: {
+            timestamp: event.timestamp!, // This is the actual task completion time
+            duration_minutes: Math.round(totalDurationMs / 60000 * 10) / 10, // Round to 1 decimal
+            cost: Math.round(totalTokens / 1000), // Tokens/1000 rounded
+            effort: totalToolUseCount
+          }
+        }];
+      }
+      return []; // No response content, skip this event
+    }
+    
+    // Skip any unexpected event types
+    return [];
+  });
+  
+  // Get subagent messages for this session
+  const subagentMessages = getSubagentMessagesForSession(sessionId, events);
+  
+  // Merge and sort all messages by timestamp
+  const timeline = [...eventMessages, ...subagentMessages].sort((a, b) => {
+    const timeA = a.metadata?.timestamp || 0;
+    const timeB = b.metadata?.timestamp || 0;
+    return timeA - timeB;
+  });
+  
+  // Calculate session duration in minutes
+  let sessionDurationMinutes = 0;
+  if (timeline.length > 0) {
+    const timestamps = timeline.map(msg => msg.metadata.timestamp).sort((a, b) => a - b);
+    const start = timestamps[0];
+    const end = timestamps[timestamps.length - 1];
+    sessionDurationMinutes = Math.round((end - start) / 60000 * 10) / 10; // Round to 1 decimal
+  }
+  
+  return {
+    sessionId,
+    timeline,
+    messageCount: timeline.length,
+    sessionDurationMinutes
   };
 }

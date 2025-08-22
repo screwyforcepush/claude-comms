@@ -51,11 +51,23 @@
           >
             📋 List View
           </button>
+          <button
+            @click="activeView = 'orchestration'"
+            :class="[
+              'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
+              activeView === 'orchestration' 
+                ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-600 transform hover:scale-105'
+            ]"
+            title="Switch to orchestration view"
+          >
+            ⚙️ Orchestration
+          </button>
         </div>
       </div>
 
       <!-- Content Area -->
-      <div v-if="selectedSessionId" class="flex-grow">
+      <div v-if="selectedSessionId" class="flex-grow overflow-hidden flex flex-col">
         
         <!-- Timeline View -->
         <div v-if="activeView === 'timeline'" class="h-full">
@@ -78,8 +90,17 @@
           />
         </div>
 
+        <!-- Orchestration View -->
+        <div v-else-if="activeView === 'orchestration'" class="h-full overflow-hidden">
+          <!-- Orchestration Timeline -->
+          <OrchestrationTimeline
+            :messages="introspectionMessages"
+            :session-id="selectedSessionId"
+          />
+        </div>
+
         <!-- List View (Original Layout) -->
-        <div v-else class="flex space-x-4 h-full">
+        <div v-else-if="activeView === 'list'" class="flex space-x-4 h-full">
           <!-- Agents List -->
           <div class="w-1/3 bg-gray-700 rounded-lg p-4">
             <h3 class="text-white font-bold mb-3">Agents</h3>
@@ -199,11 +220,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watchEffect } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watchEffect, watch } from 'vue';
 import type { Session, AgentStatus, SubagentMessage } from '../types';
 import InteractiveAgentTimeline from './InteractiveAgentTimeline.vue';
 import AgentDetailPane from './AgentDetailPane.vue';
 import MessageDetailPane from './MessageDetailPane.vue';
+import OrchestrationTimeline from './OrchestrationTimeline.vue';
+import { useSessionIntrospection } from '../composables/useSessionIntrospection';
 
 const props = defineProps<{
   wsConnection?: any;
@@ -213,12 +236,29 @@ const sessions = ref<Session[]>([]);
 const selectedSessionId = ref('');
 const subagents = ref<AgentStatus[]>([]);
 const messages = ref<SubagentMessage[]>([]);
-const activeView = ref<'timeline' | 'list'>('timeline');
+const activeView = ref<'timeline' | 'list' | 'orchestration'>('timeline');
 const selectedAgent = ref<AgentStatus | null>(null);
 const selectedMessage = ref<SubagentMessage | null>(null);
 const showAgentDetails = ref(false);
 const showMessageDetails = ref(false);
 let refreshInterval: number | null = null;
+
+// Session Introspection state
+const {
+  data: introspectionData,
+  loading: introspectionLoading,
+  error: introspectionError,
+  fetchData: fetchSessionIntrospection,
+  clearCache: clearIntrospectionData,
+  sessionId: introspectionSessionId
+} = useSessionIntrospection();
+
+const introspectionMessages = computed(() => {
+  const timeline = introspectionData.value?.timeline || [];
+  console.log('SubagentComms introspectionData:', introspectionData.value, 'timeline length:', timeline.length);
+  return timeline;
+});
+
 
 // Pane state management - ensure only one pane is open at a time
 type ActivePane = 'none' | 'agent' | 'message';
@@ -411,6 +451,15 @@ const handleHighlightAgentOnTimeline = (agentId: number) => {
   console.log('Highlight agent on timeline:', agentId);
   // Future: Scroll to and highlight agent on timeline
 };
+
+// Watch selectedSessionId and sync with introspection when in orchestration view
+watch([selectedSessionId, activeView], async ([newSessionId, newView]) => {
+  if (newView === 'orchestration' && newSessionId) {
+    console.log('Syncing introspection with selected session:', newSessionId);
+    introspectionSessionId.value = newSessionId;
+    await fetchSessionIntrospection();
+  }
+});
 
 // Listen to WebSocket for real-time updates
 watchEffect(() => {

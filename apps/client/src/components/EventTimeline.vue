@@ -11,7 +11,7 @@
     
     <!-- Timeline Direction Header -->
     <TimelineDirectionHeader
-      :current-order="currentOrder.value"
+      :current-order="currentOrder"
       :event-count="enhancedFilteredEvents.length"
       :time-range="timeRange"
       @order-changed="handleOrderChange"
@@ -39,7 +39,7 @@
           :app-gradient-class="getGradientForApp(event.source_app)"
           :app-color-class="getColorForApp(event.source_app)"
           :app-hex-color="getHexColorForApp(event.source_app)"
-          :current-order="currentOrder.value"
+          :current-order="currentOrder"
           :total-events="enhancedFilteredEvents.length"
           :use-gpu-acceleration="shouldUseGpuAcceleration"
         />

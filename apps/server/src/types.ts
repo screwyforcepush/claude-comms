@@ -253,3 +253,42 @@ export const DEFAULT_PRIORITY_CONFIG: PriorityEventConfig = {
 
 // Protocol versioning
 export const PRIORITY_PROTOCOL_VERSION = '1.0.0';
+
+// Session Introspection API Types (WP1)
+export interface SessionIntrospectionRequest {
+  sessionId: string;
+  eventTypes?: string[]; // Optional filter for event types
+}
+
+export interface SessionTimelineMessage {
+  id: number;
+  type: 'user_message' | 'orchestrator_message' | 'agent_message';
+  role: 'User' | 'Orchestrator' | 'Agent';
+  timestamp: number;
+  content: {
+    prompt?: string;
+    user_id?: string;
+    agent_name?: string;
+    task_description?: string;
+    agent_type?: string;
+    response?: string;
+    [key: string]: any;
+  };
+  source_event: {
+    hook_event_type: string;
+    payload: Record<string, any>;
+  };
+}
+
+export interface SessionTimeRange {
+  start: number;
+  end: number;
+  duration: number;
+}
+
+export interface SessionIntrospectionResponse {
+  sessionId: string;
+  timeline: SessionTimelineMessage[];
+  messageCount: number;
+  timeRange: SessionTimeRange | null;
+}

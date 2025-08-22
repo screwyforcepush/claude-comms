@@ -235,11 +235,11 @@
                   :y="getAgentLabelPosition(agent, sessionIndex).y"
                   text-anchor="middle" 
                   :fill="getAgentColor(agent.type)"
-                  font-size="9px"
-                  font-weight="500"
+                  font-size="12px"
+                  font-weight="600"
                   font-family="system-ui"
                   class="cursor-pointer select-none"
-                  :class="isAgentSelected(agent) ? 'opacity-100 font-semibold' : 'opacity-70 hover:opacity-90'"
+                  :class="isAgentSelected(agent) ? 'opacity-100 font-bold' : 'opacity-80 hover:opacity-100'"
                   @click="selectAgent(agent, session)"
                 >
                   {{ agent.name }}
@@ -663,12 +663,13 @@ const autoPanTargetX = ref(0);
 const lastUserInteractionTime = ref(0);
 const lastAutoPanTime = ref(0);
 
-// Auto-pan configuration
-const AUTO_PAN_UPDATE_INTERVAL = 1000; // Update every second
+// Auto-pan configuration - Enhanced for responsiveness
+const AUTO_PAN_UPDATE_INTERVAL = 250; // Update every 250ms for better responsiveness
 const AUTO_PAN_INACTIVITY_THRESHOLD = 3000; // 3 seconds after user stops interacting
-const AUTO_PAN_SMOOTH_FACTOR = 0.1; // Smoothing factor for auto-pan animations
-const AUTO_PAN_EASING_FACTOR = 0.05; // RobertArch's smooth interpolation factor
-const AUTO_PAN_BUFFER = 100; // Keep NOW marker 100px from right edge
+const AUTO_PAN_SMOOTH_FACTOR = 0.15; // Increased smoothing factor for better responsiveness
+const AUTO_PAN_EASING_FACTOR = 0.12; // Increased easing factor for faster response
+const AUTO_PAN_TARGET_RATIO = 0.92; // Keep NOW marker at 92% from left edge (near right side)
+const AUTO_PAN_BUFFER = 80; // Reduced buffer for more responsive positioning
 
 // Enhanced interaction state
 const isPanning = ref(false);
@@ -745,10 +746,10 @@ const timelineMargins = {
   left: 120
 };
 
-const baseSessionLaneHeight = 28; // Base height allocated per session (aggressively reduced for density)
-const agentLaneHeight = 20;   // Height per agent lane within session (doubled for better visual spacing)
-const agentLaneBuffer = 3;    // Buffer space between agent lanes (minimal buffer)
-const sessionPadding = 8;     // Padding between sessions (compact separation)
+const baseSessionLaneHeight = 32; // Increased base height for better readability
+const agentLaneHeight = 38;   // Further increased height per agent lane for better readability
+const agentLaneBuffer = 8;    // Further increased buffer space between agent lanes
+const sessionPadding = 12;    // Increased padding between sessions for clarity
 
 const timeWindows: TimeWindow[] = [
   { label: '15m', value: 15 * 60 * 1000 },
@@ -1033,8 +1034,8 @@ const getSessionHeight = (session: SessionData): number => {
   const agentSpaceNeeded = maxAgentsInBatch * (agentLaneHeight + agentLaneBuffer);
   const totalHeight = baseSessionLaneHeight + agentSpaceNeeded + sessionPadding;
   
-  // Ensure minimum height for readability (compact layout)
-  return Math.max(totalHeight, 40);
+  // Ensure minimum height for readability (increased for better agent visibility)
+  return Math.max(totalHeight, 60);
 };
 
 /**
@@ -1143,7 +1144,7 @@ const getAgentLabelPosition = (agent: SessionAgent, sessionIndex: number) => {
   
   return {
     x: labelX,
-    y: agentY - 5 // Slight offset above the branch line (matching reference)
+    y: agentY - 8 // Increased offset above the branch line for better readability
   };
 };
 
@@ -1275,9 +1276,9 @@ const clearSelections = () => {
 const fetchSessionsWithEventsInWindow = async () => {
   const { start, end } = timeRange.value;
   
-  // Throttle API calls - don't fetch more than once per second
+  // Reduced throttling - allow fetches every 500ms for better responsiveness
   const now = Date.now();
-  if (now - lastWindowFetch.value < 1000) {
+  if (now - lastWindowFetch.value < 500) {
     return;
   }
   lastWindowFetch.value = now;
@@ -1601,9 +1602,9 @@ const resetView = () => {
 
 const calculateAutoPanTarget = (): number => {
   // Calculate where the "NOW" marker should be positioned
-  // Keep it in the right 25% of the visible timeline for optimal viewing
+  // Keep it near the right edge for optimal viewing (no future events beyond NOW)
   const timelineWidth = containerWidth.value - timelineMargins.left - timelineMargins.right;
-  const targetRatio = 0.75; // Position NOW marker at 75% from left edge
+  const targetRatio = AUTO_PAN_TARGET_RATIO; // Position NOW marker at 92% from left edge
   const nowX = getNowX();
   const idealNowX = timelineMargins.left + (timelineWidth * targetRatio);
   
@@ -1617,14 +1618,15 @@ const updateAutoPan = (currentTime: number) => {
     return;
   }
   
-  // Calculate target position to keep NOW marker 100px from right edge
+  // Calculate target position to keep NOW marker at 92% from left edge (near right side)
   const nowX = getNowX();
   const viewportWidth = containerWidth.value - timelineMargins.left - timelineMargins.right;
-  const targetPanX = -(nowX - (viewportWidth - AUTO_PAN_BUFFER));
+  const targetNowX = timelineMargins.left + (viewportWidth * AUTO_PAN_TARGET_RATIO);
+  const targetPanX = panX.value + (targetNowX - nowX);
   
-  // Use smooth interpolation with easing factor
+  // Use more responsive interpolation with increased easing factor
   const diff = targetPanX - panX.value;
-  if (Math.abs(diff) > 1) { // Only update if significant difference
+  if (Math.abs(diff) > 0.5) { // More sensitive threshold for smoother updates
     panX.value += diff * AUTO_PAN_EASING_FACTOR;
     autoPanTargetX.value = targetPanX;
   }
@@ -2168,12 +2170,12 @@ let sessionRefreshInterval: number | null = null;
 const startSessionRefresh = () => {
   if (sessionRefreshInterval) return;
   
-  // Refresh sessions every 3 seconds if auto-pan is enabled
+  // Refresh sessions more frequently (every 1.5 seconds) if auto-pan is enabled
   sessionRefreshInterval = window.setInterval(() => {
     if (autoPanEnabled.value) {
       fetchSessionsWithEventsInWindow();
     }
-  }, 3000);
+  }, 1500);
 };
 
 const stopSessionRefresh = () => {

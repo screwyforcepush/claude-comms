@@ -111,3 +111,51 @@ export interface SubagentMessage {
   created_at: number;
   notified?: string[];
 }
+
+// Session Introspection Types
+export interface SessionIntrospectionData {
+  session_id: string;
+  events: IntrospectionEvent[];
+  message_history: TimelineMessage[];
+  session_metadata: {
+    created_at: string;
+    total_events: number;
+    event_types: string[];
+    agents_involved: string[];
+  };
+}
+
+export interface IntrospectionEvent {
+  id: number;
+  session_id: string;
+  event_type: string;
+  timestamp: number;
+  payload: Record<string, any>;
+  source_app: string;
+}
+
+export interface TimelineMessage {
+  sender: string;
+  recipient: string;
+  content: string;
+  metadata: {
+    timestamp: number;
+    task_description?: string;
+    duration_minutes?: number;
+    cost?: number;
+    effort?: number;
+    [key: string]: any;
+  };
+}
+
+// Session Introspection Response Types
+export interface SessionIntrospectionResponse {
+  sessionId: string;
+  timeline: TimelineMessage[];
+  messageCount: number;
+  sessionDurationMinutes: number;
+}
+
+export interface SessionTimelineMessage extends TimelineMessage {
+  // Alias for TimelineMessage for backward compatibility
+}
