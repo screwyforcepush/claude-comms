@@ -14,6 +14,9 @@ import sys
 import argparse
 import requests
 import time
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.server_config import get_server_url
 
 # Maximum tokens per page (easily configurable)
 MAX_TOKENS_PER_PAGE = 6000
@@ -170,12 +173,6 @@ def main():
         help='Return only the total number of pages instead of page data'
     )
     
-    parser.add_argument(
-        '--api-base',
-        default='http://localhost:4000',
-        help='Base API URL (default: http://localhost:4000)'
-    )
-    
     args = parser.parse_args()
     
     # Wait 100ms per page before hitting the DB (as requested)
@@ -184,7 +181,8 @@ def main():
     
     try:
         # Fetch the data from API
-        url = f"{args.api_base}/api/sessions/{args.session_id}/introspect"
+        api_base = args.api_base if args.api_base else get_server_url()
+        url = f"{api_base}/api/sessions/{args.session_id}/introspect"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
@@ -234,8 +232,9 @@ def main():
             sys.exit(1)
             
     except requests.exceptions.ConnectionError:
+        api_base = get_server_url()
         error_data = {
-            'error': f'Could not connect to API server at {args.api_base}',
+            'error': f'Could not connect to API server at {api_base}',
             'status_code': 0
         }
         print(json.dumps(error_data, indent=2), file=sys.stderr)

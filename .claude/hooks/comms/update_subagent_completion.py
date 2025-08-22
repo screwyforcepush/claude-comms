@@ -9,6 +9,9 @@
 import json
 import sys
 import requests
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.server_config import get_server_url
 
 
 def main():
@@ -86,7 +89,7 @@ def main():
                 # Update subagent completion status
                 try:
                     response = requests.post(
-                        'http://localhost:4000/subagents/update-completion',
+                        f'{get_server_url()}/subagents/update-completion',
                         json={
                             'session_id': session_id,
                             'name': agent_name,

@@ -16,8 +16,15 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 
-def send_event_to_server(event_data, server_url='http://localhost:4000/events'):
+# Add parent directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.server_config import get_server_url
+
+def send_event_to_server(event_data, server_url=None):
     """Send event data to the observability server."""
+    if server_url is None:
+        server_url = f'{get_server_url()}/events'
+    
     try:
         # Prepare the request
         req = urllib.request.Request(
@@ -49,7 +56,6 @@ def main():
     parser = argparse.ArgumentParser(description='Send Claude Code hook events to observability server')
     parser.add_argument('--source-app', required=True, help='Source application name')
     parser.add_argument('--event-type', required=True, help='Hook event type (PreToolUse, PostToolUse, etc.)')
-    parser.add_argument('--server-url', default='http://localhost:4000/events', help='Server URL')
     parser.add_argument('--add-chat', action='store_true', help='Include chat transcript if available')
     parser.add_argument('--summarize', action='store_true', help='Generate AI summary of the event')
     
@@ -94,7 +100,8 @@ def main():
     
     
     # Send to server
-    success = send_event_to_server(event_data, args.server_url)
+    server_url = f'{get_server_url()}/events'
+    success = send_event_to_server(event_data, server_url)
     
     # Always exit with 0 to not block Claude Code operations
     sys.exit(0)
