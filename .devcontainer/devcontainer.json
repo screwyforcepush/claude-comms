@@ -1,0 +1,65 @@
+{
+  "name": "Claude Agent Sandbox",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+  
+  // Security: Run as non-root user
+  "remoteUser": "node",
+  "containerUser": "node",
+  
+  // Features to install - now includes all required tools
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "os-provided"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:latest": {}
+  },
+  
+  // Security: Minimal capabilities
+  "capAdd": [],
+  "securityOpt": [],
+  "runArgs": [
+    "--cap-drop=SYS_ADMIN",
+    "--cap-drop=NET_ADMIN",
+    "--add-host=host.docker.internal:host-gateway"
+  ],
+  
+  // Environment variables - Only expose what's needed
+  "containerEnv": {
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    "REPO_URL": "${localEnv:REPO_URL}",
+    "REPO_OWNER": "${localEnv:REPO_OWNER}",
+    "REPO_NAME": "${localEnv:REPO_NAME}",
+    "BRANCH_NAME": "${localEnv:BRANCH_NAME:main}",
+    "SANDBOX_MODE": "true",
+    "GH_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}"
+  },
+  
+  // Post-create command to set up the repository and authenticate tools
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  
+  // Post-start command to authenticate GitHub CLI
+  "postStartCommand": "bash .devcontainer/auth-setup.sh",
+  
+  // Lifecycle scripts
+  "onCreateCommand": "echo 'Claude Agent Sandbox environment created'",
+  
+  // Resource limits
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "32gb"
+  },
+  
+  // Customizations
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}
