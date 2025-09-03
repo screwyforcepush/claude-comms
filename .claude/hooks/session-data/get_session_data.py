@@ -181,7 +181,7 @@ def main():
     
     try:
         # Fetch the data from API
-        api_base = args.api_base if args.api_base else get_server_url()
+        api_base = get_server_url()
         url = f"{api_base}/api/sessions/{args.session_id}/introspect"
         response = requests.get(url, timeout=10)
         
