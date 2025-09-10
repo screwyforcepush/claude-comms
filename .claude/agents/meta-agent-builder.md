@@ -182,10 +182,10 @@ Batch an Inbox Check with every step
    5. Test -> Code -> Test -> Repeat. Itterate until green!
 
 COMPLETION GATE: MANDITORY Completion Criteria checklist:
-□ `pnpm lint` needs to run without errors.
-□ `pnpm dev` needs to run without errors.
-□ `pnpm test` needs to run green.  
-□ `pnpm build` without errors.
+□ lint command needs to run without errors.
+□ dev server needs to run without errors.
+□ tests need to run green.  
+□ project builds without errors.
 □ No regressions introduced
 
 [/WORKFLOW]
@@ -204,10 +204,10 @@ Batch an Inbox Check with every step
    6. Update project level documentation like READMEs, docs/project/guides/ to reflect actual changes.
 
 REPORT back to the user the status of each:
-□ `pnpm lint`
-□ `pnpm dev`
-□ `pnpm test`  
-□ `pnpm build`
+□ lint command
+□ dev server
+□ tests  
+□ project builds
 □ Implementation meets requirements spec.
 □ Test coverage of Business logic and user flows.
 □ Implementation Review, Feedback, Critique.
@@ -293,7 +293,7 @@ Agents must run multiple commands concurrently.
   - TodoWrite { todos: [10+ todos] }
   - Read("file1.js"), Read("file2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
   - Write("output1.js"), Write("output2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
-  - Bash("pnpm lint"), Bash("pnpm test"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
+  - Bash("find *.ext"), Grep("pattern"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
 ```
 
 ❌ **WRONG**: Multiple messages (6x slower!)

@@ -66,7 +66,7 @@ You approach every task with the mindset: "If it's not tested, it's broken." Tes
   - TodoWrite { todos: [10+ todos] }
   - Read("file1.js"), Read("file2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
   - Write("output1.js"), Write("output2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
-  - Bash("pnpm lint"), Bash("pnpm test"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
+  - Bash("find *.ext"), Grep("pattern"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
 ```
 
 ❌ **WRONG**: Multiple messages (6x slower!)
@@ -168,11 +168,11 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Check for code duplication and extract common patterns
 
 6. **Validation & Coverage**:
-   - Run full test suite with `pnpm test` or appropriate command
+   - Run full test suite with appropriate command
    - Analyze coverage reports, ensure >80% for new code
-   - Run lint with `pnpm lint` and fix all issues
-   - Run build with `pnpm build` to verify compilation
-   - Run dev with `pnpm dev` to check runtime behavior
+   - Run lint command and fix all issues
+   - Run build command to verify compilation
+   - Run dev server to check runtime behavior
    - For UI changes, use Playwright to capture screenshots and verify visually
    - Ensure NO regressions - all existing tests must still pass
    - Broadcast final test/build status
@@ -193,10 +193,10 @@ COMPLETION GATE: MANDATORY Completion Criteria checklist:
 □ E2E tests cover critical user paths
 □ All acceptance criteria have passing tests
 □ Business Logic from source of truth specs fully tested
-□ `pnpm lint` runs without errors
-□ `pnpm test` runs fully green
-□ `pnpm build` completes without errors
-□ `pnpm dev` starts without issues
+□ lint command runs without errors
+□ tests run fully green
+□ project builds without errors
+□ dev server starts without issues
 □ NO regressions introduced (all existing tests pass)
 □ Code documented with clear comments
 □ Test plan documented in docs/project/phases/<phase-id>/
@@ -226,10 +226,10 @@ Brief overview of the feature/fix implemented, the TDD approach taken, and key o
 - Critical paths covered: [list key scenarios]
 
 ## Build & Test Status
-- `pnpm lint`: [PASS/FAIL] [details if fail]
-- `pnpm test`: [PASS/FAIL] [number passing/total]
-- `pnpm build`: [PASS/FAIL] [details if fail]
-- `pnpm dev`: [PASS/FAIL] [details if fail]
+- lint command: [PASS/FAIL] [details if fail]
+- test suite: [PASS/FAIL] [number passing/total]
+- build command: [PASS/FAIL] [details if fail]
+- dev server: [PASS/FAIL] [details if fail]
 
 ## Implementation Decisions
 Key technical decisions and rationale:

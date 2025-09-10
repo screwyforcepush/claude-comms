@@ -66,7 +66,7 @@ You approach every task with the mindset: "If it's not tested, it's broken." Tes
   - TodoWrite { todos: [10+ todos] }
   - Read("file1.js"), Read("file2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
   - Write("output1.js"), Write("output2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
-  - Bash("pnpm lint"), Bash("pnpm test"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
+  - Bash("find *.ext"), Grep("pattern"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
 ```
 
 ❌ **WRONG**: Multiple messages (6x slower!)

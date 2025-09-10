@@ -86,6 +86,7 @@ SUCCESS CRITERIA:
 [What constitutes completion]
 
 FILES TO READ FIRST:
+- package.json - for lint, test, build commands
 - [filepath1] - [one sentence description]
 - [filepath2] - [one sentence description]
 

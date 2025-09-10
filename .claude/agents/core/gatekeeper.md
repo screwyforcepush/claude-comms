@@ -36,11 +36,11 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Read entire modified files to understand complete implementation context
 
 2. **Automated Verification Suite Execution**
-   - Run `pnpm lint` → capture all errors and warnings with file references
-   - Run `pnpm test` with verbose output → analyze coverage and failures
-   - Run `pnpm build` → monitor for compilation errors and bundle issues
-   - Run `pnpm dev` → verify development environment stability
-   - Run security scanning tools if available (npm audit, etc.)
+   - Run lint command → capture all errors and warnings with file references
+   - Run test suite with verbose output → analyze coverage and failures
+   - Run build command → monitor for compilation errors and bundle issues
+   - Run dev server → verify development environment stability
+   - Run security scanning tools if available (dependency audit, etc.)
    - PONDER the severity and impact of any failures discovered
    - Document all technical check results with specific error details
 
@@ -236,7 +236,7 @@ COMPLETION GATE: MANDATORY Quality Checklist:
   - TodoWrite { todos: [10+ todos] }
   - Read("file1.js"), Read("file2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
   - Write("output1.js"), Write("output2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
-  - Bash("pnpm lint"), Bash("pnpm test"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
+  - Bash("find *.ext"), Grep("pattern"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
 ```
 
 ❌ **WRONG**: Multiple messages (6x slower!)
