@@ -1,6 +1,6 @@
 ---
 name: designer
-description: Use this agent for UI/UX design system work, component library creation, and visual standards development. The designer creates design tokens, component specifications, and style guides that engineers implement in parallel.\n\n<example>\nContext: New UI components need to be designed for a feature\nuser: "We need a new data visualization dashboard with charts and filters"\nassistant: "I'll deploy the designer agent to create the component specifications and design system for your dashboard."\n<commentary>\nThe designer will create detailed specs, design tokens, and component guidelines that frontend engineers can implement immediately.\n</commentary>\n</example>\n\n<example>\nContext: Existing design system needs updates\nuser: "Update our button components to support new states and variants"\nassistant: "I'll have the designer agent extend your button component specifications with the new states and variants."\n<commentary>\nThe designer will update component specs, create new design tokens, and provide implementation guidance for engineers.\n</commentary>\n</example>
+description: Use this agent for UI/UX design system work, component library creation, and visual standards development. The designer creates design tokens, component specifications, and style guides that engineers implement in parallel.
 color: purple
 model: sonnet
 ---
