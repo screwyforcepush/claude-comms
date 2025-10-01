@@ -1344,12 +1344,16 @@ const selectMessage = (message: any) => {
 
 const showMessageDetails = (message: any, event: MouseEvent) => {
   hideTooltipImmediate(); // Hide any existing tooltips
-  
+
   // Calculate read status for agent timeline
   const notified = message.notified || [];
   const relatedAgents = visibleAgents.value.filter(a => a.name !== message.sender);
   const readCount = notified.filter(name => name !== message.sender).length;
-  
+
+  // Don't show the detail panel modal, just emit the event for the side panel
+  selectMessage(message);
+  return;
+
   detailPanel.value = {
     visible: true,
     type: 'message',

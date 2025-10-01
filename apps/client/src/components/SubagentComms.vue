@@ -1,13 +1,13 @@
 <template>
-  <div class="flex-grow overflow-hidden p-4 bg-gray-800">
+  <div class="flex-grow overflow-hidden p-4 bg-black">
     <div class="h-full flex flex-col space-y-4">
       <!-- Session Selector -->
-      <div class="flex items-center space-x-4 bg-gray-700 p-3 rounded-lg">
-        <label class="text-white font-semibold">Session:</label>
-        <select 
-          v-model="selectedSessionId" 
+      <div class="flex items-center space-x-4 bg-gray-900/80 p-3 rounded-lg border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+        <label class="text-cyan-400 font-semibold drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Session:</label>
+        <select
+          v-model="selectedSessionId"
           @change="loadSessionData"
-          class="px-3 py-1.5 bg-gray-800 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none cursor-pointer transition-all duration-200 hover:border-gray-500 hover:bg-gray-700"
+          class="px-3 py-1.5 bg-black text-cyan-300 rounded border border-cyan-500/50 focus:border-cyan-400 focus:outline-none focus:shadow-[0_0_10px_rgba(34,211,238,0.5)] cursor-pointer transition-all duration-200 hover:border-cyan-400 hover:bg-gray-900"
           title="Select a session to view"
         >
           <option value="">Select a session...</option>
@@ -15,9 +15,9 @@
             {{ session.session_id }} ({{ session.agent_count }} agents)
           </option>
         </select>
-        <button 
+        <button
           @click="refreshSessions"
-          class="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 cursor-pointer border border-blue-700 hover:border-blue-500"
+          class="px-4 py-1.5 bg-purple-900/60 text-cyan-300 rounded hover:bg-purple-800/80 transition-all duration-200 shadow-md hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transform hover:scale-105 cursor-pointer border border-purple-500/50 hover:border-purple-400"
           title="Refresh session list"
         >
           Refresh
@@ -25,15 +25,15 @@
       </div>
 
       <!-- View Selector -->
-      <div v-if="selectedSessionId" class="bg-gray-700 mb-4 rounded-lg">
-        <div class="flex border-b border-gray-600">
+      <div v-if="selectedSessionId" class="bg-gray-900/80 mb-4 rounded-lg border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+        <div class="flex border-b border-purple-500/30">
           <button
             @click="activeView = 'timeline'"
             :class="[
               'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
-              activeView === 'timeline' 
-                ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-white hover:bg-gray-600 transform hover:scale-105'
+              activeView === 'timeline'
+                ? 'bg-black text-cyan-400 border-b-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                : 'text-gray-400 hover:text-cyan-300 hover:bg-gray-800/80 transform hover:scale-105'
             ]"
             title="Switch to timeline view"
           >
@@ -43,9 +43,9 @@
             @click="activeView = 'list'"
             :class="[
               'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
-              activeView === 'list' 
-                ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-white hover:bg-gray-600 transform hover:scale-105'
+              activeView === 'list'
+                ? 'bg-black text-cyan-400 border-b-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                : 'text-gray-400 hover:text-cyan-300 hover:bg-gray-800/80 transform hover:scale-105'
             ]"
             title="Switch to list view"
           >
@@ -55,9 +55,9 @@
             @click="activeView = 'orchestration'"
             :class="[
               'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
-              activeView === 'orchestration' 
-                ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-white hover:bg-gray-600 transform hover:scale-105'
+              activeView === 'orchestration'
+                ? 'bg-black text-cyan-400 border-b-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                : 'text-gray-400 hover:text-cyan-300 hover:bg-gray-800/80 transform hover:scale-105'
             ]"
             title="Switch to orchestration view"
           >
@@ -102,43 +102,43 @@
         <!-- List View (Original Layout) -->
         <div v-else-if="activeView === 'list'" class="flex space-x-4 h-full">
           <!-- Agents List -->
-          <div class="w-1/3 bg-gray-700 rounded-lg p-4">
-            <h3 class="text-white font-bold mb-3">Agents</h3>
+          <div class="w-1/3 bg-gray-900/80 rounded-lg p-4 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+            <h3 class="text-cyan-400 font-bold mb-3 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Agents</h3>
             <div class="space-y-2 max-h-96 overflow-y-auto">
-              <div 
-                v-for="agent in subagents" 
+              <div
+                v-for="agent in subagents"
                 :key="agent.id"
-                class="bg-gray-800 p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] border border-gray-700 hover:border-gray-600"
+                class="bg-black/60 p-3 rounded-lg cursor-pointer hover:bg-gray-800/80 transition-all duration-200 shadow-md hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] transform hover:scale-[1.02] border border-purple-500/30 hover:border-cyan-400/60"
                 @click="handleAgentSelected(agent)"
                 :title="`Click to view details for ${agent.name} (${agent.subagent_type})`"
               >
                 <div class="flex items-center justify-between mb-2">
-                  <div class="text-white font-semibold">{{ agent.name }}</div>
-                  <span 
+                  <div class="text-cyan-300 font-semibold">{{ agent.name }}</div>
+                  <span
                     :class="[
                       'px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1',
                       getStatusColor(agent.status)
                     ]"
                   >
-                    <span v-if="agent.status === 'terminated'" class="text-red-200">✕</span>
+                    <span v-if="agent.status === 'terminated'" class="text-pink-200">✕</span>
                     <span>{{ agent.status || 'pending' }}</span>
                   </span>
                 </div>
-                
+
                 <div class="text-gray-400 text-sm mb-2">Type: {{ agent.subagent_type }}</div>
-                
+
                 <div class="flex flex-wrap gap-2 mb-2">
                   <span v-if="agent.duration" class="text-gray-500 text-xs">
                     {{ formatDuration(agent.duration) }}
                   </span>
-                  <span v-if="agent.token_count" class="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                  <span v-if="agent.token_count" class="bg-cyan-900/60 text-cyan-300 text-xs px-2 py-1 rounded border border-cyan-500/30">
                     {{ agent.token_count }} tokens
                   </span>
-                  <span v-if="agent.tool_count" class="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                  <span v-if="agent.tool_count" class="bg-purple-900/60 text-purple-300 text-xs px-2 py-1 rounded border border-purple-500/30">
                     {{ agent.tool_count }} tools
                   </span>
                 </div>
-                
+
                 <div class="text-gray-500 text-xs">
                   Started: {{ new Date(agent.created_at).toLocaleTimeString() }}
                 </div>
@@ -153,21 +153,21 @@
           </div>
 
           <!-- Messages -->
-          <div class="flex-grow bg-gray-700 rounded-lg p-4">
-            <h3 class="text-white font-bold mb-3">Messages</h3>
+          <div class="flex-grow bg-gray-900/80 rounded-lg p-4 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+            <h3 class="text-cyan-400 font-bold mb-3 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Messages</h3>
             <div class="space-y-3 max-h-96 overflow-y-auto">
-              <div 
-                v-for="(msg, idx) in messages" 
+              <div
+                v-for="(msg, idx) in messages"
                 :key="idx"
-                class="bg-gray-800 p-3 rounded-lg"
+                class="bg-black/60 p-3 rounded-lg border border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]"
               >
                 <div class="flex justify-between items-start mb-2">
-                  <span class="text-blue-400 font-semibold">{{ msg.sender }}</span>
+                  <span class="text-cyan-400 font-semibold drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">{{ msg.sender }}</span>
                   <span class="text-gray-500 text-xs">
                     {{ new Date(msg.created_at).toLocaleTimeString() }}
                   </span>
                 </div>
-                <div class="text-white">
+                <div class="text-gray-300">
                   <pre class="whitespace-pre-wrap text-sm">{{ formatMessage(msg.message) }}</pre>
                 </div>
                 <div v-if="msg.notified && msg.notified.length > 0" class="mt-2">
@@ -322,16 +322,16 @@ const formatMessage = (message: any): string => {
 const getStatusColor = (status?: string): string => {
   switch (status) {
     case 'completed':
-      return 'bg-green-600 text-white';
+      return 'bg-cyan-900/60 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.4)]';
     case 'in_progress':
-      return 'bg-blue-600 text-white';
+      return 'bg-purple-900/60 text-purple-300 border border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.4)]';
     case 'error':
-      return 'bg-red-600 text-white';
+      return 'bg-pink-900/60 text-pink-300 border border-pink-500/50 shadow-[0_0_10px_rgba(236,72,153,0.4)]';
     case 'terminated':
-      return 'bg-red-800 text-white';
+      return 'bg-pink-900/80 text-pink-200 border border-pink-500/50 shadow-[0_0_10px_rgba(236,72,153,0.5)]';
     case 'pending':
     default:
-      return 'bg-gray-600 text-white';
+      return 'bg-gray-800/60 text-gray-300 border border-gray-600/50';
   }
 };
 
