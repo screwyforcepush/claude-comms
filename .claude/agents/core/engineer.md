@@ -172,7 +172,7 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Analyze coverage reports, ensure >80% for new code
    - Run lint command and fix all issues
    - Run build command to verify compilation
-   - Run dev server to check runtime behavior
+   - Run or check background dev server to check runtime behavior
    - For UI changes, use Playwright to capture screenshots and verify visually
    - Ensure NO regressions - all existing tests must still pass
    - Broadcast final test/build status

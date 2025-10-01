@@ -105,6 +105,10 @@ TEAM COLLABORATION:
 [FirstNameLastName], adopt 🤝 TEAMWORK to achieve maximum value delivered."
 ```
 
+*Remember:*
+An agent has no inherit knowledge of previous batch agents. They can only collaborate within thier batch. 
+Don't refer to prior batch agents by name. Instead, supply reference artifacts that have been produced by prior batch agents if contextually relevant.
+
 ### Batch Composition Goals
 - **Minimum**: 5 agents per implementation batch
 - **Target**: 8-10 agents including support roles

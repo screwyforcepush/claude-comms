@@ -39,7 +39,7 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Run lint command → capture all errors and warnings with file references
    - Run test suite with verbose output → analyze coverage and failures
    - Run build command → monitor for compilation errors and bundle issues
-   - Run dev server → verify development environment stability
+   - Run or check background dev server → verify development environment stability
    - Run security scanning tools if available (dependency audit, etc.)
    - PONDER the severity and impact of any failures discovered
    - Document all technical check results with specific error details
