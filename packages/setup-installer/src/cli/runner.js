@@ -276,7 +276,7 @@ function displaySuccessMessage(_promptResult) {
   console.log(chalk.blue('\n🔗 Resources:'));
   console.log(chalk.gray('• Documentation: /docs/project/guides/installation-guide.md'));
   console.log(chalk.gray('• Troubleshooting: /docs/project/guides/troubleshooting.md'));
-  console.log(chalk.gray('• GitHub: https://github.com/alexsavage/claude-code-hooks-multi-agent-observability'));
+  console.log(chalk.gray('• GitHub: https://github.com/alexsavage/claude-comms'));
 
   console.log(chalk.cyan('\nHappy coding with Claude! 🤖\n'));
 }
@@ -421,7 +421,7 @@ function handleUnexpectedError(error) {
   }
 
   console.error(chalk.yellow('\nPlease report this issue at:'));
-  console.error(chalk.blue('https://github.com/alexsavage/claude-code-hooks-multi-agent-observability/issues'));
+  console.error(chalk.blue('https://github.com/alexsavage/claude-comms/issues'));
 }
 
 module.exports = {

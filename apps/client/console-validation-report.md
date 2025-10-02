@@ -22,7 +22,7 @@ Missing `readonly` import in `usePerformanceOptimizer.ts` file line 1:
 - **After:** `import { ref, reactive, onMounted, onUnmounted, readonly } from 'vue';`
 
 ### ✅ Fix Applied
-File: `/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/apps/client/src/composables/usePerformanceOptimizer.ts`
+File: `/Users/alexsavage/dev/claude-comms/apps/client/src/composables/usePerformanceOptimizer.ts`
 - Added `readonly` to Vue imports
 - **Status:** FIXED ✅
 

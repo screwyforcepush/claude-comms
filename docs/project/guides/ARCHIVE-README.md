@@ -28,13 +28,11 @@ This directory contains archived documentation from the multi-agent observabilit
 
 For current, consolidated documentation, see the [main guides directory](../guides/):
 
-1. **[Setup Guide](../guides/setup-guide.md)** - Quick start and installation
 2. **[Integration Guide](../guides/integration-guide.md)** - Project integration
 3. **[Architecture Guide](../guides/architecture-guide.md)** - System design
 4. **[API Reference](../guides/api-reference.md)** - Complete API documentation
 5. **[Orchestration Guide](../guides/orchestration-guide.md)** - Multi-agent patterns
 6. **[Development Guide](../guides/development-guide.md)** - Contributing guidelines
-7. **[Troubleshooting Guide](../guides/troubleshooting-guide.md)** - Problem resolution
 8. **[Design System Guide](../guides/design-system-guide.md)** - UI components and patterns
 
 ## Usage Note

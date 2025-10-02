@@ -58,9 +58,9 @@ async function testPromptResponseUI() {
               console.log('✅ Prompt/Response modal opened successfully');
               
               // Take screenshot of modal
-              await page.screenshot({ 
-                path: '/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/screenshots/prompt-response-modal.png',
-                fullPage: false 
+              await page.screenshot({
+                path: '/Users/alexsavage/dev/claude-comms/screenshots/prompt-response-modal.png',
+                fullPage: false
               });
               console.log('📸 Screenshot saved: prompt-response-modal.png');
             }
@@ -74,21 +74,21 @@ async function testPromptResponseUI() {
     }
     
     // Take full page screenshot
-    await page.screenshot({ 
-      path: '/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/screenshots/ui-test-full.png',
-      fullPage: true 
+    await page.screenshot({
+      path: '/Users/alexsavage/dev/claude-comms/screenshots/ui-test-full.png',
+      fullPage: true
     });
     console.log('📸 Full page screenshot saved: ui-test-full.png');
-    
+
     console.log('\n🎉 UI Test completed successfully!');
-    
+
   } catch (error) {
     console.error('❌ UI Test failed:', error);
-    
+
     // Take error screenshot
-    await page.screenshot({ 
-      path: '/Users/alexsavage/dev/claude-code-hooks-multi-agent-observability/screenshots/ui-test-error.png',
-      fullPage: true 
+    await page.screenshot({
+      path: '/Users/alexsavage/dev/claude-comms/screenshots/ui-test-error.png',
+      fullPage: true
     });
     console.log('📸 Error screenshot saved: ui-test-error.png');
     

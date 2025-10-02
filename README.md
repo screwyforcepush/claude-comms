@@ -159,18 +159,7 @@ python3 .claude/hooks/comms/send_message.py --sender "Agent-Alpha" --message "Te
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** - Anthropic's official CLI
 - **[Astral uv](https://docs.astral.sh/uv/)** - Python package manager for hooks
 - **[Bun](https://bun.sh/)** or npm/yarn - JavaScript runtime
-- **API Keys** - Anthropic (required), OpenAI/ElevenLabs (optional)
 
-### Environment Setup
-```bash
-# Copy environment template
-cp .env.sample .env
-
-# Configure API keys in .env
-ANTHROPIC_API_KEY=your_key_here
-OPENAI_API_KEY=optional_key
-ELEVEN_API_KEY=optional_key
-```
 
 ### Server Ports
 - **Server**: `localhost:4000` (HTTP/WebSocket)
@@ -178,28 +167,54 @@ ELEVEN_API_KEY=optional_key
 
 ## 📊 Key Features
 
-### Event Types Captured
-| Event | Description | Use Case |
-|-------|-------------|----------|
-| PreToolUse | Before tool execution | Validation & blocking |
-| PostToolUse | After tool completion | Result tracking |
-| UserPromptSubmit | User prompt submission | Session analysis |
-| Notification | User interactions | UX monitoring |
-| SubagentStop | Agent completion | Orchestration tracking |
+### 🔥 Parallel Execution at Scale
+- **10+ Agents Simultaneously**: Launch engineers, architects, researchers, and gatekeepers in a single command
+- **True Concurrency**: Independent agents working different modules without blocking
+- **Recursive Orchestration**: Orchestrators managing orchestrators managing squads - infinite depth
+- **Smart Batch Composition**: Automatic detection of parallelizable vs sequential work
 
-### Dashboard Capabilities
-- **Real-time Timeline**: Live event stream with auto-scroll
-- **Advanced Filtering**: By app, session, event type, time range
-- **Chat Transcripts**: Full conversation history with AI summaries
-- **Agent Communications**: Live inter-agent message display
-- **Visual Analytics**: Pulse charts and session visualization
+### 💰 Token Efficiency Mastery
+- **Minimal Context per Agent**: SQLite-backed shared memory eliminates redundant context
+- **File References Over Contents**: Massive token savings through intelligent reference passing
+- **Real-World Economics**: Creator runs 3-5 concurrent sessions all day without hitting usage caps
+- **Strategic Research Offloading**: Perplexity MCP integration extends Claude budget by ~20%
 
-## 🤝 Contributing
+### 🧠 Zero-Code Integration
+- **Copy `.claude` Directory**: Instant observability for any project
+- **Hook-Based Architecture**: No code modifications required
+- **Automatic Agent Discovery**: Self-registering agents with session tracking
+- **Universal Compatibility**: Works with any Claude Code project
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Follow the [Contributing Guide](CONTRIBUTING.md)
-4. Submit a pull request
+### 🔍 Complete Observability
+| Event Type | Capture Point | Power Unlock |
+|------------|---------------|--------------|
+| **PreToolUse** | Before execution | Block dangerous operations, validate inputs |
+| **PostToolUse** | After completion | Track results, measure performance |
+| **UserPromptSubmit** | Prompt entry | Session analysis, requirement capture |
+| **Notification** | User interactions | UX monitoring, workflow insights |
+| **SubagentStop** | Agent completion | Orchestration state, handoff timing |
+
+### 🎯 Advanced Communication Bus
+- **Inter-Agent Messaging**: Agents broadcast discoveries, ask questions, coordinate work
+- **Message Queue with Receipts**: Guaranteed delivery with read tracking
+- **Shared Knowledge Base**: SQLite-backed memory accessible to entire swarm
+- **Real-Time Routing**: WebSocket-based instant message delivery
+- **Team Collaboration**: Support roles (Architect, Researcher) provide real-time guidance during parallel execution
+
+### 📺 Dashboard Command Center
+- **Live Event Stream**: Real-time timeline with auto-scroll and filtering
+- **Session Visualization**: Pulse charts showing agent activity patterns
+- **Chat Transcripts**: Complete conversation history with AI-powered summaries
+- **Agent Communications**: Monitor inter-agent message flow
+- **Advanced Filtering**: By app, session, event type, time range, agent name
+- **Search & Analytics**: Full-text search across all events and messages
+
+### 🎮 Recursive Clone Capability
+- **Orchestrator Spawns Orchestrator**: Meta-orchestration for complex multi-phase projects
+- **Infinite Delegation**: Each orchestrator manages their squad autonomously
+- **Hierarchical Coordination**: Top-level strategy cascades through orchestration layers
+- **Emergent Intelligence**: Swarm behavior emerges from simple coordination protocols
+
 
 ## 📄 License
 

@@ -8,7 +8,7 @@ const nock = require('nock');
 class GitHubAPIMock {
   constructor() {
     this.baseUrl = 'https://api.github.com';
-    this.repo = 'alexsavage/claude-code-hooks-multi-agent-observability';
+    this.repo = 'alexsavage/claude-comms';
     this.interceptors = [];
   }
 

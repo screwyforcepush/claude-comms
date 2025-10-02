@@ -9,14 +9,14 @@ const mockGitHubDirectoryResponse = [
     type: 'dir',
     path: '.claude/agents',
     sha: 'agents123',
-    url: 'https://api.github.com/repos/alexsavage/claude-code-hooks-multi-agent-observability/contents/.claude/agents'
+    url: 'https://api.github.com/repos/alexsavage/claude-comms/contents/.claude/agents'
   },
   {
     name: 'hooks',
     type: 'dir',
     path: '.claude/hooks',
     sha: 'hooks456',
-    url: 'https://api.github.com/repos/alexsavage/claude-code-hooks-multi-agent-observability/contents/.claude/hooks'
+    url: 'https://api.github.com/repos/alexsavage/claude-comms/contents/.claude/hooks'
   },
   {
     name: 'settings.json',
@@ -24,8 +24,8 @@ const mockGitHubDirectoryResponse = [
     path: '.claude/settings.json',
     sha: 'settings789',
     size: 256,
-    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-code-hooks-multi-agent-observability/main/.claude/settings.json',
-    url: 'https://api.github.com/repos/alexsavage/claude-code-hooks-multi-agent-observability/contents/.claude/settings.json'
+    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-comms/main/.claude/settings.json',
+    url: 'https://api.github.com/repos/alexsavage/claude-comms/contents/.claude/settings.json'
   }
 ];
 
@@ -48,7 +48,7 @@ const mockGitHubHooksResponse = [
     path: '.claude/hooks/install.py',
     sha: 'install123',
     size: 1024,
-    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-code-hooks-multi-agent-observability/main/.claude/hooks/install.py'
+    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-comms/main/.claude/hooks/install.py'
   }
 ];
 
@@ -59,7 +59,7 @@ const mockGitHubAgentsResponse = [
     path: '.claude/agents/agent-orchestrator.py',
     sha: 'orch123',
     size: 4096,
-    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-code-hooks-multi-agent-observability/main/.claude/agents/agent-orchestrator.py'
+    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-comms/main/.claude/agents/agent-orchestrator.py'
   },
   {
     name: 'planner.py',
@@ -67,7 +67,7 @@ const mockGitHubAgentsResponse = [
     path: '.claude/agents/planner.py',
     sha: 'planner123',
     size: 2048,
-    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-code-hooks-multi-agent-observability/main/.claude/agents/planner.py'
+    download_url: 'https://raw.githubusercontent.com/alexsavage/claude-comms/main/.claude/agents/planner.py'
   }
 ];
 

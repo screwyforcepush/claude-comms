@@ -23,7 +23,7 @@ describe('GitHubFetcher', () => {
   describe('constructor', () => {
     it('should initialize with default configuration', () => {
       expect(fetcher.repository.owner).toBe('alexsavage');
-      expect(fetcher.repository.repo).toBe('claude-code-hooks-multi-agent-observability');
+      expect(fetcher.repository.repo).toBe('claude-comms');
       expect(fetcher.repository.branch).toBe('main');
       expect(fetcher.config.timeout).toBe(10000);
       expect(fetcher.config.retryCount).toBe(3);

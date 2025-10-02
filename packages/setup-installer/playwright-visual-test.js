@@ -18,11 +18,11 @@ const { chromium } = require('playwright');
 
   // Test GitHub workflow page
   console.log('📸 Capturing GitHub workflow page...');
-  await page.goto('https://github.com/alexsavage/claude-code-hooks-multi-agent-observability/actions');
+  await page.goto('https://github.com/alexsavage/claude-comms/actions');
   await page.waitForLoadState('networkidle');
-  await page.screenshot({ 
+  await page.screenshot({
     path: 'screenshots/github-workflows-desktop.png',
-    fullPage: true 
+    fullPage: true
   });
 
   await browser.close();

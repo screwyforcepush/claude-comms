@@ -36,13 +36,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/alexsavage/claude-code-hooks-multi-agent-observability.git",
+    "url": "https://github.com/alexsavage/claude-comms.git",
     "directory": "packages/setup-installer"
   },
   "bugs": {
-    "url": "https://github.com/alexsavage/claude-code-hooks-multi-agent-observability/issues"
+    "url": "https://github.com/alexsavage/claude-comms/issues"
   },
-  "homepage": "https://github.com/alexsavage/claude-code-hooks-multi-agent-observability#readme",
+  "homepage": "https://github.com/alexsavage/claude-comms#readme",
   "engines": {
     "node": ">=16.0.0"
   },

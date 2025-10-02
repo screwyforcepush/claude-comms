@@ -122,7 +122,7 @@ function displayHelp(program) {
   console.log('  npx @claude-code/setup-installer --dry-run --verbose');
   console.log('  npx @claude-code/setup-installer --config-url http://localhost:4000');
 
-  console.log('\nFor more information, visit: https://github.com/alexsavage/claude-code-hooks-multi-agent-observability');
+  console.log('\nFor more information, visit: https://github.com/alexsavage/claude-comms');
 }
 
 /**

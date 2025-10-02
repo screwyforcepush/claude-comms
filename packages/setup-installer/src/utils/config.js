@@ -27,7 +27,7 @@ class Config {
       // Repository settings
       repository: {
         owner: 'alexsavage',
-        name: 'claude-code-hooks-multi-agent-observability',
+        name: 'claude-comms',
         branch: 'main',
         baseUrl: 'https://api.github.com',
         rawUrl: 'https://raw.githubusercontent.com'
@@ -358,7 +358,7 @@ class Config {
    */
   static createTemplate(filePath) {
     const template = {
-      $schema: 'https://raw.githubusercontent.com/alexsavage/claude-code-hooks-multi-agent-observability/main/packages/setup-installer/config-schema.json',
+      $schema: 'https://raw.githubusercontent.com/alexsavage/claude-comms/main/packages/setup-installer/config-schema.json',
       repository: {
         branch: 'main'
       },

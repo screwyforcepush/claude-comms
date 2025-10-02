@@ -8,9 +8,9 @@
  */
 const REPOSITORY = {
   OWNER: 'alexsavage',
-  NAME: 'claude-code-hooks-multi-agent-observability',
+  NAME: 'claude-comms',
   BRANCH: 'main',
-  FULL_NAME: 'alexsavage/claude-code-hooks-multi-agent-observability'
+  FULL_NAME: 'alexsavage/claude-comms'
 };
 
 /**
@@ -325,9 +325,9 @@ const PACKAGE_INFO = {
   NAME: '@claude-code/setup-installer',
   VERSION: '1.0.0', // Will be replaced by actual package.json
   USER_AGENT: '@claude-code/setup-installer/1.0.0',
-  REPOSITORY: 'https://github.com/alexsavage/claude-code-hooks-multi-agent-observability',
+  REPOSITORY: 'https://github.com/alexsavage/claude-comms',
   HOMEPAGE: 'https://claude.ai/code',
-  BUGS_URL: 'https://github.com/alexsavage/claude-code-hooks-multi-agent-observability/issues'
+  BUGS_URL: 'https://github.com/alexsavage/claude-comms/issues'
 };
 
 /**

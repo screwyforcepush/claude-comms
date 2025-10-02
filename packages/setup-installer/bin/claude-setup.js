@@ -95,7 +95,7 @@ async function main() {
     console.log(chalk.white('• Check network connection for GitHub access'));
     console.log(chalk.white('• Verify write permissions in target directory'));
     console.log(chalk.white('• Try running with --dev for more details'));
-    console.log(chalk.white('• Report issues: https://github.com/alexsavage/claude-code-hooks-multi-agent-observability/issues'));
+    console.log(chalk.white('• Report issues: https://github.com/alexsavage/claude-comms/issues'));
     
     process.exit(1);
   }

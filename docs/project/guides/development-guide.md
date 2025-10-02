@@ -44,8 +44,8 @@ Ensure you have the following tools installed:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/claude-code-hooks-multi-agent-observability.git
-cd claude-code-hooks-multi-agent-observability
+git clone https://github.com/yourusername/claude-comms.git
+cd claude-comms
 
 # 2. Install dependencies for both client and server
 cd apps/server && bun install
