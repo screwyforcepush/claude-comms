@@ -100,7 +100,7 @@ function _createDependencies(options = {}) {
   const fetcher = new GitHubFetcher({
     repository: {
       owner: 'screwyforcepush',
-      repo: 'claude-code-subagent-bus',
+      repo: 'claude-comms',
       branch: 'main',
       paths: {
         claudeDir: '.claude',
@@ -163,7 +163,7 @@ function _displaySuccessMessage(result, options) {
 
   console.log(chalk.blue('\n🔗 Resources:'));
   console.log(chalk.gray('• /learn in claude-comms server repo'));
-  console.log(chalk.gray('• GitHub: https://github.com/alexsavage/claude-code-hooks-multi-agent-observability'));
+  console.log(chalk.gray('• GitHub: https://github.com/screwyforcepush/claude-comms'));
 
   console.log(chalk.cyan('\nHappy coding with Claude! 🤖\n'));
 }
@@ -199,7 +199,7 @@ function _displayErrorSummary(result) {
   console.log(chalk.gray('3. Ensure sufficient disk space'));
   console.log(chalk.gray('4. Try running with --verbose flag for more details'));
 
-  console.log(chalk.gray('\nFor help, visit: https://github.com/alexsavage/claude-code-hooks-multi-agent-observability/issues'));
+  console.log(chalk.gray('\nFor help, visit: https://github.com/screwyforcepush/claude-comms/issues'));
 }
 
 // ============================================================================

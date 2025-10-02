@@ -14,7 +14,7 @@ describe('Tarball Integration Validation', () => {
     fetcher = new GitHubFetcher({
       repository: {
         owner: 'screwyforcepush',
-        repo: 'claude-code-subagent-bus',
+        repo: 'claude-comms',
         branch: 'main'
       }
     });
@@ -192,7 +192,7 @@ describe('Tarball Integration Validation', () => {
     if (requestLog.length > 0) {
       console.log('\n--- Request Summary ---');
       requestLog.forEach((req, i) => {
-        const url = req.url.replace('https://api.github.com/repos/screwyforcepush/claude-code-subagent-bus', '');
+        const url = req.url.replace('https://api.github.com/repos/screwyforcepush/claude-comms', '');
         console.log(`${i + 1}. ${req.method} ${url}`);
       });
       console.log(`Total requests: ${requestLog.length}`);

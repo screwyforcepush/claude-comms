@@ -27,7 +27,7 @@ async function runLiveValidation() {
     const fetcher = new GitHubFetcher({
       repository: {
         owner: 'screwyforcepush',
-        repo: 'claude-code-subagent-bus',
+        repo: 'claude-comms',
         branch: 'main'
       }
     });
@@ -37,7 +37,7 @@ async function runLiveValidation() {
     fetcher._makeRequest = function (...args) {
       requestCount++;
       const url = args[0];
-      console.log(`  Request ${requestCount}: ${url.replace('https://api.github.com/repos/screwyforcepush/claude-code-subagent-bus', '')}`);
+      console.log(`  Request ${requestCount}: ${url.replace('https://api.github.com/repos/screwyforcepush/claude-comms', '')}`);
       return originalMakeRequest.apply(this, args);
     };
 
@@ -79,7 +79,7 @@ async function runLiveValidation() {
     const trackingFetch = (url, options) => {
       if (url.includes('github.com')) {
         requestCount++;
-        console.log(`  Request ${requestCount}: ${url.replace('https://api.github.com/repos/screwyforcepush/claude-code-subagent-bus', '')}`);
+        console.log(`  Request ${requestCount}: ${url.replace('https://api.github.com/repos/screwyforcepush/claude-comms', '')}`);
       }
       return originalFetch(url, options);
     };

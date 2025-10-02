@@ -1,13 +1,13 @@
 <template>
-  <div class="flex-grow overflow-hidden p-4 bg-black">
+  <div class="flex-grow overflow-hidden p-4 bg-stone-950">
     <div class="h-full flex flex-col space-y-4">
       <!-- Session Selector -->
-      <div class="flex items-center space-x-4 bg-gray-900/80 p-3 rounded-lg border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-        <label class="text-cyan-400 font-semibold drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Session:</label>
+      <div class="flex items-center space-x-4 bg-stone-900/90 p-3 rounded border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+        <label class="text-amber-400 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Session:</label>
         <select
           v-model="selectedSessionId"
           @change="loadSessionData"
-          class="px-3 py-1.5 bg-black text-cyan-300 rounded border border-cyan-500/50 focus:border-cyan-400 focus:outline-none focus:shadow-[0_0_10px_rgba(34,211,238,0.5)] cursor-pointer transition-all duration-200 hover:border-cyan-400 hover:bg-gray-900"
+          class="px-3 py-1.5 bg-stone-950 text-amber-200 rounded border-2 border-amber-900/50 focus:border-amber-700 focus:outline-none focus:shadow-[0_0_8px_rgba(217,119,6,0.4)] cursor-pointer transition-all duration-150 hover:border-amber-800 hover:bg-stone-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)]"
           title="Select a session to view"
         >
           <option value="">Select a session...</option>
@@ -17,7 +17,7 @@
         </select>
         <button
           @click="refreshSessions"
-          class="px-4 py-1.5 bg-purple-900/60 text-cyan-300 rounded hover:bg-purple-800/80 transition-all duration-200 shadow-md hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transform hover:scale-105 cursor-pointer border border-purple-500/50 hover:border-purple-400"
+          class="px-4 py-1.5 bg-stone-900/80 text-amber-200 rounded hover:bg-stone-800 transition-all duration-150 shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_0_10px_rgba(217,119,6,0.3)] cursor-pointer border-2 border-amber-900/50 hover:border-amber-800"
           title="Refresh session list"
         >
           Refresh
@@ -25,15 +25,15 @@
       </div>
 
       <!-- View Selector -->
-      <div v-if="selectedSessionId" class="bg-gray-900/80 mb-4 rounded-lg border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-        <div class="flex border-b border-purple-500/30">
+      <div v-if="selectedSessionId" class="bg-stone-900/90 mb-4 rounded border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+        <div class="flex border-b-2 border-red-900/30">
           <button
             @click="activeView = 'timeline'"
             :class="[
-              'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
+              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer border-r border-stone-800',
               activeView === 'timeline'
-                ? 'bg-black text-cyan-400 border-b-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-                : 'text-gray-400 hover:text-cyan-300 hover:bg-gray-800/80 transform hover:scale-105'
+                ? 'bg-stone-950 text-amber-400 border-b-2 border-amber-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)]'
+                : 'text-stone-400 hover:text-amber-300 hover:bg-stone-800/80'
             ]"
             title="Switch to timeline view"
           >
@@ -42,10 +42,10 @@
           <button
             @click="activeView = 'list'"
             :class="[
-              'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
+              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer border-r border-stone-800',
               activeView === 'list'
-                ? 'bg-black text-cyan-400 border-b-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-                : 'text-gray-400 hover:text-cyan-300 hover:bg-gray-800/80 transform hover:scale-105'
+                ? 'bg-stone-950 text-amber-400 border-b-2 border-amber-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)]'
+                : 'text-stone-400 hover:text-amber-300 hover:bg-stone-800/80'
             ]"
             title="Switch to list view"
           >
@@ -54,10 +54,10 @@
           <button
             @click="activeView = 'orchestration'"
             :class="[
-              'px-4 py-2 font-semibold transition-all duration-200 cursor-pointer',
+              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer',
               activeView === 'orchestration'
-                ? 'bg-black text-cyan-400 border-b-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-                : 'text-gray-400 hover:text-cyan-300 hover:bg-gray-800/80 transform hover:scale-105'
+                ? 'bg-stone-950 text-amber-400 border-b-2 border-amber-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)]'
+                : 'text-stone-400 hover:text-amber-300 hover:bg-stone-800/80'
             ]"
             title="Switch to orchestration view"
           >
@@ -102,81 +102,81 @@
         <!-- List View (Original Layout) -->
         <div v-else-if="activeView === 'list'" class="flex space-x-4 h-full">
           <!-- Agents List -->
-          <div class="w-1/3 bg-gray-900/80 rounded-lg p-4 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-            <h3 class="text-cyan-400 font-bold mb-3 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Agents</h3>
+          <div class="w-1/3 bg-stone-900/90 rounded p-4 border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+            <h3 class="text-amber-400 font-bold mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-2">Agents</h3>
             <div class="space-y-2 max-h-96 overflow-y-auto">
               <div
                 v-for="agent in subagents"
                 :key="agent.id"
-                class="bg-black/60 p-3 rounded-lg cursor-pointer hover:bg-gray-800/80 transition-all duration-200 shadow-md hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] transform hover:scale-[1.02] border border-purple-500/30 hover:border-cyan-400/60"
+                class="bg-stone-950/80 p-3 rounded cursor-pointer hover:bg-stone-900 transition-all duration-150 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)] hover:shadow-[inset_0_1px_4px_rgba(0,0,0,0.8),0_0_8px_rgba(217,119,6,0.2)] border border-stone-800 hover:border-amber-900/60"
                 @click="handleAgentSelected(agent)"
                 :title="`Click to view details for ${agent.name} (${agent.subagent_type})`"
               >
                 <div class="flex items-center justify-between mb-2">
-                  <div class="text-cyan-300 font-semibold">{{ agent.name }}</div>
+                  <div class="text-amber-300 font-semibold">{{ agent.name }}</div>
                   <span
                     :class="[
-                      'px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1',
+                      'px-2 py-1 rounded text-xs font-medium flex items-center space-x-1',
                       getStatusColor(agent.status)
                     ]"
                   >
-                    <span v-if="agent.status === 'terminated'" class="text-pink-200">✕</span>
+                    <span v-if="agent.status === 'terminated'" class="text-red-300">✕</span>
                     <span>{{ agent.status || 'pending' }}</span>
                   </span>
                 </div>
 
-                <div class="text-gray-400 text-sm mb-2">Type: {{ agent.subagent_type }}</div>
+                <div class="text-stone-400 text-sm mb-2">Type: {{ agent.subagent_type }}</div>
 
                 <div class="flex flex-wrap gap-2 mb-2">
-                  <span v-if="agent.duration" class="text-gray-500 text-xs">
+                  <span v-if="agent.duration" class="text-stone-500 text-xs">
                     {{ formatDuration(agent.duration) }}
                   </span>
-                  <span v-if="agent.token_count" class="bg-cyan-900/60 text-cyan-300 text-xs px-2 py-1 rounded border border-cyan-500/30">
+                  <span v-if="agent.token_count" class="bg-stone-900/80 text-amber-300 text-xs px-2 py-1 rounded border border-amber-900/40 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
                     {{ agent.token_count }} tokens
                   </span>
-                  <span v-if="agent.tool_count" class="bg-purple-900/60 text-purple-300 text-xs px-2 py-1 rounded border border-purple-500/30">
+                  <span v-if="agent.tool_count" class="bg-stone-900/80 text-orange-300 text-xs px-2 py-1 rounded border border-orange-900/40 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
                     {{ agent.tool_count }} tools
                   </span>
                 </div>
 
-                <div class="text-gray-500 text-xs">
+                <div class="text-stone-500 text-xs">
                   Started: {{ new Date(agent.created_at).toLocaleTimeString() }}
                 </div>
-                <div v-if="agent.completion_timestamp" class="text-gray-500 text-xs">
+                <div v-if="agent.completion_timestamp" class="text-stone-500 text-xs">
                   Completed: {{ new Date(agent.completion_timestamp).toLocaleTimeString() }}
                 </div>
               </div>
-              <div v-if="subagents.length === 0" class="text-gray-400 italic">
+              <div v-if="subagents.length === 0" class="text-stone-500 italic">
                 No agents registered yet
               </div>
             </div>
           </div>
 
           <!-- Messages -->
-          <div class="flex-grow bg-gray-900/80 rounded-lg p-4 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-            <h3 class="text-cyan-400 font-bold mb-3 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Messages</h3>
+          <div class="flex-grow bg-stone-900/90 rounded p-4 border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+            <h3 class="text-amber-400 font-bold mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-2">Messages</h3>
             <div class="space-y-3 max-h-96 overflow-y-auto">
               <div
                 v-for="(msg, idx) in messages"
                 :key="idx"
-                class="bg-black/60 p-3 rounded-lg border border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]"
+                class="bg-stone-950/80 p-3 rounded border border-stone-800 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]"
               >
                 <div class="flex justify-between items-start mb-2">
-                  <span class="text-cyan-400 font-semibold drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">{{ msg.sender }}</span>
-                  <span class="text-gray-500 text-xs">
+                  <span class="text-amber-400 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ msg.sender }}</span>
+                  <span class="text-stone-500 text-xs">
                     {{ new Date(msg.created_at).toLocaleTimeString() }}
                   </span>
                 </div>
-                <div class="text-gray-300">
+                <div class="text-stone-300">
                   <pre class="whitespace-pre-wrap text-sm">{{ formatMessage(msg.message) }}</pre>
                 </div>
                 <div v-if="msg.notified && msg.notified.length > 0" class="mt-2">
-                  <span class="text-gray-500 text-xs">
+                  <span class="text-stone-500 text-xs">
                     Read by: {{ msg.notified.join(', ') }}
                   </span>
                 </div>
               </div>
-              <div v-if="messages.length === 0" class="text-gray-400 italic">
+              <div v-if="messages.length === 0" class="text-stone-500 italic">
                 No messages yet
               </div>
             </div>
@@ -322,16 +322,16 @@ const formatMessage = (message: any): string => {
 const getStatusColor = (status?: string): string => {
   switch (status) {
     case 'completed':
-      return 'bg-cyan-900/60 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.4)]';
+      return 'bg-amber-950/80 text-amber-300 border border-amber-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]';
     case 'in_progress':
-      return 'bg-purple-900/60 text-purple-300 border border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.4)]';
+      return 'bg-orange-950/80 text-orange-300 border border-orange-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_0_6px_rgba(234,88,12,0.3)]';
     case 'error':
-      return 'bg-pink-900/60 text-pink-300 border border-pink-500/50 shadow-[0_0_10px_rgba(236,72,153,0.4)]';
+      return 'bg-red-950/80 text-red-300 border border-red-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]';
     case 'terminated':
-      return 'bg-pink-900/80 text-pink-200 border border-pink-500/50 shadow-[0_0_10px_rgba(236,72,153,0.5)]';
+      return 'bg-red-950/90 text-red-200 border border-red-800/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]';
     case 'pending':
     default:
-      return 'bg-gray-800/60 text-gray-300 border border-gray-600/50';
+      return 'bg-stone-900/80 text-stone-400 border border-stone-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]';
   }
 };
 

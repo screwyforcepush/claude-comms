@@ -17,7 +17,7 @@ class GitHubFetcher extends EventEmitter {
 
     this.repository = options.repository || {
       owner: 'screwyforcepush',
-      repo: 'claude-code-subagent-bus',
+      repo: 'claude-comms',
       branch: 'main',
       paths: {
         claudeDir: '.claude',

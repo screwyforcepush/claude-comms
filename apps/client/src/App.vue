@@ -1,36 +1,37 @@
 <template>
   <div class="h-screen flex flex-col bg-gray-900">
-    <!-- Header with Cyberpunk Theme -->
-    <header class="bg-gradient-to-r from-gray-900 via-purple-900 to-gray-900 shadow-lg border-b-2 border-cyan-500 relative overflow-hidden">
-      <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 animate-pulse"></div>
+    <!-- Header with Diablo Theme -->
+    <header class="bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 shadow-2xl border-b-4 border-red-900/50 relative overflow-hidden">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-950/20 via-transparent to-transparent"></div>
+      <div class="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')]"></div>
       <div class="px-3 py-4 mobile:py-2 mobile:flex-col mobile:space-y-2 flex items-center justify-between relative z-10">
         <!-- Title Section -->
         <div class="mobile:w-full mobile:text-center">
-          <h1 class="text-2xl mobile:text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)] animate-pulse tracking-wider">
+          <h1 class="text-2xl mobile:text-lg font-bold text-amber-500 drop-shadow-[0_2px_8px_rgba(217,119,6,0.8)] tracking-wide font-serif border-b-2 border-amber-700/50 pb-1 inline-block">
             Claude Comms
           </h1>
         </div>
         
         <!-- Connection Status -->
         <div class="mobile:w-full mobile:justify-center flex items-center space-x-1.5">
-          <div v-if="isConnected" class="flex items-center space-x-1.5">
+          <div v-if="isConnected" class="flex items-center space-x-1.5 bg-stone-900/60 px-3 py-1.5 rounded border border-amber-900/50">
             <span class="relative flex h-3 w-3">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.8)]"></span>
+              <span class="animate-pulse absolute inline-flex h-full w-full rounded-full bg-amber-600 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500 shadow-[0_0_8px_rgba(217,119,6,0.9)]"></span>
             </span>
-            <span class="text-base mobile:text-sm text-cyan-300 font-semibold drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Connected</span>
+            <span class="text-base mobile:text-sm text-amber-200 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Connected</span>
           </div>
-          <div v-else class="flex items-center space-x-1.5">
+          <div v-else class="flex items-center space-x-1.5 bg-stone-900/60 px-3 py-1.5 rounded border border-red-900/50">
             <span class="relative flex h-3 w-3">
-              <span class="relative inline-flex rounded-full h-3 w-3 bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.8)]"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-red-700 shadow-[0_0_8px_rgba(185,28,28,0.9)]"></span>
             </span>
-            <span class="text-base mobile:text-sm text-pink-300 font-semibold drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">Disconnected</span>
+            <span class="text-base mobile:text-sm text-red-300 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Disconnected</span>
           </div>
         </div>
         
         <!-- Event Count and Theme Toggle -->
         <div class="mobile:w-full mobile:justify-center flex items-center space-x-2">
-          <span class="text-base mobile:text-sm text-cyan-300 font-semibold drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] bg-black/60 px-3 py-1.5 rounded-full border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.3)]">
+          <span class="text-base mobile:text-sm text-amber-200 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] bg-stone-900/80 px-3 py-1.5 rounded border-2 border-amber-900/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
             {{ events.length }} events
           </span>
 
@@ -38,7 +39,7 @@
           <button
             v-if="activeTab === 'events' || activeTab === 'sessions'"
             @click="showFilters = !showFilters"
-            class="p-3 mobile:p-1.5 rounded-lg bg-purple-900/40 hover:bg-purple-800/60 transition-all duration-200 border border-purple-500/50 hover:border-purple-400/80 backdrop-blur-sm shadow-lg hover:shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+            class="p-3 mobile:p-1.5 rounded bg-stone-900/80 hover:bg-stone-800/90 transition-all duration-150 border-2 border-red-900/50 hover:border-red-800/70 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] hover:shadow-[inset_0_2px_8px_rgba(0,0,0,0.8),0_0_12px_rgba(153,27,27,0.4)]"
             :title="showFilters ? 'Hide filters' : 'Show filters'"
           >
             <span class="text-2xl mobile:text-lg">📊</span>
@@ -49,15 +50,15 @@
     </header>
     
     <!-- Tab Navigation -->
-    <div class="bg-black/80 border-b border-purple-500/30 shadow-[0_4px_10px_rgba(168,85,247,0.2)]">
+    <div class="bg-stone-950 border-b-2 border-red-900/40 shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
       <div class="flex space-x-1 px-4 py-2">
         <button
           @click="activeTab = 'events'"
           :class="[
-            'px-4 py-2 rounded-t-lg font-semibold transition-all',
+            'px-4 py-2 rounded-t font-semibold transition-all border-t-2 border-x-2',
             activeTab === 'events'
-              ? 'bg-gray-900 text-cyan-400 border-t-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-              : 'bg-gray-800/60 text-gray-400 hover:text-cyan-300 hover:bg-gray-700/80 hover:shadow-[0_0_5px_rgba(34,211,238,0.3)]'
+              ? 'bg-stone-900 text-amber-400 border-amber-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]'
+              : 'bg-stone-900/60 text-stone-400 border-stone-800/40 hover:text-amber-300 hover:bg-stone-800/80 hover:border-amber-900/40'
           ]"
         >
           Event Timeline
@@ -65,10 +66,10 @@
         <button
           @click="activeTab = 'subagents'"
           :class="[
-            'px-4 py-2 rounded-t-lg font-semibold transition-all',
+            'px-4 py-2 rounded-t font-semibold transition-all border-t-2 border-x-2',
             activeTab === 'subagents'
-              ? 'bg-gray-900 text-cyan-400 border-t-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-              : 'bg-gray-800/60 text-gray-400 hover:text-cyan-300 hover:bg-gray-700/80 hover:shadow-[0_0_5px_rgba(34,211,238,0.3)]'
+              ? 'bg-stone-900 text-amber-400 border-amber-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]'
+              : 'bg-stone-900/60 text-stone-400 border-stone-800/40 hover:text-amber-300 hover:bg-stone-800/80 hover:border-amber-900/40'
           ]"
         >
           Agents
@@ -76,10 +77,10 @@
         <button
           @click="activeTab = 'sessions'"
           :class="[
-            'px-4 py-2 rounded-t-lg font-semibold transition-all',
+            'px-4 py-2 rounded-t font-semibold transition-all border-t-2 border-x-2',
             activeTab === 'sessions'
-              ? 'bg-gray-900 text-cyan-400 border-t-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-              : 'bg-gray-800/60 text-gray-400 hover:text-cyan-300 hover:bg-gray-700/80 hover:shadow-[0_0_5px_rgba(34,211,238,0.3)]'
+              ? 'bg-stone-900 text-amber-400 border-amber-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]'
+              : 'bg-stone-900/60 text-stone-400 border-stone-800/40 hover:text-amber-300 hover:bg-stone-800/80 hover:border-amber-900/40'
           ]"
           data-test="sessions-tab"
         >
