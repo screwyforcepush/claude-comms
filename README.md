@@ -46,8 +46,9 @@ npx claude-comms # in your project root.
 1. Observe `http://localhost:5173/`
 ./scripts/restart-system.sh restarts everything and can clear the db
 
-2. Install perplexity mcp. it will make your claude code cap last 20% longer. I've used $5 in a month and I'm a HEAVY user.
-`claude mcp add perplexity-ask -- env PERPLEXITY_API_KEY=pplx-xxxx npx -y server-perplexity-ask`
+2. MCPs. Only two are worth the context fee. Browser use for visual feedback loop, and Web Research to make your claude code cap last 20% longer
+Browser Use: `claude mcp add chrome-devtools npx chrome-devtools-mcp@latest`
+Web Research: `claude mcp add perplexity-ask -- env PERPLEXITY_API_KEY=pplx-xxxx npx -y server-perplexity-ask` I've used $5 in a month and I'm a HEAVY user.
 You can still be a wizzard without this, but its the difference between being Dumbledore and being Gandalf.
 
 3. In this project prompt claude with `/learn`

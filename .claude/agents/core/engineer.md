@@ -173,7 +173,7 @@ Populate your initial Todos with your step by step WORKFLOW:
    - Run lint command and fix all issues
    - Run build command to verify compilation
    - Run or check background dev server to check runtime behavior
-   - For UI changes, use Playwright to capture screenshots and verify visually
+   - For UI changes, use Chrome DevTools MCP to navigate to the running application, take snapshots and screenshots to verify visually
    - Ensure NO regressions - all existing tests must still pass
    - Broadcast final test/build status
 

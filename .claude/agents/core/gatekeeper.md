@@ -82,13 +82,14 @@ Populate your initial Todos with your step by step WORKFLOW:
      * Secret exposure in code or configs
 
 7. **Visual Validation & UI Testing**
-   - Create or Reuse existing Playwright scripts to capture critical UI states:
+   - Use Chrome DevTools MCP to navigate to the running application and validate critical UI states:
      * Authentication flows (login, logout, password reset)
      * Form submissions and validation states
      * Data display and pagination
      * Interactive components (modals, dropdowns, tabs)
      * Dashboard views and data visualizations
-   - Use Playwright to capture screenshots for desktop 1920x1080 (default), and other viewports if specified by the user
+   - Take snapshots (accessibility tree with UIDs) and screenshots at desktop 1920x1080 (default), and other viewports if specified by the user
+   - Use `mcp__chrome-devtools__resize_page` to test responsive layouts across viewports
    - Visually inspect captured screenshots for:
      * Layout breaks or responsive design issues
      * Missing or misaligned UI elements
@@ -96,8 +97,8 @@ Populate your initial Todos with your step by step WORKFLOW:
      * Color contrast and readability issues
      * Loading states and skeleton screens
      * Error message display and formatting
-   - Perform accessibility validation on screenshots:
-     * Check for proper heading hierarchy
+   - Perform accessibility validation on snapshots and screenshots:
+     * Check for proper heading hierarchy in accessibility tree
      * Verify interactive elements are visible and accessible
    - Compare against baseline screenshots or UI/UX guide:
      * Identify visual regressions from previous versions

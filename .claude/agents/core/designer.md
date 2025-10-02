@@ -64,7 +64,7 @@ Populate your initial Todos with your step by step WORKFLOW:
 
 6. **Support Parallel Implementation**:
    - Monitor Inbox for engineer questions and implementation feedback
-   - Review implementation screenshots using Playwright captures
+   - Review implementation screenshots using Chrome DevTools MCP to navigate to the running application and visually inspect
    - Provide real-time design adjustments based on technical constraints
    - Update specs based on implementation discoveries
    - Iterate until design vision matches implementation

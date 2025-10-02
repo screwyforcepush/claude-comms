@@ -261,7 +261,7 @@ PRO TIP: gatekeeper and agent-orchestrator agents can work in parallel, and both
 - **engineer**: Implements features end-to-end with code, writes comprehensive test suites, and documentation
 
 ### Verification
-- **gatekeeper**: Reviews code for quality, security, and standards compliance. Ensures all builds, tests, and checks pass. Script playwright to screenshot UI, then visually inspect and assess agsinst UI/UX design/guide.
+- **gatekeeper**: Reviews code for quality, security, and standards compliance. Ensures all builds, tests, and checks pass. Use Chrome DevTools MCP to navigate to the running application, capture screenshots and visually inspect UI against UI/UX design/guide.
 
 ### Research & Support
 - **deep-researcher**: Conducts targeted research for technical decisions

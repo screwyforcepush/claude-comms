@@ -136,9 +136,9 @@ Create a bespoke workflow for the Agent, leveraging specific tool instruction an
 - "read entire files"
 - Use perplexity ask to research
 - lint, dev, test, build commands
-- Use Playwrite to capture screenshots and "visually inspect" them
+- Use Chrome DevTools MCP to navigate to the running application, take snapshots and screenshots, and "visually inspect" them
 - Phase level documentation artifacts in docs/project/phases/<phase-id>
-- Project level gold docs in docs/project/guides/ 
+- Project level gold docs in docs/project/guides/
 - Source of truth spec docs in docs/project/spec/
 - allign witih source of truth spec
 - "THINK HARD" or "PONDER" keywords trigger deeper thinking in critical decision steps
@@ -178,7 +178,7 @@ Batch an Inbox Check with every step
    3. Search/grep/glob codebase multiple rounds → existing patterns + conventions
    2. Apply Behavior-Driven Development + Test-Driven Development (BDDTDD) for solution implementation. Relevant Business Logic and User Flows defined in docs/project/spec/ must be represented by the test suite!
    3. Run lint, dev, test, build commands for itterative feedback loop. You can not introduce regressions!
-   4. Use Playwrite to capture screenshots for UI-related tasks. Then spin up sub agent to visually inspect screenshot and validate UI.
+   4. Use Chrome DevTools MCP to navigate to the running application, take snapshots and screenshots for UI-related tasks and visually inspect to validate UI.
    5. Test -> Code -> Test -> Repeat. Itterate until green!
 
 COMPLETION GATE: MANDITORY Completion Criteria checklist:
@@ -198,8 +198,8 @@ Batch an Inbox Check with every step
 
    1. Run lint, dev, test, build commands and analyse the logs.
    2. Review the code and associated tests. Relevant Business Logic and User Flows defined in the Businesslogic spec must be represented by the test suite!
-   3. Visually inspect screenshots provided of UI changes.
-   4. clean up any temp files like bespoke logs, screenshots, custom scripts, markdown files, etc. and/or update gitignore as needed.
+   3. Use Chrome DevTools MCP to navigate to the running application and visually inspect UI changes.
+   4. clean up any temp files like bespoke logs, custom scripts, markdown files, etc. and/or update gitignore as needed.
    5. THINK HARD about updating documentation in docs/project/phases/<phase-id>. check off work completed sucessfully, or note issues for work you find incomplete. 
    6. Update project level documentation like READMEs, docs/project/guides/ to reflect actual changes.
 
