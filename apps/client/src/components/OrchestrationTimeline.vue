@@ -1,6 +1,6 @@
 <template>
   <div
-    class="orchestration-timeline h-full flex flex-col bg-stone-950 rounded border-2 border-red-900/40 min-h-0 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
+    class="orchestration-timeline h-full flex flex-col diablo-panel rounded min-h-0"
     role="log"
     aria-live="polite"
     :aria-label="`Orchestration timeline for session ${sessionId || 'all sessions'}`"
@@ -8,23 +8,23 @@
   >
     <!-- Header -->
     <div
-      class="timeline-header flex-shrink-0 px-4 py-3 bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 text-amber-300 rounded-t border-b-2 border-red-900/40"
+      class="timeline-header flex-shrink-0 px-4 py-3 diablo-header text-diablo-gold rounded-t border-b-2 border-diablo-blood/45"
       data-testid="timeline-header"
     >
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <span class="text-2xl">📋</span>
           <div>
-            <h2 class="text-xl font-bold text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Session Events</h2>
-            <p class="text-sm text-stone-400" v-if="sessionId">
+            <h2 class="text-xl font-bold text-diablo-gold drop-shadow-[0_2px_8px_rgba(214,168,96,0.5)] uppercase tracking-[0.12em]">Session Events</h2>
+            <p class="text-sm text-diablo-parchment/65" v-if="sessionId">
               Session: {{ sessionId }}
             </p>
-            <p class="text-sm text-stone-400" v-else>
+            <p class="text-sm text-diablo-parchment/65" v-else>
               All Sessions
             </p>
           </div>
         </div>
-        <div class="text-right text-sm text-stone-400">
+        <div class="text-right text-sm text-diablo-parchment/60">
           <div>{{ filteredMessages.length }} events</div>
           <div v-if="timeRange">{{ timeRange }}</div>
         </div>
@@ -36,14 +36,14 @@
       <!-- Empty State -->
       <div
         v-if="filteredMessages.length === 0"
-        class="h-full flex flex-col items-center justify-center text-center text-stone-500 p-8"
+        class="h-full flex flex-col items-center justify-center text-center text-diablo-parchment/60 p-8"
         data-testid="empty-state"
       >
         <div class="text-6xl mb-4">📋</div>
-        <h3 class="text-xl font-semibold text-amber-400 mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <h3 class="text-xl font-semibold text-diablo-gold mb-2 drop-shadow-[0_2px_8px_rgba(214,168,96,0.5)]">
           No orchestration events to display
         </h3>
-        <p class="text-stone-500">
+        <p class="text-diablo-parchment/60">
           Events will appear here as they occur
         </p>
       </div>
@@ -52,7 +52,7 @@
       <div
         v-else
         ref="regularScrollContainer"
-        class="regular-scroll-container h-full overflow-y-auto px-4 py-2 space-y-3"
+        class="regular-scroll-container h-full overflow-y-auto px-4 py-2 space-y-3 diablo-scrollbar"
         @scroll="handleScroll"
       >
         <MessageItem

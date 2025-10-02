@@ -3,28 +3,28 @@
     <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 mobile:p-0">
       <!-- Backdrop -->
       <div 
-        class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        class="fixed inset-0 bg-black/75 transition-opacity"
         @click="close"
       ></div>
       
       <!-- Modal -->
       <div 
-        class="relative bg-white dark:bg-gray-800 rounded-lg mobile:rounded-none shadow-xl flex flex-col overflow-hidden z-10 mobile:w-full mobile:h-full mobile:fixed mobile:inset-0"
+        class="relative diablo-panel border border-diablo-blood/50 rounded-lg mobile:rounded-none shadow-2xl flex flex-col overflow-hidden z-10 mobile:w-full mobile:h-full mobile:fixed mobile:inset-0"
         :style="{ width: '85vw', height: '85vh' }"
         :class="{ 'mobile:!w-full mobile:!h-full': true }"
         @click.stop
       >
           <!-- Header -->
-          <div class="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 mobile:p-3">
+          <div class="flex-shrink-0 diablo-header border-b border-diablo-blood/45 p-6 mobile:p-3">
             <div class="flex items-center justify-between mb-4 mobile:mb-2">
-              <h2 class="text-3xl mobile:text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 class="text-3xl mobile:text-lg font-diablo font-semibold text-diablo-gold tracking-[0.2em] uppercase drop-shadow-[0_2px_10px_rgba(214,168,96,0.55)]">
                 💬 Chat Transcript
               </h2>
               <button
                 @click="close"
-                class="p-2 mobile:p-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                class="p-2 mobile:p-3 rounded-lg transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center bg-diablo-900/70 hover:bg-diablo-850/80 border border-diablo-ash/70 hover:border-diablo-brass/60"
               >
-                <svg class="w-6 h-6 mobile:w-5 mobile:h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-6 h-6 mobile:w-5 mobile:h-5 text-diablo-parchment/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -40,21 +40,21 @@
                     @keyup.enter="executeSearch"
                     type="text"
                     placeholder="Search transcript..."
-                    class="w-full px-4 py-2 mobile:px-3 mobile:py-2 pl-10 mobile:pl-8 text-lg mobile:text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    class="w-full px-4 py-2 mobile:px-3 mobile:py-2 pl-10 mobile:pl-8 text-lg mobile:text-base rounded-lg diablo-field focus:ring-2 focus:ring-[rgba(214,168,96,0.25)] focus:border-[rgba(214,168,96,0.6)] placeholder:text-diablo-parchment/40"
                   >
-                  <svg class="absolute left-3 top-3 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="absolute left-3 top-3 w-5 h-5 text-diablo-parchment/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
                 <button
                   @click="executeSearch"
-                  class="px-4 py-2 mobile:px-3 mobile:py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors text-base mobile:text-sm min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  class="px-4 py-2 mobile:px-3 mobile:py-2 font-semibold rounded-lg transition-all text-base mobile:text-sm min-w-[44px] min-h-[44px] flex items-center justify-center diablo-button"
                 >
                   Search
                 </button>
                 <button
                   @click="copyAllMessages"
-                  class="px-4 py-2 mobile:px-3 mobile:py-2 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors text-base mobile:text-sm min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  class="px-4 py-2 mobile:px-3 mobile:py-2 bg-diablo-ash/70 hover:bg-diablo-ash text-diablo-parchment font-semibold rounded-lg transition-all text-base mobile:text-sm min-w-[44px] min-h-[44px] flex items-center justify-center border border-diablo-ash/80 hover:border-diablo-brass/50"
                   title="Copy all messages as JSON"
                 >
                   {{ copyAllButtonText }}
@@ -62,15 +62,15 @@
               </div>
               
               <!-- Filters -->
-              <div class="flex flex-wrap gap-2 mobile:gap-1 max-h-24 mobile:max-h-32 overflow-y-auto p-2 mobile:p-1 bg-gray-50 dark:bg-gray-900/50 rounded-lg mobile:overflow-x-auto mobile:pb-2">
+              <div class="flex flex-wrap gap-2 mobile:gap-1 max-h-24 mobile:max-h-32 overflow-y-auto p-2 mobile:p-1 bg-diablo-900/70 border border-diablo-blood/40 rounded-lg mobile:overflow-x-auto mobile:pb-2">
                 <button
                   v-for="filter in filters"
                   :key="filter.type"
                   @click="toggleFilter(filter.type)"
-                  class="px-4 py-2 mobile:px-3 mobile:py-1.5 rounded-full text-sm mobile:text-xs font-medium transition-colors min-h-[44px] mobile:min-h-[36px] flex items-center whitespace-nowrap"
+                  class="px-4 py-2 mobile:px-3 mobile:py-1.5 rounded-full text-sm mobile:text-xs font-semibold transition-all min-h-[44px] mobile:min-h-[36px] flex items-center whitespace-nowrap uppercase tracking-wide"
                   :class="activeFilters.includes(filter.type) 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                    ? 'bg-diablo-blood text-diablo-parchment border border-diablo-brass/60 shadow-[0_0_12px_rgba(176,30,33,0.4)]' 
+                    : 'bg-diablo-850/80 text-diablo-parchment/70 border border-diablo-ash/50 hover:bg-diablo-850 hover:text-diablo-gold hover:border-diablo-brass/50'"
                 >
                   <span class="mr-1">{{ filter.icon }}</span>
                   {{ filter.label }}
@@ -80,14 +80,14 @@
                 <button
                   v-if="searchQuery || activeSearchQuery || activeFilters.length > 0"
                   @click="clearSearch"
-                  class="px-4 py-2 mobile:px-3 mobile:py-1.5 rounded-full text-sm mobile:text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 min-h-[44px] mobile:min-h-[36px] flex items-center whitespace-nowrap"
+                  class="px-4 py-2 mobile:px-3 mobile:py-1.5 rounded-full text-sm mobile:text-xs font-semibold bg-diablo-ash/60 text-diablo-parchment hover:bg-diablo-ash min-h-[44px] mobile:min-h-[36px] flex items-center whitespace-nowrap border border-diablo-blood/50"
                 >
                   Clear All
                 </button>
               </div>
               
               <!-- Results Count -->
-              <div v-if="activeSearchQuery || activeFilters.length > 0" class="text-sm mobile:text-xs text-gray-500 dark:text-gray-400">
+              <div v-if="activeSearchQuery || activeFilters.length > 0" class="text-sm mobile:text-xs text-diablo-parchment/60">
                 Showing {{ filteredChat.length }} of {{ chat.length }} messages
                 <span v-if="activeSearchQuery" class="ml-2 font-medium mobile:block mobile:ml-0 mobile:mt-1">
                   (searching for "{{ activeSearchQuery }}")
@@ -97,7 +97,7 @@
           </div>
           
           <!-- Content -->
-          <div class="flex-1 p-6 mobile:p-3 overflow-hidden flex flex-col">
+          <div class="flex-1 p-6 mobile:p-3 overflow-hidden flex flex-col bg-diablo-900/60">
             <ChatTranscript :chat="filteredChat" />
           </div>
         </div>

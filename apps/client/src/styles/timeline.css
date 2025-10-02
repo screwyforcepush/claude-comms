@@ -2,14 +2,14 @@
 /* Dark theme styling matching the existing dashboard */
 
 :root {
-  /* Timeline-specific CSS variables for theming */
-  --timeline-bg-start: #0f0f23;
-  --timeline-bg-end: #1a1a3e;
-  --timeline-grid-color: rgba(255, 255, 255, 0.05);
-  --timeline-orchestrator-color: #00d4ff;
-  --timeline-orchestrator-glow: 0 0 20px rgba(0, 212, 255, 0.6);
-  --timeline-user-prompt-color: #ffffff;
-  --timeline-user-prompt-glow: 0 0 30px rgba(255, 255, 255, 0.8);
+  /* Timeline-specific CSS variables for Diablo theming */
+  --timeline-bg-start: #120706;
+  --timeline-bg-end: #1f0b09;
+  --timeline-grid-color: rgba(214, 168, 96, 0.08);
+  --timeline-orchestrator-color: #d6a860;
+  --timeline-orchestrator-glow: 0 0 24px rgba(214, 168, 96, 0.55);
+  --timeline-user-prompt-color: #b01c21;
+  --timeline-user-prompt-glow: 0 0 32px rgba(176, 30, 33, 0.65);
   --timeline-agent-padding: 16px;
   --timeline-message-dot-size: 8px;
   --timeline-transition-duration: 0.3s;
@@ -21,9 +21,11 @@
   position: relative;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--timeline-bg-start) 0%, var(--timeline-bg-end) 100%);
+  background: linear-gradient(140deg, rgba(10, 4, 4, 0.95) 0%, rgba(31, 11, 9, 0.9) 55%, rgba(18, 7, 6, 0.95) 100%);
   overflow: hidden;
   will-change: transform;
+  border-left: 1px solid rgba(176, 30, 33, 0.35);
+  border-right: 1px solid rgba(63, 27, 19, 0.45);
 }
 
 /* Timeline Viewport - Main scrollable area */
@@ -33,7 +35,7 @@
   height: 100%;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  scrollbar-color: rgba(214, 168, 96, 0.4) transparent;
 }
 
 .timeline-viewport::-webkit-scrollbar {
@@ -42,17 +44,17 @@
 }
 
 .timeline-viewport::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(10, 5, 4, 0.4);
 }
 
 .timeline-viewport::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(176, 30, 33, 0.55);
   border-radius: 4px;
   transition: background-color var(--timeline-transition-duration) var(--timeline-ease-function);
 }
 
 .timeline-viewport::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(214, 168, 96, 0.6);
 }
 
 /* Timeline SVG Canvas */
@@ -82,7 +84,7 @@
   fill: none;
   filter: drop-shadow(var(--timeline-orchestrator-glow));
   will-change: filter;
-  animation: orchestratorGlow 2s ease-in-out infinite alternate;
+  animation: orchestratorGlow 2.4s ease-in-out infinite alternate;
 }
 
 @keyframes orchestratorGlow {
@@ -97,12 +99,13 @@
 /* User Prompts - White with strong glow */
 .timeline-user-prompt {
   position: absolute;
-  background: var(--timeline-user-prompt-color);
-  color: var(--timeline-bg-start);
+  background: linear-gradient(145deg, rgba(176, 30, 33, 0.95), rgba(214, 168, 96, 0.8));
+  color: var(--theme-text-primary);
   padding: 8px 16px;
   border-radius: 20px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
+  letter-spacing: 0.08em;
   box-shadow: var(--timeline-user-prompt-glow);
   transform: translateX(-50%) translateY(-50%);
   z-index: 100;
@@ -113,21 +116,21 @@
 
 .timeline-user-prompt:hover {
   transform: translateX(-50%) translateY(-50%) scale(1.05);
-  box-shadow: 0 0 40px rgba(255, 255, 255, 1);
+  box-shadow: 0 0 40px rgba(214, 168, 96, 0.85);
 }
 
 .timeline-user-prompt.high-priority {
-  background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
-  color: white;
+  background: linear-gradient(135deg, rgba(176, 30, 33, 1), rgba(240, 182, 94, 0.9));
+  color: var(--theme-text-primary);
   animation: urgentPulse 1.5s ease-in-out infinite;
 }
 
 @keyframes urgentPulse {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(255, 107, 107, 0.6);
+    box-shadow: 0 0 20px rgba(176, 30, 33, 0.6);
   }
   50% {
-    box-shadow: 0 0 40px rgba(255, 107, 107, 1);
+    box-shadow: 0 0 40px rgba(214, 168, 96, 0.8);
   }
 }
 

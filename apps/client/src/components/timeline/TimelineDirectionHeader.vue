@@ -77,14 +77,15 @@ const toggleOrder = () => {
 .timeline-direction-header {
   position: sticky;
   top: 0;
-  background: rgba(17, 24, 39, 0.95);
-  backdrop-filter: blur(8px);
-  border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+  background: rgba(18, 8, 7, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid rgba(176, 30, 33, 0.45);
   padding: 12px 16px;
   z-index: 200;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -94,12 +95,14 @@ const toggleOrder = () => {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #00d4ff;
+  color: var(--theme-accent-gold);
+  letter-spacing: 0.08em;
 }
 
 .timeline-direction-arrow {
   font-size: 18px;
-  color: #00d4ff;
+  color: var(--theme-accent-ember);
+  text-shadow: 0 0 10px rgba(176, 30, 33, 0.4);
   animation: direction-pulse 2s ease-in-out infinite;
   user-select: none;
   line-height: 1;
@@ -107,12 +110,13 @@ const toggleOrder = () => {
 
 .direction-text {
   font-family: system-ui, -apple-system, sans-serif;
-  color: #00d4ff;
-  letter-spacing: 0.025em;
+  color: var(--theme-text-secondary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .relative-time-text {
-  color: #9ca3af;
+  color: var(--theme-text-tertiary);
   font-size: 11px;
   font-weight: 500;
   font-family: 'SF Mono', 'Monaco', monospace;
@@ -120,9 +124,9 @@ const toggleOrder = () => {
 }
 
 .order-toggle-button {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: #e5e7eb;
+  background: linear-gradient(135deg, rgba(176, 30, 33, 0.65) 0%, rgba(208, 138, 63, 0.55) 100%);
+  border: 1px solid rgba(208, 138, 63, 0.45);
+  color: var(--theme-text-primary);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 12px;
@@ -133,18 +137,21 @@ const toggleOrder = () => {
   min-height: 32px;
   display: flex;
   align-items: center;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 .order-toggle-button:hover {
-  background: rgba(59, 130, 246, 0.3);
-  border-color: rgba(59, 130, 246, 0.6);
-  transform: scale(1.02);
+  background: linear-gradient(135deg, rgba(176, 30, 33, 0.75) 0%, rgba(214, 168, 96, 0.65) 100%);
+  border-color: rgba(214, 168, 96, 0.6);
+  transform: scale(1.03);
+  box-shadow: 0 0 12px rgba(214, 168, 96, 0.45);
 }
 
 .order-toggle-button:focus-visible {
-  outline: 2px solid #00d4ff;
+  outline: 2px solid rgba(214, 168, 96, 0.65);
   outline-offset: 2px;
-  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+  box-shadow: 0 0 10px rgba(214, 168, 96, 0.5);
 }
 
 .order-toggle-button:active {

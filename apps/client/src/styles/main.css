@@ -2,6 +2,163 @@
 @import './timeline.css';
 @import './timeline-utilities.css';
 
+:root {
+  --theme-primary: #b01c21;
+  --theme-primary-light: rgba(214, 168, 96, 0.75);
+  --theme-border-primary: rgba(176, 30, 33, 0.65);
+  --theme-border-secondary: rgba(95, 19, 21, 0.65);
+  --theme-text-primary: #f3e0bd;
+  --theme-text-secondary: rgba(243, 224, 189, 0.78);
+  --theme-text-tertiary: rgba(211, 180, 146, 0.6);
+  --theme-panel: rgba(27, 11, 9, 0.95);
+  --theme-panel-dark: rgba(18, 8, 7, 0.94);
+  --theme-panel-border: rgba(127, 29, 29, 0.6);
+  --theme-panel-glow: 0 0 28px rgba(153, 27, 27, 0.45);
+  --theme-accent-gold: #d6a860;
+  --theme-accent-ember: #b01c21;
+  --theme-ash: #3b1f1a;
+}
+
+html, body {
+  height: 100%;
+  background-color: #090504;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(214, 168, 96, 0.12) 0%, rgba(12, 6, 5, 0) 45%),
+    radial-gradient(circle at 80% 15%, rgba(176, 30, 33, 0.15) 0%, rgba(8, 4, 4, 0) 50%),
+    linear-gradient(135deg, rgba(59, 25, 16, 0.6), rgba(8, 4, 4, 0.85));
+  background-attachment: fixed;
+  color: var(--theme-text-primary);
+  font-feature-settings: 'liga' on, 'kern' on;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  min-height: 100%;
+  color: var(--theme-text-primary);
+}
+
+body::-webkit-scrollbar,
+.diablo-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  background: rgba(10, 6, 5, 0.9);
+}
+
+body::-webkit-scrollbar-thumb,
+.diablo-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(176, 30, 33, 0.7), rgba(208, 138, 63, 0.6));
+  border-radius: 12px;
+  border: 2px solid rgba(10, 6, 5, 0.9);
+}
+
+.diablo-panel {
+  background: linear-gradient(150deg, var(--theme-panel) 0%, var(--theme-panel-dark) 100%);
+  border: 1px solid var(--theme-panel-border);
+  box-shadow: var(--theme-panel-glow), 0 0 36px rgba(0, 0, 0, 0.65);
+}
+
+.diablo-panel-soft {
+  background: linear-gradient(145deg, rgba(27, 11, 9, 0.88) 0%, rgba(15, 7, 6, 0.95) 100%);
+  border: 1px solid rgba(208, 138, 63, 0.3);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+}
+
+.diablo-header {
+  background: linear-gradient(170deg, rgba(8, 4, 4, 0.92) 0%, rgba(27, 11, 9, 0.9) 100%);
+  border-bottom: 2px solid rgba(176, 30, 33, 0.55);
+}
+
+.diablo-button {
+  background: linear-gradient(135deg, rgba(176, 30, 33, 0.95) 0%, rgba(208, 138, 63, 0.85) 80%);
+  border: 1px solid rgba(208, 138, 63, 0.6);
+  color: var(--theme-text-primary);
+  box-shadow: 0 0 14px rgba(153, 27, 27, 0.45);
+  transition: all 160ms ease-in-out;
+}
+
+.diablo-button:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 18px rgba(208, 138, 63, 0.55);
+}
+
+.diablo-field {
+  background: rgba(18, 8, 7, 0.95);
+  border: 1px solid rgba(95, 19, 21, 0.65);
+  color: var(--theme-text-secondary);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.diablo-field:focus {
+  outline: none;
+  border-color: rgba(208, 138, 63, 0.8);
+  box-shadow: 0 0 0 2px rgba(208, 138, 63, 0.2);
+}
+
+.diablo-divider {
+  border-color: rgba(95, 19, 21, 0.55);
+}
+
+.diablo-tag {
+  background: rgba(208, 138, 63, 0.12);
+  border: 1px solid rgba(208, 138, 63, 0.45);
+  color: var(--theme-text-primary);
+}
+
+.diablo-theme [class*='bg-gray-900'] {
+  background-color: rgba(12, 6, 5, 0.95) !important;
+}
+
+.diablo-theme [class*='bg-gray-800'] {
+  background-color: rgba(23, 11, 9, 0.92) !important;
+}
+
+.diablo-theme [class*='bg-gray-700'] {
+  background-color: rgba(39, 18, 15, 0.88) !important;
+}
+
+.diablo-theme [class*='bg-gray-600'] {
+  background-color: rgba(58, 30, 24, 0.8) !important;
+}
+
+.diablo-theme [class*='bg-gray-100'],
+.diablo-theme [class*='bg-gray-200'],
+.diablo-theme [class*='bg-gray-50'] {
+  background-color: rgba(48, 22, 18, 0.6) !important;
+}
+
+.diablo-theme [class*='text-gray-300'] {
+  color: var(--theme-text-secondary) !important;
+}
+
+.diablo-theme [class*='text-gray-400'],
+.diablo-theme [class*='text-gray-500'],
+.diablo-theme [class*='text-stone-400'],
+.diablo-theme [class*='text-stone-500'] {
+  color: var(--theme-text-tertiary) !important;
+}
+
+.diablo-theme [class*='border-gray-600'],
+.diablo-theme [class*='border-gray-500'],
+.diablo-theme [class*='border-stone-800'] {
+  border-color: rgba(127, 29, 29, 0.45) !important;
+}
+
+.diablo-theme [class*='border-gray-400'] {
+  border-color: rgba(214, 168, 96, 0.35) !important;
+}
+
+.diablo-theme [class*='bg-blue-600'] {
+  background: linear-gradient(135deg, rgba(176, 30, 33, 0.9), rgba(214, 168, 96, 0.75)) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+.diablo-theme [class*='hover:bg-blue-600']:hover,
+.diablo-theme [class*='hover:bg-blue-700']:hover {
+  background: linear-gradient(135deg, rgba(176, 30, 33, 1), rgba(214, 168, 96, 0.85)) !important;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

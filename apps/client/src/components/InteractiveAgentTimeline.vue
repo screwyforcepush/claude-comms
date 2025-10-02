@@ -1,15 +1,15 @@
 <template>
-  <div class="agent-timeline-container w-full h-full bg-stone-950 rounded border-2 border-red-900/40 overflow-hidden shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+  <div class="agent-timeline-container w-full h-full flex flex-col diablo-panel rounded overflow-hidden">
     <!-- Timeline Header -->
-    <div class="timeline-header bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-4 py-3 border-b-2 border-red-900/40">
+    <div class="timeline-header diablo-header px-4 py-3 border-b-2 border-diablo-blood/45">
       <div class="flex items-center justify-between">
-        <h3 class="text-amber-400 font-bold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">Interactive Agent Timeline</h3>
+        <h3 class="text-diablo-gold font-bold text-lg drop-shadow-[0_2px_8px_rgba(214,168,96,0.5)] border-b border-diablo-brass/60 pb-1 uppercase tracking-[0.14em]">Interactive Agent Timeline</h3>
         <div class="flex items-center space-x-3">
-          <span class="text-stone-400 text-sm">Session: {{ sessionId || 'None selected' }}</span>
-          <div class="flex items-center space-x-2 bg-stone-900/60 px-3 py-1 rounded border border-amber-900/50">
-            <span class="text-amber-500 text-xs shadow-[0_0_6px_rgba(217,119,6,0.6)]">● Live</span>
-            <span class="text-stone-400 text-xs">{{ totalAgents }} agents</span>
-            <span v-if="selectedMessage || selectedAgent" class="text-amber-400 text-xs">
+          <span class="text-diablo-parchment/70 text-sm">Session: {{ sessionId || 'None selected' }}</span>
+          <div class="flex items-center space-x-2 bg-diablo-900/70 px-3 py-1 rounded border border-diablo-brass/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]">
+            <span class="text-diablo-gold text-xs shadow-[0_0_6px_rgba(214,168,96,0.5)]">● Live</span>
+            <span class="text-diablo-parchment/65 text-xs">{{ totalAgents }} agents</span>
+            <span v-if="selectedMessage || selectedAgent" class="text-diablo-gold text-xs">
               {{ selectedMessage ? 'Message' : 'Agent' }} selected
             </span>
           </div>
@@ -18,7 +18,7 @@
     </div>
 
     <!-- Timeline Content -->
-    <div class="timeline-content relative w-full flex-1 overflow-hidden" ref="timelineContainer">
+    <div class="timeline-content relative w-full flex-1 overflow-hidden min-h-0" ref="timelineContainer">
       <!-- SVG Timeline -->
       <svg
         ref="timelineSvg"
@@ -511,56 +511,56 @@
       />
 
       <!-- Loading Overlay -->
-      <div v-if="isLoading" class="absolute inset-0 bg-stone-950/80 flex items-center justify-center">
-        <div class="text-amber-300 text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Loading timeline data...</div>
+      <div v-if="isLoading" class="absolute inset-0 bg-diablo-900/80 flex items-center justify-center">
+        <div class="text-diablo-gold text-lg drop-shadow-[0_2px_8px_rgba(214,168,96,0.5)]">Summoning timeline data...</div>
       </div>
 
       <!-- Empty State -->
       <div v-if="!isLoading && totalAgents === 0" class="absolute inset-0 flex items-center justify-center">
-        <div class="text-stone-500 text-center">
+        <div class="text-diablo-parchment/60 text-center">
           <div class="text-2xl mb-2">📊</div>
-          <div class="text-lg mb-2 text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">No agent data available</div>
+          <div class="text-lg mb-2 text-diablo-gold drop-shadow-[0_2px_8px_rgba(214,168,96,0.5)]">No agent data available</div>
           <div class="text-sm">Agent timeline will appear when agents are spawned</div>
         </div>
       </div>
     </div>
 
     <!-- Timeline Controls -->
-    <div v-if="showControls" class="timeline-footer bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-4 py-2 border-t-2 border-red-900/40">
+    <div v-if="showControls" class="timeline-footer diablo-header px-4 py-2 border-t-2 border-diablo-blood/45">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <button 
             @click="zoomIn" 
-            class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
+            class="px-3 py-1 diablo-button rounded transition-all duration-150 text-sm"
           >
             Zoom In
           </button>
           <button 
             @click="zoomOut" 
-            class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
+            class="px-3 py-1 bg-diablo-900/70 text-diablo-parchment border border-diablo-brass/50 rounded hover:bg-diablo-850/80 transition-all duration-150 text-sm"
           >
             Zoom Out
           </button>
           <button 
             @click="resetZoom" 
-            class="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm"
+            class="px-3 py-1 bg-diablo-900/70 text-diablo-parchment border border-diablo-ash/60 rounded hover:border-diablo-brass/50 transition-all duration-150 text-sm"
           >
             Reset
           </button>
           <button 
             @click="clearSelections" 
-            class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm"
+            class="px-3 py-1 bg-diablo-blood text-diablo-parchment border border-diablo-brass/60 rounded hover:brightness-110 transition-all duration-150 text-sm"
             v-if="selectedAgent || selectedMessage"
           >
             Clear Selection
           </button>
         </div>
         <div class="flex items-center space-x-2">
-          <label class="flex items-center space-x-1 text-gray-300 text-sm">
+          <label class="flex items-center space-x-1 text-diablo-parchment/70 text-sm">
             <input 
               v-model="autoScroll" 
               type="checkbox" 
-              class="rounded border-gray-400 bg-gray-700 text-blue-600"
+              class="rounded border-diablo-ash/60 bg-diablo-900/70 text-diablo-gold"
             />
             <span>Auto-scroll</span>
           </label>
@@ -571,21 +571,21 @@
     <!-- Selection Info Bar -->
     <div 
       v-if="selectedAgent || selectedMessage" 
-      class="selection-info bg-blue-600/20 border-t border-blue-400/30 px-4 py-2 text-sm"
+      class="selection-info bg-diablo-blood/20 border-t border-diablo-brass/50 px-4 py-2 text-sm"
     >
       <div v-if="selectedAgent" class="flex items-center justify-between">
-        <span class="text-blue-400">
+        <span class="text-diablo-gold">
           Selected Agent: <strong>{{ selectedAgent.name }}</strong> ({{ selectedAgent.subagent_type }})
         </span>
-        <span class="text-gray-400">
+        <span class="text-diablo-parchment/65">
           {{ getAgentMessages(selectedAgent).length }} messages
         </span>
       </div>
       <div v-else-if="selectedMessage" class="flex items-center justify-between">
-        <span class="text-yellow-400">
+        <span class="text-diablo-gold">
           Selected Message from: <strong>{{ selectedMessage.sender }}</strong>
         </span>
-        <span class="text-gray-400">
+        <span class="text-diablo-parchment/65">
           {{ formatTimestamp(selectedMessage.created_at) }}
         </span>
       </div>
@@ -594,7 +594,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import type { AgentStatus, SubagentMessage } from '../types';
 import TimelineTooltip from './TimelineTooltip.vue';
 import DetailPanel from './DetailPanel.vue';
@@ -1639,7 +1639,8 @@ const handleMouseLeave = () => {
 const updateDimensions = () => {
   if (timelineContainer.value) {
     containerWidth.value = timelineContainer.value.clientWidth;
-    baseContainerHeight.value = props.height;
+    const availableHeight = timelineContainer.value.clientHeight;
+    baseContainerHeight.value = Math.max(props.height, availableHeight || 0);
   }
 };
 
@@ -1701,19 +1702,29 @@ onUnmounted(() => {
   laneOccupancy.value.clear();
 });
 
-watch(() => props.height, (newHeight) => {
-  baseContainerHeight.value = newHeight;
+watch(() => props.height, async () => {
+  await nextTick();
+  updateDimensions();
 });
 
 // Watch for time range changes and fetch sessions with events
-watch(timeRange, () => {
-  fetchSessionsWithEventsInWindow();
+watch(timeRange, async () => {
+  await fetchSessionsWithEventsInWindow();
+  await nextTick();
+  updateDimensions();
 }, { immediate: false });
 
 // Watch for new agents to update session filtering
-watch(() => props.agents, () => {
+watch(() => props.agents, async () => {
   // When agents change, refetch sessions with events
-  fetchSessionsWithEventsInWindow();
+  await fetchSessionsWithEventsInWindow();
+  await nextTick();
+  updateDimensions();
+}, { deep: true });
+
+watch(laneOccupancy, async () => {
+  await nextTick();
+  updateDimensions();
 }, { deep: true });
 
 // Watch autoScroll to control refresh interval
@@ -1757,7 +1768,7 @@ const stopSessionRefresh = () => {
 .timeline-content {
   position: relative;
   flex: 1;
-  min-height: 400px;
+  min-height: 0;
 }
 
 .timeline-header,

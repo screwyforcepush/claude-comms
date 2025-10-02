@@ -1,37 +1,37 @@
 <template>
-  <div class="h-screen flex flex-col bg-gray-900">
+  <div class="diablo-theme relative h-screen min-h-screen flex flex-col bg-diablo-900 bg-diablo-texture text-diablo-parchment">
+    <div class="pointer-events-none absolute inset-0 z-0 bg-diablo-vignette opacity-70 mix-blend-overlay"></div>
     <!-- Header with Diablo Theme -->
-    <header class="bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 shadow-2xl border-b-4 border-red-900/50 relative overflow-hidden">
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-950/20 via-transparent to-transparent"></div>
-      <div class="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')]"></div>
-      <div class="px-3 py-4 mobile:py-2 mobile:flex-col mobile:space-y-2 flex items-center justify-between relative z-10">
+    <header class="relative z-10 overflow-hidden shadow-2xl border-b-4 border-diablo-blood/60 diablo-header">
+      <div class="absolute inset-0 opacity-20 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzIiIGhlaWdodD0iNzIiIHZpZXdCb3g9IjAgMCA3MiA3MiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNzIiIGhlaWdodD0iNzIiIGZpbGw9IiMyMTExMDgiLz48cGF0aCBkPSIwIDMyTDMydi0zMkwzMiAzMloiIGZpbGw9IiM3ZjEwMTRCIiBvcGFjaXR5PSIwLjIiLz48cGF0aCBkPSI3MiA0MEw0MCA3MmwtNDAtNDBMNDBsMzJaIiBmaWxsPSIjYmAxYzIxIiBvcGFjaXR5PSIwLjA4Ii8+PC9zdmc+')]"></div>
+      <div class="px-4 py-5 mobile:py-3 mobile:flex-col mobile:space-y-3 flex items-center justify-between relative z-10">
         <!-- Title Section -->
         <div class="mobile:w-full mobile:text-center">
-          <h1 class="text-2xl mobile:text-lg font-bold text-amber-500 drop-shadow-[0_2px_8px_rgba(217,119,6,0.8)] tracking-wide font-serif border-b-2 border-amber-700/50 pb-1 inline-block">
+          <h1 class="text-3xl mobile:text-xl font-diablo font-semibold text-diablo-gold drop-shadow-[0_2px_10px_rgba(214,168,96,0.65)] tracking-[0.18em] uppercase border-b border-diablo-brass/60 pb-1 inline-block">
             Claude Comms
           </h1>
         </div>
         
         <!-- Connection Status -->
         <div class="mobile:w-full mobile:justify-center flex items-center space-x-1.5">
-          <div v-if="isConnected" class="flex items-center space-x-1.5 bg-stone-900/60 px-3 py-1.5 rounded border border-amber-900/50">
+          <div v-if="isConnected" class="flex items-center space-x-1.5 bg-diablo-850/80 px-3 py-1.5 rounded border border-diablo-brass/60 shadow-[0_0_12px_rgba(176,30,33,0.35)]">
             <span class="relative flex h-3 w-3">
               <span class="animate-pulse absolute inline-flex h-full w-full rounded-full bg-amber-600 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500 shadow-[0_0_8px_rgba(217,119,6,0.9)]"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500 shadow-[0_0_10px_rgba(214,168,96,0.9)]"></span>
             </span>
-            <span class="text-base mobile:text-sm text-amber-200 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Connected</span>
+            <span class="text-base mobile:text-sm text-diablo-parchment font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Connected</span>
           </div>
-          <div v-else class="flex items-center space-x-1.5 bg-stone-900/60 px-3 py-1.5 rounded border border-red-900/50">
+          <div v-else class="flex items-center space-x-1.5 bg-diablo-850/80 px-3 py-1.5 rounded border border-diablo-blood/60 shadow-[0_0_12px_rgba(127,16,20,0.4)]">
             <span class="relative flex h-3 w-3">
-              <span class="relative inline-flex rounded-full h-3 w-3 bg-red-700 shadow-[0_0_8px_rgba(185,28,28,0.9)]"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-diablo-blood shadow-[0_0_8px_rgba(127,16,20,0.9)]"></span>
             </span>
             <span class="text-base mobile:text-sm text-red-300 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Disconnected</span>
           </div>
         </div>
-        
+
         <!-- Event Count and Theme Toggle -->
         <div class="mobile:w-full mobile:justify-center flex items-center space-x-2">
-          <span class="text-base mobile:text-sm text-amber-200 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] bg-stone-900/80 px-3 py-1.5 rounded border-2 border-amber-900/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+          <span class="text-base mobile:text-sm text-diablo-parchment font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] bg-diablo-850/80 px-3 py-1.5 rounded border-2 border-diablo-brass/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.75)]">
             {{ events.length }} events
           </span>
 
@@ -39,26 +39,27 @@
           <button
             v-if="activeTab === 'events' || activeTab === 'sessions'"
             @click="showFilters = !showFilters"
-            class="p-3 mobile:p-1.5 rounded bg-stone-900/80 hover:bg-stone-800/90 transition-all duration-150 border-2 border-red-900/50 hover:border-red-800/70 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] hover:shadow-[inset_0_2px_8px_rgba(0,0,0,0.8),0_0_12px_rgba(153,27,27,0.4)]"
+            class="p-3 mobile:p-1.5 rounded bg-diablo-850/80 hover:bg-diablo-800/90 transition-all duration-150 border-2 border-diablo-blood/60 hover:border-diablo-brass/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.75)] hover:shadow-[inset_0_2px_8px_rgba(0,0,0,0.9),0_0_16px_rgba(214,168,96,0.4)]"
             :title="showFilters ? 'Hide filters' : 'Show filters'"
           >
-            <span class="text-2xl mobile:text-lg">📊</span>
+            <span class="text-2xl mobile:text-lg drop-shadow-[0_2px_6px_rgba(214,168,96,0.6)]">📊</span>
           </button>
 
         </div>
       </div>
     </header>
-    
+
     <!-- Tab Navigation -->
-    <div class="bg-stone-950 border-b-2 border-red-900/40 shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
+    <div class="relative bg-diablo-900/95 border-b-2 border-diablo-blood/50 shadow-[0_4px_18px_rgba(0,0,0,0.65)]">
+      <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-diablo-brass/60 to-transparent"></div>
       <div class="flex space-x-1 px-4 py-2">
         <button
           @click="activeTab = 'events'"
           :class="[
             'px-4 py-2 rounded-t font-semibold transition-all border-t-2 border-x-2',
             activeTab === 'events'
-              ? 'bg-stone-900 text-amber-400 border-amber-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]'
-              : 'bg-stone-900/60 text-stone-400 border-stone-800/40 hover:text-amber-300 hover:bg-stone-800/80 hover:border-amber-900/40'
+              ? 'bg-diablo-850 text-diablo-gold border-diablo-brass/70 shadow-[inset_0_2px_10px_rgba(0,0,0,0.55),0_0_14px_rgba(214,168,96,0.25)]'
+              : 'bg-diablo-900/75 text-diablo-parchment/60 border-diablo-800/50 hover:text-diablo-gold hover:bg-diablo-850/80 hover:border-diablo-brass/50'
           ]"
         >
           Event Timeline
@@ -68,8 +69,8 @@
           :class="[
             'px-4 py-2 rounded-t font-semibold transition-all border-t-2 border-x-2',
             activeTab === 'subagents'
-              ? 'bg-stone-900 text-amber-400 border-amber-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]'
-              : 'bg-stone-900/60 text-stone-400 border-stone-800/40 hover:text-amber-300 hover:bg-stone-800/80 hover:border-amber-900/40'
+              ? 'bg-diablo-850 text-diablo-gold border-diablo-brass/70 shadow-[inset_0_2px_10px_rgba(0,0,0,0.55),0_0_14px_rgba(214,168,96,0.25)]'
+              : 'bg-diablo-900/75 text-diablo-parchment/60 border-diablo-800/50 hover:text-diablo-gold hover:bg-diablo-850/80 hover:border-diablo-brass/50'
           ]"
         >
           Agents
@@ -79,8 +80,8 @@
           :class="[
             'px-4 py-2 rounded-t font-semibold transition-all border-t-2 border-x-2',
             activeTab === 'sessions'
-              ? 'bg-stone-900 text-amber-400 border-amber-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]'
-              : 'bg-stone-900/60 text-stone-400 border-stone-800/40 hover:text-amber-300 hover:bg-stone-800/80 hover:border-amber-900/40'
+              ? 'bg-diablo-850 text-diablo-gold border-diablo-brass/70 shadow-[inset_0_2px_10px_rgba(0,0,0,0.55),0_0_14px_rgba(214,168,96,0.25)]'
+              : 'bg-diablo-900/75 text-diablo-parchment/60 border-diablo-800/50 hover:text-diablo-gold hover:bg-diablo-850/80 hover:border-diablo-brass/50'
           ]"
           data-test="sessions-tab"
         >
@@ -91,25 +92,28 @@
     
     <!-- Tab Content -->
     <template v-if="activeTab === 'events'">
-      <!-- Filters -->
-      <FilterPanel
-        v-if="showFilters"
-        :filters="filters"
-        @update:filters="filters = $event"
-      />
-      
-      <!-- Live Pulse Chart -->
-      <LivePulseChart
-        :events="events"
-        :filters="filters"
-      />
-      
-      <!-- Timeline -->
-      <EventTimeline
-        :events="events"
-        :filters="filters"
-        v-model:stick-to-bottom="stickToBottom"
-      />
+      <div class="flex-1 flex flex-col min-h-0 relative z-10">
+        <!-- Filters -->
+        <FilterPanel
+          v-if="showFilters"
+          :filters="filters"
+          @update:filters="filters = $event"
+        />
+        
+        <!-- Live Pulse Chart -->
+        <LivePulseChart
+          :events="events"
+          :filters="filters"
+        />
+        
+        <!-- Timeline -->
+        <EventTimeline
+          class="flex-1 min-h-0"
+          :events="events"
+          :filters="filters"
+          v-model:stick-to-bottom="stickToBottom"
+        />
+      </div>
       
       <!-- Stick to bottom button -->
       <StickScrollButton
@@ -119,23 +123,28 @@
     </template>
     
     <template v-else-if="activeTab === 'subagents'">
-      <SubagentComms :ws-connection="wsConnection" />
+      <div class="flex-1 min-h-0 relative z-10">
+        <SubagentComms class="h-full" :ws-connection="wsConnection" />
+      </div>
     </template>
     
     <template v-else-if="activeTab === 'sessions'">
-      <!-- Sessions Filters (can be expanded later with specific session filters) -->
-      <FilterPanel
-        v-if="showFilters"
-        :filters="filters"
-        @update:filters="filters = $event"
-        data-test="filter-panel"
-      />
-      
-      <SessionsView 
-        :ws-connection="wsConnection" 
-        :filters="filters" 
-        data-test="sessions-view"
-      />
+      <div class="flex-1 flex flex-col min-h-0 relative z-10">
+        <!-- Sessions Filters (can be expanded later with specific session filters) -->
+        <FilterPanel
+          v-if="showFilters"
+          :filters="filters"
+          @update:filters="filters = $event"
+          data-test="filter-panel"
+        />
+        
+        <SessionsView 
+          class="flex-1 min-h-0"
+          :ws-connection="wsConnection" 
+          :filters="filters" 
+          data-test="sessions-view"
+        />
+      </div>
     </template>
     
     <!-- Error message -->

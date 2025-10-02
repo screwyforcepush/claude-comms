@@ -1,24 +1,24 @@
 <template>
-  <div class="sessions-timeline-container w-full h-full bg-gray-800 rounded-lg border border-blue-400/30 overflow-hidden">
+  <div class="sessions-timeline-container w-full h-full flex flex-col diablo-panel rounded-lg overflow-hidden">
     
     <!-- Session Filters Panel -->
-    <div v-if="false" class="bg-gray-700 px-4 py-2 border-b border-gray-600">
-      <div class="text-gray-400 text-sm">Filters temporarily disabled</div>
+    <div v-if="false" class="bg-diablo-900/70 px-4 py-2 border-b border-diablo-blood/45">
+      <div class="text-diablo-parchment/60 text-sm">Filters temporarily disabled</div>
     </div>
     
     <!-- Sessions Timeline Header -->
-    <div class="timeline-header bg-gradient-to-r from-gray-700 to-gray-600 px-4 py-3 border-b border-gray-600">
+    <div class="timeline-header diablo-header px-4 py-3 border-b border-diablo-blood/45">
       <div class="flex items-center justify-between">
-        <h3 class="text-white font-bold text-lg">Sessions Timeline</h3>
+        <h3 class="text-diablo-gold font-bold text-lg drop-shadow-[0_2px_8px_rgba(214,168,96,0.5)] uppercase tracking-[0.14em]">Sessions Timeline</h3>
         <div class="flex items-center space-x-4">
           <!-- Enhanced Time Window Controls with Auto-Pan -->
           <div class="flex items-center space-x-2 text-sm">
-            <span class="text-gray-300">Window:</span>
+            <span class="text-diablo-parchment/70">Window:</span>
             <button 
               v-for="window in timeWindows"
               :key="window.label"
               @click="setTimeWindow(window.value)"
-              class="px-3 py-1 rounded text-xs font-medium transition-all duration-200 transform hover:scale-105"
+              class="px-3 py-1 rounded text-xs font-semibold transition-all duration-200 transform hover:scale-105 uppercase tracking-wide"
               :class="getTimeWindowButtonClass(window)"
               :title="getTimeWindowButtonTitle(window)"
             >
@@ -29,8 +29,8 @@
               @click="toggleAutoPan"
               class="px-3 py-1 rounded text-xs font-medium transition-all duration-200 transform hover:scale-105 flex items-center space-x-1"
               :class="autoPanEnabled 
-                ? 'bg-green-600 text-white shadow-lg ring-2 ring-green-400/50' 
-                : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'"
+                ? 'diablo-button shadow-lg ring-2 ring-diablo-brass/40' 
+                : 'bg-diablo-900/70 text-diablo-parchment/70 border border-diablo-ash/60 hover:bg-diablo-850/80 hover:text-diablo-gold'"
               :title="autoPanEnabled ? 'Disable auto-pan (A)' : 'Enable auto-pan (A)'"
             >
               <span>{{ autoPanEnabled ? '⏸️' : '▶️' }}</span>
@@ -44,19 +44,19 @@
           
           <!-- Session Stats -->
           <div class="flex items-center space-x-3 text-sm">
-            <span class="text-green-400">● {{ activeSessions.length }} Active</span>
-            <span class="text-gray-400">{{ totalSessions }} Total</span>
-            <span class="text-blue-400">{{ totalAgents }} Agents</span>
+            <span class="text-diablo-gold">● {{ activeSessions.length }} Active</span>
+            <span class="text-diablo-parchment/65">{{ totalSessions }} Total</span>
+            <span class="text-diablo-parchment/65">{{ totalAgents }} Agents</span>
             <!-- FPS counter hidden for UI cleanup -->
             <!-- <span class="text-purple-400">{{ Math.round(performanceMetrics.frameRate) }}fps</span> -->
-            <span class="text-orange-400">{{ performanceMetrics.memoryUsage.toFixed(1) }}MB</span>
+            <span class="text-diablo-gold">{{ performanceMetrics.memoryUsage.toFixed(1) }}MB</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Sessions Content Area -->
-    <div class="sessions-content relative w-full flex-1 overflow-hidden" ref="sessionsContainer">
+    <div class="sessions-content relative w-full flex-1 overflow-hidden min-h-0" ref="sessionsContainer">
       <!-- SVG Sessions Timeline -->
       <svg
         ref="sessionsSvg"
@@ -458,27 +458,27 @@
       
 
       <!-- Loading Overlay -->
-      <div v-if="isLoading" class="absolute inset-0 bg-gray-800/50 flex items-center justify-center">
-        <div class="text-white text-lg">Loading sessions timeline...</div>
+      <div v-if="isLoading" class="absolute inset-0 bg-diablo-900/70 flex items-center justify-center">
+        <div class="text-diablo-gold text-lg drop-shadow-[0_2px_8px_rgba(214,168,96,0.5)]">Summoning multi-session data...</div>
       </div>
 
       <!-- Empty State -->
       <div v-if="!isLoading && totalSessions === 0" class="absolute inset-0 flex items-center justify-center">
-        <div class="text-gray-400 text-center">
+        <div class="text-diablo-parchment/60 text-center">
           <div class="text-2xl mb-2">🔄</div>
-          <div class="text-lg mb-2">No sessions in time window</div>
+          <div class="text-lg mb-2 text-diablo-gold">No sessions in time window</div>
           <div class="text-sm">Try adjusting the time window or check filters</div>
         </div>
       </div>
     </div>
 
     <!-- Sessions Controls -->
-    <div v-if="showControls" class="sessions-footer bg-gray-700 px-4 py-2 border-t border-gray-600">
+    <div v-if="showControls" class="sessions-footer diablo-header px-4 py-2 border-t border-diablo-blood/45">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <button 
             @click="zoomIn" 
-            class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
+            class="px-3 py-1 diablo-button rounded transition-all duration-200 transform hover:scale-105 text-sm font-medium"
             title="Zoom In (+)"
             :disabled="zoomLevel >= 10"
             :class="zoomLevel >= 10 ? 'opacity-50 cursor-not-allowed' : ''"
@@ -487,7 +487,7 @@
           </button>
           <button 
             @click="zoomOut" 
-            class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
+            class="px-3 py-1 bg-diablo-900/70 text-diablo-parchment border border-diablo-brass/50 rounded hover:bg-diablo-850/80 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
             title="Zoom Out (-)"
             :disabled="zoomLevel <= 0.1"
             :class="zoomLevel <= 0.1 ? 'opacity-50 cursor-not-allowed' : ''"
@@ -496,14 +496,14 @@
           </button>
           <button 
             @click="resetView" 
-            class="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
+            class="px-3 py-1 bg-diablo-900/70 text-diablo-parchment border border-diablo-ash/60 rounded hover:border-diablo-brass/50 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
             title="Reset View (R)"
           >
             ⚡ Reset View
           </button>
           <button 
             @click="clearSelections" 
-            class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
+            class="px-3 py-1 bg-diablo-blood text-diablo-parchment border border-diablo-brass/60 rounded hover:brightness-110 transition-all duration-200 transform hover:scale-105 text-sm font-medium"
             title="Clear Selection (Esc)"
             v-if="selectedAgent || selectedMessage || selectedEventIndicator"
           >
@@ -511,16 +511,16 @@
           </button>
           
           <!-- Enhanced Zoom Level Indicator -->
-          <div class="flex items-center space-x-2 px-3 py-1 bg-gray-800 rounded border border-gray-600">
-            <span class="text-gray-400 text-xs">Zoom:</span>
+          <div class="flex items-center space-x-2 px-3 py-1 bg-diablo-900/70 rounded border border-diablo-brass/50">
+            <span class="text-diablo-parchment/65 text-xs">Zoom:</span>
             <div class="flex items-center space-x-1">
-              <div class="w-16 h-1 bg-gray-600 rounded overflow-hidden">
+              <div class="w-16 h-1 bg-diablo-ash/70 rounded overflow-hidden">
                 <div 
-                  class="h-full bg-blue-500 transition-all duration-200"
+                  class="h-full bg-diablo-gold transition-all duration-200"
                   :style="{ width: `${Math.min((zoomLevel / 10) * 100, 100)}%` }"
                 ></div>
               </div>
-              <span class="text-white text-xs font-mono min-w-[3rem] text-right">
+              <span class="text-diablo-parchment/65 text-xs font-mono min-w-[3rem] text-right">
                 {{ Math.round(zoomLevel * 100) }}%
               </span>
             </div>
@@ -528,19 +528,19 @@
         </div>
         
         <div class="flex items-center space-x-2 text-sm">
-          <span class="text-gray-300">
+          <span class="text-diablo-parchment/65">
             {{ visibleSessions.length }} sessions in window
           </span>
-          <span class="text-gray-500">|</span>
-          <span class="text-gray-300">
+          <span class="text-diablo-parchment/40">|</span>
+          <span class="text-diablo-parchment/65">
             Zoom: {{ Math.round(zoomLevel * 100) }}%
           </span>
-          <span v-if="filterPerformanceMetrics" class="text-gray-500">|</span>
-          <span v-if="filterPerformanceMetrics" class="text-gray-300 text-xs">
+          <span v-if="filterPerformanceMetrics" class="text-diablo-parchment/40">|</span>
+          <span v-if="filterPerformanceMetrics" class="text-diablo-parchment/60 text-xs">
             Filter: {{ filterPerformanceMetrics.filterTime.toFixed(1) }}ms
           </span>
-          <span class="text-gray-500">|</span>
-          <span class="text-gray-300 text-xs">
+          <span class="text-diablo-parchment/40">|</span>
+          <span class="text-diablo-parchment/60 text-xs">
             Shortcuts: Ctrl+Scroll, ←→↑↓, +/-, R, 1-4
           </span>
         </div>
@@ -550,29 +550,29 @@
     <!-- Selection Info Bar -->
     <div 
       v-if="selectedAgent || selectedMessage || selectedEventIndicator" 
-      class="selection-info bg-blue-600/20 border-t border-blue-400/30 px-4 py-2 text-sm"
+      class="selection-info bg-diablo-blood/20 border-t border-diablo-brass/50 px-4 py-2 text-sm"
     >
       <div v-if="selectedAgent" class="flex items-center justify-between">
-        <span class="text-green-400">
+        <span class="text-diablo-gold">
           Selected Agent: <strong>{{ selectedAgent.name }}</strong>
         </span>
-        <span class="text-gray-400">
+        <span class="text-diablo-parchment/65">
           Type: {{ selectedAgent.type }}, Status: {{ selectedAgent.status }}
         </span>
       </div>
       <div v-else-if="selectedMessage" class="flex items-center justify-between">
-        <span class="text-yellow-400">
+        <span class="text-diablo-gold">
           Selected Message from: <strong>{{ selectedMessage.sender }}</strong>
         </span>
-        <span class="text-gray-400">
+        <span class="text-diablo-parchment/65">
           {{ formatTimestamp(selectedMessage.timestamp) }}
         </span>
       </div>
       <div v-else-if="selectedEventIndicator" class="flex items-center justify-between">
-        <span class="text-blue-400">
+        <span class="text-diablo-gold">
           Selected {{ selectedEventIndicator.eventType === 'UserPromptSubmit' ? 'User Prompt' : 'Notification' }}
         </span>
-        <span class="text-gray-400">
+        <span class="text-diablo-parchment/65">
           {{ formatTimestamp(selectedEventIndicator.timestamp) }} | Session: {{ selectedEventIndicator.sessionId.slice(-6) }}
         </span>
       </div>
@@ -581,7 +581,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import TimelineTooltip from './TimelineTooltip.vue';
 import EventDetailPanel from './EventDetailPanel.vue';
 // import SessionFilterPanel from './SessionFilterPanel.vue'; // Unused
@@ -1989,14 +1989,17 @@ const updateDimensions = () => {
   if (sessionsContainer.value) {
     containerWidth.value = sessionsContainer.value.clientWidth;
     
+    const availableHeight = sessionsContainer.value.clientHeight || 0;
+
     // Calculate total height based on dynamic session heights
     const totalSessionsHeight = visibleSessions.value.reduce((sum, session) => {
       return sum + getSessionHeight(session);
     }, 0);
     
     containerHeight.value = Math.max(
-      props.height,
-      timelineMargins.top + totalSessionsHeight + timelineMargins.bottom
+      availableHeight,
+      timelineMargins.top + totalSessionsHeight + timelineMargins.bottom,
+      props.height
     );
   }
 };
@@ -2102,6 +2105,8 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 onMounted(async () => {
   updateDimensions();
+  await nextTick();
+  updateDimensions();
   loadPersistedFilters();
   window.addEventListener('resize', updateDimensions);
   document.addEventListener('keydown', handleKeydown);
@@ -2143,11 +2148,18 @@ onUnmounted(() => {
   clearTooltipTimers();
 });
 
-watch(() => visibleSessions.value.length, () => {
+watch(() => visibleSessions.value.length, async () => {
+  await nextTick();
   updateDimensions();
 });
 
-watch(() => props.height, (newHeight) => {
+watch(visibleSessions, async () => {
+  await nextTick();
+  updateDimensions();
+}, { deep: true });
+
+watch(() => props.height, async () => {
+  await nextTick();
   updateDimensions();
 });
 
@@ -2159,9 +2171,11 @@ watch(() => timeRange.value, async () => {
 }, { deep: true });
 
 // Watch for new sessions to update event-based filtering
-watch(() => transformedSessions.value, () => {
+watch(() => transformedSessions.value, async () => {
   // When sessions change, refetch sessions with events
-  fetchSessionsWithEventsInWindow();
+  await fetchSessionsWithEventsInWindow();
+  await nextTick();
+  updateDimensions();
 }, { deep: true });
 
 // Set up auto-refresh for event-based session filtering
@@ -2205,7 +2219,7 @@ watch(autoPanEnabled, (enabled) => {
 .sessions-content {
   position: relative;
   flex: 1;
-  min-height: 400px;
+  min-height: 0;
 }
 
 .timeline-header,

@@ -1,15 +1,15 @@
 <template>
-  <div class="sessions-view h-full flex flex-col bg-stone-950">
+  <div class="sessions-view h-full flex flex-col min-h-0 bg-diablo-900/95">
     <!-- Sessions Header -->
-    <div class="sessions-header bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-4 py-3 border-b-2 border-red-900/40 shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
+    <div class="sessions-header diablo-panel px-4 py-3 border-b-2 border-diablo-blood/45 shadow-[0_6px_18px_rgba(0,0,0,0.65)]">
       <div class="flex items-center justify-between">
-        <h3 class="text-amber-400 font-bold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">Multi-Session Timeline</h3>
+        <h3 class="text-diablo-gold font-bold text-lg drop-shadow-[0_2px_8px_rgba(214,168,96,0.55)] border-b border-diablo-brass/60 pb-1 uppercase tracking-[0.14em]">Multi-Session Timeline</h3>
         <div class="flex items-center space-x-3">
-          <div class="flex items-center space-x-2 bg-stone-900/60 px-3 py-1.5 rounded border border-amber-900/50">
-            <span v-if="isLoading" class="text-amber-400 text-xs">● Loading...</span>
+          <div class="flex items-center space-x-2 bg-diablo-900/70 px-3 py-1.5 rounded border border-diablo-brass/60 shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)]">
+            <span v-if="isLoading" class="text-diablo-gold text-xs">● Loading...</span>
             <span v-else-if="error" class="text-red-400 text-xs">● Error</span>
-            <span v-else class="text-amber-500 text-xs shadow-[0_0_6px_rgba(217,119,6,0.6)]">● Connected</span>
-            <span class="text-stone-400 text-xs">{{ visibleSessions.length }} sessions</span>
+            <span v-else class="text-diablo-gold text-xs shadow-[0_0_8px_rgba(214,168,96,0.55)]">● Connected</span>
+            <span class="text-diablo-parchment/65 text-xs">{{ visibleSessions.length }} sessions</span>
           </div>
         </div>
       </div>
@@ -23,7 +23,7 @@
     -->
 
     <!-- Sessions Timeline Content -->
-    <div class="sessions-timeline-container flex-1 overflow-hidden">
+    <div class="sessions-timeline-container flex-1 overflow-hidden min-h-0">
       <InteractiveSessionsTimeline
         :sessions="visibleSessions"
         :filters="filters"

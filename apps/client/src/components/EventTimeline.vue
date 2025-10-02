@@ -1,9 +1,9 @@
 <template>
-  <div class="flex-1 mobile:h-[50vh] overflow-hidden flex flex-col">
+  <div class="relative z-10 flex-1 min-h-0 mobile:h-[50vh] overflow-hidden flex flex-col">
     <!-- Fixed Header -->
-    <div class="px-3 py-4 mobile:py-2 bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 relative z-10 border-b-2 border-red-900/40 shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
+    <div class="px-3 py-4 mobile:py-2 diablo-panel relative z-10 border-b-2 border-diablo-blood/45 shadow-[0_6px_18px_rgba(0,0,0,0.65)]">
       <div class="flex items-center justify-center">
-        <h2 class="text-2xl mobile:text-lg font-bold text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">
+        <h2 class="text-2xl mobile:text-lg font-semibold text-diablo-gold drop-shadow-[0_2px_10px_rgba(214,168,96,0.6)] border-b border-diablo-brass/60 pb-1 tracking-[0.08em] uppercase">
           Agent Event Stream
         </h2>
       </div>
@@ -21,7 +21,7 @@
     <div 
       data-testid="timeline-view"
       ref="scrollContainer"
-      class="flex-1 overflow-y-auto px-3 py-3 mobile:px-2 mobile:py-1.5 relative"
+      class="flex-1 min-h-0 overflow-y-auto px-3 py-3 mobile:px-2 mobile:py-1.5 relative diablo-scrollbar"
       @scroll="handleScroll"
     >
       <TransitionGroup
@@ -45,13 +45,13 @@
         />
       </TransitionGroup>
       
-      <div v-if="enhancedFilteredEvents.length === 0" class="text-center py-8 mobile:py-6 text-stone-500">
+      <div v-if="enhancedFilteredEvents.length === 0" class="text-center py-8 mobile:py-6 text-diablo-parchment/60">
         <div class="text-4xl mobile:text-3xl mb-3">🔳</div>
-        <p class="text-lg mobile:text-base font-semibold text-amber-400 mb-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">No events to display</p>
+        <p class="text-lg mobile:text-base font-semibold text-diablo-gold mb-1.5 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">No events to display</p>
         <p class="text-base mobile:text-sm">Events will appear here as they are received</p>
       </div>
     </div>
-    
+
   </div>
 </template>
 

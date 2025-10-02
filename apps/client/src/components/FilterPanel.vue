@@ -1,14 +1,14 @@
 <template>
-  <div class="bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 border-b-2 border-red-900/40 px-3 py-4 mobile:py-2 shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
+  <div class="diablo-panel border-b-2 border-diablo-blood/40 px-3 py-4 mobile:py-2 shadow-[0_6px_18px_rgba(0,0,0,0.6)]">
     <div class="flex flex-wrap gap-3 items-center mobile:flex-col mobile:items-stretch">
       <div class="flex-1 min-w-0 mobile:w-full">
-        <label class="block text-base mobile:text-sm font-bold text-amber-400 mb-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <label class="block text-base mobile:text-sm font-semibold text-diablo-gold mb-1.5 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)] tracking-wide uppercase">
           Source App
         </label>
         <select
           v-model="localFilters.sourceApp"
           @change="updateFilters"
-          class="w-full px-4 py-2 mobile:px-2 mobile:py-1.5 text-base mobile:text-sm border-2 border-amber-900/50 rounded focus:ring-2 focus:ring-amber-700/50 focus:border-amber-700 bg-stone-950 text-amber-200 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] hover:border-amber-800 transition-all duration-150"
+          class="diablo-field w-full px-4 py-2 mobile:px-2 mobile:py-1.5 text-base mobile:text-sm rounded focus:ring-2 focus:ring-[rgba(214,168,96,0.25)] focus:border-[rgba(214,168,96,0.6)] transition-all duration-150"
         >
           <option value="">All Sources</option>
           <option v-for="app in filterOptions.source_apps" :key="app" :value="app">
@@ -18,13 +18,13 @@
       </div>
 
       <div class="flex-1 min-w-0 mobile:w-full">
-        <label class="block text-base mobile:text-sm font-bold text-amber-400 mb-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <label class="block text-base mobile:text-sm font-semibold text-diablo-gold mb-1.5 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)] tracking-wide uppercase">
           Session ID
         </label>
         <select
           v-model="localFilters.sessionId"
           @change="updateFilters"
-          class="w-full px-4 py-2 mobile:px-2 mobile:py-1.5 text-base mobile:text-sm border-2 border-amber-900/50 rounded focus:ring-2 focus:ring-amber-700/50 focus:border-amber-700 bg-stone-950 text-amber-200 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] hover:border-amber-800 transition-all duration-150"
+          class="diablo-field w-full px-4 py-2 mobile:px-2 mobile:py-1.5 text-base mobile:text-sm rounded focus:ring-2 focus:ring-[rgba(214,168,96,0.25)] focus:border-[rgba(214,168,96,0.6)] transition-all duration-150"
         >
           <option value="">All Sessions</option>
           <option v-for="session in filterOptions.session_ids" :key="session" :value="session">
@@ -34,13 +34,13 @@
       </div>
 
       <div class="flex-1 min-w-0 mobile:w-full">
-        <label class="block text-base mobile:text-sm font-bold text-amber-400 mb-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <label class="block text-base mobile:text-sm font-semibold text-diablo-gold mb-1.5 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)] tracking-wide uppercase">
           Event Type
         </label>
         <select
           v-model="localFilters.eventType"
           @change="updateFilters"
-          class="w-full px-4 py-2 mobile:px-2 mobile:py-1.5 text-base mobile:text-sm border-2 border-amber-900/50 rounded focus:ring-2 focus:ring-amber-700/50 focus:border-amber-700 bg-stone-950 text-amber-200 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] hover:border-amber-800 transition-all duration-150"
+          class="diablo-field w-full px-4 py-2 mobile:px-2 mobile:py-1.5 text-base mobile:text-sm rounded focus:ring-2 focus:ring-[rgba(214,168,96,0.25)] focus:border-[rgba(214,168,96,0.6)] transition-all duration-150"
         >
           <option value="">All Types</option>
           <option v-for="type in filterOptions.hook_event_types" :key="type" :value="type">
@@ -52,7 +52,7 @@
       <button
         v-if="hasActiveFilters"
         @click="clearFilters"
-        class="px-4 py-2 mobile:px-2 mobile:py-1.5 mobile:w-full text-base mobile:text-sm font-medium text-amber-200 bg-stone-900/80 hover:bg-stone-800 rounded border-2 border-red-900/50 hover:border-red-800/70 shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)] transition-all duration-150"
+        class="px-4 py-2 mobile:px-2 mobile:py-1.5 mobile:w-full text-base mobile:text-sm font-semibold tracking-wide uppercase text-diablo-parchment bg-diablo-850/80 hover:bg-diablo-800 rounded border-2 border-diablo-blood/60 hover:border-diablo-brass/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.7)] transition-all duration-150"
       >
         Clear Filters
       </button>

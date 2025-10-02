@@ -1,6 +1,6 @@
 <template>
   <div
-    class="message-item p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 transition-colors"
+    class="message-item p-4 rounded-lg border bg-diablo-900/85 border-diablo-ash/60 text-diablo-parchment shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)] hover:border-diablo-brass/60 hover:shadow-[0_0_14px_rgba(214,168,96,0.22)] transition-all duration-150"
     :class="messageTypeClasses"
     :data-testid="'message-item'"
     role="article"
@@ -16,10 +16,10 @@
         <div class="flex-shrink-0 flex items-center space-x-2">
           <span class="message-icon text-2xl">{{ messageIcon }}</span>
           <div class="flex flex-col">
-            <span class="message-label text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <span class="message-label text-sm font-semibold text-diablo-gold tracking-wide uppercase">
               {{ formattedSender }}
             </span>
-            <span class="message-recipient text-xs text-gray-500 dark:text-gray-400">
+            <span class="message-recipient text-xs text-diablo-parchment/60">
               {{ formattedRecipient }}
             </span>
           </div>
@@ -27,54 +27,54 @@
         
         <!-- Message Content -->
         <div class="flex-1 min-w-0">
-          <div class="message-content text-gray-800 dark:text-gray-100 text-sm leading-relaxed">
+          <div class="message-content text-diablo-parchment text-sm leading-relaxed">
             <p class="truncate" v-if="!isExpanded">{{ contentPreview }}</p>
             <p class="whitespace-pre-wrap" v-else>{{ message.content }}</p>
           </div>
-          
+
           <!-- Metadata Row -->
-          <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <div class="flex flex-wrap items-center gap-3 mt-3 text-xs text-diablo-parchment/65">
             <span class="message-timestamp" v-if="message.metadata?.timestamp">
               {{ formatTimestamp(message.metadata.timestamp) }}
             </span>
             <span 
               v-if="message.metadata?.agent_type" 
-              class="agent-type bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded"
+              class="agent-type diablo-tag px-2 py-1 rounded border border-diablo-brass/50"
             >
               {{ message.metadata.agent_type }}
             </span>
             <!-- Read by indicator for team messages -->
             <span 
               v-if="message.recipient === 'Team' && message.metadata?.read_by" 
-              class="read-by px-2 py-1 rounded"
+              class="read-by px-2 py-1 rounded border"
               :class="message.metadata.read_by.length > 0 
-                ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300' 
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
+                ? 'border-diablo-brass/60 bg-diablo-blood/25 text-diablo-gold' 
+                : 'border-diablo-ash/55 bg-diablo-900/70 text-diablo-parchment/45'"
             >
               👁️ {{ message.metadata.read_by.length > 0 ? message.metadata.read_by.join(', ') : 'Unread' }}
             </span>
             <!-- Performance metrics for agent responses -->
             <span 
               v-if="message.metadata?.duration_minutes" 
-              class="duration bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded"
+              class="duration px-2 py-1 rounded border border-diablo-brass/60 bg-diablo-900/70 text-diablo-gold"
             >
               ⏱️ {{ message.metadata.duration_minutes }} min
             </span>
             <span 
               v-if="message.metadata?.cost" 
-              class="cost bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded"
+              class="cost px-2 py-1 rounded border border-diablo-brass/60 bg-diablo-900/70 text-[#9be27a]"
             >
               💰 {{ message.metadata.cost }}k tokens
             </span>
             <span 
               v-if="message.metadata?.effort" 
-              class="effort bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-2 py-1 rounded"
+              class="effort px-2 py-1 rounded border border-diablo-brass/60 bg-diablo-900/70 text-[#d3a6ff]"
             >
               🔧 {{ message.metadata.effort }} tools
             </span>
             <span 
               v-if="message.metadata?.status" 
-              class="status-badge px-2 py-1 rounded text-xs font-medium"
+              class="status-badge px-2 py-1 rounded text-xs font-medium border"
               :class="statusBadgeClasses"
             >
               {{ message.metadata.status }}
@@ -87,14 +87,14 @@
       <div class="flex items-center space-x-1 ml-2">
         <button
           @click.stop="copyContent"
-          class="copy-btn p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+          class="copy-btn p-1 text-diablo-parchment/60 hover:text-diablo-gold transition-colors"
           :title="`Copy ${messageLabel.toLowerCase()} content`"
           :aria-label="`Copy ${messageLabel.toLowerCase()} content`"
         >
           📋
         </button>
         <button
-          class="expand-btn p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+          class="expand-btn p-1 text-diablo-parchment/60 hover:text-diablo-gold transition-colors"
           :title="isExpanded ? 'Collapse details' : 'Expand details'"
           :aria-label="isExpanded ? 'Collapse details' : 'Expand details'"
           :aria-expanded="isExpanded"
@@ -107,12 +107,12 @@
     <!-- Expanded Details - Metadata Only -->
     <div 
       v-if="isExpanded && hasDisplayableMetadata" 
-      class="message-details mt-4 pt-4 border-t border-gray-200 dark:border-gray-600"
+      class="message-details mt-4 pt-4 border-t border-diablo-ash/60"
     >
       <!-- Metadata Section -->
       <div class="metadata-section">
-        <div class="bg-gray-50 dark:bg-gray-900 p-3 rounded">
-          <pre class="text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">{{ JSON.stringify(filteredMetadata, null, 2) }}</pre>
+        <div class="bg-diablo-900/70 border border-diablo-ash/60 p-3 rounded">
+          <pre class="text-xs text-diablo-parchment/70 overflow-x-auto">{{ JSON.stringify(filteredMetadata, null, 2) }}</pre>
         </div>
       </div>
     </div>
@@ -138,29 +138,29 @@ const messageTypeConfig = {
   user_prompt: {
     icon: '👤',
     label: 'User Prompt',
-    classes: 'user-prompt-message bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+    classes: 'bg-[#21100d] border-diablo-brass/60'
   },
   orchestrator_task: {
     icon: '⚙️',
     label: 'Orchestrator Task',
-    classes: 'orchestrator-task-message bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
+    classes: 'bg-[#1b0e0b] border-diablo-blood/55'
   },
   agent_response: {
     icon: '🤖',
     label: 'Agent Response',
-    classes: 'agent-response-message bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+    classes: 'bg-[#120d0c] border-[#3f2a1f]'
   },
   team_message: {
     icon: '💬',
     label: 'Team Communication',
-    classes: 'team-message bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+    classes: 'bg-[#1c140e] border-diablo-brass/50'
   },
   default: {
     icon: '❓',
     label: 'Unknown Message',
-    classes: 'unknown-message bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'
+    classes: 'bg-diablo-900/80 border-diablo-ash/60'
   }
-}
+} as const
 
 // Computed properties
 const messageConfig = computed(() => {
@@ -204,19 +204,15 @@ const contentPreview = computed(() => {
 })
 
 const statusBadgeClasses = computed(() => {
-  const status = props.message.metadata?.status
-  switch (status) {
-    case 'completed':
-      return 'status-completed bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-    case 'in_progress':
-      return 'status-in-progress bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-    case 'error':
-      return 'status-error bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-    case 'pending':
-      return 'status-pending bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    default:
-      return 'status-unknown bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400'
+  const status = props.message.metadata?.status?.toLowerCase()
+  const palette: Record<string, string> = {
+    completed: 'bg-[#12331a] border-[#3b6a3d] text-[#8ddf8a]',
+    in_progress: 'bg-[#1a2130] border-[#2c4a63] text-[#7ab5ff]',
+    error: 'bg-[#2c0f10] border-[#7f1d1d] text-[#f98f8f]',
+    pending: 'bg-[#2b2113] border-[#7c4f1d] text-[#f1c27d]'
   }
+
+  return palette[status ?? ''] || 'bg-diablo-900/70 border-diablo-ash/60 text-diablo-parchment/65'
 })
 
 // Filter out timestamp and read_by from metadata display (they're shown in the main UI)

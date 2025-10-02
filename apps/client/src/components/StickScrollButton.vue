@@ -4,8 +4,8 @@
     class="fixed bottom-6 right-6 mobile:bottom-4 mobile:right-4 p-4 mobile:p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center border-2 transform hover:scale-110"
     :class="[
       stickToBottom 
-        ? 'bg-gradient-to-r from-blue-600 to-blue-400 text-white border-blue-800 drop-shadow-md' 
-        : 'bg-gray-800 hover:bg-gray-700 text-white border-gray-600 hover:border-blue-500'
+        ? 'bg-gradient-to-r from-diablo-blood to-diablo-brass text-diablo-parchment border-diablo-brass drop-shadow-[0_0_16px_rgba(214,168,96,0.45)]' 
+        : 'bg-diablo-ash/90 hover:bg-diablo-ash text-diablo-parchment border-diablo-ash/80 hover:border-diablo-brass/50'
     ]"
     :title="stickToBottom ? 'Disable auto-scroll' : 'Enable auto-scroll'"
   >

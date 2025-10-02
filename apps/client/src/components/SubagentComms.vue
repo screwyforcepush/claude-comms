@@ -1,13 +1,13 @@
 <template>
-  <div class="flex-grow overflow-hidden p-4 bg-stone-950">
-    <div class="h-full flex flex-col space-y-4">
+  <div class="flex flex-col h-full min-h-0 overflow-hidden p-4 bg-diablo-900/95">
+    <div class="flex-1 flex flex-col space-y-4 min-h-0">
       <!-- Session Selector -->
-      <div class="flex items-center space-x-4 bg-stone-900/90 p-3 rounded border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
-        <label class="text-amber-400 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Session:</label>
+      <div class="flex items-center space-x-4 diablo-panel p-3 rounded">
+        <label class="text-diablo-gold font-semibold drop-shadow-[0_2px_6px_rgba(214,168,96,0.5)] tracking-[0.15em] uppercase">Session:</label>
         <select
           v-model="selectedSessionId"
           @change="loadSessionData"
-          class="px-3 py-1.5 bg-stone-950 text-amber-200 rounded border-2 border-amber-900/50 focus:border-amber-700 focus:outline-none focus:shadow-[0_0_8px_rgba(217,119,6,0.4)] cursor-pointer transition-all duration-150 hover:border-amber-800 hover:bg-stone-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)]"
+          class="px-3 py-1.5 diablo-field rounded cursor-pointer transition-all duration-150"
           title="Select a session to view"
         >
           <option value="">Select a session...</option>
@@ -17,7 +17,7 @@
         </select>
         <button
           @click="refreshSessions"
-          class="px-4 py-1.5 bg-stone-900/80 text-amber-200 rounded hover:bg-stone-800 transition-all duration-150 shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_0_10px_rgba(217,119,6,0.3)] cursor-pointer border-2 border-amber-900/50 hover:border-amber-800"
+          class="px-4 py-1.5 diablo-button rounded cursor-pointer"
           title="Refresh session list"
         >
           Refresh
@@ -25,15 +25,15 @@
       </div>
 
       <!-- View Selector -->
-      <div v-if="selectedSessionId" class="bg-stone-900/90 mb-4 rounded border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
-        <div class="flex border-b-2 border-red-900/30">
+      <div v-if="selectedSessionId" class="diablo-panel mb-4 rounded">
+        <div class="flex border-b border-diablo-blood/45">
           <button
             @click="activeView = 'timeline'"
             :class="[
-              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer border-r border-stone-800',
+              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer border-r border-diablo-800/60 uppercase tracking-wide',
               activeView === 'timeline'
-                ? 'bg-stone-950 text-amber-400 border-b-2 border-amber-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)]'
-                : 'text-stone-400 hover:text-amber-300 hover:bg-stone-800/80'
+                ? 'bg-diablo-850 text-diablo-gold border-b-2 border-diablo-brass/70 shadow-[inset_0_2px_6px_rgba(0,0,0,0.75)]'
+                : 'text-diablo-parchment/60 hover:text-diablo-gold hover:bg-diablo-850/80'
             ]"
             title="Switch to timeline view"
           >
@@ -42,10 +42,10 @@
           <button
             @click="activeView = 'list'"
             :class="[
-              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer border-r border-stone-800',
+              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer border-r border-diablo-800/60 uppercase tracking-wide',
               activeView === 'list'
-                ? 'bg-stone-950 text-amber-400 border-b-2 border-amber-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)]'
-                : 'text-stone-400 hover:text-amber-300 hover:bg-stone-800/80'
+                ? 'bg-diablo-850 text-diablo-gold border-b-2 border-diablo-brass/70 shadow-[inset_0_2px_6px_rgba(0,0,0,0.75)]'
+                : 'text-diablo-parchment/60 hover:text-diablo-gold hover:bg-diablo-850/80'
             ]"
             title="Switch to list view"
           >
@@ -54,10 +54,10 @@
           <button
             @click="activeView = 'orchestration'"
             :class="[
-              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer',
+              'px-4 py-2 font-semibold transition-all duration-150 cursor-pointer uppercase tracking-wide',
               activeView === 'orchestration'
-                ? 'bg-stone-950 text-amber-400 border-b-2 border-amber-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)]'
-                : 'text-stone-400 hover:text-amber-300 hover:bg-stone-800/80'
+                ? 'bg-diablo-850 text-diablo-gold border-b-2 border-diablo-brass/70 shadow-[inset_0_2px_6px_rgba(0,0,0,0.75)]'
+                : 'text-diablo-parchment/60 hover:text-diablo-gold hover:bg-diablo-850/80'
             ]"
             title="Switch to orchestration view"
           >
@@ -67,10 +67,10 @@
       </div>
 
       <!-- Content Area -->
-      <div v-if="selectedSessionId" class="flex-grow overflow-hidden flex flex-col">
+      <div v-if="selectedSessionId" class="flex-1 min-h-0 overflow-hidden flex flex-col">
         
         <!-- Timeline View -->
-        <div v-if="activeView === 'timeline'" class="h-full">
+        <div v-if="activeView === 'timeline'" class="h-full min-h-0">
           
           <InteractiveAgentTimeline 
             :session-id="selectedSessionId"
@@ -100,83 +100,83 @@
         </div>
 
         <!-- List View (Original Layout) -->
-        <div v-else-if="activeView === 'list'" class="flex space-x-4 h-full">
+        <div v-else-if="activeView === 'list'" class="flex space-x-4 h-full min-h-0">
           <!-- Agents List -->
-          <div class="w-1/3 bg-stone-900/90 rounded p-4 border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
-            <h3 class="text-amber-400 font-bold mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-2">Agents</h3>
-            <div class="space-y-2 max-h-96 overflow-y-auto">
+          <div class="w-1/3 diablo-panel rounded p-4">
+            <h3 class="text-diablo-gold font-bold mb-3 drop-shadow-[0_2px_6px_rgba(214,168,96,0.5)] border-b border-diablo-brass/50 pb-2 uppercase tracking-[0.14em]">Agents</h3>
+            <div class="space-y-2 max-h-full overflow-y-auto diablo-scrollbar">
               <div
                 v-for="agent in subagents"
                 :key="agent.id"
-                class="bg-stone-950/80 p-3 rounded cursor-pointer hover:bg-stone-900 transition-all duration-150 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)] hover:shadow-[inset_0_1px_4px_rgba(0,0,0,0.8),0_0_8px_rgba(217,119,6,0.2)] border border-stone-800 hover:border-amber-900/60"
+                class="bg-diablo-900/80 p-3 rounded cursor-pointer hover:bg-diablo-850/85 transition-all duration-150 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)] hover:shadow-[inset_0_1px_4px_rgba(0,0,0,0.85),0_0_10px_rgba(214,168,96,0.2)] border border-diablo-ash/70 hover:border-diablo-brass/60"
                 @click="handleAgentSelected(agent)"
                 :title="`Click to view details for ${agent.name} (${agent.subagent_type})`"
               >
                 <div class="flex items-center justify-between mb-2">
-                  <div class="text-amber-300 font-semibold">{{ agent.name }}</div>
+                  <div class="text-diablo-gold font-semibold">{{ agent.name }}</div>
                   <span
                     :class="[
                       'px-2 py-1 rounded text-xs font-medium flex items-center space-x-1',
                       getStatusColor(agent.status)
                     ]"
                   >
-                    <span v-if="agent.status === 'terminated'" class="text-red-300">✕</span>
+                    <span v-if="agent.status === 'terminated'" class="text-red-400">✕</span>
                     <span>{{ agent.status || 'pending' }}</span>
                   </span>
                 </div>
 
-                <div class="text-stone-400 text-sm mb-2">Type: {{ agent.subagent_type }}</div>
+                <div class="text-diablo-parchment/70 text-sm mb-2">Type: {{ agent.subagent_type }}</div>
 
                 <div class="flex flex-wrap gap-2 mb-2">
-                  <span v-if="agent.duration" class="text-stone-500 text-xs">
+                  <span v-if="agent.duration" class="text-diablo-parchment/60 text-xs">
                     {{ formatDuration(agent.duration) }}
                   </span>
-                  <span v-if="agent.token_count" class="bg-stone-900/80 text-amber-300 text-xs px-2 py-1 rounded border border-amber-900/40 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
+                  <span v-if="agent.token_count" class="bg-diablo-900/75 text-diablo-gold text-xs px-2 py-1 rounded border border-diablo-brass/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
                     {{ agent.token_count }} tokens
                   </span>
-                  <span v-if="agent.tool_count" class="bg-stone-900/80 text-orange-300 text-xs px-2 py-1 rounded border border-orange-900/40 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
+                  <span v-if="agent.tool_count" class="bg-diablo-900/75 text-amber-300 text-xs px-2 py-1 rounded border border-diablo-brass/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
                     {{ agent.tool_count }} tools
                   </span>
                 </div>
 
-                <div class="text-stone-500 text-xs">
+                <div class="text-diablo-parchment/60 text-xs">
                   Started: {{ new Date(agent.created_at).toLocaleTimeString() }}
                 </div>
-                <div v-if="agent.completion_timestamp" class="text-stone-500 text-xs">
+                <div v-if="agent.completion_timestamp" class="text-diablo-parchment/60 text-xs">
                   Completed: {{ new Date(agent.completion_timestamp).toLocaleTimeString() }}
                 </div>
               </div>
-              <div v-if="subagents.length === 0" class="text-stone-500 italic">
+              <div v-if="subagents.length === 0" class="text-diablo-parchment/60 italic">
                 No agents registered yet
               </div>
             </div>
           </div>
 
           <!-- Messages -->
-          <div class="flex-grow bg-stone-900/90 rounded p-4 border-2 border-red-900/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
-            <h3 class="text-amber-400 font-bold mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-2">Messages</h3>
-            <div class="space-y-3 max-h-96 overflow-y-auto">
+          <div class="flex-grow diablo-panel rounded p-4">
+            <h3 class="text-diablo-gold font-bold mb-3 drop-shadow-[0_2px_6px_rgba(214,168,96,0.5)] border-b border-diablo-brass/50 pb-2 uppercase tracking-[0.14em]">Messages</h3>
+            <div class="space-y-3 max-h-full overflow-y-auto diablo-scrollbar">
               <div
                 v-for="(msg, idx) in messages"
                 :key="idx"
-                class="bg-stone-950/80 p-3 rounded border border-stone-800 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]"
+                class="bg-diablo-900/80 p-3 rounded border border-diablo-ash/70 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]"
               >
                 <div class="flex justify-between items-start mb-2">
-                  <span class="text-amber-400 font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ msg.sender }}</span>
-                  <span class="text-stone-500 text-xs">
+                  <span class="text-diablo-gold font-semibold drop-shadow-[0_2px_6px_rgba(214,168,96,0.45)]">{{ msg.sender }}</span>
+                  <span class="text-diablo-parchment/60 text-xs">
                     {{ new Date(msg.created_at).toLocaleTimeString() }}
                   </span>
                 </div>
-                <div class="text-stone-300">
+                <div class="text-diablo-parchment/80">
                   <pre class="whitespace-pre-wrap text-sm">{{ formatMessage(msg.message) }}</pre>
                 </div>
                 <div v-if="msg.notified && msg.notified.length > 0" class="mt-2">
-                  <span class="text-stone-500 text-xs">
+                  <span class="text-diablo-parchment/60 text-xs">
                     Read by: {{ msg.notified.join(', ') }}
                   </span>
                 </div>
               </div>
-              <div v-if="messages.length === 0" class="text-stone-500 italic">
+              <div v-if="messages.length === 0" class="text-diablo-parchment/60 italic">
                 No messages yet
               </div>
             </div>
@@ -186,9 +186,9 @@
 
       <!-- Instructions when no session selected -->
       <div v-else class="flex-grow flex items-center justify-center">
-        <div class="text-gray-400 text-center">
+        <div class="text-diablo-parchment/60 text-center">
           <p class="text-lg mb-2">Select a session to view agent status and communication</p>
-          <p class="text-sm">Agents are registered when you use Task tool with nickname:description format</p>
+          <p class="text-sm">Agents register automatically when Task tool runs with nickname:description format</p>
         </div>
       </div>
     </div>
@@ -322,16 +322,16 @@ const formatMessage = (message: any): string => {
 const getStatusColor = (status?: string): string => {
   switch (status) {
     case 'completed':
-      return 'bg-amber-950/80 text-amber-300 border border-amber-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]';
+      return 'bg-diablo-900/80 text-diablo-gold border border-diablo-brass/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]';
     case 'in_progress':
-      return 'bg-orange-950/80 text-orange-300 border border-orange-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_0_6px_rgba(234,88,12,0.3)]';
+      return 'bg-diablo-blood/40 text-diablo-gold border border-diablo-brass/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_0_8px_rgba(214,168,96,0.25)]';
     case 'error':
-      return 'bg-red-950/80 text-red-300 border border-red-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]';
+      return 'bg-red-950/80 text-red-300 border border-red-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.85)]';
     case 'terminated':
       return 'bg-red-950/90 text-red-200 border border-red-800/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]';
     case 'pending':
     default:
-      return 'bg-stone-900/80 text-stone-400 border border-stone-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]';
+      return 'bg-diablo-850/80 text-diablo-parchment/70 border border-diablo-ash/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]';
   }
 };
 

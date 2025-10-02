@@ -344,7 +344,7 @@ watch(componentError, (error) => {
 .sessions-content {
   position: relative;
   flex: 1;
-  min-height: 400px;
+  min-height: 0;
 }
 
 .timeline-header {

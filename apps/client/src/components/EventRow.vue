@@ -1,7 +1,7 @@
 <template>
   <div
-    class="group relative p-4 mobile:p-2 rounded shadow-lg hover:shadow-[0_4px_16px_rgba(217,119,6,0.2)] transition-all duration-200 cursor-pointer border-2 border-stone-800 hover:border-amber-900/60 hover:bg-stone-900 bg-stone-950/80 transform hover:translate-y-[-1px] min-h-[44px] touch-manipulation shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]"
-    :class="{ 'ring-2 ring-amber-600 border-amber-700 shadow-[0_4px_20px_rgba(217,119,6,0.4)]': isExpanded }"
+    class="group relative p-4 mobile:p-2 rounded-lg shadow-[inset_0_1px_6px_rgba(0,0,0,0.65)] hover:shadow-[0_6px_18px_rgba(214,168,96,0.28)] transition-all duration-200 cursor-pointer border border-diablo-ash/70 hover:border-diablo-brass/60 hover:bg-diablo-850/90 bg-diablo-900/80 backdrop-blur-[1px] transform hover:translate-y-[-1px] min-h-[44px] touch-manipulation"
+    :class="{ 'ring-2 ring-diablo-brass border-diablo-brass shadow-[0_0_24px_rgba(214,168,96,0.55)]': isExpanded }"
     @click="toggleExpanded"
     title="Click to expand event details"
     style="touch-action: manipulation;"
@@ -24,22 +24,22 @@
         <!-- Mobile: App + Time on first row -->
         <div class="flex items-center justify-between mb-1">
           <span
-            class="text-xs font-semibold text-amber-200 px-1.5 py-0.5 rounded border-2 bg-stone-900/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]"
+            class="text-xs font-semibold text-diablo-gold px-1.5 py-0.5 rounded border bg-diablo-850/90 shadow-[inset_0_1px_3px_rgba(0,0,0,0.75)]"
             :style="{ ...appBgStyle, ...appBorderStyle }"
           >
             {{ event.source_app }}
           </span>
-          <span class="text-xs text-stone-400 font-medium">
+          <span class="text-xs text-diablo-parchment/70 font-medium">
             {{ formatTime(event.timestamp) }}
           </span>
         </div>
 
         <!-- Mobile: Session + Event Type on second row -->
         <div class="flex items-center space-x-2">
-          <span class="text-xs text-stone-300 px-1.5 py-0.5 rounded border bg-stone-900/60 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]" :class="borderColorClass">
+          <span class="text-xs text-diablo-parchment/75 px-1.5 py-0.5 rounded border bg-diablo-900/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" :class="borderColorClass">
             {{ sessionIdShort }}
           </span>
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-diablo-blood/30 text-diablo-gold border border-diablo-brass/60 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] uppercase tracking-wide">
             <span class="mr-1 text-sm">{{ hookEmoji }}</span>
             {{ event.hook_event_type }}
           </span>
@@ -50,34 +50,34 @@
       <div class="flex items-center justify-between mb-2 mobile:hidden">
         <div class="flex items-center space-x-4">
           <span
-            class="text-base font-bold text-amber-200 px-2 py-0.5 rounded border-2 bg-stone-900/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]"
+            class="text-base font-semibold text-diablo-gold px-2 py-0.5 rounded border bg-diablo-850/90 shadow-[inset_0_1px_3px_rgba(0,0,0,0.75)] uppercase tracking-wide"
             :style="{ ...appBgStyle, ...appBorderStyle }"
           >
             {{ event.source_app }}
           </span>
-          <span class="text-sm text-stone-300 px-2 py-0.5 rounded border bg-stone-900/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" :class="borderColorClass">
+          <span class="text-sm text-diablo-parchment/75 px-2 py-0.5 rounded border bg-diablo-900/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" :class="borderColorClass">
             {{ sessionIdShort }}
           </span>
-          <span class="inline-flex items-center px-3 py-0.5 rounded text-sm font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]">
+          <span class="inline-flex items-center px-3 py-0.5 rounded text-sm font-bold bg-diablo-blood/30 text-diablo-gold border border-diablo-brass/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)] uppercase tracking-[0.14em]">
             <span class="mr-1.5 text-base">{{ hookEmoji }}</span>
             {{ event.hook_event_type }}
           </span>
         </div>
-        <span class="text-sm text-stone-400 font-semibold">
+        <span class="text-sm text-diablo-parchment/70 font-semibold">
           {{ formatTime(event.timestamp) }}
         </span>
       </div>
       
       <!-- Tool info and Summary - Desktop Layout -->
       <div class="flex items-center justify-between mb-2 mobile:hidden">
-        <div v-if="toolInfo" class="text-base text-stone-300 font-semibold">
+        <div v-if="toolInfo" class="text-base text-diablo-parchment/85 font-semibold">
           <span class="font-medium">{{ toolInfo.tool }}</span>
-          <span v-if="toolInfo.detail" class="ml-2 text-stone-400" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
+          <span v-if="toolInfo.detail" class="ml-2 text-diablo-parchment/65" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
         </div>
 
         <!-- Summary aligned to the right -->
-        <div v-if="event.summary" class="max-w-[50%] px-3 py-1.5 bg-amber-950/20 border border-amber-900/40 rounded shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]">
-          <span class="text-sm text-amber-200 font-semibold">
+        <div v-if="event.summary" class="max-w-[50%] px-3 py-1.5 bg-diablo-ash/50 border border-diablo-brass/50 rounded shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
+          <span class="text-sm text-diablo-gold font-semibold">
             <span class="mr-1">📝</span>
             {{ event.summary }}
           </span>
@@ -86,38 +86,38 @@
 
       <!-- Tool info and Summary - Mobile Layout -->
       <div class="space-y-2 hidden mobile:block mb-2">
-        <div v-if="toolInfo" class="text-sm text-gray-300 font-semibold w-full">
+        <div v-if="toolInfo" class="text-sm text-diablo-parchment/80 font-semibold w-full">
           <span class="font-medium">{{ toolInfo.tool }}</span>
-          <span v-if="toolInfo.detail" class="ml-2 text-gray-400" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
+          <span v-if="toolInfo.detail" class="ml-2 text-diablo-parchment/60" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
         </div>
         
-        <div v-if="event.summary" class="w-full px-2 py-1 bg-blue-600/10 border border-blue-600/30 rounded-lg shadow-md">
-          <span class="text-xs text-white font-semibold">
+        <div v-if="event.summary" class="w-full px-2 py-1 bg-diablo-ash/50 border border-diablo-brass/40 rounded-lg shadow-md">
+          <span class="text-xs text-diablo-gold font-semibold">
             <span class="mr-1">📝</span>
             {{ event.summary }}
           </span>
         </div>
       </div>
-      
+
       <!-- Expanded content -->
-      <div v-if="isExpanded" class="mt-2 pt-2 border-t-2 border-blue-500 bg-gradient-to-r from-gray-800 to-gray-700 rounded-b-lg p-3 space-y-3">
+      <div v-if="isExpanded" class="mt-2 pt-2 border-t-2 border-diablo-blood/60 bg-gradient-to-r from-diablo-900/95 via-diablo-850/95 to-diablo-900/95 rounded-b-lg p-3 space-y-3">
         <!-- Payload -->
         <div>
           <div class="flex items-center justify-between mb-2">
-            <h4 class="text-base mobile:text-sm font-bold text-blue-400 drop-shadow-sm flex items-center">
+            <h4 class="text-base mobile:text-sm font-semibold text-diablo-gold drop-shadow-[0_2px_6px_rgba(214,168,96,0.5)] flex items-center uppercase tracking-wide">
               <span class="mr-1.5 text-xl mobile:text-base">📦</span>
               Payload
             </h4>
             <button
               @click.stop="copyPayload"
-              class="px-3 py-1 mobile:px-2 mobile:py-0.5 text-sm mobile:text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 cursor-pointer border border-blue-700 hover:border-blue-500 min-h-[44px] min-w-[44px] touch-manipulation"
+              class="px-3 py-1 mobile:px-2 mobile:py-0.5 text-sm mobile:text-xs font-semibold rounded-lg diablo-button transition-all duration-200 hover:scale-105 cursor-pointer min-h-[44px] min-w-[44px] touch-manipulation"
               title="Copy payload to clipboard"
               style="touch-action: manipulation;"
             >
               <span>{{ copyButtonText }}</span>
             </button>
           </div>
-          <pre class="text-sm mobile:text-xs text-white bg-gray-600 p-3 mobile:p-2 rounded-lg overflow-x-auto max-h-64 overflow-y-auto font-mono border border-blue-600/30 shadow-md hover:shadow-lg transition-shadow duration-200">{{ formattedPayload }}</pre>
+          <pre class="text-sm mobile:text-xs text-diablo-parchment bg-[#150907] p-3 mobile:p-2 rounded-lg overflow-x-auto max-h-64 overflow-y-auto font-mono border border-diablo-ash/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.7)] hover:shadow-[0_0_12px_rgba(214,168,96,0.2)] transition-shadow duration-200">{{ formattedPayload }}</pre>
         </div>
         
         <!-- Chat transcript button -->
@@ -125,17 +125,17 @@
           <button
             @click.stop="!isMobile && (showChatModal = true)"
             :class="[
-              'px-4 py-2 mobile:px-3 mobile:py-1.5 font-bold rounded-lg transition-all duration-200 flex items-center space-x-1.5 shadow-md hover:shadow-lg min-h-[44px] min-w-[44px] touch-manipulation',
+              'px-4 py-2 mobile:px-3 mobile:py-1.5 font-semibold rounded-lg transition-all duration-200 flex items-center space-x-1.5 shadow-md hover:shadow-lg min-h-[44px] min-w-[44px] touch-manipulation uppercase tracking-wide',
               isMobile 
-                ? 'bg-gray-500 cursor-not-allowed opacity-50 text-gray-400 border border-gray-600' 
-                : 'bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500 text-white border border-blue-800 hover:border-blue-600 transform hover:scale-105 cursor-pointer'
+                ? 'bg-diablo-ash/40 cursor-not-allowed opacity-50 text-diablo-parchment/40 border border-diablo-ash/60' 
+                : 'diablo-button transform hover:scale-105 cursor-pointer'
             ]"
             :disabled="isMobile"
             :title="isMobile ? 'Chat transcript not available on mobile' : `View chat transcript (${event.chat.length} messages)`"
             style="touch-action: manipulation;"
           >
             <span class="text-base mobile:text-sm">💬</span>
-            <span class="text-sm mobile:text-xs font-bold drop-shadow-sm">
+            <span class="text-sm mobile:text-xs font-semibold drop-shadow-[0_2px_6px_rgba(214,168,96,0.4)]">
               {{ isMobile ? 'Not available in mobile' : `View Chat Transcript (${event.chat.length} messages)` }}
             </span>
           </button>

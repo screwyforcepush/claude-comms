@@ -10,6 +10,38 @@ export default {
       screens: {
         'mobile': {'max': '699px'}, // Custom mobile breakpoint for < 700px
       },
+      colors: {
+        diablo: {
+          950: '#050302',
+          900: '#0b0504',
+          850: '#120807',
+          800: '#1a0c0a',
+          700: '#231110',
+          600: '#2d1512',
+          ember: '#b01c21',
+          blood: '#7f1014',
+          ash: '#3b1f1a',
+          brass: '#b07932',
+          gold: '#d6a860',
+          parchment: '#f3e0bd'
+        }
+      },
+      fontFamily: {
+        diablo: ['"Cinzel"', '"Trajan Pro"', '"Times New Roman"', 'serif'],
+        inferno: ['"UnifrakturMaguntia"', '"Cinzel"', 'serif']
+      },
+      boxShadow: {
+        inferno: '0 0 28px rgba(153, 27, 27, 0.45)',
+        ember: '0 0 16px rgba(208, 138, 63, 0.35)'
+      },
+      dropShadow: {
+        glyph: '0 0 12px rgba(208, 138, 63, 0.4)',
+        ember: '0 0 10px rgba(153, 27, 27, 0.45)'
+      },
+      backgroundImage: {
+        'diablo-texture': "radial-gradient(circle at 20% 20%, rgba(214,168,96,0.12) 0, rgba(12,6,5,0.05) 40%, rgba(5,3,2,0.9) 100%)",
+        'diablo-vignette': "radial-gradient(circle at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.5) 100%)",
+      }
     },
   },
   plugins: [],
