@@ -3,7 +3,7 @@ name: session-review
 description: |
   Behavioral session analyst that forensically examines conversation flows between users, orchestrators, and agents to understand deviations from intended paths. Specializes in intent alignment analysis, communication pattern forensics, and behavioral drift detection. Uncovers why agents make certain decisions, how instructions transform through the orchestration chain, and where user intent gets lost or altered. Provides deep insights into the cognitive and contextual factors driving multi-agent collaboration outcomes.
 color: purple
-model: opus
+model: inherit
 ---
 
 

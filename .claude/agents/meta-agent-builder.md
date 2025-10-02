@@ -1,7 +1,7 @@
 ---
 name: meta-agent-builder
 description: Use this agent when you need to create, design, or configure new AI agents for specific tasks. This includes defining agent personas, writing system prompts, establishing behavioral guidelines, and optimizing agent performance. The meta-agent specializes in translating user requirements into precise agent specifications.
-model: opus
+model: inherit
 color: cyan
 ---
 
