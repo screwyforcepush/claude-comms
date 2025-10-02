@@ -1,7 +1,7 @@
 <template>
-  <div 
-    class="group relative p-4 mobile:p-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-700 hover:border-blue-500 hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-600 bg-gradient-to-r from-gray-800 to-gray-700 transform hover:scale-[1.01] hover:translate-y-[-1px] min-h-[44px] touch-manipulation"
-    :class="{ 'ring-2 ring-blue-500 border-blue-500 shadow-2xl': isExpanded }"
+  <div
+    class="group relative p-4 mobile:p-2 rounded shadow-lg hover:shadow-[0_4px_16px_rgba(217,119,6,0.2)] transition-all duration-200 cursor-pointer border-2 border-stone-800 hover:border-amber-900/60 hover:bg-stone-900 bg-stone-950/80 transform hover:translate-y-[-1px] min-h-[44px] touch-manipulation shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]"
+    :class="{ 'ring-2 ring-amber-600 border-amber-700 shadow-[0_4px_20px_rgba(217,119,6,0.4)]': isExpanded }"
     @click="toggleExpanded"
     title="Click to expand event details"
     style="touch-action: manipulation;"
@@ -23,23 +23,23 @@
       <div class="hidden mobile:block mb-2">
         <!-- Mobile: App + Time on first row -->
         <div class="flex items-center justify-between mb-1">
-          <span 
-            class="text-xs font-semibold text-white px-1.5 py-0.5 rounded-full border-2 bg-gray-600 shadow-md"
+          <span
+            class="text-xs font-semibold text-amber-200 px-1.5 py-0.5 rounded border-2 bg-stone-900/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]"
             :style="{ ...appBgStyle, ...appBorderStyle }"
           >
             {{ event.source_app }}
           </span>
-          <span class="text-xs text-gray-400 font-medium">
+          <span class="text-xs text-stone-400 font-medium">
             {{ formatTime(event.timestamp) }}
           </span>
         </div>
-        
+
         <!-- Mobile: Session + Event Type on second row -->
         <div class="flex items-center space-x-2">
-          <span class="text-xs text-gray-300 px-1.5 py-0.5 rounded-full border bg-gray-600/50" :class="borderColorClass">
+          <span class="text-xs text-stone-300 px-1.5 py-0.5 rounded border bg-stone-900/60 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]" :class="borderColorClass">
             {{ sessionIdShort }}
           </span>
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white shadow-md">
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
             <span class="mr-1 text-sm">{{ hookEmoji }}</span>
             {{ event.hook_event_type }}
           </span>
@@ -49,35 +49,35 @@
       <!-- Desktop Layout: Original single row layout -->
       <div class="flex items-center justify-between mb-2 mobile:hidden">
         <div class="flex items-center space-x-4">
-          <span 
-            class="text-base font-bold text-white px-2 py-0.5 rounded-full border-2 bg-gray-600 shadow-lg"
+          <span
+            class="text-base font-bold text-amber-200 px-2 py-0.5 rounded border-2 bg-stone-900/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]"
             :style="{ ...appBgStyle, ...appBorderStyle }"
           >
             {{ event.source_app }}
           </span>
-          <span class="text-sm text-gray-300 px-2 py-0.5 rounded-full border bg-gray-600/50 shadow-md" :class="borderColorClass">
+          <span class="text-sm text-stone-300 px-2 py-0.5 rounded border bg-stone-900/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" :class="borderColorClass">
             {{ sessionIdShort }}
           </span>
-          <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-bold bg-blue-600 text-white shadow-lg">
+          <span class="inline-flex items-center px-3 py-0.5 rounded text-sm font-bold bg-amber-950/80 text-amber-300 border border-amber-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]">
             <span class="mr-1.5 text-base">{{ hookEmoji }}</span>
             {{ event.hook_event_type }}
           </span>
         </div>
-        <span class="text-sm text-gray-400 font-semibold">
+        <span class="text-sm text-stone-400 font-semibold">
           {{ formatTime(event.timestamp) }}
         </span>
       </div>
       
       <!-- Tool info and Summary - Desktop Layout -->
       <div class="flex items-center justify-between mb-2 mobile:hidden">
-        <div v-if="toolInfo" class="text-base text-gray-300 font-semibold">
+        <div v-if="toolInfo" class="text-base text-stone-300 font-semibold">
           <span class="font-medium">{{ toolInfo.tool }}</span>
-          <span v-if="toolInfo.detail" class="ml-2 text-gray-400" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
+          <span v-if="toolInfo.detail" class="ml-2 text-stone-400" :class="{ 'italic': event.hook_event_type === 'UserPromptSubmit' }">{{ toolInfo.detail }}</span>
         </div>
-        
+
         <!-- Summary aligned to the right -->
-        <div v-if="event.summary" class="max-w-[50%] px-3 py-1.5 bg-blue-600/10 border border-blue-600/30 rounded-lg shadow-md">
-          <span class="text-sm text-white font-semibold">
+        <div v-if="event.summary" class="max-w-[50%] px-3 py-1.5 bg-amber-950/20 border border-amber-900/40 rounded shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]">
+          <span class="text-sm text-amber-200 font-semibold">
             <span class="mr-1">📝</span>
             {{ event.summary }}
           </span>

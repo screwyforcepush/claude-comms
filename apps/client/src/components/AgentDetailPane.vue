@@ -1,16 +1,16 @@
 <template>
-  <div 
-    v-if="visible" 
-    class="agent-detail-pane fixed right-0 top-0 h-full w-96 bg-gray-800 border-l border-gray-600 shadow-2xl transform transition-transform duration-300 ease-out z-50"
+  <div
+    v-if="visible"
+    class="agent-detail-pane fixed right-0 top-0 h-full w-96 bg-stone-950 border-l-2 border-red-900/40 shadow-[0_0_24px_rgba(0,0,0,0.8)] transform transition-transform duration-300 ease-out z-50"
     :class="{ 'translate-x-full': !visible }"
     data-testid="agent-detail-pane"
   >
     <!-- Header -->
-    <div class="flex items-center justify-between bg-gradient-to-r from-gray-700 to-gray-600 px-4 py-3 border-b border-gray-600">
-      <h3 class="text-white font-bold text-lg">Agent Details</h3>
+    <div class="flex items-center justify-between bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-4 py-3 border-b-2 border-red-900/40">
+      <h3 class="text-amber-400 font-bold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">Agent Details</h3>
       <button
         @click="close"
-        class="text-gray-400 hover:text-white transition-colors p-1 rounded"
+        class="text-stone-400 hover:text-amber-300 transition-colors p-1 rounded"
         aria-label="Close agent details"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -24,19 +24,19 @@
       <!-- Agent Header -->
       <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-blue-400 font-semibold text-lg">{{ selectedAgent.name }}</div>
-          <span 
-            class="px-3 py-1 rounded-full text-xs font-medium"
+          <div class="text-amber-400 font-semibold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ selectedAgent.name }}</div>
+          <span
+            class="px-3 py-1 rounded text-xs font-medium"
             :class="getStatusClass(selectedAgent.status)"
           >
             {{ selectedAgent.status || 'pending' }}
           </span>
         </div>
-        
+
         <!-- Agent Type Badge -->
         <div class="mb-3">
-          <span 
-            class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-purple-600 text-white"
+          <span
+            class="inline-block px-3 py-1 rounded text-xs font-medium bg-orange-950/80 text-orange-300 border border-orange-800/60 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]"
           >
             {{ formatAgentType(selectedAgent.subagent_type) }}
           </span>
@@ -44,26 +44,26 @@
 
         <!-- Quick Stats -->
         <div class="grid grid-cols-2 gap-2 text-sm">
-          <div class="bg-gray-700 rounded-lg p-2">
-            <div class="text-gray-400">Duration</div>
-            <div class="text-white font-medium">{{ formatDuration(selectedAgent.total_duration_ms) }}</div>
+          <div class="bg-stone-900/90 rounded p-2 border border-stone-800 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]">
+            <div class="text-stone-400">Duration</div>
+            <div class="text-amber-300 font-medium">{{ formatDuration(selectedAgent.total_duration_ms) }}</div>
           </div>
-          <div class="bg-gray-700 rounded-lg p-2">
-            <div class="text-gray-400">Session</div>
-            <div class="text-white font-medium text-xs truncate">{{ sessionId }}</div>
+          <div class="bg-stone-900/90 rounded p-2 border border-stone-800 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]">
+            <div class="text-stone-400">Session</div>
+            <div class="text-amber-300 font-medium text-xs truncate">{{ sessionId }}</div>
           </div>
         </div>
       </div>
 
       <!-- Performance Metrics -->
       <div v-if="hasPerformanceData()" class="mb-6">
-        <h4 class="text-white font-semibold mb-3">Performance</h4>
+        <h4 class="text-amber-400 font-semibold mb-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">Performance</h4>
         <div class="space-y-3">
           <!-- Total Tokens -->
-          <div v-if="selectedAgent.total_tokens" class="bg-gray-700 rounded-lg p-3">
+          <div v-if="selectedAgent.total_tokens" class="bg-stone-900/90 rounded p-3 border border-stone-800 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-gray-400 text-sm">Total Tokens</span>
-              <span class="text-blue-400 font-medium">{{ selectedAgent.total_tokens.toLocaleString() }}</span>
+              <span class="text-stone-400 text-sm">Total Tokens</span>
+              <span class="text-amber-400 font-medium">{{ selectedAgent.total_tokens.toLocaleString() }}</span>
             </div>
             <div v-if="selectedAgent.input_tokens || selectedAgent.output_tokens" class="space-y-1">
               <div class="flex items-center justify-between text-xs">

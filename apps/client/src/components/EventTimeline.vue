@@ -1,9 +1,9 @@
 <template>
   <div class="flex-1 mobile:h-[50vh] overflow-hidden flex flex-col">
     <!-- Fixed Header -->
-    <div class="px-3 py-4 mobile:py-2 bg-gradient-to-r from-gray-800 to-gray-700 relative z-10" style="box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3), 0 8px 25px -5px rgba(0, 0, 0, 0.2);">
+    <div class="px-3 py-4 mobile:py-2 bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 relative z-10 border-b-2 border-red-900/40 shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
       <div class="flex items-center justify-center">
-        <h2 class="text-2xl mobile:text-lg font-bold text-blue-400 drop-shadow-sm">
+        <h2 class="text-2xl mobile:text-lg font-bold text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">
           Agent Event Stream
         </h2>
       </div>
@@ -45,9 +45,9 @@
         />
       </TransitionGroup>
       
-      <div v-if="enhancedFilteredEvents.length === 0" class="text-center py-8 mobile:py-6 text-gray-400">
+      <div v-if="enhancedFilteredEvents.length === 0" class="text-center py-8 mobile:py-6 text-stone-500">
         <div class="text-4xl mobile:text-3xl mb-3">🔳</div>
-        <p class="text-lg mobile:text-base font-semibold text-blue-400 mb-1.5">No events to display</p>
+        <p class="text-lg mobile:text-base font-semibold text-amber-400 mb-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">No events to display</p>
         <p class="text-base mobile:text-sm">Events will appear here as they are received</p>
       </div>
     </div>

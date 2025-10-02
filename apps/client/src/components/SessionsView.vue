@@ -1,15 +1,15 @@
 <template>
-  <div class="sessions-view h-full flex flex-col bg-gray-900">
+  <div class="sessions-view h-full flex flex-col bg-stone-950">
     <!-- Sessions Header -->
-    <div class="sessions-header bg-gradient-to-r from-gray-700 to-gray-600 px-4 py-3 border-b border-gray-600">
+    <div class="sessions-header bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-4 py-3 border-b-2 border-red-900/40 shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
       <div class="flex items-center justify-between">
-        <h3 class="text-white font-bold text-lg">Multi-Session Timeline</h3>
+        <h3 class="text-amber-400 font-bold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">Multi-Session Timeline</h3>
         <div class="flex items-center space-x-3">
-          <div class="flex items-center space-x-2">
-            <span v-if="isLoading" class="text-yellow-400 text-xs">● Loading...</span>
+          <div class="flex items-center space-x-2 bg-stone-900/60 px-3 py-1.5 rounded border border-amber-900/50">
+            <span v-if="isLoading" class="text-amber-400 text-xs">● Loading...</span>
             <span v-else-if="error" class="text-red-400 text-xs">● Error</span>
-            <span v-else class="text-green-400 text-xs">● Connected</span>
-            <span class="text-gray-400 text-xs">{{ visibleSessions.length }} sessions</span>
+            <span v-else class="text-amber-500 text-xs shadow-[0_0_6px_rgba(217,119,6,0.6)]">● Connected</span>
+            <span class="text-stone-400 text-xs">{{ visibleSessions.length }} sessions</span>
           </div>
         </div>
       </div>

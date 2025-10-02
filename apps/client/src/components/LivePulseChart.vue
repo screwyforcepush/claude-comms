@@ -1,7 +1,7 @@
 <template>
-  <div class="bg-gradient-to-r from-gray-800 to-gray-700 px-3 py-4 mobile:py-3 shadow-lg">
+  <div class="bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-3 py-4 mobile:py-3 shadow-[0_4px_12px_rgba(0,0,0,0.6)] border-b-2 border-red-900/40">
     <div class="flex items-center justify-between mb-3 mobile:flex-col mobile:space-y-2 mobile:items-start">
-      <h3 class="text-base mobile:text-sm font-bold text-blue-400 drop-shadow-sm flex items-center">
+      <h3 class="text-base mobile:text-sm font-bold text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] flex items-center border-b border-amber-900/50 pb-1">
         <span class="mr-1.5 text-xl mobile:text-base">📊</span>
         Live Activity Pulse
       </h3>
@@ -12,10 +12,10 @@
           @click="setTimeRange(range)"
           @keydown="handleTimeRangeKeyDown($event, index)"
           :class="[
-            'px-3 py-1.5 mobile:px-4 mobile:py-2 text-sm mobile:text-base font-bold rounded-lg transition-all duration-200 min-w-[30px] min-h-[30px] flex items-center justify-center shadow-md hover:shadow-lg transform hover:scale-105 border',
+            'px-3 py-1.5 mobile:px-4 mobile:py-2 text-sm mobile:text-base font-bold rounded transition-all duration-150 min-w-[30px] min-h-[30px] flex items-center justify-center border-2',
             timeRange === range
-              ? 'bg-gradient-to-r from-blue-600 to-blue-400 text-white border-blue-800 drop-shadow-md'
-              : 'bg-gray-600 text-white border-gray-500 hover:bg-gray-500 hover:border-blue-500'
+              ? 'bg-stone-900 text-amber-400 border-amber-800/60 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_0_8px_rgba(217,119,6,0.3)]'
+              : 'bg-stone-900/60 text-stone-400 border-stone-800/40 hover:text-amber-300 hover:bg-stone-800/80 hover:border-amber-900/40'
           ]"
           role="tab"
           :aria-selected="timeRange === range"
@@ -38,7 +38,7 @@
       ></canvas>
       <div
         v-if="tooltip.visible"
-        class="absolute bg-gradient-to-r from-blue-600 to-blue-800 text-white px-2 py-1.5 mobile:px-3 mobile:py-2 rounded-lg text-xs mobile:text-sm pointer-events-none z-10 shadow-lg border border-blue-400 font-bold drop-shadow-md"
+        class="absolute bg-stone-900/95 text-amber-300 px-2 py-1.5 mobile:px-3 mobile:py-2 rounded text-xs mobile:text-sm pointer-events-none z-10 shadow-[0_4px_12px_rgba(0,0,0,0.8)] border-2 border-amber-800/60 font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
         :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
       >
         {{ tooltip.text }}
@@ -47,7 +47,7 @@
         v-if="!hasData"
         class="absolute inset-0 flex items-center justify-center"
       >
-        <p class="text-gray-400 mobile:text-sm text-base font-semibold">
+        <p class="text-stone-500 mobile:text-sm text-base font-semibold">
           <span class="mr-1.5 text-base">⏳</span>
           Waiting for events...
         </p>

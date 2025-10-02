@@ -93,22 +93,22 @@ const positionWeightClass = computed(() => {
   pointer-events: none;
 }
 
-/* Position-based visual hierarchy */
+/* Position-based visual hierarchy - Diablo Theme */
 .enhanced-event-container.position-latest {
-  filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.3));
+  filter: drop-shadow(0 0 12px rgba(217, 119, 6, 0.4));
 }
 
 .enhanced-event-container.position-latest .event-content-wrapper {
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid #d97706;
   padding-left: 8px;
 }
 
 .enhanced-event-container.position-recent {
-  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.2));
+  filter: drop-shadow(0 0 8px rgba(217, 119, 6, 0.2));
 }
 
 .enhanced-event-container.position-recent .event-content-wrapper {
-  border-left: 2px solid #60a5fa;
+  border-left: 2px solid #f59e0b;
   padding-left: 6px;
 }
 
@@ -121,7 +121,7 @@ const positionWeightClass = computed(() => {
 }
 
 .enhanced-event-container.position-oldest .event-content-wrapper {
-  border-left: 1px solid rgba(107, 114, 128, 0.3);
+  border-left: 1px solid rgba(120, 113, 108, 0.3);
   padding-left: 4px;
 }
 

@@ -1,15 +1,15 @@
 <template>
-  <div class="agent-timeline-container w-full h-full bg-gray-800 rounded-lg border border-blue-400/30 overflow-hidden">
+  <div class="agent-timeline-container w-full h-full bg-stone-950 rounded border-2 border-red-900/40 overflow-hidden shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
     <!-- Timeline Header -->
-    <div class="timeline-header bg-gradient-to-r from-gray-700 to-gray-600 px-4 py-3 border-b border-gray-600">
+    <div class="timeline-header bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-4 py-3 border-b-2 border-red-900/40">
       <div class="flex items-center justify-between">
-        <h3 class="text-white font-bold text-lg">Interactive Agent Timeline</h3>
+        <h3 class="text-amber-400 font-bold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-b border-amber-900/50 pb-1">Interactive Agent Timeline</h3>
         <div class="flex items-center space-x-3">
-          <span class="text-gray-300 text-sm">Session: {{ sessionId || 'None selected' }}</span>
-          <div class="flex items-center space-x-2">
-            <span class="text-green-400 text-xs">● Live</span>
-            <span class="text-gray-400 text-xs">{{ totalAgents }} agents</span>
-            <span v-if="selectedMessage || selectedAgent" class="text-blue-400 text-xs">
+          <span class="text-stone-400 text-sm">Session: {{ sessionId || 'None selected' }}</span>
+          <div class="flex items-center space-x-2 bg-stone-900/60 px-3 py-1 rounded border border-amber-900/50">
+            <span class="text-amber-500 text-xs shadow-[0_0_6px_rgba(217,119,6,0.6)]">● Live</span>
+            <span class="text-stone-400 text-xs">{{ totalAgents }} agents</span>
+            <span v-if="selectedMessage || selectedAgent" class="text-amber-400 text-xs">
               {{ selectedMessage ? 'Message' : 'Agent' }} selected
             </span>
           </div>
@@ -36,14 +36,14 @@
         <!-- Grid Background -->
         <defs>
           <pattern id="grid" width="50" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 50 0 L 0 0 0 40" fill="none" stroke="rgba(59, 130, 246, 0.1)" stroke-width="1"/>
+            <path d="M 50 0 L 0 0 0 40" fill="none" stroke="rgba(120, 113, 108, 0.15)" stroke-width="1"/>
           </pattern>
           <!-- Glow filters for selections -->
-          <!-- Orchestrator gradient -->
+          <!-- Orchestrator gradient - Diablo style -->
           <linearGradient id="orchestratorGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
-            <stop offset="50%" style="stop-color:#00d4ff;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+            <stop offset="0%" style="stop-color:#d97706;stop-opacity:1" />
+            <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
           </linearGradient>
           <!-- Agent path gradients - optimized pooling -->
           <g v-for="colorKey in agentColorKeys" :key="`grad-${colorKey}`">
@@ -73,28 +73,28 @@
 
         <!-- Time Axis -->
         <g class="time-axis">
-          <line 
-            :x1="timelineMargins.left" 
-            :y1="timelineMargins.top - 20" 
-            :x2="containerWidth - timelineMargins.right" 
+          <line
+            :x1="timelineMargins.left"
+            :y1="timelineMargins.top - 20"
+            :x2="containerWidth - timelineMargins.right"
             :y2="timelineMargins.top - 20"
-            stroke="#6b7280" 
+            stroke="#78716c"
             stroke-width="2"
           />
           <g v-for="tick in timeTicks" :key="tick.time">
-            <line 
-              :x1="tick.x" 
-              :y1="timelineMargins.top - 25" 
-              :x2="tick.x" 
+            <line
+              :x1="tick.x"
+              :y1="timelineMargins.top - 25"
+              :x2="tick.x"
               :y2="timelineMargins.top - 15"
-              stroke="#6b7280" 
+              stroke="#78716c"
               stroke-width="1"
             />
-            <text 
-              :x="tick.x" 
+            <text
+              :x="tick.x"
               :y="timelineMargins.top - 30"
-              text-anchor="middle" 
-              fill="#9ca3af" 
+              text-anchor="middle"
+              fill="#a8a29e"
               font-size="11px"
               font-family="system-ui"
             >
@@ -103,39 +103,38 @@
           </g>
         </g>
 
-        <!-- Orchestrator Line Enhanced -->
+        <!-- Orchestrator Line Enhanced - Diablo Style -->
         <g class="orchestrator-line" style="z-index: 10;">
-          <!-- Main orchestrator trunk with stronger glow -->
-          <line 
-            :x1="timelineMargins.left" 
-            :y1="orchestratorY" 
-            :x2="containerWidth - timelineMargins.right" 
+          <!-- Main orchestrator trunk with amber glow -->
+          <line
+            :x1="timelineMargins.left"
+            :y1="orchestratorY"
+            :x2="containerWidth - timelineMargins.right"
             :y2="orchestratorY"
-            stroke="url(#orchestratorGradient)" 
+            stroke="url(#orchestratorGradient)"
             stroke-width="6"
-            class="drop-shadow-[0_0_16px_#00d4ff]"
-            style="filter: drop-shadow(0 0 12px #00d4ff) drop-shadow(0 0 6px #00d4ff);"
+            style="filter: drop-shadow(0 0 12px #d97706) drop-shadow(0 0 6px #f59e0b);"
           />
           <!-- Secondary glow layer -->
-          <line 
-            :x1="timelineMargins.left" 
-            :y1="orchestratorY" 
-            :x2="containerWidth - timelineMargins.right" 
+          <line
+            :x1="timelineMargins.left"
+            :y1="orchestratorY"
+            :x2="containerWidth - timelineMargins.right"
             :y2="orchestratorY"
-            stroke="#00d4ff" 
+            stroke="#d97706"
             stroke-width="12"
             opacity="0.3"
             class="animate-pulse"
           />
-          <text 
-            :x="timelineMargins.left - 10" 
+          <text
+            :x="timelineMargins.left - 10"
             :y="orchestratorY + 5"
-            text-anchor="end" 
-            fill="#00d4ff" 
+            text-anchor="end"
+            fill="#d97706"
             font-size="16px"
             font-weight="700"
             font-family="system-ui"
-            class="drop-shadow-[0_0_8px_currentColor]"
+            style="filter: drop-shadow(0 0 8px #d97706);"
           >
             ORCHESTRATOR
           </text>
@@ -454,11 +453,12 @@
               width="16"
               height="16"
               fill="#ec4899"
-              stroke="#ffffff"
+              stroke="#d97706"
               stroke-width="2"
               rx="3"
               ry="3"
               class="pointer-events-none hover:opacity-80 transition-all"
+              style="filter: drop-shadow(0 0 4px #ec4899);"
             />
             <!-- Invisible hit area for better clicking - minimum 44x44px -->
             <rect
@@ -473,16 +473,17 @@
               @mouseenter="showPromptTooltip(prompt, $event)"
               @mouseleave="hideTooltip"
             />
-            <text 
-              x="0" 
+            <text
+              x="0"
               y="0"
-              text-anchor="middle" 
-              fill="#ffffff" 
+              text-anchor="middle"
+              fill="#fbbf24"
               font-size="12px"
               font-weight="700"
               font-family="system-ui"
               :transform="`translate(${getTimeX(prompt.timestamp)}, ${orchestratorY - 12})`"
               class="cursor-pointer select-none"
+              style="filter: drop-shadow(0 0 4px #d97706);"
               @click="selectPrompt(prompt)"
               @mouseenter="showPromptTooltip(prompt, $event)"
               @mouseleave="hideTooltip"
@@ -510,22 +511,22 @@
       />
 
       <!-- Loading Overlay -->
-      <div v-if="isLoading" class="absolute inset-0 bg-gray-800/50 flex items-center justify-center">
-        <div class="text-white text-lg">Loading timeline data...</div>
+      <div v-if="isLoading" class="absolute inset-0 bg-stone-950/80 flex items-center justify-center">
+        <div class="text-amber-300 text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Loading timeline data...</div>
       </div>
 
       <!-- Empty State -->
       <div v-if="!isLoading && totalAgents === 0" class="absolute inset-0 flex items-center justify-center">
-        <div class="text-gray-400 text-center">
+        <div class="text-stone-500 text-center">
           <div class="text-2xl mb-2">📊</div>
-          <div class="text-lg mb-2">No agent data available</div>
+          <div class="text-lg mb-2 text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">No agent data available</div>
           <div class="text-sm">Agent timeline will appear when agents are spawned</div>
         </div>
       </div>
     </div>
 
     <!-- Timeline Controls -->
-    <div v-if="showControls" class="timeline-footer bg-gray-700 px-4 py-2 border-t border-gray-600">
+    <div v-if="showControls" class="timeline-footer bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 px-4 py-2 border-t-2 border-red-900/40">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <button 
@@ -703,23 +704,24 @@ const timelineMargins = {
 const orchestratorY = 80;
 const agentLaneHeight = 55; // Increased from 40px to prevent overlaps
 
-// Agent Type Colors
+// Agent Type Colors - Diablo Theme
 const agentColors: Record<string, string> = {
-  orchestrator: '#00d4ff',
-  coder: '#ff6b6b',
-  architect: '#4ecdc4',
-  reviewer: '#95e77e',
-  gatekeeper: '#a78bfa', // Consolidated from code-reviewer and green-verifier
-  verifier: '#a78bfa',
+  orchestrator: '#d97706',
+  'agent-orchestrator': '#f59e0b', // Agent orchestrator - brighter amber
+  coder: '#ef4444',
+  architect: '#3b82f6',
+  reviewer: '#10b981',
+  gatekeeper: '#a855f7', // Consolidated from code-reviewer and green-verifier
+  verifier: '#a855f7',
   planner: '#f97316',
   analyst: '#ec4899',
   researcher: '#06b6d4',
   designer: '#8b5cf6',
   'cloud-cicd': '#22c55e',
-  'general-purpose': '#9ca3af',
+  'general-purpose': '#d97706',
   'deep-researcher': '#0ea5e9',
   'business-analyst': '#d946ef',
-  engineer: '#ff6b6b' // Engineers now handle testing responsibilities
+  engineer: '#ef4444' // Engineers now handle testing responsibilities
 };
 
 // Status Colors - REMOVED (no longer needed since status indicators removed)
