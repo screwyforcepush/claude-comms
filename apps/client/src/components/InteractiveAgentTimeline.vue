@@ -180,12 +180,24 @@
             
             <!-- Agent Type-Name Label on Branch -->
             <g>
-              <text 
-                :x="getAgentLabelX(agent, index)"
-                :y="getAgentLaneY(index, agent) - 5"
-                text-anchor="middle" 
+              <!-- Agent Icon -->
+              <image
+                :href="getAgentIconPath(agent.type)"
+                :x="getAgentLabelX(agent, index) - 70"
+                :y="getAgentLaneY(index, agent) - 16"
+                width="22"
+                height="22"
+                class="cursor-pointer"
+                @click="showAgentDetails(agent, $event)"
+                @mouseenter="showAgentTooltip(agent, $event)"
+                @mouseleave="hideTooltip"
+              />
+              <text
+                :x="getAgentLabelX(agent, index) - 44"
+                :y="getAgentLaneY(index, agent) - 2"
+                text-anchor="start"
                 :fill="getAgentColor(agent.type)"
-                font-size="10px"
+                font-size="16px"
                 font-weight="600"
                 font-family="system-ui"
                 class="cursor-pointer select-none drop-shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-opacity duration-200"
@@ -196,12 +208,12 @@
               >
                 {{ agent.type }}-{{ agent.name }}
               </text>
-              <!-- Invisible hit area around label - minimum 44x44px -->
+              <!-- Invisible hit area around label - adjusted for medium content -->
               <rect
-                :x="getAgentLabelX(agent, index) - 22"
-                :y="getAgentLaneY(index, agent) - 27"
-                width="44"
-                height="44"
+                :x="getAgentLabelX(agent, index) - 72"
+                :y="getAgentLaneY(index, agent) - 30"
+                width="140"
+                height="50"
                 fill="transparent"
                 class="cursor-pointer"
                 style="pointer-events: all;"
@@ -598,6 +610,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import type { AgentStatus, SubagentMessage } from '../types';
 import TimelineTooltip from './TimelineTooltip.vue';
 import DetailPanel from './DetailPanel.vue';
+import { useAgentIcon } from '../composables/useAgentIcon';
 
 // Component Props
 const props = withDefaults(defineProps<{
@@ -631,6 +644,9 @@ const emit = defineEmits<{
 // Refs
 const timelineContainer = ref<HTMLDivElement>();
 const timelineSvg = ref<SVGElement>();
+
+// Agent Icon composable
+const { getAgentIconPath, getAgentIconAlt } = useAgentIcon();
 
 // Reactive State
 const isLoading = ref(false);
@@ -708,6 +724,7 @@ const agentLaneHeight = 55; // Increased from 40px to prevent overlaps
 const agentColors: Record<string, string> = {
   orchestrator: '#d97706',
   'agent-orchestrator': '#f59e0b', // Agent orchestrator - brighter amber
+  consultant: '#67e8f9', // Consultant (OpenAI) - bright cyan, mystical glow
   coder: '#ef4444',
   architect: '#3b82f6',
   reviewer: '#10b981',
@@ -1502,19 +1519,23 @@ const showAgentTooltip = (agent: any, event: MouseEvent) => {
 
 const showMessageTooltip = (message: any, event: MouseEvent) => {
   clearTooltipTimers();
-  
+
   tooltipShowTimer = window.setTimeout(() => {
-    const preview = typeof message.message === 'string' 
+    const preview = typeof message.message === 'string'
       ? message.message.substring(0, 50) + (message.message.length > 50 ? '...' : '')
       : 'Object message';
-      
+
+    // Find sender agent to get their type
+    const senderAgent = visibleAgents.value.find(agent => agent.name === message.sender);
+
     tooltip.value = {
       visible: true,
       type: 'message' as const,
       data: {
         sender: message.sender,
         created_at: message.created_at,
-        preview
+        preview,
+        agentType: senderAgent?.type
       },
       position: { x: event.clientX, y: event.clientY }
     };

@@ -16,9 +16,18 @@
         <div class="flex-shrink-0 flex items-center space-x-2">
           <span class="message-icon text-2xl">{{ messageIcon }}</span>
           <div class="flex flex-col">
-            <span class="message-label text-sm font-semibold text-diablo-gold tracking-wide uppercase">
-              {{ formattedSender }}
-            </span>
+            <div class="flex items-center space-x-2">
+              <!-- Agent Icon -->
+              <img
+                v-if="message.metadata?.agent_type"
+                :src="senderIconPath"
+                :alt="senderIconAlt"
+                class="w-4 h-4 inline-block"
+              />
+              <span class="message-label text-sm font-semibold text-diablo-gold tracking-wide uppercase">
+                {{ formattedSender }}
+              </span>
+            </div>
             <span class="message-recipient text-xs text-diablo-parchment/60">
               {{ formattedRecipient }}
             </span>
@@ -122,6 +131,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TimelineMessage } from '../../types'
+import { useAgentIcon } from '../../composables/useAgentIcon'
 
 const props = defineProps<{
   message: TimelineMessage
@@ -132,6 +142,9 @@ const emit = defineEmits<{
   'toggle-expand': [messageKey: string]
   'copy-content': [content: string]
 }>()
+
+// Agent Icon composable
+const { getAgentIconPath, getAgentIconAlt } = useAgentIcon()
 
 // Message type configuration
 const messageTypeConfig = {
@@ -188,8 +201,17 @@ const messageTypeClasses = computed(() => messageConfig.value.classes)
 const formattedSender = computed(() => {
   // Debug log
   console.log('MessageItem sender:', props.message.sender, 'recipient:', props.message.recipient);
-  
+
   return props.message.sender || 'Unknown'
+})
+
+// Get agent icon path based on agent type
+const senderIconPath = computed(() => {
+  return getAgentIconPath(props.message.metadata?.agent_type)
+})
+
+const senderIconAlt = computed(() => {
+  return getAgentIconAlt(props.message.metadata?.agent_type)
 })
 
 const formattedRecipient = computed(() => {

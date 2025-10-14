@@ -229,13 +229,23 @@
                   @mouseleave="hideTooltip"
                 />
                 
-                <!-- Agent Label -->
-                <text 
-                  :x="getAgentLabelPosition(agent, sessionIndex).x"
+                <!-- Agent Label with Icon -->
+                <!-- Agent Icon -->
+                <image
+                  :href="getAgentIconPath(agent.type)"
+                  :x="getAgentLabelPosition(agent, sessionIndex).x - 48"
+                  :y="getAgentLabelPosition(agent, sessionIndex).y - 12"
+                  width="16"
+                  height="16"
+                  class="cursor-pointer"
+                  @click="selectAgent(agent, session)"
+                />
+                <text
+                  :x="getAgentLabelPosition(agent, sessionIndex).x - 28"
                   :y="getAgentLabelPosition(agent, sessionIndex).y"
-                  text-anchor="middle" 
+                  text-anchor="start"
                   :fill="getAgentColor(agent.type)"
-                  font-size="12px"
+                  font-size="13px"
                   font-weight="600"
                   font-family="system-ui"
                   class="cursor-pointer select-none"
@@ -592,6 +602,7 @@ import type { SessionData, SessionAgent, SessionMessage } from '../utils/session
 import { usePerformanceOptimizer } from '../composables/usePerformanceOptimizer';
 import type { EventIndicator, EventIndicatorType } from '../types/event-indicators';
 import type { HookEvent } from '../types';
+import { useAgentIcon } from '../composables/useAgentIcon';
 
 interface TimeWindow {
   label: string;
@@ -640,6 +651,9 @@ const emit = defineEmits<{
 
 // Initialize Performance Optimizer
 const { performanceMetrics } = usePerformanceOptimizer();
+
+// Agent Icon composable
+const { getAgentIconPath, getAgentIconAlt } = useAgentIcon();
 
 // Container refs
 const sessionsContainer = ref<HTMLDivElement>();
@@ -777,11 +791,12 @@ const eventIndicatorStyles = {
 // Agent colors (reuse from single timeline)
 const agentColors: Record<string, string> = {
   orchestrator: '#00d4ff',
+  consultant: '#67e8f9', // Consultant (OpenAI) - bright cyan, mystical glow
   coder: '#ff6b6b',
   architect: '#4ecdc4',
   reviewer: '#95e77e',
   gatekeeper: '#a78bfa',
-  verifier: '#a78bfa', 
+  verifier: '#a78bfa',
   planner: '#f97316',
   analyst: '#ec4899',
   researcher: '#06b6d4',
@@ -1830,13 +1845,16 @@ const showAgentTooltip = (agent: SessionAgent, session: SessionData, event: Mous
 
 const showMessageTooltip = (message: SessionMessage, session: SessionData, event: MouseEvent) => {
   clearTooltipTimers();
-  
+
   tooltipShowTimer = window.setTimeout(() => {
     const content = message.content || 'No content';
-    const preview = typeof content === 'string' 
+    const preview = typeof content === 'string'
       ? content.substring(0, 100) + (content.length > 100 ? '...' : '')
       : 'Object message';
-      
+
+    // Find sender agent to get their type
+    const senderAgent = session.agents.find(agent => agent.name === message.sender);
+
     tooltip.value = {
       visible: true,
       type: 'message' as const,
@@ -1845,7 +1863,8 @@ const showMessageTooltip = (message: SessionMessage, session: SessionData, event
         created_at: message.timestamp,
         preview,
         sessionName: session.displayName,
-        fullContent: content
+        fullContent: content,
+        agentType: senderAgent?.type
       },
       position: { x: event.clientX, y: event.clientY }
     };

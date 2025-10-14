@@ -19,10 +19,15 @@
         <!-- Agent Tooltip -->
         <div v-if="tooltipData.type === 'agent'" class="space-y-2">
           <div class="flex items-center space-x-2">
-            <div 
+            <div
               class="w-3 h-3 rounded-full"
               :style="{ backgroundColor: tooltipData.data.color }"
             ></div>
+            <img
+              :src="getAgentIconPath(tooltipData.data.type)"
+              :alt="getAgentIconAlt(tooltipData.data.type)"
+              class="w-3 h-3"
+            />
             <span class="text-white font-semibold">{{ tooltipData.data.name }}</span>
           </div>
           <div class="text-gray-400 text-xs">Type: {{ tooltipData.data.type }}</div>
@@ -49,7 +54,15 @@
             <div class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
             <span class="text-yellow-400 font-semibold text-xs">Message</span>
           </div>
-          <div class="text-white font-medium">{{ tooltipData.data.sender }}</div>
+          <div class="flex items-center space-x-2">
+            <img
+              v-if="tooltipData.data.agentType"
+              :src="getAgentIconPath(tooltipData.data.agentType)"
+              :alt="getAgentIconAlt(tooltipData.data.agentType)"
+              class="w-3.5 h-3.5"
+            />
+            <span class="text-white font-medium">{{ tooltipData.data.sender }}</span>
+          </div>
           <div class="text-gray-400 text-xs">
             {{ formatTimestamp(tooltipData.data.created_at) }}
           </div>
@@ -76,12 +89,17 @@
           <div v-if="tooltipData.data.agents.length > 0" class="space-y-1">
             <div class="text-gray-500 text-xs">Agents:</div>
             <div class="flex flex-wrap gap-1">
-              <span 
-                v-for="agent in tooltipData.data.agents.slice(0, 3)" 
+              <span
+                v-for="agent in tooltipData.data.agents.slice(0, 3)"
                 :key="agent.agentId"
-                class="inline-block px-2 py-1 bg-gray-800 text-gray-300 rounded text-xs"
+                class="inline-flex items-center space-x-1 px-2 py-1 bg-gray-800 text-gray-300 rounded text-xs"
               >
-                {{ agent.name }}
+                <img
+                  :src="getAgentIconPath(agent.type)"
+                  :alt="getAgentIconAlt(agent.type)"
+                  class="w-3 h-3 inline-block"
+                />
+                <span>{{ agent.name }}</span>
               </span>
               <span 
                 v-if="tooltipData.data.agents.length > 3"
@@ -127,6 +145,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useAgentIcon } from '../composables/useAgentIcon';
 
 // Types
 interface TooltipData {
@@ -134,6 +153,9 @@ interface TooltipData {
   data: any;
   position: { x: number; y: number };
 }
+
+// Agent Icon composable
+const { getAgentIconPath, getAgentIconAlt } = useAgentIcon();
 
 // Component Props
 const props = defineProps<{

@@ -2,28 +2,6 @@
 name: architect
 description: |
   System and test architecture expert who defines technical blueprints, interfaces, testing strategies, and technology decisions. Operates at project, phase, and Work Package scopes.
-  
-  <example>
-  When to use: "Define the API contract for the authentication service"
-  When to use: "Choose between PostgreSQL and MongoDB for our data layer"
-  When to use: "Design microservices boundaries for the e-commerce platform"
-  When to use: "Create architecture for real-time event streaming"
-  When to use: "Define test architecture and coverage strategy for the platform"
-  When to use: "Establish mock/stub patterns for external service testing"
-  When to use: "Design performance testing approach for high-load scenarios"
-  When to use: "Support implementation team for new Feature"
-  </example>
-  
-  <commentary>
-  Provide Context:
-  - Filepath references for relevant artifacts with descriptions
-  - SoT requirements document from docs/project/spec/
-  - Current architecture documentation from docs/project/guides/
-  - Technology constraints and preferences
-  - Phase-id and docs/project/phases/<phase-id>/ dir for phase/WP work, or indication of project-level work
-  - Existing system patterns and conventions
-  - Current test coverage and testing infrastructure
-  </commentary>
 color: Blue
 model: inherit
 ---

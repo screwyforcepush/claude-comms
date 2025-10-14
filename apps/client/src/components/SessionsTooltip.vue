@@ -102,7 +102,14 @@
                    style="opacity: 0.4"></div>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="text-white font-semibold text-sm">{{ tooltipData.data.agent.name }}</div>
+              <div class="flex items-center space-x-2 text-white font-semibold text-sm">
+                <img
+                  :src="getAgentIconPath(tooltipData.data.agent.type)"
+                  :alt="getAgentIconAlt(tooltipData.data.agent.type)"
+                  class="w-3.5 h-3.5"
+                />
+                <span>{{ tooltipData.data.agent.name }}</span>
+              </div>
               <div class="text-gray-400 text-xs">
                 <span class="inline-block px-2 py-0.5 bg-gray-700/50 rounded text-xs">
                   {{ capitalizeType(tooltipData.data.agent.type) }}
@@ -253,6 +260,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useAgentIcon } from '../composables/useAgentIcon';
 
 // Types for multi-session tooltip data
 interface SessionsTooltipData {
@@ -260,6 +268,9 @@ interface SessionsTooltipData {
   data: any;
   position: { x: number; y: number };
 }
+
+// Agent Icon composable
+const { getAgentIconPath, getAgentIconAlt } = useAgentIcon();
 
 // Component Props
 const props = defineProps<{

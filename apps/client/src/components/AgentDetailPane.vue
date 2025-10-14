@@ -24,7 +24,14 @@
       <!-- Agent Header -->
       <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-amber-400 font-semibold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ selectedAgent.name }}</div>
+          <div class="flex items-center space-x-2 text-amber-400 font-semibold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+            <img
+              :src="getAgentIconPath(selectedAgent.subagent_type)"
+              :alt="getAgentIconAlt(selectedAgent.subagent_type)"
+              class="w-5 h-5"
+            />
+            <span>{{ selectedAgent.name }}</span>
+          </div>
           <span
             class="px-3 py-1 rounded text-xs font-medium"
             :class="getStatusClass(selectedAgent.status)"
@@ -213,14 +220,22 @@
       <div v-if="relatedMessages.length > 0" class="mb-6">
         <h4 class="text-white font-semibold mb-3">Messages ({{ relatedMessages.length }})</h4>
         <div class="space-y-2 max-h-64 overflow-y-auto">
-          <div 
-            v-for="message in relatedMessages" 
+          <div
+            v-for="message in relatedMessages"
             :key="`${message.created_at}-${message.sender}`"
             class="bg-gray-700 rounded-lg p-3 cursor-pointer hover:bg-gray-600 transition-colors"
             @click="selectMessage(message)"
           >
             <div class="flex items-center justify-between mb-1">
-              <span class="text-blue-400 text-sm font-medium">{{ message.sender }}</span>
+              <div class="flex items-center space-x-2">
+                <img
+                  v-if="getAgentTypeBySender(message.sender)"
+                  :src="getAgentIconPath(getAgentTypeBySender(message.sender))"
+                  :alt="getAgentIconAlt(getAgentTypeBySender(message.sender))"
+                  class="w-3.5 h-3.5"
+                />
+                <span class="text-blue-400 text-sm font-medium">{{ message.sender }}</span>
+              </div>
               <span class="text-gray-400 text-xs">{{ formatTimestamp(message.created_at) }}</span>
             </div>
             <div class="text-gray-300 text-sm line-clamp-2">
@@ -237,14 +252,21 @@
       <div v-if="getCollaborators().length > 0" class="mb-6">
         <h4 class="text-white font-semibold mb-3">Collaborating With</h4>
         <div class="space-y-2">
-          <div 
-            v-for="collaborator in getCollaborators()" 
+          <div
+            v-for="collaborator in getCollaborators()"
             :key="collaborator.id"
             class="flex items-center justify-between bg-gray-700 rounded-lg p-3 cursor-pointer hover:bg-gray-600 transition-colors"
             @click="selectAgent(collaborator)"
           >
             <div>
-              <div class="text-white font-medium">{{ collaborator.name }}</div>
+              <div class="flex items-center space-x-2 text-white font-medium">
+                <img
+                  :src="getAgentIconPath(collaborator.subagent_type)"
+                  :alt="getAgentIconAlt(collaborator.subagent_type)"
+                  class="w-4 h-4"
+                />
+                <span>{{ collaborator.name }}</span>
+              </div>
               <div class="text-gray-400 text-sm">{{ collaborator.subagent_type }}</div>
             </div>
             <div class="flex items-center space-x-2">
@@ -305,6 +327,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import type { AgentStatus, SubagentMessage } from '../types';
+import { useAgentIcon } from '../composables/useAgentIcon';
 
 // Component Props
 const props = defineProps<{
@@ -323,6 +346,9 @@ const emit = defineEmits<{
   'highlight-timeline': [agentId: number];
   'open-prompt-response-modal': [agent: AgentStatus];
 }>();
+
+// Agent Icon composable
+const { getAgentIconPath, getAgentIconAlt } = useAgentIcon();
 
 // Reactive state
 const isClosing = ref(false);
@@ -389,6 +415,12 @@ const formatDuration = (durationMs?: number): string => {
 const formatAgentType = (type?: string): string => {
   if (!type) return 'Unknown';
   return type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ');
+};
+
+// Get agent type from sender name for message icons
+const getAgentTypeBySender = (senderName: string): string | undefined => {
+  const agent = props.agents?.find(a => a.name === senderName);
+  return agent?.subagent_type;
 };
 
 const formatMessagePreview = (message: any): string => {

@@ -113,7 +113,14 @@
                 :title="`Click to view details for ${agent.name} (${agent.subagent_type})`"
               >
                 <div class="flex items-center justify-between mb-2">
-                  <div class="text-diablo-gold font-semibold">{{ agent.name }}</div>
+                  <div class="flex items-center space-x-2 text-diablo-gold font-semibold">
+                    <img
+                      :src="getAgentIconPath(agent.subagent_type)"
+                      :alt="getAgentIconAlt(agent.subagent_type)"
+                      class="w-4 h-4 inline-block"
+                    />
+                    <span>{{ agent.name }}</span>
+                  </div>
                   <span
                     :class="[
                       'px-2 py-1 rounded text-xs font-medium flex items-center space-x-1',
@@ -162,7 +169,15 @@
                 class="bg-diablo-900/80 p-3 rounded border border-diablo-ash/70 shadow-[inset_0_1px_4px_rgba(0,0,0,0.6)]"
               >
                 <div class="flex justify-between items-start mb-2">
-                  <span class="text-diablo-gold font-semibold drop-shadow-[0_2px_6px_rgba(214,168,96,0.45)]">{{ msg.sender }}</span>
+                  <div class="flex items-center space-x-2">
+                    <img
+                      v-if="getAgentTypeBySender(msg.sender)"
+                      :src="getAgentIconPath(getAgentTypeBySender(msg.sender))"
+                      :alt="getAgentIconAlt(getAgentTypeBySender(msg.sender))"
+                      class="w-4 h-4 inline-block"
+                    />
+                    <span class="text-diablo-gold font-semibold drop-shadow-[0_2px_6px_rgba(214,168,96,0.45)]">{{ msg.sender }}</span>
+                  </div>
                   <span class="text-diablo-parchment/60 text-xs">
                     {{ new Date(msg.created_at).toLocaleTimeString() }}
                   </span>
@@ -227,6 +242,7 @@ import AgentDetailPane from './AgentDetailPane.vue';
 import MessageDetailPane from './MessageDetailPane.vue';
 import OrchestrationTimeline from './OrchestrationTimeline.vue';
 import { useSessionIntrospection } from '../composables/useSessionIntrospection';
+import { useAgentIcon } from '../composables/useAgentIcon';
 
 const props = defineProps<{
   wsConnection?: any;
@@ -242,6 +258,9 @@ const selectedMessage = ref<SubagentMessage | null>(null);
 const showAgentDetails = ref(false);
 const showMessageDetails = ref(false);
 let refreshInterval: number | null = null;
+
+// Agent Icon composable
+const { getAgentIconPath, getAgentIconAlt } = useAgentIcon();
 
 // Session Introspection state
 const {
@@ -340,6 +359,12 @@ const formatDuration = (duration: number): string => {
     return `${duration}ms`;
   }
   return `${(duration / 1000).toFixed(1)}s`;
+};
+
+// Get agent type from sender name
+const getAgentTypeBySender = (senderName: string): string | undefined => {
+  const agent = subagents.value.find(a => a.name === senderName);
+  return agent?.subagent_type;
 };
 
 // Pane management helpers
