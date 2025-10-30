@@ -1525,14 +1525,14 @@ export function getSessionIntrospectionEvents(sessionId: string, eventTypes?: st
 
   const startTime = performance.now();
   
-  const hasEventTypes = eventTypes && eventTypes.length > 0;
+  const hasEventTypes = eventTypes && eventTypes.length > 0 ? true : false;
   const stmt = getIntrospectionStmt(hasEventTypes);
   
   let params: any[] = [sessionId];
   if (hasEventTypes) {
     // Pad with nulls for unused placeholders
     const paddedEventTypes = [...(eventTypes || [])].slice(0, 5);
-    while (paddedEventTypes.length < 5) paddedEventTypes.push(null);
+    while (paddedEventTypes.length < 5) paddedEventTypes.push('');
     params.push(...paddedEventTypes);
   }
   
