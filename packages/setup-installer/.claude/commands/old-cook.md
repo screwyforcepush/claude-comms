@@ -13,13 +13,24 @@ ULTRATHINK about your CRITICAL ORCHESTRATION PROTOCOLS, and apply ⚡ORCHESTRATI
 # ⚡ORCHESTRATION
 ## EXECUTION SEQUENCE
 
+### Step 0: initial todowrite
+Create initial Todos based on ASSIGNMENT:
+[Determine Phase,
+Discovery Batch ?,
+Planning Batch,
+Consult Agent-Orchestrator,
+Refine Todos,
+Agent Batch,
+Agent-Orchestrator+Gatekeeper Batch,
+Refine Todos]
+
+
 ### Step 1: Initial Analysis & Planning
-1. **TodoWrite** - Capture assignment as initial todos
-2. **Determine Phase** - New feature (create phase-id) or continuation?
-3. **Discovery Batch** (if complex/new):
+1. **Determine Phase** - New feature (create phase-id) or continuation?
+2. **Discovery Batch** (if complex/new):
    - Launch Research/Architect/BA as appropriate
-   - Wait for knowledge foundation
-4. **Planning Batch**:
+   - Discovery batch crafts knowledge foundation
+3. **Planning Batch**:
    - Launch Planner with phase decision
    - Planner creates phase-id dir if new
 
@@ -75,6 +86,7 @@ SUCCESS CRITERIA:
 [What constitutes completion]
 
 FILES TO READ FIRST:
+- package.json - for lint, test, build commands
 - [filepath1] - [one sentence description]
 - [filepath2] - [one sentence description]
 
@@ -83,8 +95,19 @@ TEAM COLLABORATION:
 - Support your Team with [what]
 - Coordinate with your Team on [shared concern]
 
+
+⭐*The successful delivery of your assigned task, contributes to the high level Assignment:*⭐
+[User's exact ASSIGNMENT]
+
+⭐Ensure you are alligned with this North Star objective*⭐
+
+
 [FirstNameLastName], adopt 🤝 TEAMWORK to achieve maximum value delivered."
 ```
+
+*Remember:*
+An agent has no inherit knowledge of previous batch agents. They can only collaborate within thier batch. 
+Don't refer to prior batch agents by name. Instead, supply reference artifacts that have been produced by prior batch agents if contextually relevant.
 
 ### Batch Composition Goals
 - **Minimum**: 5 agents per implementation batch

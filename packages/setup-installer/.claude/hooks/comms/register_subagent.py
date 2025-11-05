@@ -9,6 +9,9 @@
 import json
 import sys
 import requests
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.server_config import get_server_url
 
 
 def main():
@@ -34,7 +37,7 @@ def main():
                 # Register the subagent with the server
                 try:
                     response = requests.post(
-                        'http://localhost:4000/subagents/register',
+                        f'{get_server_url()}/subagents/register',
                         json={
                             'session_id': session_id,
                             'name': nickname,
@@ -48,7 +51,7 @@ def main():
                         # Now update with initial prompt using PATCH endpoint
                         if initial_prompt:
                             prompt_response = requests.patch(
-                                f'http://localhost:4000/subagents/{session_id}/{nickname}',
+                                f'{get_server_url()}/subagents/{session_id}/{nickname}',
                                 json={'initial_prompt': initial_prompt},
                                 timeout=2
                             )

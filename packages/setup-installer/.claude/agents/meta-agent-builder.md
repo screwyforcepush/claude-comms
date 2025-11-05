@@ -1,7 +1,7 @@
 ---
 name: meta-agent-builder
-description: Use this agent when you need to create, design, or configure new AI agents for specific tasks. This includes defining agent personas, writing system prompts, establishing behavioral guidelines, and optimizing agent performance. The meta-agent specializes in translating user requirements into precise agent specifications.\n\nExamples:\n<example>\nContext: The user wants to create a specialized agent for a specific task.\nuser: "I need an agent that can review my Python code for security vulnerabilities"\nassistant: "I'll use the meta-agent-builder to create a security-focused code review agent for you."\n<commentary>\nSince the user needs a new agent created, use the Task tool to launch the meta-agent-builder to design and configure the security review agent.\n</commentary>\n</example>\n<example>\nContext: The user needs multiple agents for a complex workflow.\nuser: "Create agents for my CI/CD pipeline - one for testing, one for deployment, and one for monitoring"\nassistant: "I'll invoke the meta-agent-builder to design these three specialized agents for your CI/CD pipeline."\n<commentary>\nThe user requires multiple agent configurations, so use the meta-agent-builder to create each specialized agent with appropriate capabilities.\n</commentary>\n</example>
-model: opus
+description: Use this agent when you need to create, design, or configure new AI agents for specific tasks. This includes defining agent personas, writing system prompts, establishing behavioral guidelines, and optimizing agent performance. The meta-agent specializes in translating user requirements into precise agent specifications.
+model: inherit
 color: cyan
 ---
 
@@ -136,9 +136,9 @@ Create a bespoke workflow for the Agent, leveraging specific tool instruction an
 - "read entire files"
 - Use perplexity ask to research
 - lint, dev, test, build commands
-- Use Playwrite to capture screenshots and "visually inspect" them
+- Use Chrome DevTools MCP to navigate to the running application, take snapshots and screenshots, and "visually inspect" them
 - Phase level documentation artifacts in docs/project/phases/<phase-id>
-- Project level gold docs in docs/project/guides/ 
+- Project level gold docs in docs/project/guides/
 - Source of truth spec docs in docs/project/spec/
 - allign witih source of truth spec
 - "THINK HARD" or "PONDER" keywords trigger deeper thinking in critical decision steps
@@ -178,14 +178,14 @@ Batch an Inbox Check with every step
    3. Search/grep/glob codebase multiple rounds → existing patterns + conventions
    2. Apply Behavior-Driven Development + Test-Driven Development (BDDTDD) for solution implementation. Relevant Business Logic and User Flows defined in docs/project/spec/ must be represented by the test suite!
    3. Run lint, dev, test, build commands for itterative feedback loop. You can not introduce regressions!
-   4. Use Playwrite to capture screenshots for UI-related tasks. Then spin up sub agent to visually inspect screenshot and validate UI.
+   4. Use Chrome DevTools MCP to navigate to the running application, take snapshots and screenshots for UI-related tasks and visually inspect to validate UI.
    5. Test -> Code -> Test -> Repeat. Itterate until green!
 
 COMPLETION GATE: MANDITORY Completion Criteria checklist:
-□ `pnpm lint` needs to run without errors.
-□ `pnpm dev` needs to run without errors.
-□ `pnpm test` needs to run green.  
-□ `pnpm build` without errors.
+□ lint command needs to run without errors.
+□ dev server needs to run without errors.
+□ tests need to run green.  
+□ project builds without errors.
 □ No regressions introduced
 
 [/WORKFLOW]
@@ -198,16 +198,16 @@ Batch an Inbox Check with every step
 
    1. Run lint, dev, test, build commands and analyse the logs.
    2. Review the code and associated tests. Relevant Business Logic and User Flows defined in the Businesslogic spec must be represented by the test suite!
-   3. Visually inspect screenshots provided of UI changes.
-   4. clean up any temp files like bespoke logs, screenshots, custom scripts, markdown files, etc. and/or update gitignore as needed.
+   3. Use Chrome DevTools MCP to navigate to the running application and visually inspect UI changes.
+   4. clean up any temp files like bespoke logs, custom scripts, markdown files, etc. and/or update gitignore as needed.
    5. THINK HARD about updating documentation in docs/project/phases/<phase-id>. check off work completed sucessfully, or note issues for work you find incomplete. 
    6. Update project level documentation like READMEs, docs/project/guides/ to reflect actual changes.
 
 REPORT back to the user the status of each:
-□ `pnpm lint`
-□ `pnpm dev`
-□ `pnpm test`  
-□ `pnpm build`
+□ lint command
+□ dev server
+□ tests  
+□ project builds
 □ Implementation meets requirements spec.
 □ Test coverage of Business logic and user flows.
 □ Implementation Review, Feedback, Critique.

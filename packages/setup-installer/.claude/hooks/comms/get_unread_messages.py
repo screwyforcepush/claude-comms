@@ -4,6 +4,9 @@ import json
 import sys
 import requests
 import argparse
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.server_config import get_server_url
 
 def get_unread_messages(subagent_name):
     """
@@ -17,7 +20,7 @@ def get_unread_messages(subagent_name):
     """
     try:
         response = requests.post(
-            'http://localhost:4000/subagents/unread',
+            f'{get_server_url()}/subagents/unread',
             json={
                 'subagent_name': subagent_name
             },
@@ -32,7 +35,7 @@ def get_unread_messages(subagent_name):
             return []
             
     except requests.exceptions.ConnectionError:
-        print("Error: Could not connect to observability server at localhost:4000", file=sys.stderr)
+        print(f"Error: Could not connect to observability server at {get_server_url()}", file=sys.stderr)
         return []
     except requests.exceptions.Timeout:
         print("Error: Request timed out", file=sys.stderr)
