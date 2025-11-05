@@ -25,8 +25,8 @@ dirs.forEach(dir => {
   }
 });
 
-// Sync .claude directory and CLAUDE.md from project root
-console.log('📋 Syncing .claude directory and CLAUDE.md...');
+// Sync .claude, .agents directories and CLAUDE.md from project root
+console.log('📋 Syncing .claude, .agents directories and CLAUDE.md...');
 
 const projectRoot = path.join(__dirname, '..', '..', '..');
 const packageRoot = path.join(__dirname, '..');
@@ -40,12 +40,29 @@ if (fs.existsSync(claudeSrc)) {
   if (fs.existsSync(claudeDest)) {
     fs.rmSync(claudeDest, { recursive: true, force: true });
   }
-  
+
   // Copy the directory recursively
   fs.cpSync(claudeSrc, claudeDest, { recursive: true });
   console.log('✅ Synced .claude directory');
 } else {
   console.warn('⚠️  .claude directory not found in project root');
+}
+
+// Copy .agents directory
+const agentsSrc = path.join(projectRoot, '.agents');
+const agentsDest = path.join(packageRoot, '.agents');
+
+if (fs.existsSync(agentsSrc)) {
+  // Remove existing .agents directory if it exists
+  if (fs.existsSync(agentsDest)) {
+    fs.rmSync(agentsDest, { recursive: true, force: true });
+  }
+
+  // Copy the directory recursively
+  fs.cpSync(agentsSrc, agentsDest, { recursive: true });
+  console.log('✅ Synced .agents directory');
+} else {
+  console.warn('⚠️  .agents directory not found in project root');
 }
 
 // Copy CLAUDE.md
@@ -57,17 +74,6 @@ if (fs.existsSync(claudeMdSrc)) {
   console.log('✅ Synced CLAUDE.md');
 } else {
   console.warn('⚠️  CLAUDE.md not found in project root');
-}
-
-// Copy AGENTS.md
-const agentsMdSrc = path.join(projectRoot, 'AGENTS.md');
-const agentsMdDest = path.join(packageRoot, 'AGENTS.md');
-
-if (fs.existsSync(agentsMdSrc)) {
-  fs.copyFileSync(agentsMdSrc, agentsMdDest);
-  console.log('✅ Synced AGENTS.md');
-} else {
-  console.warn('⚠️  AGENTS.md not found in project root');
 }
 
 console.log('✅ Build complete - directories created and files synced');
