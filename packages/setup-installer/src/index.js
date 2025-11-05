@@ -104,7 +104,8 @@ function _createDependencies(options = {}) {
       branch: 'main',
       paths: {
         claudeDir: '.claude',
-        claudeMd: 'CLAUDE.md'
+        claudeMd: 'CLAUDE.md',
+        agentsDir: '.agents'
       }
     },
     timeout: options.timeout || 10000,

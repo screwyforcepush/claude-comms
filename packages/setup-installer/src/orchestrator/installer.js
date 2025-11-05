@@ -274,6 +274,13 @@ class Installer extends EventEmitter {
         retryCount: 3
       });
 
+      // Fetch .agents directory structure
+      const agentsFiles = await this.fetcher.fetchDirectory('.agents', {
+        version: this.options.version,
+        useCache: this.options.cache,
+        retryCount: 3
+      });
+
       // Fetch CLAUDE.md file
       const claudeMd = await this.fetcher.fetchFile('CLAUDE.md', {
         version: this.options.version,
@@ -282,6 +289,7 @@ class Installer extends EventEmitter {
 
       const fetchedFiles = {
         '.claude': claudeFiles,
+        '.agents': agentsFiles,
         'CLAUDE.md': claudeMd
       };
 
@@ -444,6 +452,7 @@ class Installer extends EventEmitter {
 
     const requiredPaths = [
       path.join(this.options.targetDir, '.claude'),
+      path.join(this.options.targetDir, '.agents'),
       path.join(this.options.targetDir, 'CLAUDE.md'),
       path.join(this.options.targetDir, '.claude', 'settings.local.json')
     ];
@@ -701,13 +710,17 @@ class Installer extends EventEmitter {
    */
   async _createBackupsIfNeeded(_fetchedFiles) {
     if (!this.options.force) {
-      // Check for existing .claude directory
+      // Check for existing directories and files
       const claudeDir = path.join(this.options.targetDir, '.claude');
+      const agentsDir = path.join(this.options.targetDir, '.agents');
       const claudeMd = path.join(this.options.targetDir, 'CLAUDE.md');
 
       const existingPaths = [];
       if (await this.validator.pathExists(claudeDir)) {
         existingPaths.push('.claude/');
+      }
+      if (await this.validator.pathExists(agentsDir)) {
+        existingPaths.push('.agents/');
       }
       if (await this.validator.pathExists(claudeMd)) {
         existingPaths.push('CLAUDE.md');
@@ -731,6 +744,14 @@ class Installer extends EventEmitter {
         type: 'missing_component',
         component: '.claude',
         message: 'Missing .claude directory structure'
+      });
+    }
+
+    if (!fetchedFiles['.agents']) {
+      issues.push({
+        type: 'missing_component',
+        component: '.agents',
+        message: 'Missing .agents directory structure'
       });
     }
 
