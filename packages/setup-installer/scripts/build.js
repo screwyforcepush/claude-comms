@@ -59,5 +59,16 @@ if (fs.existsSync(claudeMdSrc)) {
   console.warn('⚠️  CLAUDE.md not found in project root');
 }
 
+// Copy AGENTS.md
+const agentsMdSrc = path.join(projectRoot, 'AGENTS.md');
+const agentsMdDest = path.join(packageRoot, 'AGENTS.md');
+
+if (fs.existsSync(agentsMdSrc)) {
+  fs.copyFileSync(agentsMdSrc, agentsMdDest);
+  console.log('✅ Synced AGENTS.md');
+} else {
+  console.warn('⚠️  AGENTS.md not found in project root');
+}
+
 console.log('✅ Build complete - directories created and files synced');
 console.log('Note: Full build process will be implemented in production phase');

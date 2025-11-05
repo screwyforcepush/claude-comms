@@ -79,7 +79,8 @@
     "README.md",
     "CHANGELOG.md",
     ".claude/",
-    "CLAUDE.md"
+    "CLAUDE.md",
+    "AGENTS.md"
   ],
   "publishConfig": {
     "access": "public"
