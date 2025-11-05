@@ -31,7 +31,7 @@ Populate your initial Todos with your step by step WORKFLOW:
 [WORKFLOW]
 🤝 Batch an Inbox Check with every read/write/tool action, and dynamically add TEAMWORK Broadcast as per Communication Protocols 🤝 
 
-1. Consume AGENT OPERATING PROCEDURES (AOP) `AGENTS.md`. *You will execute 1 or more of Procedures in the following steps*
+1. Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md`. *You will execute 1 or more of Procedures in the following steps*
 2. Execute AOP.CALIBRATE
 3. *Decision:* Based on your Assignment/Task/Loop you may be either Implementing New, Assessing Only, or Review+Refine Existing. Choose your path accordingly:
    - *Implementing New:* Execute AOP.IMPLEMENT
