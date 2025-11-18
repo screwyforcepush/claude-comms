@@ -26,7 +26,7 @@ Follow your WORKFLOW step-by-step:
    - UserPrompt starts with "Your name is" and ends with "adopt 🤝 TEAMWORK to achieve maximum value delivered."
    - The result must be stringified with escaped backticks so it can be parsed as an arg to the Consultant invocation.
 2. **Invoke Consultant**: Run background bash with your prepared ConsultantAssignment `codex --yolo exec "<ConsultantAssignment>"`
-3. **Monitoring Loop**: Sleep 60 seconds, then check the background bash Consultant. Keep checking every 60 seconds until Consultant is finished/exit. 
+3. **Monitoring Loop**: Sleep 60 seconds, then check the background bash Consultant. Keep checking every 60 seconds until Consultant is finished/exit. Note: Do not rely on your system reminders - they may show running when codex is already finished/failed! You must check the BackroundBash output.
    - Each check, make note of most recent consultant trace, and Increment Monitoring Check count.
 4. **Completion Handling**: Respond back to the user, the consultant's final response/output verbatim.
 

@@ -1,0 +1,63 @@
+{
+  "description": "Example UAT login flow",
+  "steps": [
+    {
+      "cmd": "navigate",
+      "args": {
+        "url": "https://example.com/login"
+      }
+    },
+    {
+      "cmd": "snapshot",
+      "args": {
+        "file_path": "/tmp/login-page.txt"
+      }
+    },
+    {
+      "cmd": "fill",
+      "args": {
+        "uid": "email-input",
+        "value": "user@example.com"
+      }
+    },
+    {
+      "cmd": "fill",
+      "args": {
+        "uid": "password-input",
+        "value": "password123"
+      }
+    },
+    {
+      "cmd": "click",
+      "args": {
+        "uid": "submit-button"
+      }
+    },
+    {
+      "cmd": "wait",
+      "args": {
+        "text": "Dashboard",
+        "timeout": 5000
+      }
+    },
+    {
+      "cmd": "screenshot",
+      "args": {
+        "file_path": "/tmp/logged-in.png"
+      }
+    },
+    {
+      "cmd": "network-list",
+      "args": {
+        "resource_types": ["xhr", "fetch"],
+        "page_size": 10
+      }
+    },
+    {
+      "cmd": "console-list",
+      "args": {
+        "types": ["error", "warn"]
+      }
+    }
+  ]
+}

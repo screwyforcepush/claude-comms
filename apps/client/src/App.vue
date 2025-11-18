@@ -154,7 +154,17 @@
     >
       {{ error }}
     </div>
-    
+
+    <!-- Feedback Widget (React component wrapped in Vue) -->
+    <FeedbackWidget
+      v-if="feedbackEnabled"
+      :convex-url="convexUrl"
+      project="claude-comms"
+      :enabled="true"
+      hotkey="Alt+F"
+      :show-button="true"
+    />
+
   </div>
 </template>
 
@@ -167,9 +177,14 @@ import StickScrollButton from './components/StickScrollButton.vue';
 import LivePulseChart from './components/LivePulseChart.vue';
 import SubagentComms from './components/SubagentComms.vue';
 import SessionsView from './components/SessionsView.vue';
+import FeedbackWidget from './components/FeedbackWidget.vue';
 
 // WebSocket connection
 const { allEvents: events, isConnected, error, ws: wsConnection } = useWebSocketWithPriority('ws://localhost:4000/stream');
+
+// Feedback widget configuration
+const convexUrl = import.meta.env.VITE_CONVEX_URL || '';
+const feedbackEnabled = import.meta.env.VITE_FEEDBACK_ENABLED === 'true' && !!convexUrl;
 
 // Tab state
 const activeTab = ref('events');
