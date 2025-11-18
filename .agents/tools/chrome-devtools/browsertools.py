@@ -434,6 +434,12 @@ async def execute_command(cmd: str, cmd_args: Dict[str, Any]):
     elif cmd == "upload":
         tool_name = "upload_file"
         tool_args = {"uid": cmd_args["uid"], "filePath": cmd_args["file_path"]}
+    elif cmd == "drag":
+        tool_name = "drag"
+        tool_args = {"from_uid": cmd_args["from_uid"], "to_uid": cmd_args["to_uid"]}
+    elif cmd == "fillform":
+        tool_name = "fill_form"
+        tool_args = {"elements": cmd_args["elements"]}
     else:
         raise ValueError(f"Unknown command: {cmd}")
 
@@ -452,6 +458,9 @@ async def main():
         description="Chrome DevTools MCP wrapper - persistent daemon mode",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+browsertools.py - Chrome DevTools automation tool
+
+
 Usage: uv run .agents/tools/chrome-devtools/browsertools.py <command>
 
 DAEMON MANAGEMENT:
@@ -483,6 +492,9 @@ INTERACTION:
   key <key>             Press key or combo
                         Examples: "Enter", "Tab", "Control+A"
   hover <uid>           Hover over element
+  drag <from> <to>      Drag element from UID to target UID
+  fillform <json>       Fill multiple form fields at once
+                        Example: '[{"uid":"1_1","value":"text"}]'
 
 DEBUGGING:
   conslist              List console messages
@@ -495,13 +507,33 @@ DEBUGGING:
     --types xhr fetch   Filter by resource type
     --size N            Max requests
 
-  netget [reqid]        Get request details
+  netget [reqid]        Get request details (omit reqid for currently selected)
 
 PAGE MANIPULATION:
   resize <width> <height>        Resize viewport
   dialog <accept|dismiss>        Handle alert/confirm/prompt
     --text <text>                Text for prompt
   upload <uid> <file_path>       Upload file
+
+WORKFLOW RECOMMENDATIONS:
+  1. Always take fresh snapshot after UI interactions
+     Example: click -> snap -> click again
+
+  2. Use grep/head to filter verbose snapshot output
+     Example: snap | grep "button.*Login"
+
+  3. Save screenshots to /tmp for temporary inspection
+     Example: shot /tmp/debug.png
+
+  4. Use --size limits for debugging commands to manage output
+     Example: netlist --size 10 --types fetch
+
+  5. Stop daemon when done to clean up browser resources
+     Example: daemon stop
+
+  6. UIDs are invalidated on every DOM change - always use latest
+     BAD:  snap -> click -> click (using old UID)
+     GOOD: snap -> click -> snap -> click (fresh UIDs)
 
 EXAMPLES:
   # Login workflow (from repo root)
@@ -592,6 +624,14 @@ IMPORTANT:
     upload.add_argument("uid", help="File input element UID")
     upload.add_argument("file_path", help="Local file path to upload")
 
+    # Advanced interaction
+    drag_parser = subparsers.add_parser("drag", help="Drag element to target")
+    drag_parser.add_argument("from_uid", help="Source element UID")
+    drag_parser.add_argument("to_uid", help="Target element UID")
+
+    fillform_parser = subparsers.add_parser("fillform", help="Fill multiple form fields")
+    fillform_parser.add_argument("elements", help="JSON array: [{'uid':'1_1','value':'text'}]")
+
     args = parser.parse_args()
 
     # Handle daemon commands
@@ -679,6 +719,11 @@ IMPORTANT:
         elif args.cmd == "upload":
             cmd_args_dict["uid"] = args.uid
             cmd_args_dict["file_path"] = args.file_path
+        elif args.cmd == "drag":
+            cmd_args_dict["from_uid"] = args.from_uid
+            cmd_args_dict["to_uid"] = args.to_uid
+        elif args.cmd == "fillform":
+            cmd_args_dict["elements"] = json.loads(args.elements)
 
         output = await execute_command(args.cmd, cmd_args_dict)
         print(output)
