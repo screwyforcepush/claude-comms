@@ -2,6 +2,26 @@
 
 Guide the user through installing the `annotated-feedback` widget in their application. This widget provides visual feedback annotation capabilities with screenshot capture and Convex backend integration.
 
+## ⚠️ PREREQUISITES - MUST COMPLETE BEFORE STARTING
+
+**STOP! Before proceeding, ask the user:**
+
+1. **Do you have a Convex deployment URL?**
+   - Format: `https://xxx-xxx-123.convex.cloud`
+   - If NO: Guide them to create one at https://dashboard.convex.dev
+   - They MUST provide this URL before installation can proceed
+
+2. **What is your project name?**
+   - If not provided: Use the current repository name as the default
+   - Command to get repo name: `basename $(git rev-parse --show-toplevel 2>/dev/null) || basename $PWD`
+   - This will be used as the namespace for feedback submissions
+
+**DO NOT PROCEED** until you have:
+- ✅ Convex deployment URL (verified format)
+- ✅ Project name (user-provided or auto-detected from repo)
+
+---
+
 ## CRITICAL CONTEXT
 
 **Package Details:**
@@ -381,20 +401,49 @@ npx convex deploy
 
 ---
 
-## MCP SERVER SETUP (Optional)
+## 🎯 FINAL STEP: MCP SERVER SETUP (REQUIRED)
 
-The package includes an MCP server for Claude to interact with feedback.
+**This is NOT optional - it's the entire point of installing the widget!**
 
-**Add to Claude Desktop Config:**
+After successful widget installation and testing, instruct the user to:
+
+1. **Run this command in their terminal (OUTSIDE of Claude):**
 
 ```bash
 claude mcp add annotated-feedback \
-  -- env CONVEX_URL="https://your-deployment.convex.cloud" \
+  -- env CONVEX_URL="<CONVEX_URL>" \
   npx -y annotated-feedback \
-  -- --PROJECT="your-project-name"
+  -- --PROJECT="<PROJECT_NAME>"
 ```
 
-**Note:** Replace `your-deployment.convex.cloud` and `your-project-name` with actual values.
+2. **Provide them with the actual command to copy/paste:**
+
+Replace `<CONVEX_URL>` and `<PROJECT_NAME>` with the values you collected at the start.
+
+**Example output to user:**
+
+```
+✅ Widget installation complete!
+
+📋 NEXT STEP: Install the MCP server so Claude can interact with your feedback.
+
+Copy and paste this command in your terminal (outside of this chat):
+
+claude mcp add annotated-feedback \
+  -- env CONVEX_URL="https://utmost-llama-56.convex.cloud" \
+  npx -y annotated-feedback \
+  -- --PROJECT="my-awesome-app"
+
+Then start a new Claude session to activate the MCP integration.
+```
+
+3. **Tell the user to start a new Claude session** after running the command
+
+The MCP server allows Claude to:
+- List all feedback submissions
+- View feedback with annotations
+- Update feedback status
+- Filter by project, status, priority
 
 ---
 
@@ -469,7 +518,7 @@ interface FeedbackMetadata {
 
 ## SUCCESS CRITERIA
 
-Installation is complete when:
+Widget installation is complete when:
 
 1. ✅ Package installed and no build errors
 2. ✅ Dev server starts without warnings about the widget
@@ -477,6 +526,30 @@ Installation is complete when:
 4. ✅ Can draw annotations on the canvas
 5. ✅ Submitting feedback shows success toast
 6. ✅ Feedback appears in Convex dashboard
+
+**THEN provide the MCP installation command** with substituted values.
+
+---
+
+## INSTALLATION FLOW SUMMARY
+
+```
+1. Ask for prerequisites (Convex URL, Project Name)
+   ↓
+2. Detect framework
+   ↓
+3. Install packages
+   ↓
+4. Apply framework-specific configuration
+   ↓
+5. Set environment variables
+   ↓
+6. Test the widget
+   ↓
+7. ✅ SUCCESS: Provide MCP installation command
+   ↓
+8. Tell user to run command and start new session
+```
 
 ---
 

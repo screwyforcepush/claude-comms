@@ -62,22 +62,28 @@ def is_daemon_running() -> bool:
 
 def load_config() -> Dict[str, Any]:
     """Load config file or return defaults."""
-    default_config = {
+    # Try user config first
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE) as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Failed to load user config: {e}", file=sys.stderr)
+
+    # Try repo default config
+    repo_config = Path(__file__).parent / "config.json"
+    if repo_config.exists():
+        try:
+            with open(repo_config) as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Failed to load repo config: {e}", file=sys.stderr)
+
+    # Fallback to hardcoded defaults
+    return {
         "mcp_command": "npx",
-        "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated"]
+        "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--headless=true"]
     }
-
-    if not CONFIG_FILE.exists():
-        return default_config
-
-    try:
-        with open(CONFIG_FILE) as f:
-            user_config = json.load(f)
-            # Merge with defaults
-            return {**default_config, **user_config}
-    except Exception as e:
-        print(f"Warning: Failed to load config: {e}", file=sys.stderr)
-        return default_config
 
 
 def save_default_config():
@@ -112,6 +118,7 @@ async def read_mcp_responses():
 
     while True:
         try:
+            # Read line with increased limit for large snapshots
             line = await mcp_reader.readline()
             if not line:
                 print("MCP server closed stdout", file=sys.stderr)
@@ -125,12 +132,15 @@ async def read_mcp_responses():
                 if msg_id and msg_id in pending_requests:
                     future = pending_requests.pop(msg_id)
                     future.set_result(resp)
-            except json.JSONDecodeError:
-                print(f"Invalid JSON from MCP: {line}", file=sys.stderr)
+            except json.JSONDecodeError as e:
+                print(f"Invalid JSON from MCP: {e}", file=sys.stderr)
+                print(f"Line length: {len(line)}", file=sys.stderr)
 
         except Exception as e:
             print(f"Error reading MCP: {e}", file=sys.stderr)
-            break
+            # Don't break on limit errors, just log and continue
+            if "longer than limit" not in str(e):
+                break
 
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -238,6 +248,7 @@ async def run_daemon():
         stdout=asyncio.subprocess.PIPE,
         stderr=sys.stderr,
         start_new_session=True,  # Creates new process group
+        limit=1024 * 1024 * 10,  # 10MB limit for large snapshots
     )
 
     mcp_reader = mcp_proc.stdout
@@ -300,8 +311,11 @@ async def send_command(tool_name: str, args: Dict[str, Any]) -> Any:
     if not is_daemon_running():
         raise RuntimeError("Daemon not running. Start with: bt daemon start")
 
-    # Connect to daemon's Unix socket
-    reader, writer = await asyncio.open_unix_connection(str(SOCKET_PATH))
+    # Connect to daemon's Unix socket with increased limit for large responses
+    reader, writer = await asyncio.open_unix_connection(
+        str(SOCKET_PATH),
+        limit=1024 * 1024 * 10  # 10MB limit for large snapshots
+    )
 
     try:
         # Create JSON-RPC request
@@ -442,6 +456,8 @@ Usage: uv run .agents/tools/chrome-devtools/browsertools.py <command>
 
 DAEMON MANAGEMENT:
   daemon start          Start persistent daemon + Chrome
+                        IMPORTANT: Run in background with &
+                        Example: uv run .agents/tools/chrome-devtools/browsertools.py daemon start &
   daemon stop           Stop daemon, kill Chrome cleanly
   daemon status         Check if daemon running
   daemon config         Create config file
@@ -489,7 +505,8 @@ PAGE MANIPULATION:
 
 EXAMPLES:
   # Login workflow (from repo root)
-  uv run .agents/tools/chrome-devtools/browsertools.py daemon start
+  uv run .agents/tools/chrome-devtools/browsertools.py daemon start &
+  sleep 5  # Wait for daemon to be ready
   uv run .agents/tools/chrome-devtools/browsertools.py nav http://app.com/login
   uv run .agents/tools/chrome-devtools/browsertools.py snap | grep email
   uv run .agents/tools/chrome-devtools/browsertools.py fill 1_23 user@example.com
