@@ -8,18 +8,9 @@ importers:
 
   .:
     dependencies:
-      '@excalidraw/excalidraw':
-        specifier: ^0.18.0
-        version: 0.18.0(@types/react-dom@19.2.3(@types/react@19.2.6))(@types/react@19.2.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       annotated-feedback:
-        specifier: ^0.1.17
-        version: 0.1.17(react@18.3.1)
-      convex:
-        specifier: ^1.29.2
-        version: 1.29.2(react@18.3.1)
-      html-to-image:
-        specifier: ^1.11.13
-        version: 1.11.13
+        specifier: ^0.1.18
+        version: 0.1.18(@types/react-dom@19.2.3(@types/react@19.2.6))(@types/react@19.2.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1242,8 +1233,8 @@ packages:
   alien-signals@1.0.13:
     resolution: {integrity: sha512-OGj9yyTnJEttvzhTUWuscOvtqxq5vrhF7vL9oS0xJ2mK0ItPYP1/y+vCFebfxoEyAz0++1AIwJ5CMr+Fk3nDmg==}
 
-  annotated-feedback@0.1.17:
-    resolution: {integrity: sha512-RDEH2PFONolNNvTaWGk9XI9Er7fRGuwYPwHDEcfUqxS/7NC6AfBjlnurrYSX+KYidhbSaRhHSW957ksM4UshOw==}
+  annotated-feedback@0.1.18:
+    resolution: {integrity: sha512-ysoLEQ7opr2eiyqIcvBJopi1NdFWrHILRVIC54/05p7uyiszP47q6WZAtgBl/1dt6HnlPMmifQTbfc/kPvY8wA==}
     hasBin: true
 
   ansi-regex@5.0.1:
@@ -4357,8 +4348,9 @@ snapshots:
 
   alien-signals@1.0.13: {}
 
-  annotated-feedback@0.1.17(react@18.3.1):
+  annotated-feedback@0.1.18(@types/react-dom@19.2.3(@types/react@19.2.6))(@types/react@19.2.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
+      '@excalidraw/excalidraw': 0.18.0(@types/react-dom@19.2.3(@types/react@19.2.6))(@types/react@19.2.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@modelcontextprotocol/sdk': 1.22.0
       convex: 1.29.2(react@18.3.1)
       html-to-image: 1.11.13
@@ -4367,7 +4359,11 @@ snapshots:
       - '@auth0/auth0-react'
       - '@cfworker/json-schema'
       - '@clerk/clerk-react'
+      - '@types/react'
+      - '@types/react-dom'
+      - immer
       - react
+      - react-dom
       - supports-color
 
   ansi-regex@5.0.1: {}

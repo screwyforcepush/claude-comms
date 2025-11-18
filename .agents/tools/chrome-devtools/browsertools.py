@@ -28,6 +28,7 @@ from typing import Any, Dict, Optional
 STATE_DIR = Path.home() / ".browsertools"
 SOCKET_PATH = STATE_DIR / "daemon.sock"
 PID_FILE = STATE_DIR / "daemon.pid"
+CONFIG_FILE = STATE_DIR / "config.json"
 
 # Global daemon state
 mcp_proc = None
@@ -57,6 +58,48 @@ def get_daemon_pid() -> Optional[int]:
 def is_daemon_running() -> bool:
     """Check if daemon is running."""
     return get_daemon_pid() is not None and SOCKET_PATH.exists()
+
+
+def load_config() -> Dict[str, Any]:
+    """Load config file or return defaults."""
+    default_config = {
+        "mcp_command": "npx",
+        "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated"]
+    }
+
+    if not CONFIG_FILE.exists():
+        return default_config
+
+    try:
+        with open(CONFIG_FILE) as f:
+            user_config = json.load(f)
+            # Merge with defaults
+            return {**default_config, **user_config}
+    except Exception as e:
+        print(f"Warning: Failed to load config: {e}", file=sys.stderr)
+        return default_config
+
+
+def save_default_config():
+    """Save default config file."""
+    ensure_state_dir()
+    config = {
+        "mcp_command": "npx",
+        "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated"],
+        "_comment": "Customize MCP server startup. Examples:",
+        "_example_headless": {
+            "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--headless=true"]
+        },
+        "_example_custom_chrome": {
+            "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--executablePath=/usr/local/bin/chromium-mcp"]
+        },
+        "_example_sandbox": {
+            "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated=true", "--headless=true", "--executablePath=/usr/local/bin/chromium-mcp"]
+        }
+    }
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+    print(f"Created config file: {CONFIG_FILE}", file=sys.stderr)
 
 
 # ============================================================================
@@ -179,12 +222,18 @@ async def run_daemon():
     if SOCKET_PATH.exists():
         SOCKET_PATH.unlink()
 
+    # Load config
+    config = load_config()
+    mcp_command = config.get("mcp_command", "npx")
+    mcp_args = config.get("mcp_args", ["-y", "chrome-devtools-mcp@latest", "--isolated"])
+
     print(f"Starting chrome-devtools-mcp...", file=sys.stderr)
+    print(f"Command: {mcp_command} {' '.join(mcp_args)}", file=sys.stderr)
 
     # Start MCP server as subprocess in new process group
     # This ensures we can kill Chrome and all its children together
     mcp_proc = await asyncio.create_subprocess_exec(
-        'npx', '-y', 'chrome-devtools-mcp@latest', '--isolated',
+        mcp_command, *mcp_args,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=sys.stderr,
@@ -311,6 +360,8 @@ async def execute_command(cmd: str, cmd_args: Dict[str, Any]):
     if cmd == "nav":
         tool_name = "navigate_page"
         tool_args = {"url": cmd_args["url"]}
+        if "timeout" in cmd_args:
+            tool_args["timeout"] = cmd_args["timeout"]
     elif cmd == "snap":
         tool_name = "take_snapshot"
     elif cmd == "click":
@@ -326,9 +377,13 @@ async def execute_command(cmd: str, cmd_args: Dict[str, Any]):
     elif cmd == "wait":
         tool_name = "wait_for"
         tool_args = {"text": cmd_args["text"]}
+        if "timeout" in cmd_args:
+            tool_args["timeout"] = cmd_args["timeout"]
     elif cmd == "eval":
         tool_name = "evaluate_script"
         tool_args = {"function": cmd_args["function"]}
+        if "args" in cmd_args:
+            tool_args["args"] = cmd_args["args"]
     elif cmd == "key":
         tool_name = "press_key"
         tool_args = {"key": cmd_args["key"]}
@@ -379,77 +434,73 @@ async def execute_command(cmd: str, cmd_args: Dict[str, Any]):
 
 async def main():
     parser = argparse.ArgumentParser(
-        prog="bt",
+        prog="browsertools.py",
         description="Chrome DevTools MCP wrapper - persistent daemon mode",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Usage: uv run .agents/tools/chrome-devtools/browsertools.py <command>
+
 DAEMON MANAGEMENT:
-  bt daemon start          Start persistent daemon + Chrome
-  bt daemon stop           Stop daemon, kill Chrome cleanly
-  bt daemon status         Check if daemon running
+  daemon start          Start persistent daemon + Chrome
+  daemon stop           Stop daemon, kill Chrome cleanly
+  daemon status         Check if daemon running
+  daemon config         Create config file
 
 NAVIGATION:
-  bt nav <url>             Navigate to URL
-  bt wait <text>           Wait for text to appear (optional --timeout ms)
+  nav <url>             Navigate to URL
+    --timeout <ms>      Max wait time in milliseconds
+  wait <text>           Wait for text to appear
+    --timeout <ms>      Max wait time in milliseconds
 
 INSPECTION:
-  bt snap                  Take a11y tree snapshot (get element UIDs)
-                           IMPORTANT: Always use latest snapshot for UIDs
-  bt shot [path]           Screenshot viewport (optional: save to path)
-  bt eval <js>             Execute JavaScript, returns JSON
-                           Example: "() => document.title"
+  snap                  Take a11y tree snapshot (get element UIDs)
+                        IMPORTANT: Always use latest snapshot for UIDs
+  shot [path]           Screenshot viewport (optional: save to path)
+  eval <js>             Execute JavaScript, returns JSON
+    --args <json>       JSON array of element references (advanced)
+                        Simple: "() => document.title"
+                        Complex: "(el) => el.innerText" --args '[{"uid":"1_23"}]'
 
 INTERACTION:
-  bt click <uid>           Click element by UID from snapshot
-  bt fill <uid> <value>    Fill input/textarea or select option
-  bt key <key>             Press key or combo
-                           Examples: "Enter", "Tab", "Control+A", "Control+Shift+R"
-  bt hover <uid>           Hover over element
+  click <uid>           Click element by UID from snapshot
+  fill <uid> <value>    Fill input/textarea or select option
+  key <key>             Press key or combo
+                        Examples: "Enter", "Tab", "Control+A"
+  hover <uid>           Hover over element
 
 DEBUGGING:
-  bt conslist              List console messages (all types)
-    --types error warn     Filter by type (log, error, warn, info, debug)
-    --size N               Max messages to return
+  conslist              List console messages
+    --types error warn  Filter by type
+    --size N            Max messages
 
-  bt consget <msgid>       Get console message details by ID
+  consget <msgid>       Get console message details
 
-  bt netlist               List all network requests since navigation
-    --types xhr fetch      Filter by resource type
-    --size N               Max requests to return
+  netlist               List network requests
+    --types xhr fetch   Filter by resource type
+    --size N            Max requests
 
-  bt netget [reqid]        Get network request details (omit for latest)
+  netget [reqid]        Get request details
 
 PAGE MANIPULATION:
-  bt resize <width> <height>        Resize viewport (pixels)
-  bt dialog <accept|dismiss>        Handle alert/confirm/prompt
-    --text <text>                   Text for prompt dialog
-  bt upload <uid> <file_path>       Upload file through input element
+  resize <width> <height>        Resize viewport
+  dialog <accept|dismiss>        Handle alert/confirm/prompt
+    --text <text>                Text for prompt
+  upload <uid> <file_path>       Upload file
 
 EXAMPLES:
-  # Login workflow
-  bt daemon start
-  bt nav http://app.com/login
-  bt snap | grep email          # Find UIDs
-  bt fill 1_23 user@example.com
-  bt fill 1_24 password
-  bt click 1_25                 # Submit
-  bt wait Dashboard
-  bt conslist --types error     # Check for errors
-  bt shot /tmp/success.png
-  bt daemon stop
+  # Login workflow (from repo root)
+  uv run .agents/tools/chrome-devtools/browsertools.py daemon start
+  uv run .agents/tools/chrome-devtools/browsertools.py nav http://app.com/login
+  uv run .agents/tools/chrome-devtools/browsertools.py snap | grep email
+  uv run .agents/tools/chrome-devtools/browsertools.py fill 1_23 user@example.com
+  uv run .agents/tools/chrome-devtools/browsertools.py click 1_25
+  uv run .agents/tools/chrome-devtools/browsertools.py daemon stop
 
-  # Form validation
-  bt snap
-  bt fill 1_10 invalid-email
-  bt click 1_15
-  bt wait "Invalid email"
-  bt conslist
-
-IMPORTANT NOTES:
-  - UIDs from snapshot only valid until page changes
-  - Always take new snapshot after navigation/clicks that change DOM
-  - Daemon maintains ALL state: snapshots, network, console logs
-  - Stop daemon when done to clean up Chrome processes
+IMPORTANT:
+  - UIDs only valid until page changes
+  - Take new snapshot after DOM changes
+  - Daemon maintains all state
+  - Stop daemon when done
         """
     )
 
@@ -461,10 +512,12 @@ IMPORTANT NOTES:
     daemon_sub.add_parser("start", help="Start daemon")
     daemon_sub.add_parser("stop", help="Stop daemon")
     daemon_sub.add_parser("status", help="Check daemon status")
+    daemon_sub.add_parser("config", help="Create default config file")
 
     # Browser commands
     nav = subparsers.add_parser("nav", help="Navigate to URL")
     nav.add_argument("url", help="URL to navigate to")
+    nav.add_argument("--timeout", type=int, help="Max wait time in milliseconds")
 
     subparsers.add_parser("snap", help="Take page snapshot")
 
@@ -480,9 +533,11 @@ IMPORTANT NOTES:
 
     wait = subparsers.add_parser("wait", help="Wait for text")
     wait.add_argument("text", help="Text to wait for")
+    wait.add_argument("--timeout", type=int, help="Max wait time in milliseconds")
 
     eval_parser = subparsers.add_parser("eval", help="Execute JavaScript")
     eval_parser.add_argument("function", help="JS function to execute")
+    eval_parser.add_argument("--args", help="JSON array of element UIDs to pass as arguments")
 
     # Keyboard & mouse
     key = subparsers.add_parser("key", help="Press keyboard key")
@@ -544,6 +599,15 @@ IMPORTANT NOTES:
                 print(f"Socket: {SOCKET_PATH}")
             else:
                 print("Daemon not running")
+
+        elif args.daemon_cmd == "config":
+            save_default_config()
+            print(f"\nEdit {CONFIG_FILE} to customize MCP server settings.")
+            print("\nExamples:")
+            print("  Headless mode: --headless=true")
+            print("  Custom Chrome: --executablePath=/path/to/chrome")
+            print("  Sandbox: --headless=true --executablePath=/usr/local/bin/chromium-mcp")
+
         return
 
     # Execute browser command
@@ -552,6 +616,8 @@ IMPORTANT NOTES:
 
         if args.cmd == "nav":
             cmd_args_dict["url"] = args.url
+            if args.timeout:
+                cmd_args_dict["timeout"] = args.timeout
         elif args.cmd == "click":
             cmd_args_dict["uid"] = args.uid
         elif args.cmd == "fill":
@@ -561,8 +627,12 @@ IMPORTANT NOTES:
             cmd_args_dict["path"] = args.path
         elif args.cmd == "wait":
             cmd_args_dict["text"] = args.text
+            if args.timeout:
+                cmd_args_dict["timeout"] = args.timeout
         elif args.cmd == "eval":
             cmd_args_dict["function"] = args.function
+            if args.args:
+                cmd_args_dict["args"] = json.loads(args.args)
         elif args.cmd == "key":
             cmd_args_dict["key"] = args.key
         elif args.cmd == "hover":

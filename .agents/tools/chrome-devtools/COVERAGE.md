@@ -5,32 +5,32 @@
 ### ✅ IMPLEMENTED (16 tools)
 
 **Navigation (2/6):**
-- ✅ `navigate_page` → `bt nav`
-- ✅ `wait_for` → `bt wait`
+- ✅ `navigate_page` → `uv run .agents/tools/chrome-devtools/browsertools.py nav`
+- ✅ `wait_for` → `uv run .agents/tools/chrome-devtools/browsertools.py wait`
 - ❌ `list_pages`, `select_page`, `new_page`, `close_page`
 
 **Inspection (3/5):**
-- ✅ `take_snapshot` → `bt snap`
-- ✅ `take_screenshot` → `bt shot`
-- ✅ `evaluate_script` → `bt eval`
-- ✅ `list_console_messages` → `bt conslist`
-- ✅ `get_console_message` → `bt consget`
+- ✅ `take_snapshot` → `uv run .agents/tools/chrome-devtools/browsertools.py snap`
+- ✅ `take_screenshot` → `uv run .agents/tools/chrome-devtools/browsertools.py shot`
+- ✅ `evaluate_script` → `uv run .agents/tools/chrome-devtools/browsertools.py eval`
+- ✅ `list_console_messages` → `uv run .agents/tools/chrome-devtools/browsertools.py conslist`
+- ✅ `get_console_message` → `uv run .agents/tools/chrome-devtools/browsertools.py consget`
 
 **Interaction (5/8):**
-- ✅ `click` → `bt click`
-- ✅ `fill` → `bt fill`
-- ✅ `press_key` → `bt key`
-- ✅ `hover` → `bt hover`
-- ✅ `upload_file` → `bt upload`
-- ❌ `drag`, `fill_form`, `handle_dialog` (partially - added `bt dialog`)
+- ✅ `click` → `uv run .agents/tools/chrome-devtools/browsertools.py click`
+- ✅ `fill` → `uv run .agents/tools/chrome-devtools/browsertools.py fill`
+- ✅ `press_key` → `uv run .agents/tools/chrome-devtools/browsertools.py key`
+- ✅ `hover` → `uv run .agents/tools/chrome-devtools/browsertools.py hover`
+- ✅ `upload_file` → `uv run .agents/tools/chrome-devtools/browsertools.py upload`
+- ❌ `drag`, `fill_form`, `handle_dialog` (partially - added `uv run .agents/tools/chrome-devtools/browsertools.py dialog`)
 
 **Network (2/2):**
-- ✅ `list_network_requests` → `bt netlist`
-- ✅ `get_network_request` → `bt netget`
+- ✅ `list_network_requests` → `uv run .agents/tools/chrome-devtools/browsertools.py netlist`
+- ✅ `get_network_request` → `uv run .agents/tools/chrome-devtools/browsertools.py netget`
 
 **Page Manipulation (3/4):**
-- ✅ `resize_page` → `bt resize`
-- ✅ `handle_dialog` → `bt dialog`
+- ✅ `resize_page` → `uv run .agents/tools/chrome-devtools/browsertools.py resize`
+- ✅ `handle_dialog` → `uv run .agents/tools/chrome-devtools/browsertools.py dialog`
 - ❌ `emulate`
 
 **Performance (0/3):**
@@ -202,7 +202,7 @@
 ## Recommendations
 
 ### For Basic UAT
-Use `bt --help` only (~500 tokens). Sufficient for most workflows.
+Use `uv run .agents/tools/chrome-devtools/browsertools.py --help` only (~500 tokens). Sufficient for most workflows.
 
 ### For Complex UAT
 Read `TOOL_REFERENCE.md` (~2000 tokens). Get full parameter details.

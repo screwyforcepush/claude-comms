@@ -2,12 +2,12 @@
 
 ## Overview
 
-Chrome DevTools MCP wrapper. Run `bt daemon start` once, then use commands. State persists across all invocations.
+Chrome DevTools MCP wrapper. Run `uv run .agents/tools/chrome-devtools/browsertools.py daemon start` once, then use commands. State persists across all invocations.
 
 ## Critical Concepts
 
 **UIDs (Element Identifiers):**
-- Obtained from `bt snap` output (e.g., `uid=1_23`)
+- Obtained from `uv run .agents/tools/chrome-devtools/browsertools.py snap` output (e.g., `uid=1_23`)
 - Only valid until page DOM changes
 - Must take new snapshot after navigation or DOM-altering clicks
 
@@ -19,7 +19,7 @@ Chrome DevTools MCP wrapper. Run `bt daemon start` once, then use commands. Stat
 
 ## Daemon Management
 
-### `bt daemon start`
+### `uv run .agents/tools/chrome-devtools/browsertools.py daemon start`
 Start persistent daemon. Spawns Chrome with remote debugging.
 
 **No parameters**
@@ -28,7 +28,7 @@ Start persistent daemon. Spawns Chrome with remote debugging.
 
 ---
 
-### `bt daemon stop`
+### `uv run .agents/tools/chrome-devtools/browsertools.py daemon stop`
 Stop daemon and kill all Chrome processes cleanly.
 
 **No parameters**
@@ -37,7 +37,7 @@ Stop daemon and kill all Chrome processes cleanly.
 
 ---
 
-### `bt daemon status`
+### `uv run .agents/tools/chrome-devtools/browsertools.py daemon status`
 Check if daemon is running.
 
 **No parameters**
@@ -48,7 +48,7 @@ Check if daemon is running.
 
 ## Navigation
 
-### `bt nav <url>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py nav <url>`
 Navigate current page to URL.
 
 **Parameters:**
@@ -58,13 +58,13 @@ Navigate current page to URL.
 
 **Example:**
 ```bash
-bt nav http://localhost:5173/
-bt nav https://example.com
+uv run .agents/tools/chrome-devtools/browsertools.py nav http://localhost:5173/
+uv run .agents/tools/chrome-devtools/browsertools.py nav https://example.com
 ```
 
 ---
 
-### `bt wait <text>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py wait <text>`
 Wait for specified text to appear on page.
 
 **Parameters:**
@@ -75,8 +75,8 @@ Wait for specified text to appear on page.
 
 **Example:**
 ```bash
-bt wait "Dashboard"
-bt wait "Login successful"
+uv run .agents/tools/chrome-devtools/browsertools.py wait "Dashboard"
+uv run .agents/tools/chrome-devtools/browsertools.py wait "Login successful"
 ```
 
 **Use cases:** Wait for navigation, async content loading, success messages
@@ -85,7 +85,7 @@ bt wait "Login successful"
 
 ## Inspection
 
-### `bt snap`
+### `uv run .agents/tools/chrome-devtools/browsertools.py snap`
 Take accessibility tree snapshot of current page. Returns text representation with element UIDs.
 
 **Parameters:**
@@ -110,14 +110,14 @@ uid=1_0 RootWebArea "Page Title" url="http://..."
 
 **Example:**
 ```bash
-bt snap
-bt snap --verbose
-bt snap --file-path /tmp/page.txt
+uv run .agents/tools/chrome-devtools/browsertools.py snap
+uv run .agents/tools/chrome-devtools/browsertools.py snap --verbose
+uv run .agents/tools/chrome-devtools/browsertools.py snap --file-path /tmp/page.txt
 ```
 
 ---
 
-### `bt shot [path]`
+### `uv run .agents/tools/chrome-devtools/browsertools.py shot [path]`
 Take screenshot of viewport or specific element.
 
 **Parameters:**
@@ -131,16 +131,16 @@ Take screenshot of viewport or specific element.
 
 **Example:**
 ```bash
-bt shot /tmp/page.png
-bt shot --full-page /tmp/full.png
-bt shot --format jpeg --quality 80 /tmp/compressed.jpg
+uv run .agents/tools/chrome-devtools/browsertools.py shot /tmp/page.png
+uv run .agents/tools/chrome-devtools/browsertools.py shot --full-page /tmp/full.png
+uv run .agents/tools/chrome-devtools/browsertools.py shot --format jpeg --quality 80 /tmp/compressed.jpg
 ```
 
 **Note:** `--uid` and `--full-page` are incompatible
 
 ---
 
-### `bt eval <function>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py eval <function>`
 Execute JavaScript function in page context. Returns JSON-serializable result.
 
 **Parameters:**
@@ -151,10 +151,10 @@ Execute JavaScript function in page context. Returns JSON-serializable result.
 
 **Examples:**
 ```bash
-bt eval "() => document.title"
-bt eval "() => window.location.href"
-bt eval "async () => await fetch('/api/user').then(r => r.json())"
-bt eval "(el) => el.innerText" --args '["1_23"]'
+uv run .agents/tools/chrome-devtools/browsertools.py eval "() => document.title"
+uv run .agents/tools/chrome-devtools/browsertools.py eval "() => window.location.href"
+uv run .agents/tools/chrome-devtools/browsertools.py eval "async () => await fetch('/api/user').then(r => r.json())"
+uv run .agents/tools/chrome-devtools/browsertools.py eval "(el) => el.innerText" --args '["1_23"]'
 ```
 
 **Important:** Returned values must be JSON-serializable
@@ -163,27 +163,27 @@ bt eval "(el) => el.innerText" --args '["1_23"]'
 
 ## Interaction
 
-### `bt click <uid>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py click <uid>`
 Click on element by UID from snapshot.
 
 **Parameters:**
-- `uid` (string, required): Element UID from `bt snap` output
+- `uid` (string, required): Element UID from `uv run .agents/tools/chrome-devtools/browsertools.py snap` output
 - `--double` (boolean, optional): Double-click instead of single click
 
 **Output:** Success message with updated page snapshot
 
 **Example:**
 ```bash
-bt snap
-bt click 1_23
-bt click 1_45 --double
+uv run .agents/tools/chrome-devtools/browsertools.py snap
+uv run .agents/tools/chrome-devtools/browsertools.py click 1_23
+uv run .agents/tools/chrome-devtools/browsertools.py click 1_45 --double
 ```
 
 **Important:** Must have valid snapshot first
 
 ---
 
-### `bt fill <uid> <value>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py fill <uid> <value>`
 Fill input, textarea, or select element with value.
 
 **Parameters:**
@@ -194,9 +194,9 @@ Fill input, textarea, or select element with value.
 
 **Example:**
 ```bash
-bt fill 1_23 "user@example.com"
-bt fill 1_24 "password123"
-bt fill 1_25 "Option2"  # For <select> elements
+uv run .agents/tools/chrome-devtools/browsertools.py fill 1_23 "user@example.com"
+uv run .agents/tools/chrome-devtools/browsertools.py fill 1_24 "password123"
+uv run .agents/tools/chrome-devtools/browsertools.py fill 1_25 "Option2"  # For <select> elements
 ```
 
 **Supported elements:**
@@ -206,7 +206,7 @@ bt fill 1_25 "Option2"  # For <select> elements
 
 ---
 
-### `bt key <key>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py key <key>`
 Press keyboard key or key combination.
 
 **Parameters:**
@@ -221,17 +221,17 @@ Press keyboard key or key combination.
 
 **Example:**
 ```bash
-bt key Enter
-bt key Tab
-bt key Control+A
-bt key Control++     # Zoom in
+uv run .agents/tools/chrome-devtools/browsertools.py key Enter
+uv run .agents/tools/chrome-devtools/browsertools.py key Tab
+uv run .agents/tools/chrome-devtools/browsertools.py key Control+A
+uv run .agents/tools/chrome-devtools/browsertools.py key Control++     # Zoom in
 ```
 
-**Use case:** When `bt fill` cannot be used (keyboard shortcuts, navigation)
+**Use case:** When `uv run .agents/tools/chrome-devtools/browsertools.py fill` cannot be used (keyboard shortcuts, navigation)
 
 ---
 
-### `bt hover <uid>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py hover <uid>`
 Hover mouse over element (for tooltips, dropdown menus, etc.)
 
 **Parameters:**
@@ -241,16 +241,16 @@ Hover mouse over element (for tooltips, dropdown menus, etc.)
 
 **Example:**
 ```bash
-bt snap
-bt hover 1_23  # Trigger tooltip
-bt snap        # See tooltip in new snapshot
+uv run .agents/tools/chrome-devtools/browsertools.py snap
+uv run .agents/tools/chrome-devtools/browsertools.py hover 1_23  # Trigger tooltip
+uv run .agents/tools/chrome-devtools/browsertools.py snap        # See tooltip in new snapshot
 ```
 
 ---
 
 ## Page Manipulation
 
-### `bt resize <width> <height>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py resize <width> <height>`
 Resize page viewport to specified dimensions.
 
 **Parameters:**
@@ -261,16 +261,16 @@ Resize page viewport to specified dimensions.
 
 **Example:**
 ```bash
-bt resize 1920 1080    # Full HD
-bt resize 375 812      # iPhone 13 Pro
-bt resize 1366 768     # Common laptop
+uv run .agents/tools/chrome-devtools/browsertools.py resize 1920 1080    # Full HD
+uv run .agents/tools/chrome-devtools/browsertools.py resize 375 812      # iPhone 13 Pro
+uv run .agents/tools/chrome-devtools/browsertools.py resize 1366 768     # Common laptop
 ```
 
 **Use case:** Test responsive designs, mobile views
 
 ---
 
-### `bt dialog <action>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py dialog <action>`
 Handle browser alert, confirm, or prompt dialogs.
 
 **Parameters:**
@@ -281,21 +281,21 @@ Handle browser alert, confirm, or prompt dialogs.
 
 **Example:**
 ```bash
-bt click 1_23                    # Click triggers alert()
-bt dialog accept                 # Accept the alert
+uv run .agents/tools/chrome-devtools/browsertools.py click 1_23                    # Click triggers alert()
+uv run .agents/tools/chrome-devtools/browsertools.py dialog accept                 # Accept the alert
 
-bt click 1_24                    # Triggers confirm()
-bt dialog dismiss                # Cancel
+uv run .agents/tools/chrome-devtools/browsertools.py click 1_24                    # Triggers confirm()
+uv run .agents/tools/chrome-devtools/browsertools.py dialog dismiss                # Cancel
 
-bt click 1_25                    # Triggers prompt()
-bt dialog accept --text "Hello"  # Enter text and accept
+uv run .agents/tools/chrome-devtools/browsertools.py click 1_25                    # Triggers prompt()
+uv run .agents/tools/chrome-devtools/browsertools.py dialog accept --text "Hello"  # Enter text and accept
 ```
 
 **Important:** Dialog must be open when command runs, or it will error
 
 ---
 
-### `bt upload <uid> <file_path>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py upload <uid> <file_path>`
 Upload file through file input element.
 
 **Parameters:**
@@ -306,10 +306,10 @@ Upload file through file input element.
 
 **Example:**
 ```bash
-bt snap
-bt upload 1_23 /tmp/document.pdf
-bt upload 1_24 ./image.png
-bt upload 1_25 ~/Downloads/data.csv
+uv run .agents/tools/chrome-devtools/browsertools.py snap
+uv run .agents/tools/chrome-devtools/browsertools.py upload 1_23 /tmp/document.pdf
+uv run .agents/tools/chrome-devtools/browsertools.py upload 1_24 ./image.png
+uv run .agents/tools/chrome-devtools/browsertools.py upload 1_25 ~/Downloads/data.csv
 ```
 
 **Important:**
@@ -320,7 +320,7 @@ bt upload 1_25 ~/Downloads/data.csv
 
 ## Debugging
 
-### `bt conslist`
+### `uv run .agents/tools/chrome-devtools/browsertools.py conslist`
 List all console messages since last navigation.
 
 **Parameters:**
@@ -333,30 +333,30 @@ List all console messages since last navigation.
 
 **Example:**
 ```bash
-bt conslist                    # All messages
-bt conslist --types error      # Only errors
-bt conslist --types error warn --size 10
+uv run .agents/tools/chrome-devtools/browsertools.py conslist                    # All messages
+uv run .agents/tools/chrome-devtools/browsertools.py conslist --types error      # Only errors
+uv run .agents/tools/chrome-devtools/browsertools.py conslist --types error warn --size 10
 ```
 
 ---
 
-### `bt consget <msgid>`
+### `uv run .agents/tools/chrome-devtools/browsertools.py consget <msgid>`
 Get full details of specific console message.
 
 **Parameters:**
-- `msgid` (integer, required): Message ID from `bt conslist`
+- `msgid` (integer, required): Message ID from `uv run .agents/tools/chrome-devtools/browsertools.py conslist`
 
 **Output:** Full message details including stack trace (if error)
 
 **Example:**
 ```bash
-bt conslist
-bt consget 5  # Get details of message #5
+uv run .agents/tools/chrome-devtools/browsertools.py conslist
+uv run .agents/tools/chrome-devtools/browsertools.py consget 5  # Get details of message #5
 ```
 
 ---
 
-### `bt netlist`
+### `uv run .agents/tools/chrome-devtools/browsertools.py netlist`
 List all network requests since last navigation.
 
 **Parameters:**
@@ -369,27 +369,27 @@ List all network requests since last navigation.
 
 **Example:**
 ```bash
-bt netlist                        # All requests
-bt netlist --types xhr fetch      # Only AJAX
-bt netlist --types script --size 5
+uv run .agents/tools/chrome-devtools/browsertools.py netlist                        # All requests
+uv run .agents/tools/chrome-devtools/browsertools.py netlist --types xhr fetch      # Only AJAX
+uv run .agents/tools/chrome-devtools/browsertools.py netlist --types script --size 5
 ```
 
 ---
 
-### `bt netget [reqid]`
+### `uv run .agents/tools/chrome-devtools/browsertools.py netget [reqid]`
 Get full details of network request.
 
 **Parameters:**
-- `reqid` (integer, optional): Request ID from `bt netlist`
+- `reqid` (integer, optional): Request ID from `uv run .agents/tools/chrome-devtools/browsertools.py netlist`
   - If omitted: returns currently selected request in DevTools Network panel
 
 **Output:** Full request/response details (headers, body, timing)
 
 **Example:**
 ```bash
-bt netlist
-bt netget 42  # Get details of request #42
-bt netget     # Get currently selected request
+uv run .agents/tools/chrome-devtools/browsertools.py netlist
+uv run .agents/tools/chrome-devtools/browsertools.py netget 42  # Get details of request #42
+uv run .agents/tools/chrome-devtools/browsertools.py netget     # Get currently selected request
 ```
 
 ---
@@ -434,7 +434,7 @@ These tools exist in chrome-devtools-mcp but are NOT in bt wrapper:
 
 ```python
 # 1. Start daemon (once)
-bash: "uv run .agents/tools/browsertools.py daemon start &"
+bash: "uv run .agents/tools/chrome-devtools/browsertools.py daemon start &"
 
 # 2. Navigate
 bash: "bt nav http://app.com/login"

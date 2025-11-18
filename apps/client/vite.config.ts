@@ -25,8 +25,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     // Pre-bundle and force single instance
-    include: ['react', 'react-dom', 'react/jsx-runtime'],
-    // Exclude the widget from optimization to let Vite resolve imports fresh
-    exclude: ['annotated-feedback']
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime'
+    ]
   }
 })
