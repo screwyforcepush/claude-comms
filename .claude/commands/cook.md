@@ -19,8 +19,8 @@ Populate your initial Todos with your step by step WORKFLOW:
 [WORKFLOW]
 1. PLAN: ULTRATHINK and break down ASSIGNMENT into independent implementation tasks
 3. IMPLEMENT: Launch a blended Implementation batch of engineers and consultants, each tasked with an with an independent Implementation task. 
-4. REFINE: Launch a blended Review+Refine batch of engineers and consultants. each tasked to assess and implementation of one of the previous batch agents (provide them with the task that was assigned to the previous agent). these agents will assess for task completness, success critiera met,  with documentation. They should then refine the implementation if needed. this batch should be alternate the previous batch. ie. engeneer reviews consultant work, consultant reviews engineer work.
-5  VERIFY: Launch a Assessing Only, Verification batch (Architect, Engineer, Consultant) to assess the implementation completness of the full ASSIGNMENT. Each agent in this batch will provide their unique perspective, so give them the same comprehensive assessment task
+4. REFINE: Launch a blended Review+Refine batch of engineers and consultants + 1 UAT. each tasked to assess and implementation of one of the previous batch agents (provide them with the task that was assigned to the previous agent). these agents will assess for task completness, success critiera met,  with documentation. They should then refine the implementation if needed. this batch should be alternate the previous batch. ie. engeneer reviews consultant work, consultant reviews engineer work.
+5  VERIFY: Launch a Assessing Only, Verification batch (Architect, Engineer, Consultant, UAT) to assess the implementation completness of the full ASSIGNMENT. Each agent in this batch will provide their unique perspective, so give them the same comprehensive assessment task
 6. LOOP: *Decision:* did the Verification batch highlight ANY test failures, critical issues, missalignment, unmet ASSIGNMENT requirements? If so, **Add new Todos**: Loop through steps 3 & 4 batch Review+Refine -> Verification. Continue itterating until 100% pass/green/success reported by Verification batch
 [/WORKFLOW]
 
@@ -78,7 +78,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 ### Batch Composition Goals
 - **Minimum**: 5 agents per implementation batch
 - **Target**: 8-10 agents including support roles
-- **Include**: Architect/Researcher for guidance
+- **Include**: Support Architect/Researcher for guidance
 - **Follow with**: Verification batch always
 
 ### Phase Management

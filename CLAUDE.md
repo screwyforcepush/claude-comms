@@ -84,7 +84,7 @@ TEAM COLLABORATION:
 
 Parallel Specialization Examples
 - **Multiple Engineers/Consultants**: Each owns different module/file
-- **Support Roles**: Architect answers questions or researches and suggests solution approachs, Designer creates storybook assets
+- **Support Roles**: Architect answers questions or researches and suggests solution approachs, Designer creates storybook assets, UAT manually performs user flows and provides feedback
 
 ### Inter-Batch Sequencing (Dependencies)
 - Wait for ALL agents in current batch to complete before launching next batch
@@ -107,7 +107,7 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 - NO blocking dependencies between agents
 - NO file editing conflicts (only ONE agent edits each file)
 - Agents collaborate via messaging but complete independently
-- Support roles (Architect, Researcher, Designer) provide real-time guidance
+- Support roles (Architect, Researcher, Designer, UAT) provide real-time guidance
 - Multiple same-type agents OK with different focus areas
 
 ⚠️ When to sequence:
@@ -116,6 +116,7 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 2. **File Dependencies**: Tasks modifying same file CANNOT be in same batch
 3. **Verification Dependencies**: Always launch verification batch to confirm complete implementation, or descover refinement batch needed
 4. **Knowledge Dependencies**: Planner needs architecture/research to plan against
+5. **UI Dependenccies**: UAT needs a UI to use, a running server, a entry point url.
 
 
 ### Example Workflows
@@ -125,20 +126,20 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 2. **Planning Batch**: [Planner] - creates phase-id and WPs
 3. **Implementation Batch**: [5-10 Engineers, Consultants with distinct role and focus + support agents (maximum 10 total per batch) ]
 4. **Review+Refine Batch**: [5-10 Engineers, Consultants with previous batch task (swap Engineers and Consultants so they review/refine each others work) to review+refine + support agents (maximum 10 total per batch) ]
-5. **Verification + Reco Batch**: [Engineer + Consultant + Architect to provide their completion assessments]
+5. **Verification + Reco Batch**: [Engineer + Consultant + Architect + UAT to provide their completion assessments]
 6. **If verificaiton fail**: Loop Review+refine -> Verification Batches until PASS
 
 #### Bug Fix Workflow
-1. **Investigation Batch**: [Engineer, Consultant, Architect] - diagnose collaboratively
+1. **Investigation Batch**: [Engineer, Consultant, Architect, UAT] - diagnose collaboratively
 2. **Fix Batch**: [Engineer-Fix, Engineer-Tests, support Consultant] - parallel, different files
-3. **Verification Batch**: [Engineer + Consultant] - validates fix
+3. **Verification Batch**: [Engineer + Consultant + UAT] - validates fix
 
 #### Architecture Change Workflow
 1. **Research Batch**: [Consultant, Architect]
 2. **Planning Batch**: [Planner, Business-Analyst]
 3. **Migration Batch**: [Multiple Engineers, Consultants, supporting architect] - each owns different module
 4. **Review+Refine Batch**: [Multiple Engineers, Consultants with previous batch task to review+refine]
-4. **Verification Batch**: [Engineer + Consultant + Architect]
+4. **Verification Batch**: [Engineer + Consultant + Architect +UAT]
 
 
 ### Batch Size Optimization
@@ -222,7 +223,7 @@ When you are batching multple engineers across implementation Tasks, you can use
 - **designer**: Creates UI/UX specifications, component libraries
 - **engineer**: Implements features end-to-end with code, writes comprehensive test suites, and documentation. Reviews code for quality, security, and standards compliance. Ensures all builds, tests, and checks pass. Visually inspects the running application against UI/UX design/guide.
 - **consultant**: diverse multi-hat. same read/doc tasks as planner, architect, designer for perspective roll up. seperate implementation task to engineer, and review engineer implmentation.
-
+- **uat**: uses browser automation to manually test user flows. Collaborates with engineer/consultant in refinement batch, always included in verification batch. Max 1 UAT agent per batch. 
 
 ## Critical Reminders
 
