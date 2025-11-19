@@ -356,8 +356,16 @@ def clean_output(result: Any) -> str:
             if isinstance(content, list):
                 texts = []
                 for item in content:
-                    if isinstance(item, dict) and "text" in item:
-                        texts.append(item["text"])
+                    if isinstance(item, dict):
+                        if "text" in item:
+                            texts.append(item["text"])
+                        elif item.get("type") == "image" and "data" in item:
+                            # Return base64 image data
+                            mime = item.get("mimeType", "image/png")
+                            b64_data = item["data"]
+                            texts.append(f"\n## Base64 Image ({mime})")
+                            texts.append(b64_data)
+
                 return "\n".join(texts) if texts else str(content)
         elif "text" in result:
             return result["text"]
@@ -457,7 +465,7 @@ async def main():
         prog="browsertools.py",
         description="Chrome DevTools MCP wrapper - persistent daemon mode",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=r"""
 browsertools.py - Chrome DevTools automation tool
 
 
@@ -515,18 +523,16 @@ PAGE MANIPULATION:
     --text <text>                Text for prompt
   upload <uid> <file_path>       Upload file
 
-WORKFLOW GUIDELINES:
-  1. **Snapshots** are verbose. Always try to pipe grep first
-     - Default pattern: snap | grep -iC5 "search term"
-     - **Interaction commands** return updated page state snapshots: click, fill, key, hover, drag, wait return updated page state
+USAGE TIPS:
+**Snapshots** are verbose. Always try to pipe grep first
+    - Default pattern: snap | grep -iC5 "search term"
+    - **Interaction commands** return updated page state snapshots: click, fill, key, hover, drag, wait return updated page state
         - Pipe to grep with context. eg. click 1_7 | grep -iC5 "dashboard\|home"
-     - No grep hits? Run explicit snap to see full page
+    - No grep hits? Run explicit snap to see full page
 
-  3. Save **screenshots** for visual debugging eg. shot /tmp/debug.png
-
-  4. Limit output for **debugging** commands
-     - Network: netlist --size 10 --types fetch
-     - Console: conslist --size 5 --types error
+Limit output for **debugging** commands
+    - Network: netlist --size 10 --types fetch
+    - Console: conslist --size 5 --types error
 
 EXAMPLES:
   # Login workflow

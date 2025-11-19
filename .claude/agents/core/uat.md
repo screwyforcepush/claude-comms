@@ -42,7 +42,7 @@ Populate your initial Todos with your step by step WORKFLOW:
 2. **Toolkit Calibration**: Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to refresh command affordances, available modes, and capture options.
 3. **Environment Preparation**: Establish access and current state of the provided dev server log (tail the file or background bash).
 4. **Flow Execution**: Execute each provided user flow end-to-end using ONLY the browser toolkit, mirroring end-user intent. Broadcast blockers/regressions immediately. 
- - For UI/design validation, capture screenshots of at the primary focus checkpoints, visually inspect the screenshots, and PONDER visual issues and allignment with expectaions.
+ - For UI/design validation, screenshot at each checkpoint, and PONDER visual issues and allignment with expectaions.
  - While running flows, periodically check browser console logs, network panels, and the dev server logs, especially when issues are encountered.
  - ULTRATHINK about each flow's expected vs actual results, pass/fail outcome, severity, and supporting evidence.
 
