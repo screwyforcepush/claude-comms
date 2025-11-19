@@ -515,41 +515,34 @@ PAGE MANIPULATION:
     --text <text>                Text for prompt
   upload <uid> <file_path>       Upload file
 
-WORKFLOW RECOMMENDATIONS:
-  1. Always take fresh snapshot after UI interactions
-     Example: click -> snap -> click again
+WORKFLOW GUIDELINES:
+  1. **Snapshots** are verbose. Always try to pipe grep first
+     - Default pattern: snap | grep -iC5 "search term"
+     - **Interaction commands** return updated page state snapshots: click, fill, key, hover, drag, wait return updated page state
+        - Pipe to grep with context. eg. click 1_7 | grep -iC5 "dashboard\|home"
+     - No grep hits? Run explicit snap to see full page
 
-  2. Use grep/head to filter verbose snapshot output
-     Example: snap | grep "button.*Login"
+  3. Save **screenshots** for visual debugging eg. shot /tmp/debug.png
 
-  3. Save screenshots to /tmp for temporary inspection
-     Example: shot /tmp/debug.png
-
-  4. Use --size limits for debugging commands to manage output
-     Example: netlist --size 10 --types fetch
-
-  5. Stop daemon when done to clean up browser resources
-     Example: daemon stop
-
-  6. UIDs are invalidated on every DOM change - always use latest
-     BAD:  snap -> click -> click (using old UID)
-     GOOD: snap -> click -> snap -> click (fresh UIDs)
+  4. Limit output for **debugging** commands
+     - Network: netlist --size 10 --types fetch
+     - Console: conslist --size 5 --types error
 
 EXAMPLES:
-  # Login workflow (from repo root)
+  # Login workflow
   uv run .agents/tools/chrome-devtools/browsertools.py daemon start &
   sleep 5  # Wait for daemon to be ready
   uv run .agents/tools/chrome-devtools/browsertools.py nav http://app.com/login
-  uv run .agents/tools/chrome-devtools/browsertools.py snap | grep email
+  uv run .agents/tools/chrome-devtools/browsertools.py snap | grep -iC5 "email\|username\|login"
   uv run .agents/tools/chrome-devtools/browsertools.py fill 1_23 user@example.com
-  uv run .agents/tools/chrome-devtools/browsertools.py click 1_25
+  uv run .agents/tools/chrome-devtools/browsertools.py snap | grep -iC5 "button.*(submit|login|sign.?in)"
+  uv run .agents/tools/chrome-devtools/browsertools.py click 1_25 | grep -iC5 "dashboard\|home\|welcome"
   uv run .agents/tools/chrome-devtools/browsertools.py daemon stop
 
 IMPORTANT:
-  - UIDs only valid until page changes
-  - Take new snapshot after DOM changes
-  - Daemon maintains all state
-  - Stop daemon when done
+  - UIDs only valid from latest snapshot (interaction commands return fresh ones)
+  - Daemon maintains state (snapshots, network, console) across all commands
+  - Always stop daemon when you are finished to clean up browser resources
         """
     )
 
