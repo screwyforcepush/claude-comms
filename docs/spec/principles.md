@@ -25,3 +25,36 @@ Value/Token Ratio. signal to noise. Give the model FOCUS.
 - Leverage vocab for maximal compression while remaining unambiguous to the model.
 - Feedback loops. agents need internal feedback loops, orchestrators need agentic feedback loops
 - CLAUDE.md is more of a reference file, in context but not always followed organically. The commands are the true prompts and can linkback to CLAUDE.md with attention mechanisms.
+
+## Intent based Outcomes 
+Problem: The orchestrator agent assigns tasks to subagents. great. but I cant trust the orchestrator to distill the original intent enough so the subagent understands why. It needs to understand the why, the purpose, the north star. Otherwise it will "do the job assigned" but leave loose ends out of scope, rough edges at integration points, gaps between subagents that were not explicity assigned.
+Approach: I have the orchestrator include the original user prompt within the subagent prompt, framed as the high level epic objective. so the subagent understands they are a part of a bigger picture and will work in better allignment.
+
+## Parallel agent collaboration
+Problem: Orchestrating multiple parallel subagents concurrently can lead to each subagent going its own way and the missalignment from a wholistic system. What if they pick a different lib, duplicate an existing service, or have write conflicts on common files?
+Approach: The agents communicate with each other as they work. call out discoveries, decisions, and provide feedback to each other. They work as a team. Some subagents are added to the team with the sole purpose of supporting/advising other agents!
+
+## Agent Model Diversity
+Just like the various subagent types, Anthropic's Claude Code agnet and OpenAI's Codex have strengths and weaknesses inherent in the models+harness.
+Dont pick one, use both claude and codex. I've built a "consultant" subagent which is claude, and all it does is spin up a headless codex agent instance and wait for it to finish. 
+- the codex agent can communicate with any parallel claude or codex agents. after execution the codex final response bubbles up through the consultant back to the orchestrator.
+- The orchestrator doesnt know that the consultant is doing this, it doesnt need to know. All it knows is that it assigns a task to consultant, it gets executed on, and it gets a response back.
+- The orchestrator gets the agents to check each others work to gap fill weaknesses in individual models. Claude checks Codex's work, Codex checks claudes work.
+- When planning/architecting, the orchestrator get one of each to independently analyse, research, plan. then the orchestrator merges to get the best of both perspectives.
+
+## Progressive Disclosure
+Loading up all important context all the time, chokes the model's context and confuses it. The agents can pull in what they need when they need it. Just provide them an index of resources and when to consume/use them.
+This is why you will find pointers to docs, scripts, prompts in key locations in the codebase.
+Simply put: instruct the agents how and when to get the context it may need SOMETIMES. Feed it context that it needs ALWAYS directly. 
+
+## Visual Feedback
+Problem: When building a product with a front end, code review is not enough. e2e tests help but sometimes the agents fail to hit all the critical user flows. Also, what if it just looks like shit? An element selector wont pick up ugly UX. Ive tried A11y but thats so overbearing and noisy. What is needed is a user's perspective.
+
+### Human loop
+I built `annotated-feedback`. its a widget + mcp package. widget goes in the app, mcp is for the agent. Inside the app, the widget is used to provide text feedback on any page, and provides an excallidraw canvas overlay for annotations/diagram/watever. Feedback is submitted by the human, Agent picks its up via mcp: screenshot of the page with canvas overlay, text feedback, url/route.
+This is a highly detailed and unambiguous prompting medium. Less context switching for the human as they submit feedback as they use the app!
+
+### Agent loop
+UAT agent that is part of the validation/approval batch, uses chrome devtools mcp to navigate theh running dev server UI, perform the user flows, screenshot and visually inspect at checkpoints, give feedback, raise issues, provide browser console logs, etc. They act as the user.
+Problem: Here is the thing with that chrome devtools MCP. When installed, it floods the context of all agents with a LOT of tool defs, usage examples, etc. It has 26+ tools in it! is not a light weight MCP like perplexity-ask (1 tool). This fat context dump gets injected into every instance of every agent, includeing the orchestrator, even when it is not needed for the current assignment. 
+Approach: uninstall the MCP, and wrap it in a script. Sprinkle in some agentic harness engineering. And we have the same outcome at half the context cost (A/B tested mcp vs script wrapper). Not only is it half the context cost for a UAT task, it also cuts the context bloat out of the agents who DO NOT need to use it. Progressive Disclosure: agents can learn how to use the script only when they need to, using --help.

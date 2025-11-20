@@ -6,13 +6,11 @@
 
 ## The Ancient Knowledge
 
-You've been using Claude Code like a single warrior. This system awakens the **swarm**:
+Transform one Claude into collaborative teams of specialized agents working in parallel:
 
-- **Engineers** building different modules simultaneously
-- **Architects** designing while others implement
-- **Researchers** gathering wisdom as code flows
-- **Gatekeepers** ensuring perfection in parallel
-- **Recursive Orchestration**: Infinite orchestrators managing infinite squads
+**Model Diversity**: Claude and Codex agents collaborate seamlessly - each checking the other's work, bringing unique strengths to the team. Architects research while engineers build, consultants review while UAT validates, all communicating in real-time through the shared message bus.
+
+**True Parallelism**: 10+ agents working simultaneously on independent tasks, broadcasting discoveries and coordinating through team messages. Support agents provide guidance while implementation agents build.
 
 Watch your legion work through the real-time dashboard. Feel the power.
 
@@ -21,6 +19,7 @@ Watch your legion work through the real-time dashboard. Feel the power.
 Context-engineered for extended battles without bankruptcy:
 - Minimal context per agent (they share memory through SQLite)
 - File references, not contents (massive token savings)
+- Agentic harness engineering reduced token burn by 45% (A/B tested methodology)
 - **From the Maker**: I rarely hit my claude usage cap, even with 3-5 concurrent sessions running all day.
 
 
@@ -39,19 +38,25 @@ npx claude-comms # in your project root.
 # 3. Launch claude code in your project. --dangerously-skip-permissions if you like.
 
 # 4. prompt claude to get cookin: /cook <what you want to build, requirements spec, etc>
-"/cook make a dashboard that for the real time event stream but style it like the matrix and populate the matrix characters with the event stream data"
+/cook make a dashboard that for the real time event stream but style it like the matrix and populate the matrix characters with the event stream data
+
+# If you get stuck on anything, errors/issues just ask for help (this repo)
+/learn
 ```
 
 ### Level Up
 1. Observe `http://localhost:5173/`
 ./scripts/restart-system.sh restarts everything and can clear the db
 
-2. MCPs. Only two are worth the context fee. Browser use for visual feedback loop, and Web Research to make your claude code cap last 20% longer
-Browser Use: `claude mcp add chrome-devtools npx chrome-devtools-mcp@latest`
-Web Research: `claude mcp add perplexity-ask -- env PERPLEXITY_API_KEY=pplx-xxxx npx -y server-perplexity-ask` I've used $5 in a month and I'm a HEAVY user.
-You can still be a wizzard without this, but its the difference between being Dumbledore and being Gandalf.
+2. Visual Feedback Loop - Add the feedback widget to your app for human-in-the-loop UI refinement:
+- `/install-feedback-widget` - Installs annotated feedback widget in your project
+- `/feedback` - Review and action UI feedback (requires widget installation first)
 
-3. In this project prompt claude with `/learn`
+3. MCPs. Only one is worth the context fee - Web Research to make your claude code cap last 20% longer:
+`claude mcp add perplexity-ask -- env PERPLEXITY_API_KEY=pplx-xxxx npx -y server-perplexity-ask` I've used $5 in a month and I'm a HEAVY user.
+Note: Browser automation is built-in via browsertools wrapper - you get Chrome DevTools benefits without the context bloat (progressive disclosure principle)!
+
+4. In this project prompt claude with `/learn`
 My man Deckard Cain will teach you everything I know.
 
 

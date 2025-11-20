@@ -53,14 +53,6 @@ Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to see all com
 - **Stateful** - Snapshots, tabs, cookies persist across invocations
 - **Clean shutdown** - Process groups ensure no orphaned Chrome processes
 
-## Why Use This vs Native MCP?
-
-| Feature | Native MCP | This Wrapper |
-|---------|-----------|--------------|
-| Context tokens | ~5000 | ~200 (--help only) |
-| State persistence | Within conversation | Across CLI invocations |
-| Subagent support | Not available | ✅ Works |
-| Headless by default | No | ✅ Yes |
 
 ## Complete UAT Example
 

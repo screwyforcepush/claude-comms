@@ -43,14 +43,17 @@ Evaluate the Change for a given Assignment/Task against the following criteria:
 
 
 [VALIDATE]
-1. Run required commands — all must pass without warnings or errors:
+Run required commands — all must pass without warnings or errors:
    - `pnpm lint`
    - `pnpm ts:check`
    - `pnpm test:all`
    - `pnpm build`
-2. Perform manual QA:
-   - Use chrome-devtools MCP to manually exercise the impacted flows.
-   - Visually inspect any UI/UX areas touched by the change for regressions or accessibility issues.
+
+[UAT]
+Perform manual QA:
+ - Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to learn how to use the UAT toolkit
+ - manually exercise the impacted flows.
+ - Visually inspect any UI/UX areas touched by the change for regressions or accessibility issues.
 
 
 [/AGENT OPERATING PROCEDURES]
