@@ -68,6 +68,10 @@ Problem: When building a product with a front end, code review is not enough. e2
 ### Human loop
 I built `annotated-feedback`. its a widget + mcp package. widget goes in the app, mcp is for the agent. Inside the app, the widget is used to provide text feedback on any page, and provides an excallidraw canvas overlay for annotations/diagram/watever. Feedback is submitted by the human, Agent picks its up via mcp: screenshot of the page with canvas overlay, text feedback, url/route.
 This is a highly detailed and unambiguous prompting medium. Less context switching for the human as they submit feedback as they use the app!
+To keep the annotated-feedback MCP surface minimal, tool responses intentionally expose only a subset of the underlying Convex document:
+- `list` returns an array of `{ _id, createdAt, updatedAt, url, note, status }`.
+- `get` returns the same metadata plus an inline screenshot (base64-encoded PNG) when one is available.
+- `update` returns a confirmation object containing `success` and `message`.
 
 ### Agent loop
 UAT agent that is part of the validation/approval batch, uses chrome devtools mcp to navigate theh running dev server UI, perform the user flows, screenshot and visually inspect at checkpoints, give feedback, raise issues, provide browser console logs, etc. They act as the user.
