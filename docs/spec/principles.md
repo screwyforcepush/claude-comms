@@ -26,6 +26,21 @@ Value/Token Ratio. signal to noise. Give the model FOCUS.
 - Feedback loops. agents need internal feedback loops, orchestrators need agentic feedback loops
 - CLAUDE.md is more of a reference file, in context but not always followed organically. The commands are the true prompts and can linkback to CLAUDE.md with attention mechanisms.
 
+
+# Performance at Scale
+A lot of agentic harness engineering is figuring out how to throw more autonomous compute at a problem, while being performant at scale.
+
+**Problem Context**
+For a large assignment/feature/project A human can sequentially prompt a single agent to completion. This is heavy on human in the loop. low autonomous compute.
+Prompting an agent with a large project leads to poor results, the context fills before it can complete. Agents get dumber as their context fills past 50k tokens. Dont trust an agent past 100k tokens in context. 
+Give the orchestrator autonomy, to act on your behalf, and employ ephemeral subagents. load minimal context they need for their thin slice of the assignment scope.
+
+**Batch Concurrent Parallelisation**
+Speed multiplier at scale. Paralellise as much as possible.
+- Tool uses: agent can call multiple tools at once. Low risk. A bit of basic prompt engineer for parrelisation decision logic. eg. parallelise multiple reads, sequence read then write
+- Agents: Teams of agents can be employed at the same time. High risk. requires significant agentic harness engineering.
+- Recursive Orchestration: Exponential scaling. Shows some merrit but experimental and unproven. Observability and in turn emprical evidence has not been addressed
+
 ## Intent based Outcomes 
 Problem: The orchestrator agent assigns tasks to subagents. great. but I cant trust the orchestrator to distill the original intent enough so the subagent understands why. It needs to understand the why, the purpose, the north star. Otherwise it will "do the job assigned" but leave loose ends out of scope, rough edges at integration points, gaps between subagents that were not explicity assigned.
 Approach: I have the orchestrator include the original user prompt within the subagent prompt, framed as the high level epic objective. so the subagent understands they are a part of a bigger picture and will work in better allignment.
