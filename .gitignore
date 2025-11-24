@@ -245,3 +245,4 @@ claude-output.json
 .claude/commands/feature.md
 
 specs/
+sa-gemini.json

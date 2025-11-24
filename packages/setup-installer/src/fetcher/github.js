@@ -332,6 +332,10 @@ class GitHubFetcher extends EventEmitter {
       // Observability hooks
       '.claude/hooks/observability/send_event.py',
 
+      // Agents directory
+      '.agents/AGENTS.md',
+      '.agents/repo.md',
+
       // Root CLAUDE.md
       'CLAUDE.md'
     ];
@@ -339,7 +343,10 @@ class GitHubFetcher extends EventEmitter {
     const files = [];
 
     for (const filePath of knownFiles) {
-      if (filePath.startsWith(path) || (path === '.claude' && filePath.startsWith('.claude')) || (path === 'CLAUDE.md' && filePath === 'CLAUDE.md')) {
+      if (filePath.startsWith(path) ||
+          (path === '.claude' && filePath.startsWith('.claude')) ||
+          (path === '.agents' && filePath.startsWith('.agents')) ||
+          (path === 'CLAUDE.md' && filePath === 'CLAUDE.md')) {
         try {
           const content = await this._fetchSingleFileRaw(filePath, options);
           files.push(content);
@@ -867,6 +874,12 @@ class GitHubFetcher extends EventEmitter {
           type: 'dir',
           children: [],
           files: []
+        },
+        '.agents': {
+          path: '.agents',
+          type: 'dir',
+          children: [],
+          files: []
         }
       };
 
@@ -899,18 +912,19 @@ class GitHubFetcher extends EventEmitter {
 
           // Only extract files we care about
           const isClaudeFile = actualPath.startsWith('.claude/') || actualPath === '.claude';
+          const isAgentsFile = actualPath.startsWith('.agents/') || actualPath === '.agents';
           const isClaudeMd = actualPath === 'CLAUDE.md';
 
-          console.log(`DEBUG: ${actualPath} -> claude: ${isClaudeFile}, md: ${isClaudeMd}, type: ${entry.type}`);
+          console.log(`DEBUG: ${actualPath} -> claude: ${isClaudeFile}, agents: ${isAgentsFile}, md: ${isClaudeMd}, type: ${entry.type}`);
 
-          if ((isClaudeFile || isClaudeMd) && entry.type === 'File') {
+          if ((isClaudeFile || isAgentsFile || isClaudeMd) && entry.type === 'File') {
             wantedFiles.set(filePath, actualPath);
             console.log(`DEBUG: Will extract: ${filePath} -> ${actualPath}`);
             return true;
           }
 
-          // Also allow .claude directories to be processed for their children
-          if (isClaudeFile && entry.type === 'Directory') {
+          // Also allow .claude and .agents directories to be processed for their children
+          if ((isClaudeFile || isAgentsFile) && entry.type === 'Directory') {
             return true;
           }
 
@@ -964,6 +978,21 @@ class GitHubFetcher extends EventEmitter {
                   // Build directory structure for compatibility
                   const relativePath = actualPath.slice('.claude/'.length);
                   this._addToDirectoryStructure(extractedFiles['.claude'], relativePath, fileObj);
+                } else if (actualPath.startsWith('.agents/')) {
+                  // Add to .agents files
+                  const fileObj = {
+                    path: actualPath,
+                    content: content,
+                    encoding: 'utf-8',
+                    type: 'file'
+                  };
+
+                  extractedFiles['.agents'].files.push(fileObj);
+                  console.log(`DEBUG: Added ${actualPath} to .agents files (${extractedFiles['.agents'].files.length} total)`);
+
+                  // Build directory structure for compatibility
+                  const relativePath = actualPath.slice('.agents/'.length);
+                  this._addToDirectoryStructure(extractedFiles['.agents'], relativePath, fileObj);
                 }
               }
             } catch (fileError) {
@@ -972,7 +1001,7 @@ class GitHubFetcher extends EventEmitter {
             }
           }
 
-          console.log(`DEBUG: Final result - .claude has ${extractedFiles['.claude'].files.length} files, CLAUDE.md: ${extractedFiles['CLAUDE.md'] ? 'present' : 'missing'}`);
+          console.log(`DEBUG: Final result - .claude has ${extractedFiles['.claude'].files.length} files, .agents has ${extractedFiles['.agents'].files.length} files, CLAUDE.md: ${extractedFiles['CLAUDE.md'] ? 'present' : 'missing'}`);
 
           // Clean up temp directory
           try {
@@ -1059,8 +1088,13 @@ async function fetchRepository(gitRef = 'main', options = {}) {
 
     return {
       claudeDirectory: tarballFiles['.claude'],
+      agentsDirectory: tarballFiles['.agents'],
       claudeFile: tarballFiles['CLAUDE.md'],
-      files: [...(tarballFiles['.claude'].files || []), tarballFiles['CLAUDE.md']]
+      files: [
+        ...(tarballFiles['.claude'].files || []),
+        ...(tarballFiles['.agents'].files || []),
+        tarballFiles['CLAUDE.md']
+      ]
     };
 
   } catch (tarballError) {
@@ -1069,15 +1103,17 @@ async function fetchRepository(gitRef = 'main', options = {}) {
 
     try {
       // Strategy 2: Individual file fetch (fallback)
-      const [claudeDir, claudeMd] = await Promise.all([
+      const [claudeDir, agentsDir, claudeMd] = await Promise.all([
         fetcher.fetchDirectory('.claude', { version: gitRef }),
+        fetcher.fetchDirectory('.agents', { version: gitRef }),
         fetcher.fetchFile('CLAUDE.md', { version: gitRef })
       ]);
 
       return {
         claudeDirectory: claudeDir,
+        agentsDirectory: agentsDir,
         claudeFile: claudeMd,
-        files: [...(claudeDir.files || []), claudeMd]
+        files: [...(claudeDir.files || []), ...(agentsDir.files || []), claudeMd]
       };
 
     } catch (fallbackError) {
