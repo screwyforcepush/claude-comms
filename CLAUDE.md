@@ -126,20 +126,20 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 2. **Planning Batch**: [Planner] - creates phase-id and WPs
 3. **Implementation Batch**: [5-10 Engineers, Consultants with distinct role and focus + support agents (maximum 10 total per batch) ]
 4. **Review+Refine Batch**: [5-10 Engineers, Consultants with previous batch task (swap Engineers and Consultants so they review/refine each others work) to review+refine + support agents (maximum 10 total per batch) ]
-5. **Verification + Reco Batch**: [Engineer + Consultant + Architect + UAT to provide their completion assessments]
+5. **Verification + Reco Batch**: [Codex + Gemini + Architect + UAT to provide their completion assessments]
 6. **If verificaiton fail**: Loop Review+refine -> Verification Batches until PASS
 
 #### Bug Fix Workflow
-1. **Investigation Batch**: [Engineer, Consultant, Architect, UAT] - diagnose collaboratively
+1. **Investigation Batch**: [Architect, Gemini Consultant, Codex Consultant, UAT] - diagnose collaboratively
 2. **Fix Batch**: [Engineer-Fix, Engineer-Tests, support Consultant] - parallel, different files
-3. **Verification Batch**: [Engineer + Consultant + UAT] - validates fix
+3. **Verification Batch**: [Engineer + gemini + codex + UAT] - validates fix
 
 #### Architecture Change Workflow
-1. **Research Batch**: [Consultant, Architect]
+1. **Research Batch**: [Gemini, Codex, Architect]
 2. **Planning Batch**: [Planner, Business-Analyst]
 3. **Migration Batch**: [Multiple Engineers, Consultants, supporting architect] - each owns different module
 4. **Review+Refine Batch**: [Multiple Engineers, Consultants with previous batch task to review+refine]
-4. **Verification Batch**: [Engineer + Consultant + Architect +UAT]
+4. **Verification Batch**: [Engineer + Consultants codex, gemini +  +UAT]
 
 
 ### Batch Size Optimization
@@ -166,11 +166,9 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 
 
 ## Consultant Agent
-When you are tasking an agent with read+document type task, also task a Consultant with the exact same instructions (except a different name). Include the consultant in the same batch.
- - Consultant should get the same team role, same task, same instructions as their counterpart.
- - Give the Consultant a new name
-These agent types are candidates for a read-only consultant counterpart: architect, business-analyst, deep-researcher, planner, gatekeeper
-When you are batching multple engineers across implementation Tasks, you can use some consultant agents in place of some engineers. do not give these code changing consultant agents the same instructions as the engineer agents in their batch, or you will end up with double implementation
+Consultants come in two variants: Codex and Gemini. leverage them both liberally to diversify.
+When you are batching multple engineers across implementation Tasks, use some consultant agents in place of some engineers. Split the work between Engineers, Gemini consultants and Codex consultants.
+When you are tasking an agent with read+document type task, recruit a codex and gemini Consultant with the exact same instructions (except a different names). Include the consultants in the same batch. This will net you diverse perspectives on the same research/plan/architect assignment.
 
 
 
@@ -222,7 +220,7 @@ When you are batching multple engineers across implementation Tasks, you can use
 - **architect**: Defines system shape, interfaces, technology decisions, Designs test strategies, Conducts targeted research for technical decisions
 - **designer**: Creates UI/UX specifications, component libraries
 - **engineer**: Implements features end-to-end with code, writes comprehensive test suites, and documentation. Reviews code for quality, security, and standards compliance. Ensures all builds, tests, and checks pass. Visually inspects the running application against UI/UX design/guide.
-- **consultant**: diverse multi-hat. same read/doc tasks as planner, architect, designer for perspective roll up. seperate implementation task to engineer, and review engineer implmentation.
+- **gemini|codex consultant**: diverse multi-hat. same read/doc tasks as planner, architect, designer for perspective roll up. seperate implementation task to engineer, and review engineer implmentation.
 - **uat**: uses browser automation to manually test user flows. Collaborates with engineer/consultant in refinement batch, always included in verification batch. Max 1 UAT agent per batch. 
 
 ## Critical Reminders

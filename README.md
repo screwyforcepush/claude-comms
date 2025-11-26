@@ -48,15 +48,17 @@ npx claude-comms # in your project root.
 1. Observe `http://localhost:5173/`
 ./scripts/restart-system.sh restarts everything and can clear the db
 
-2. Visual Feedback Loop - Add the feedback widget to your app for human-in-the-loop UI refinement:
+2. **Model Diversity**: Install [Codex CLI](https://github.com/openai/codex) and [Gemini CLI](https://github.com/google-gemini/gemini-cli) for multi-model orchestration. The system can spawn Codex and Gemini consultants alongside Claude agents—different models checking each other's work, diverse perspectives on research tasks. See [Consultant Paradigm Guide](docs/project/guides/consultant-paradigm-guide.md).
+
+3. Visual Feedback Loop - Add the feedback widget to your app for human-in-the-loop UI refinement:
 - `/install-feedback-widget` - Installs annotated feedback widget in your project
 - `/feedback` - Review and action UI feedback (requires widget installation first)
 
-3. MCPs. Only one is worth the context fee - Web Research to make your claude code cap last 20% longer:
+4. MCPs. Only one is worth the context fee - Web Research to make your claude code cap last 20% longer:
 `claude mcp add perplexity-ask -- env PERPLEXITY_API_KEY=pplx-xxxx npx -y server-perplexity-ask` I've used $5 in a month and I'm a HEAVY user.
 Note: Browser automation is built-in via browsertools wrapper - you get Chrome DevTools benefits without the context bloat (progressive disclosure principle)!
 
-4. In this project prompt claude with `/learn`
+5. In this project prompt claude with `/learn`
 My man Deckard Cain will teach you everything I know.
 
 
@@ -112,6 +114,7 @@ Claude Agents → Hook Scripts → HTTP POST → Bun Server → SQLite → WebSo
 
 ### Multi-Agent Development
 - [Orchestration Guide](docs/project/guides/orchestration-guide.md) - Multi-agent coordination patterns
+- [Consultant Paradigm Guide](docs/project/guides/consultant-paradigm-guide.md) - Codex & Gemini model diversity
 - [Development Guide](docs/project/guides/development-guide.md) - Contributing and local setup
 - [Troubleshooting Guide](docs/project/guides/troubleshooting-guide.md) - Common issues and solutions
 

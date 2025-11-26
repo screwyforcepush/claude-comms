@@ -18,9 +18,9 @@ Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
 1. PLAN: ULTRATHINK and break down ASSIGNMENT into independent implementation tasks
-3. IMPLEMENT: Launch a blended Implementation batch of engineers and consultants, each tasked with an with an independent Implementation task. 
-4. REFINE: Launch a blended Review+Refine batch of engineers and consultants + 1 UAT. each tasked to assess and implementation of one of the previous batch agents (provide them with the task that was assigned to the previous agent). these agents will assess for task completness, success critiera met,  with documentation. They should then refine the implementation if needed. this batch should be alternate the previous batch. ie. engeneer reviews consultant work, consultant reviews engineer work.
-5  VERIFY: Launch a Assessing Only, Verification batch (Architect, Engineer, Consultant, UAT) to assess the implementation completness of the full ASSIGNMENT. Each agent in this batch will provide their unique perspective, so give them the same comprehensive assessment task
+3. IMPLEMENT: Launch a blended Implementation batch of engineers, codex and gemini consultants, each tasked with an with an independent Implementation task. 
+4. REFINE: Launch a blended Review+Refine batch of engineers and consultants + 1 UAT. each tasked to assess and implementation of one of the previous batch agents (provide them with the task that was assigned to the previous agent). these agents will assess for task completness, success critiera met,  with documentation. They should then refine the implementation if needed. this batch should be alternate the previous batch. eg. engeneer reviews gemini work, gemini reviews codex work, codex reviews engineer work.
+5  VERIFY: Launch a Assessing Only, Verification batch (Architect, Codex, Gemini, UAT) to assess the implementation completness of the full ASSIGNMENT. Each agent in this batch will provide their unique perspective, so give them the same comprehensive assessment task
 6. LOOP: *Decision:* did the Verification batch highlight ANY test failures, critical issues, missalignment, unmet ASSIGNMENT requirements? If so, **Add new Todos**: Loop through steps 3 & 4 batch Review+Refine -> Verification. Continue itterating until 100% pass/green/success reported by Verification batch
 [/WORKFLOW]
 
@@ -31,8 +31,8 @@ Populate your initial Todos with your step by step WORKFLOW:
 ⚡ **NEVER** assign multiple agents to edit the same file in the same batch
 ⚡ **ALWAYS** verification after implementation/refinement
 ⚡ **ALWAYS** batch consultant counterpart for read-only + document tasks
-⚡ **ALWAYS** blend consultant + engineers for implementation/refinement tasks
-⚡ **ALWAYS** inverse consultant + engineers reviewing and refining previous batch tasks
+⚡ **ALWAYS** blend consultants + engineers for implementation/refinement tasks
+⚡ **ALWAYS** have gemini, codex and engineers reviewing and refining each others work from previous batch tasks
 
 
 ### Agent Instructions Template
@@ -90,11 +90,9 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 
 
 ## Consultant Agent
-When you are tasking an agent with read+document type task, also task a Consultant with the exact same instructions (except a different name). Include the consultant in the same batch.
- - Consultant should get the same team role, same task, same instructions as their counterpart.
- - Give the Consultant a new name
-When you are batching multple engineers across implementation Tasks, you can use some consultant agents in place of some engineers. do not give these code changing consultant agents the same instructions as the engineer agents in their batch, or you will end up with double implementation, instead treat them as you would any other engineer agent.
-
+Consultants come in two variants: Codex and Gemini. leverage them both liberally to diversify.
+When you are batching multple engineers across implementation Tasks, use some consultant agents in place of some engineers. Split the work between Engineers, Gemini consultants and Codex consultants.
+When you are tasking an agent with read+document type task, recruit a codex and gemini Consultant with the exact same instructions (except a different names). Include the consultants in the same batch. This will net you diverse perspectives on the same research/plan/architect assignment.
 
 
 

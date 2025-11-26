@@ -16,6 +16,8 @@ Usage:
 import argparse
 import curses
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -102,6 +104,28 @@ def get_job_status(job_id: str) -> Optional[dict]:
         return None
 
 
+def kill_job(pid: int) -> bool:
+    """Kill a job by PID. Returns True if successful."""
+    if not pid:
+        return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+        # Give it a moment, then force kill if still running
+        time.sleep(0.5)
+        try:
+            os.kill(pid, 0)  # Check if still running
+            os.kill(pid, signal.SIGKILL)  # Force kill
+        except ProcessLookupError:
+            pass  # Already dead
+        return True
+    except ProcessLookupError:
+        return True  # Already dead
+    except PermissionError:
+        return False
+    except Exception:
+        return False
+
+
 def format_duration(seconds: float) -> str:
     """Format seconds as human-readable duration"""
     if seconds < 60:
@@ -139,6 +163,39 @@ def truncate(s: str, max_len: int) -> str:
     return s[:max_len-1] + "…"
 
 
+def wrap_line(line: str, width: int, max_lines: int = 5) -> list[str]:
+    """Wrap a line to fit within width, max number of wrapped lines.
+
+    Returns a list of display lines. If content exceeds max_lines,
+    the last line is truncated with ellipsis.
+    """
+    line = line.rstrip('\n\r')
+    if not line:
+        return [""]
+
+    if len(line) <= width:
+        return [line]
+
+    wrapped = []
+    remaining = line
+
+    while remaining and len(wrapped) < max_lines:
+        if len(remaining) <= width:
+            wrapped.append(remaining)
+            remaining = ""
+        else:
+            # Check if this will be the last allowed line
+            if len(wrapped) == max_lines - 1:
+                # Truncate with ellipsis
+                wrapped.append(remaining[:width-1] + "…")
+                remaining = ""
+            else:
+                wrapped.append(remaining[:width])
+                remaining = remaining[width:]
+
+    return wrapped if wrapped else [""]
+
+
 class Monitor:
     def __init__(self, stdscr, interval: float = 2.0):
         self.stdscr = stdscr
@@ -150,6 +207,7 @@ class Monitor:
         self.log_job: Optional[JobInfo] = None
         self.log_lines: list[str] = []
         self.log_scroll = 0
+        self.log_display_line_count = 0  # Cached count of wrapped display lines
 
         # Setup colors
         curses.start_color()
@@ -315,20 +373,27 @@ class Monitor:
         # Log content area
         log_start = 5
         log_height = height - log_start - 2
+        content_width = width - 4  # Leave margin for wrap indicator
 
-        # Clamp scroll
-        max_scroll = max(0, len(self.log_lines) - log_height)
+        # Build display lines (wrapped) from source lines
+        display_lines = []
+        for source_line in self.log_lines:
+            wrapped = wrap_line(source_line, content_width, max_lines=5)
+            display_lines.extend(wrapped)
+
+        # Cache display line count for scroll handling
+        self.log_display_line_count = len(display_lines)
+
+        # Clamp scroll to display lines
+        max_scroll = max(0, len(display_lines) - log_height)
         self.log_scroll = max(0, min(self.log_scroll, max_scroll))
 
-        # Draw log lines
-        for i, line in enumerate(self.log_lines[self.log_scroll:self.log_scroll + log_height]):
+        # Draw display lines
+        visible_lines = display_lines[self.log_scroll:self.log_scroll + log_height]
+        for i, line in enumerate(visible_lines):
             y = log_start + i
             if y >= height - 2:
                 break
-            # Strip newline and truncate
-            line = line.rstrip('\n\r')
-            if len(line) > width - 2:
-                line = line[:width - 3] + "…"
             self.stdscr.addnstr(y, 1, line, width - 2)
 
         # Scroll indicators
@@ -336,13 +401,13 @@ class Monitor:
             self.stdscr.attron(curses.color_pair(4))
             self.stdscr.addstr(log_start, width - 2, "▲")
             self.stdscr.attroff(curses.color_pair(4))
-        if self.log_scroll + log_height < len(self.log_lines):
+        if self.log_scroll + log_height < len(display_lines):
             self.stdscr.attron(curses.color_pair(4))
             self.stdscr.addstr(min(log_start + log_height - 1, height - 3), width - 2, "▼")
             self.stdscr.attroff(curses.color_pair(4))
 
         # Line count
-        total = len(self.log_lines)
+        total = len(display_lines)
         showing = f"Lines {self.log_scroll + 1}-{min(self.log_scroll + log_height, total)} of {total}"
         self.stdscr.attron(curses.color_pair(4))
         self.stdscr.addnstr(height - 2, width - len(showing) - 2, showing, len(showing))
@@ -363,7 +428,7 @@ class Monitor:
         if self.show_log:
             help_text = " [↑↓/PgUp/PgDn] Scroll  [r] Reload  [ESC] Back  [q] Quit "
         else:
-            help_text = " [↑↓] Select  [Enter] View Log  [r] Refresh  [q] Quit "
+            help_text = " [↑↓] Select  [Enter] Log  [x] Kill  [r] Refresh  [q] Quit "
 
         # Draw footer bar
         footer = f"{summary}{'─' * (width - len(summary) - len(help_text) - 2)}{help_text}"
@@ -421,7 +486,7 @@ class Monitor:
             elif key == curses.KEY_HOME:
                 self.log_scroll = 0
             elif key == curses.KEY_END:
-                self.log_scroll = max(0, len(self.log_lines) - log_height)
+                self.log_scroll = max(0, self.log_display_line_count - log_height)
             elif key == ord('r') or key == ord('R'):
                 # Reload log file
                 if self.log_job and self.log_job.logs:
@@ -445,6 +510,15 @@ class Monitor:
                         self.log_lines = ["(No log file available)"]
             elif key == ord('r') or key == ord('R'):
                 self.jobs = get_jobs()
+            elif key == ord('x') or key == ord('X'):
+                # Kill selected job
+                if self.jobs and 0 <= self.selected_idx < len(self.jobs):
+                    job = self.jobs[self.selected_idx]
+                    if job.pid and job.status == "running":
+                        kill_job(job.pid)
+                        # Refresh job list after kill
+                        time.sleep(0.2)
+                        self.jobs = get_jobs()
             elif key == curses.KEY_HOME:
                 self.selected_idx = 0
             elif key == curses.KEY_END:

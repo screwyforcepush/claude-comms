@@ -49,6 +49,14 @@ def get_jobs_root() -> Path:
     return Path(tmpdir) / "agent_jobs" / user
 
 
+def get_consultant_template() -> str:
+    """Load the consultant template from the template file."""
+    template_path = Path(__file__).parent / "consultant_template.txt"
+    if template_path.exists():
+        return template_path.read_text()
+    return ""
+
+
 # =============================================================================
 # Data Models
 # =============================================================================
@@ -767,6 +775,11 @@ def main():
         help="Agent harness to use"
     )
     spawn_parser.add_argument(
+        "--consultant",
+        action="store_true",
+        help="Append consultant template (WORKFLOW + TEAMWORK) to assignment"
+    )
+    spawn_parser.add_argument(
         "assignment",
         nargs=argparse.REMAINDER,
         help="Assignment text (after --)"
@@ -802,6 +815,13 @@ def main():
                 sys.exit(1)
 
             assignment = " ".join(assignment_parts)
+
+            # Append consultant template if --consultant flag is set
+            if args.consultant:
+                template = get_consultant_template()
+                if template:
+                    assignment = assignment + "\n\n" + template
+
             result = spawn_job(args.harness, assignment)
 
             if "error" in result:

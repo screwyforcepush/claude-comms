@@ -50,11 +50,11 @@ Problem: Orchestrating multiple parallel subagents concurrently can lead to each
 Approach: The agents communicate with each other as they work. call out discoveries, decisions, and provide feedback to each other. They work as a team. Some subagents are added to the team with the sole purpose of supporting/advising other agents!
 
 ## Agent Model Diversity
-Just like the various subagent types, Anthropic's Claude Code agnet and OpenAI's Codex have strengths and weaknesses inherent in the models+harness.
-Dont pick one, use both claude and codex. I've built a "consultant" subagent which is claude, and all it does is spin up a headless codex agent instance and wait for it to finish. 
-- the codex agent can communicate with any parallel claude or codex agents. after execution the codex final response bubbles up through the consultant back to the orchestrator.
+Just like the various subagent types, Anthropic's Claude Code, OpenAI's Codex, and Google's Gemini agent have strengths and weaknesses inherent in the models+harness.
+Dont pick one, use claude, codex, and gemini!. I've built "consultant" subagents which are claude, and all it does is spin up a headless codex/gemini agent instance and wait for it to finish. 
+- the codex and gemini agents can communicate with any parallel claude, codex, or gemini agents. after execution the agent final response bubbles up through the consultant proxy back to the orchestrator.
 - The orchestrator doesnt know that the consultant is doing this, it doesnt need to know. All it knows is that it assigns a task to consultant, it gets executed on, and it gets a response back.
-- The orchestrator gets the agents to check each others work to gap fill weaknesses in individual models. Claude checks Codex's work, Codex checks claudes work.
+- The orchestrator gets the agents to check each others work to gap fill weaknesses in individual models. Claude checks Codex's work, Codex checks Gemini's work, Gemini checks Claudes work.
 - When planning/architecting, the orchestrator get one of each to independently analyse, research, plan. then the orchestrator merges to get the best of both perspectives.
 
 ## Progressive Disclosure

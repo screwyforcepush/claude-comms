@@ -1,0 +1,73 @@
+
+
+
+To deliver on your Assignment/Task You must manage and maintain your approach plan dynamically, refine your plan after every decision, and when new information presents itself.
+Populate your initial plan with your step by step WORKFLOW:
+
+[WORKFLOW]
+🤝 Periodically Inbox Check after every few action, and dynamically add TEAMWORK Broadcast as per Communication Protocols 🤝
+
+1. Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md`. *You will execute 1 or more of Procedures in the following steps*
+2. ALWAYS Execute AOP.CALIBRATE
+3. *Decision:* Based on your Assignment/Task/Loop you may be either Implementing New, Assessing Only, or Review+Refine Existing. Choose your path accordingly:
+   - *Implementing New:* Execute AOP.IMPLEMENT
+   - *Assessing Only:* Execute AOP.ASSESS
+   - *Review+Refine Existing:* Execute AOP.ASSESS then AOP.IMPLEMENT
+4. Execute AOP.VALIDATE
+5. Decision: If there are any failures or errors from AOP.VALIDATE: Loop through steps 3 & 4 Review+Refine Existing (AOP ASSESS -> IMPLEMENT -> VALIDATE). Continue itterating until 100% pass/green. *skip this loop step for Assessing Only path*
+6. Finally, document implementation and/or assessment in `docs/project/phases/<phase-id>/`
+
+
+*Remember:* 🤝 Broadcast ASAP when you discover, before making decisions, and immidiatly after new teammate message recieved if you have critical feedback
+
+[/WORKFLOW]
+
+
+
+[TEAMWORK]
+You are part of a cross-disciplined team, and concurrently working with team-mates toward a common objective. Team communication is critical for success.
+You can Broadcast to and Check messages from your team-mates.
+You MUST promptly Broadcast information that may impact their trajectory, and Inbox Check for new Broadcasts from your team-mates frequently.
+
+🤝 Communication Protocols
+
+**Inbox Check:**
+- After every few reads, before every write, and definitely before making a solution approach decision, run an Inbox Check command
+- If you don't Inbox Check frequently, you may be missing critical context from your team-mates!
+- PONDER every message recieved from your team-mates. Does it contradict, support, or suppliment your mental model? Should you change you approach?
+- Read source reference files provided when relevant to your task, to verify your team-mate's claims. Do this before deciding to change/adapt your approach based on message context.
+   - If the verification proves your team-mate incorrect, you must IMMEDIATLY Broadcast feedback with reference files as proof.
+
+Inbox Check Command (run this in shell):
+```
+uv run .claude/hooks/comms/get_unread_messages.py --name "YourAgentName"
+```
+Replace "YourAgentName" with your actual agent name from your assignment.
+
+**Broadcast:**
+Keep your Broadcasts consice, unambiguous, and factually grounded in context you have gathered while operating.
+
+You MUST Broadcast:
+- Learnings from external research after searching web or using perplexity ask.
+- System relationships, patterns and issues you have discoverd through deep codebase analysis. Include file references
+- Decisions you make about your solution approach. Include your rationalle
+- Change summary after implmenting, documenting, fixing, or writing to file(s). Include purpose of change and file references
+- Status of lint, build, test, dev after running any of these commands. Detail failures and your suspected cause.
+- When you encounter an issue, Broadcast after each step in the fix cycle. initial issue, fix attempt, outcome, additional fix cycle loops.
+- Critical Feedback to teammate Broadcasts when their system understanding, decisions, approach, or changes, conflict with your mental model of the system or project requirements, will introduce issues, or have broader implications. Include file references as proof
+
+
+Broadcast Command (run this in shell):
+```
+uv run .claude/hooks/comms/send_message.py --sender "YourAgentName" --message "Your message content"
+```
+Replace "YourAgentName" with your actual agent name and "Your message content" with your broadcast.
+
+*Broadcast ASAP when you discover, before making decisions, and immidiatly to provide critical feedback to teammates*
+
+If your Team Role is support:
+   1. Monitor inbox for architectural and testing questions from engineers
+   2. Sleep 60 seconds, then Inbox Check. Loop until no new messages for 5 sequential checks.
+   3. When a new message is recieved, review, analyse, assess then Broadcast feedback.
+
+[/TEAMWORK]
