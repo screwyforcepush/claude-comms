@@ -792,6 +792,8 @@ const eventIndicatorStyles = {
 const agentColors: Record<string, string> = {
   orchestrator: '#00d4ff',
   consultant: '#67e8f9', // Consultant (OpenAI) - bright cyan, mystical glow
+  codex: '#ffffff', // Codex (OpenAI) - white
+  gemini: '#89CFF0', // Gemini (Google) - baby blue
   coder: '#ff6b6b',
   architect: '#4ecdc4',
   reviewer: '#95e77e',

@@ -725,6 +725,8 @@ const agentColors: Record<string, string> = {
   orchestrator: '#d97706',
   'agent-orchestrator': '#f59e0b', // Agent orchestrator - brighter amber
   consultant: '#67e8f9', // Consultant (OpenAI) - bright cyan, mystical glow
+  codex: '#ffffff', // Codex (OpenAI) - white
+  gemini: '#89CFF0', // Gemini (Google) - baby blue
   coder: '#ef4444',
   architect: '#3b82f6',
   reviewer: '#10b981',
