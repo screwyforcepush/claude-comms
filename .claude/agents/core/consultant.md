@@ -20,23 +20,24 @@ IMPORTANT: The user has messaged you with a prompt, including a name. This is NO
 Your purpose is to run a Consultant agent in the background. This agent gives a working trace, then a final output response. You are the link between the user and the Consultant
  
 
+uv run agent_job.py spawn --harness codex -- "your assignment here"
+# Output: Agent running. Check status with: `uv run agent_job.py status <job_id>`
+
+# Check job status
+uv run agent_job.py status <job_id>
+
 Follow your WORKFLOW step-by-step:
 # WORKFLOW
 1. **ConsultantAssignment Compilation**: Insert the exact message you recieved from the user into ConsultantAssignment Template in place of the UserPrompt var. 
    - UserPrompt starts with "Your name is" and ends with "adopt 🤝 TEAMWORK to achieve maximum value delivered."
    - The result must be stringified with escaped backticks so it can be parsed as an arg to the Consultant invocation.
-2. **Invoke Consultant**: Run background bash with your prepared ConsultantAssignment `codex --yolo exec "<ConsultantAssignment>"`
-3. **Monitoring Loop**: Sleep 60 seconds, then check the background bash Consultant. Keep checking every 60 seconds until Consultant is finished/exit. Note: Do not rely on your system reminders - they may show running when codex is already finished/failed! You must check the BackroundBash output.
-   - Each check, make note of most recent consultant trace, and Increment Monitoring Check count.
-4. **Completion Handling**: Respond back to the user, the consultant's final response/output verbatim.
+2. **Invoke Consultant**: Run with your prepared ConsultantAssignment using the appropriate harness `uv run .agents/tools/agent-job/agent_job.py spawn --harness <codex|gemini> -- "<ConsultantAssignment>"`, and note the returned status check job_id
+3. **Monitoring Loop**: Sleep 60 seconds, then Check Status with: `uv run .agents/tools/agent-job/agent_job.py status <job_id>`. Keep checking every 60 seconds until Consultant status is complete (or no longer running eg. error/failed). IMPORTANT: Continue this monitoring loop while the Consultant is running, it could take hours. keep going.
+4. **Completion Handling**: Respond back to the user, the consultant's completion messages verbatim.
 
-
-# Timeout Policy
-If you detect a timeout, terminate Consultant background bash process and report back to the user: "Consultant Terminated: <your rationalle>"
-Timeout can be triggered by either of the following two signals:
-- No change in Consultant's working trace for 5 mins (5 Monitoring checks with same recent trace)
-- 1 hour (60 checks total) hard timeout.
-
+*Available Consultants:* 
+- CODEX: harness=codex. eg. `uv run .agents/tools/agent-job/agent_job.py spawn --harness codex -- "full ConsultantAssignment"`
+- GEMINI: harness=gemini eg. `uv run .agents/tools/agent-job/agent_job.py spawn --harness gemini -- "full ConsultantAssignment"`
 
 
 # ConsultantAssignment Template:

@@ -26,7 +26,7 @@ Guide the user through installing the `annotated-feedback` widget in their appli
 
 **Package Details:**
 - NPM Package: `annotated-feedback` (NOT `annotated-feedback-widget`)
-- Current Version: 0.1.18+
+- **Minimum Version: 0.1.24+** (earlier versions have SSR/Convex context issues)
 - Import Paths:
   - Components: `annotated-feedback/widget`
   - Styles: `annotated-feedback/widget/styles`
@@ -40,11 +40,18 @@ Guide the user through installing the `annotated-feedback` widget in their appli
 - Submits annotated feedback to Convex backend
 - Includes metadata: route, environment, project name, feature flags
 
-**Dependencies Included (as of v0.1.18):**
-- `@excalidraw/excalidraw` - Drawing canvas
-- `convex` - Backend client
+**Dependencies Included (v0.1.24+):**
+- `@excalidraw/excalidraw` - Drawing canvas (dynamically imported, client-side only)
+- `convex` - Backend client (externalized)
 - `html-to-image` - Screenshot capture
 - All are automatically installed as transitive dependencies
+- **SSR Compatible**: Excalidraw loads asynchronously after page hydration
+
+**Key Improvements in v0.1.24:**
+- ✅ Next.js SSR compatible (dynamic Excalidraw import)
+- ✅ No font file errors (stripped from bundled CSS)
+- ✅ Isolated Convex context (doesn't override parent app's Convex)
+- ✅ Properly externalized React (no "Invalid hook call" errors)
 
 ---
 
@@ -312,53 +319,67 @@ VITE_FEEDBACK_ENABLED=true
 
 ## COMMON ISSUES & SOLUTIONS
 
-### Issue 1: "Invalid hook call" or "Cannot read properties of null (reading 'useContext')"
+### Issue 1: "Invalid hook call" or "Cannot read properties of null (reading 'useState')"
 
-**Cause:** Multiple React instances in the bundle.
-
-**Solution for Vue/non-React frameworks:**
-- Ensure Vite config has `resolve.dedupe` and `resolve.alias` set correctly
-- Clear Vite cache: `rm -rf node_modules/.vite`
-- Restart dev server
-
-**Solution for React/Next.js:**
-- Check for duplicate React installations: `npm ls react`
-- Remove any local React copies and reinstall
-
----
-
-### Issue 2: "Failed to resolve import '@excalidraw/excalidraw'"
-
-**Cause:** Using old version of `annotated-feedback` (< 0.1.18) that's missing dependencies.
+**Cause:** Multiple React instances (FIXED in v0.1.23+)
 
 **Solution:**
 ```bash
-# Update to latest version
+# Update to v0.1.24 or later
 pnpm update annotated-feedback@latest
 
-# Verify version is 0.1.18 or higher
+# Verify version is 0.1.24+
 pnpm list annotated-feedback
 ```
 
-If still failing on older versions, manually install:
+**If still occurring on v0.1.24+:**
+- Check for duplicate React: `pnpm list react`
+- Clear cache: `rm -rf node_modules/.cache .next`
+- Reinstall: `pnpm install`
+
+---
+
+### Issue 2: "Cannot find module 'roughjs/bin/rough'" (Next.js SSR)
+
+**Cause:** Excalidraw SSR incompatibility (FIXED in v0.1.23+)
+
+**Solution:**
 ```bash
-pnpm add @excalidraw/excalidraw convex html-to-image
+# Update to v0.1.23 or later (has dynamic Excalidraw import)
+pnpm update annotated-feedback@latest
+```
+
+**If still occurring:** Verify you're on v0.1.23+ and restart dev server.
+
+---
+
+### Issue 3: "Can't resolve './fonts/Assistant/*.woff2'"
+
+**Cause:** Missing font files in Excalidraw CSS (FIXED in v0.1.22+)
+
+**Solution:**
+```bash
+# Update to v0.1.22 or later (fonts stripped from CSS)
+pnpm update annotated-feedback@latest
 ```
 
 ---
 
-### Issue 3: "The requested module does not provide an export named 'default'"
+### Issue 4: Dashboard Convex queries fail after adding widget
 
-**Cause:** Vite ESM compatibility issue with nested dependencies.
+**Cause:** Widget's ConvexProvider overriding parent context (FIXED in v0.1.24+)
 
 **Solution:**
-- Clear Vite cache: `rm -rf node_modules/.vite`
-- Ensure `optimizeDeps.include` in Vite config includes React
-- Restart dev server
+```bash
+# Update to v0.1.24 or later (isolated Convex contexts)
+pnpm update annotated-feedback@latest
+```
+
+**Architecture:** v0.1.24+ only wraps the feedback overlay with ConvexProvider, leaving your app's Convex context intact.
 
 ---
 
-### Issue 4: Widget doesn't appear
+### Issue 5: Widget doesn't appear
 
 **Checklist:**
 1. Is `CONVEX_URL` environment variable set?
@@ -366,6 +387,7 @@ pnpm add @excalidraw/excalidraw convex html-to-image
 3. Check browser console for errors
 4. Try pressing the hotkey (default: Alt+F)
 5. If `showButton={true}`, check for floating button in bottom-right corner
+6. Wait 1-2 seconds for Excalidraw to load dynamically (v0.1.23+)
 
 ---
 
@@ -411,9 +433,11 @@ After successful widget installation and testing, instruct the user to:
 
 ```bash
 claude mcp add annotated-feedback \
-  -- env CONVEX_URL="<CONVEX_URL>" \
-  npx -y annotated-feedback \
-  -- --PROJECT="<PROJECT_NAME>"
+  --scope project \
+  -- env \
+    CONVEX_URL="<CONVEX_URL>" \
+    PROJECT="<PROJECT_NAME>" \
+  npx -y annotated-feedback
 ```
 
 2. **Provide them with the actual command to copy/paste:**
@@ -430,9 +454,11 @@ Replace `<CONVEX_URL>` and `<PROJECT_NAME>` with the values you collected at the
 Copy and paste this command in your terminal (outside of this chat):
 
 claude mcp add annotated-feedback \
-  -- env CONVEX_URL="https://utmost-llama-56.convex.cloud" \
-  npx -y annotated-feedback \
-  -- --PROJECT="my-awesome-app"
+  --scope project \
+  -- env \
+    CONVEX_URL="https://utmost-llama-56.convex.cloud" \
+    PROJECT="my-awesome-app" \
+  npx -y annotated-feedback
 
 Then start a new Claude session to activate the MCP integration.
 ```
@@ -476,15 +502,18 @@ After installation, test the widget:
 
 Before asking for help, verify:
 
-- [ ] `annotated-feedback` version is 0.1.18 or higher
-- [ ] React 18+ is installed (check `package.json`)
+- [ ] **`annotated-feedback` version is 0.1.24 or higher** (check `pnpm list annotated-feedback`)
+- [ ] React 18+ or 19+ is installed (check `package.json`)
 - [ ] Convex URL is set in environment variables
+- [ ] **For Next.js**: No webpack/transpilePackages config needed (widget handles SSR)
+- [ ] **For apps with existing ConvexProvider**: Widget uses isolated context (v0.1.24+)
 - [ ] For Vue: Vite config includes React plugin and dedupe config
 - [ ] For Vue: React alias paths match installed version
-- [ ] Vite cache cleared: `rm -rf node_modules/.vite`
-- [ ] Dev server restarted after config changes
+- [ ] Cache cleared: `rm -rf node_modules/.cache .next node_modules/.vite`
+- [ ] Dev server restarted after installation
 - [ ] No console errors in browser DevTools
 - [ ] Browser console shows no 404s for widget assets
+- [ ] Wait 1-2 seconds after pressing Alt+F for Excalidraw to load
 
 ---
 
@@ -520,12 +549,15 @@ interface FeedbackMetadata {
 
 Widget installation is complete when:
 
-1. ✅ Package installed and no build errors
+1. ✅ Package installed (v0.1.24+) and no build errors
 2. ✅ Dev server starts without warnings about the widget
-3. ✅ Pressing Alt+F opens the feedback overlay
-4. ✅ Can draw annotations on the canvas
-5. ✅ Submitting feedback shows success toast
-6. ✅ Feedback appears in Convex dashboard
+3. ✅ **Parent app's Convex queries still work** (if applicable)
+4. ✅ Pressing Alt+F opens the feedback overlay
+5. ✅ Brief "Loading drawing tools..." appears (~1-2 seconds)
+6. ✅ Excalidraw canvas loads and drawing tools appear
+7. ✅ Can draw annotations on the canvas
+8. ✅ Submitting feedback shows success toast
+9. ✅ Feedback appears in Convex dashboard (utmost-llama-56 deployment)
 
 **THEN provide the MCP installation command** with substituted values.
 

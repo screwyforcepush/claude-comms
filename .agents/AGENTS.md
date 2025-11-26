@@ -43,11 +43,11 @@ Evaluate the Change for a given Assignment/Task against the following criteria:
 
 
 [VALIDATE]
-Run required commands — all must pass without warnings or errors:
-   - `pnpm lint`
-   - `pnpm ts:check`
-   - `pnpm test:all`
-   - `pnpm build`
+Run required commands from `.agents/repo.md` — all must pass without warnings or errors:
+   - lint
+   - typecheck
+   - build
+   - test
 
 [UAT]
 Perform manual QA:
@@ -58,4 +58,4 @@ Perform manual QA:
 
 [/AGENT OPERATING PROCEDURES]
 
-# Repository Guidelines: see `.agents/repo.md`
+# Adhere to the Repository Guidelines: `.agents/repo.md`
