@@ -411,7 +411,6 @@ def build_harness_command(harness: str, assignment: str) -> list[str]:
         return [
             "gemini",
             "--yolo",
-            "-s",
             "-m", "gemini-3-pro-preview",
             "--output-format", "stream-json",
             assignment,
