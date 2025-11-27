@@ -17,23 +17,26 @@ You must manage and maintain Todos dynamically, refine Todos after every decisio
 Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
-1. PLAN: ULTRATHINK and break down ASSIGNMENT into independent implementation tasks
-2. IMPLEMENT: Launch a blended Implementation batch of engineers, codex and gemini consultants, each tasked with an with an independent Implementation task. 
-3. REFINE: Launch a blended Review+Refine batch of engineers and consultants + 1 UAT. each tasked to assess and implementation of one of the previous batch agents (provide them with the task that was assigned to the previous agent). these agents will assess for task completness, success critiera met,  with documentation. They should then refine the implementation if needed. this batch should be alternate the previous batch. eg. engeneer reviews gemini work, gemini reviews codex work, codex reviews engineer work.
-4.  VERIFY: Launch a Assessing Only, Verification batch (Architect, Codex, Gemini, UAT) to assess the implementation completness of the full ASSIGNMENT. Each agent in this batch will provide their unique perspective, so give them the same comprehensive assessment task
-5...N. LOOP: *Decision:* did the Verification batch highlight ANY test failures, critical issues, missalignment, unmet ASSIGNMENT requirements? If so, **Add new Todos**: Loop through steps 3 & 4 batch Review+Refine -> Verification. Continue itterating until 100% pass/green/success reported by Verification batch
+PLAN: ULTRATHINK about the UI/UX pages, features, user flows involved and the dependencies between. Break down ASSIGNMENT into dependency sequenced test scenarios.
+ENABLE: ensure the dev server is running. you may need to kill an old process and start it again `.agents/repo.md`
+
+For each test scenario in the sequence:
+1. FEEDBACK: Task a single UAT agent to manually execute the test scenario, visually inspect the UI/UX and provide feedback on: design allignment, expected functionality, issues encountered, error logs. This UAT agent is a proxy for the user. Their perspecttive matters!
+2. IMPLEMENT: Launch a blended Implementation batch of engineers, codex and gemini consultants to implement changes based on UAT FEEDBACK.
+3. REQUEST APPROVAL: Task a single UAT agent to manually execute the test scenario, and provide their assessment of changes, design allignment, expected functionality.
+ - If UAT gives critical feedback, and DOES NOT APPROVE: itterate until approval awarded. 
+ - When UAT gives signoff approval for deployment, continue to the next test scenario
 [/WORKFLOW]
 
 
 ## 🎯 CRITICAL EXECUTION RULES
 
 ### Dependency Laws
-⚡ **NEVER** assign multiple agents to edit the same file in the same batch
-⚡ **ALWAYS** verification after implementation/refinement
-⚡ **ALWAYS** batch consultant counterpart for read-only + document tasks
-⚡ **ALWAYS** blend consultants + engineers for implementation/refinement tasks
-⚡ **ALWAYS** have gemini, codex and engineers reviewing and refining each others work from previous batch tasks
+⚡ **NEVER** batch multiple UAT agents together. Focus on one scenario at a time.
 ⚡ **ALWAYS** Take UAT feedback seriously. They are the user's representitive.
+⚡ **ALWAYS** Add new todos if Approval is not awarded.
+⚡ **ALWAYS** blend consultants + engineers for implementation/refinement tasks
+
 
 
 ### Agent Instructions Template

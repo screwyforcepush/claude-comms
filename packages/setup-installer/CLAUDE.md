@@ -128,6 +128,11 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 5. **Verification + Reco Batch**: [Engineer + Consultant + Architect to provide their completion assessments]
 6. **If verificaiton fail**: Loop Review+refine -> Verification Batches until PASS
 
+#### Signoff Workflow
+1. **User Flow UAT**: 1 UAT agent testing a discrete page/app function. provides feedback on functionality and UI/UX
+2. **Implementation Batch**: [Engineers, and Consultants with distinct role and focus]
+3. **Verification Batch**: [Engineer + gemini + codex + UAT] - validates change
+
 #### Bug Fix Workflow
 1. **Investigation Batch**: [Engineer, Consultant, Architect] - diagnose collaboratively
 2. **Fix Batch**: [Engineer-Fix, Engineer-Tests, support Consultant] - parallel, different files
