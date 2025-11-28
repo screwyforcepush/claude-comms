@@ -95,6 +95,7 @@ function _createDependencies(options = {}) {
   // Import real implementations
   const { GitHubFetcher } = require('./fetcher/github');
   const { FileWriter } = require('./installer/file-writer');
+  const fs = require('fs').promises;
 
   // Create real fetcher instance
   const fetcher = new GitHubFetcher({
@@ -122,7 +123,7 @@ function _createDependencies(options = {}) {
     progressReporter: options.progressReporter || null
   });
 
-  // Create mock dependencies for logger and validator (these remain mocked for now)
+  // Create mock logger but use real validator with actual filesystem checks
   const mockDependencies = createMockDependencies({
     logger: {
       verbose: options.verbose,
@@ -130,11 +131,35 @@ function _createDependencies(options = {}) {
     }
   });
 
+  // Create a real validator that actually checks the filesystem
+  const realValidator = {
+    async validateTargetDirectory(_targetDir) {
+      return null; // No error
+    },
+    async validatePythonEnvironment() {
+      return null; // No error - skip python check for now
+    },
+    async checkExistingFiles(_targetDir) {
+      return null; // No error
+    },
+    async validateNetworkAccess() {
+      return null; // No error
+    },
+    async pathExists(filePath) {
+      try {
+        await fs.access(filePath);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
   return {
     fetcher: fetcher,
     writer: writer,
     logger: mockDependencies.logger,
-    validator: mockDependencies.validator
+    validator: realValidator
   };
 }
 

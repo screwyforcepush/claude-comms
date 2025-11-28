@@ -1,0 +1,24 @@
+{
+  "mcp_command": "npx",
+  "mcp_args": [
+    "-y",
+    "chrome-devtools-mcp@latest",
+    "--isolated",
+    "--headless=true"
+  ],
+  "_comment": "Default config runs headless. Override by creating ~/.browsertools/config.json",
+  "_examples": {
+    "visual_mode": {
+      "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated"]
+    },
+    "sandbox": {
+      "mcp_args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--isolated=true",
+        "--headless=true",
+        "--executablePath=/usr/local/bin/chromium-mcp"
+      ]
+    }
+  }
+}

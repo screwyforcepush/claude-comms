@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PreToolUse --summarize"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app claude-comms --event-type PreToolUse --summarize"
           }
         ]
       }
@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PostToolUse --summarize"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app claude-comms --event-type PostToolUse --summarize"
           }
         ]
       }
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type Notification --summarize"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app claude-comms --event-type Notification --summarize"
           }
         ]
       }
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type Stop --add-chat"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app claude-comms --event-type Stop --add-chat"
           }
         ]
       }
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type SubagentStop"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app claude-comms --event-type SubagentStop"
           }
         ]
       }
@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type PreCompact"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app claude-comms --event-type PreCompact"
           }
         ]
       }
@@ -99,7 +99,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app cc-hook-multi-agent-obvs --event-type UserPromptSubmit --summarize"
+            "command": "uv run $CLAUDE_PROJECT_DIR/.claude/hooks/observability/send_event.py --source-app claude-comms --event-type UserPromptSubmit --summarize"
           }
         ]
       }
