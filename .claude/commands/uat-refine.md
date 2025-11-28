@@ -17,15 +17,15 @@ You must manage and maintain Todos dynamically, refine Todos after every decisio
 Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
-PLAN: ULTRATHINK about the UI/UX pages, features, user flows involved and the dependencies between. Break down ASSIGNMENT into dependency sequenced test scenarios.
+PLAN: ULTRATHINK about the UI/UX pages, features, user flows involved and the dependencies between. Break down ASSIGNMENT into dependency sequenced test scenario batches.
 ENABLE: ensure the dev server is running. you may need to kill an old process and start it again `.agents/repo.md`
 
-For each test scenario in the sequence:
-1. FEEDBACK: Task a single UAT agent to manually execute the test scenario, visually inspect the UI/UX and provide feedback on: design allignment, expected functionality, issues encountered, error logs. This UAT agent is a proxy for the user. Their perspecttive matters!
-2. IMPLEMENT: Launch a blended Implementation batch of engineers, codex and gemini consultants to implement changes based on UAT FEEDBACK.
-3. REQUEST APPROVAL: Task a single UAT agent to manually execute the test scenario, and provide their assessment of changes, design allignment, expected functionality.
+For each test scenario batch sequence:
+1. FEEDBACK: Launch a batch of UAT agents and a support designer. Each UAT agent should be given a focused test scenario or portion of the app to review. they must visually inspect the UI/UX and provide feedback on: design allignment, expected functionality, issues encountered, error logs. These UAT agents are proxy for the user. Their perspecttive matters!
+2. IMPLEMENT: Launch a blended Implementation batch of engineers + codex consultants + gemini consultants  to implement changes based on UAT FEEDBACK.
+3. REQUEST APPROVAL: Task a batch of UAT agent to manually execute the test scenario, and provide their assessment of changes, design allignment, expected functionality.
  - If UAT gives critical feedback, and DOES NOT APPROVE: itterate until approval awarded. 
- - When UAT gives signoff approval for deployment, continue to the next test scenario
+ - When all UAT agents in the batch give signoff approval for deployment, continue to the next to the next batch of test scenarios
 [/WORKFLOW]
 
 
@@ -80,9 +80,9 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 
 
 ### Batch Composition Goals
-- **Minimum**: 5 agents per implementation batch
+- **Minimum**: 5 agents per batch
 - **Target**: 8-10 agents including support roles
-- **Include**: Support Architect/Researcher for guidance
+- **Include**: roughly equal number of gemini, codex, and engineer implementers, and a support architect for guidance/coordination.
 - **Follow with**: Verification batch always
 
 ### Phase Management
@@ -95,7 +95,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 
 ## Consultant Agent
 Consultants come in two variants: Codex and Gemini. leverage them both liberally to diversify.
-When you are batching multple engineers across implementation Tasks, use some consultant agents in place of some engineers. Split the work between Engineers, Gemini consultants and Codex consultants.
+For implementation batches, distribute the tasks across engineers, codex consultants, and gemini consultants. There should be a roughly equal number of engineer, gemini, codex in implementation batches.
 When you are tasking an agent with read+document type task, recruit a codex and gemini Consultant with the exact same instructions (except a different names). Include the consultants in the same batch. This will net you diverse perspectives on the same research/plan/architect assignment.
 
 
