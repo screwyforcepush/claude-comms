@@ -334,13 +334,30 @@ class Installer extends EventEmitter {
       // Create backups if files exist
       await this._createBackupsIfNeeded(fetchedFiles);
 
-      // Write files using injected writer
+      // Flatten files and filter out user-customizable files if they already exist
+      let filesToWrite = this._flattenFiles(fetchedFiles);
+
+      // Files that should not be overwritten if they exist (user customizations)
+      const preserveIfExists = [
+        { path: '.agents/repo.md', fullPath: path.join(this.options.targetDir, '.agents', 'repo.md') },
+        { path: '.agents/tools/chrome-devtools/config.json', fullPath: path.join(this.options.targetDir, '.agents', 'tools', 'chrome-devtools', 'config.json') }
+      ];
+
+      for (const file of preserveIfExists) {
+        const exists = await this.validator.pathExists(file.fullPath);
+        if (exists) {
+          this.logger.info(`${file.path} already exists, skipping (preserving user customizations)`);
+          filesToWrite = filesToWrite.filter(f => f.path !== file.path);
+        }
+      }
+
+      // Write files using injected writer (overwrite existing, no backups)
       const writeResult = await this.writer.writeDirectory(
-        this._flattenFiles(fetchedFiles),
+        filesToWrite,
         {
           targetDir: this.options.targetDir,
-          overwrite: this.options.force,
-          backup: true,
+          overwrite: true,
+          backup: false,
           preservePermissions: true,
           dryRun: this.options.dryRun
         }
@@ -449,6 +466,11 @@ class Installer extends EventEmitter {
   async _verifyInstallation() {
     this.state = InstallationState.VERIFYING;
     this._emitProgress('Verifying installation...', 90);
+
+    if (this.options.dryRun) {
+      this.logger.info('DRY RUN: Would verify installation');
+      return;
+    }
 
     const requiredPaths = [
       path.join(this.options.targetDir, '.claude'),
@@ -706,29 +728,27 @@ class Installer extends EventEmitter {
   }
 
   /**
-   * Create backups of existing files if needed
+   * Log info about existing files that will be overwritten
    */
   async _createBackupsIfNeeded(_fetchedFiles) {
-    if (!this.options.force) {
-      // Check for existing directories and files
-      const claudeDir = path.join(this.options.targetDir, '.claude');
-      const agentsDir = path.join(this.options.targetDir, '.agents');
-      const claudeMd = path.join(this.options.targetDir, 'CLAUDE.md');
+    // Check for existing directories and files that will be overwritten
+    const claudeDir = path.join(this.options.targetDir, '.claude');
+    const agentsDir = path.join(this.options.targetDir, '.agents');
+    const claudeMd = path.join(this.options.targetDir, 'CLAUDE.md');
 
-      const existingPaths = [];
-      if (await this.validator.pathExists(claudeDir)) {
-        existingPaths.push('.claude/');
-      }
-      if (await this.validator.pathExists(agentsDir)) {
-        existingPaths.push('.agents/');
-      }
-      if (await this.validator.pathExists(claudeMd)) {
-        existingPaths.push('CLAUDE.md');
-      }
+    const existingPaths = [];
+    if (await this.validator.pathExists(claudeDir)) {
+      existingPaths.push('.claude/');
+    }
+    if (await this.validator.pathExists(agentsDir)) {
+      existingPaths.push('.agents/');
+    }
+    if (await this.validator.pathExists(claudeMd)) {
+      existingPaths.push('CLAUDE.md');
+    }
 
-      if (existingPaths.length > 0) {
-        this.logger.warn(`Existing files will be backed up: ${existingPaths.join(', ')}`);
-      }
+    if (existingPaths.length > 0) {
+      this.logger.info(`Existing files will be overwritten: ${existingPaths.join(', ')}`);
     }
   }
 

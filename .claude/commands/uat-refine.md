@@ -66,7 +66,7 @@ TEAM COLLABORATION:
 
 
 ⭐*The successful delivery of your assigned task, contributes to the high level Assignment:*⭐
-[User's exact ASSIGNMENT]
+[Your full ASSIGNMENT]
 
 ⭐Ensure you are alligned with this North Star objective*⭐
 

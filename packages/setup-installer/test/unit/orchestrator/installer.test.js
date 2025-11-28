@@ -27,14 +27,6 @@ describe('Installer', () => {
       validateConnection: jest.fn().mockResolvedValue(true)
     };
 
-    mockWriter = {
-      writeFile: jest.fn(),
-      writeDirectory: jest.fn(),
-      backup: jest.fn(),
-      rollback: jest.fn(),
-      removeFile: jest.fn()
-    };
-
     mockLogger = {
       info: jest.fn(),
       warn: jest.fn(),
@@ -42,12 +34,38 @@ describe('Installer', () => {
       debug: jest.fn()
     };
 
+    // Track which files have been "written" for realistic pathExists behavior
+    const writtenFiles = new Set();
+
     mockValidator = {
       validateTargetDirectory: jest.fn().mockResolvedValue(null),
       validatePythonEnvironment: jest.fn().mockResolvedValue(null),
       checkExistingFiles: jest.fn().mockResolvedValue(null),
       validateNetworkAccess: jest.fn().mockResolvedValue(null),
-      pathExists: jest.fn().mockResolvedValue(true)
+      // For most tests, paths exist except repo.md (which we want to write)
+      pathExists: jest.fn().mockImplementation((pathArg) => {
+        // repo.md should not exist (so we copy it)
+        if (pathArg.includes('repo.md')) return Promise.resolve(false);
+        // For settings.local.json, check if it was "written"
+        if (pathArg.includes('settings.local.json')) {
+          return Promise.resolve(writtenFiles.has('settings.local.json'));
+        }
+        return Promise.resolve(true);
+      }),
+      _writtenFiles: writtenFiles  // expose for test manipulation
+    };
+
+    mockWriter = {
+      writeFile: jest.fn().mockImplementation((filePath) => {
+        if (filePath.includes('settings.local.json')) {
+          writtenFiles.add('settings.local.json');
+        }
+        return Promise.resolve({ path: filePath });
+      }),
+      writeDirectory: jest.fn(),
+      backup: jest.fn(),
+      rollback: jest.fn(),
+      removeFile: jest.fn()
     };
 
     installer = new Installer({
@@ -137,7 +155,7 @@ describe('Installer', () => {
 
       await installer.install(validOptions);
 
-      expect(progressEvents).toHaveLength(6); // Start + 5 phases
+      expect(progressEvents).toHaveLength(7); // Start + 6 phases (including completion)
       expect(progressEvents[0].current).toBe(0);
       expect(progressEvents[progressEvents.length - 1].current).toBe(100);
     });
@@ -148,10 +166,9 @@ describe('Installer', () => {
       const result = await installer.install(dryRunOptions);
 
       expect(result.success).toBe(true);
-      expect(mockWriter.writeDirectory).toHaveBeenCalledWith(
-        expect.any(Array),
-        expect.objectContaining({ dryRun: true })
-      );
+      // In dry-run mode, writeDirectory is not called - the function returns early
+      // and just logs what would be installed
+      expect(mockWriter.writeDirectory).not.toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('DRY RUN')
       );

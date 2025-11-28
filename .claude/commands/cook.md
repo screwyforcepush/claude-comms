@@ -18,7 +18,7 @@ Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
 1. PLAN: ULTRATHINK and break down ASSIGNMENT into independent implementation tasks
-2. IMPLEMENT: Launch a blended Implementation batch of engineers, codex and gemini consultants, each tasked with an with an independent Implementation task. 
+2. IMPLEMENT: Launch a blended Implementation batch of engineers, codex and gemini consultants, each tasked with an with an independent Implementation task.
 3. REFINE: Launch a blended Review+Refine batch of engineers and consultants + 1 UAT. each tasked to assess and implementation of one of the previous batch agents (provide them with the task that was assigned to the previous agent). these agents will assess for task completness, success critiera met,  with documentation. They should then refine the implementation if needed. this batch should be alternate the previous batch. eg. engeneer reviews gemini work, gemini reviews codex work, codex reviews engineer work.
 4.  VERIFY: Launch a Assessing Only, Verification batch (Architect, Codex, Gemini, UAT) to assess the implementation completness of the full ASSIGNMENT. Each agent in this batch will provide their unique perspective, so give them the same comprehensive assessment task
 5...N. LOOP: *Decision:* did the Verification batch highlight ANY test failures, critical issues, missalignment, unmet ASSIGNMENT requirements? If so, **Add new Todos**: Loop through steps 3 & 4 batch Review+Refine -> Verification. Continue itterating until 100% pass/green/success reported by Verification batch
@@ -63,7 +63,7 @@ TEAM COLLABORATION:
 
 
 ⭐*The successful delivery of your assigned task, contributes to the high level Assignment:*⭐
-[User's exact ASSIGNMENT]
+[Your full ASSIGNMENT]
 
 ⭐Ensure you are alligned with this North Star objective*⭐
 
@@ -79,7 +79,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 ### Batch Composition Goals
 - **Minimum**: 5 agents per implementation batch
 - **Target**: 8-10 agents including support roles
-- **Include**: Support Architect/Researcher for guidance
+- **Include**: roughly equal number of gemini, codex, and engineer implementers, and a support architect for guidance/coordination.
 - **Follow with**: Verification batch always
 
 ### Phase Management
@@ -92,7 +92,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 
 ## Consultant Agent
 Consultants come in two variants: Codex and Gemini. leverage them both liberally to diversify.
-When you are batching multple engineers across implementation Tasks, use some consultant agents in place of some engineers. Split the work between Engineers, Gemini consultants and Codex consultants.
+For implementation batches, distribute the tasks across engineers, codex consultants, and gemini consultants. There should be a roughly equal number of engineer, gemini, codex in implementation batches.
 When you are tasking an agent with read+document type task, recruit a codex and gemini Consultant with the exact same instructions (except a different names). Include the consultants in the same batch. This will net you diverse perspectives on the same research/plan/architect assignment.
 
 

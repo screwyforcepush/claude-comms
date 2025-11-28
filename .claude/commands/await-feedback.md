@@ -15,6 +15,7 @@ WAIT: Poll the mcp__annotated-feedback__list endpoint for feedback with status: 
   - navigate to the dev server (see `.agents/repo.md`)
   - manually execute user flows impacted by your change
   - screenshot at each checkpoint, and PONDER visual issues and allignment with expectaions.
+  - check browser and dev server logs for errors
 4. Itterate, refine, UAT loop until satisfied.
 5. DEPLOY: run Pre-deployment validation build eg. `vercel build --yes`. when green, commit and push changes to kick off CI/CD. Mission accomplished!
 [/WORKFLOW]

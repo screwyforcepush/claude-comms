@@ -21,20 +21,38 @@ import json
 import os
 import signal
 import sys
+import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 # State directory
 STATE_DIR = Path.home() / ".browsertools"
-SOCKET_PATH = STATE_DIR / "daemon.sock"
-PID_FILE = STATE_DIR / "daemon.pid"
 CONFIG_FILE = STATE_DIR / "config.json"
+INACTIVITY_TIMEOUT = 600  # 10 minutes
 
 # Global daemon state
 mcp_proc = None
 mcp_reader = None
 mcp_writer = None
 pending_requests = {}  # msg_id -> response_future
+last_activity_time = time.time()
+current_instance_id = None
+
+
+def generate_instance_id() -> str:
+    """Generate 8-char hex instance ID."""
+    return uuid.uuid4().hex[:8]
+
+
+def get_socket_path(instance_id: str) -> Path:
+    """Get socket path for instance."""
+    return STATE_DIR / f"daemon-{instance_id}.sock"
+
+
+def get_pid_file(instance_id: str) -> Path:
+    """Get PID file path for instance."""
+    return STATE_DIR / f"daemon-{instance_id}.pid"
 
 
 def ensure_state_dir():
@@ -42,22 +60,39 @@ def ensure_state_dir():
     STATE_DIR.mkdir(exist_ok=True)
 
 
-def get_daemon_pid() -> Optional[int]:
-    """Get PID of running daemon."""
-    if not PID_FILE.exists():
+def get_daemon_pid(instance_id: str) -> Optional[int]:
+    """Get PID of running daemon for instance."""
+    pid_file = get_pid_file(instance_id)
+    if not pid_file.exists():
         return None
     try:
-        pid = int(PID_FILE.read_text().strip())
+        pid = int(pid_file.read_text().strip())
         os.kill(pid, 0)  # Check if alive
         return pid
     except (ProcessLookupError, ValueError):
-        PID_FILE.unlink(missing_ok=True)
+        pid_file.unlink(missing_ok=True)
         return None
 
 
-def is_daemon_running() -> bool:
-    """Check if daemon is running."""
-    return get_daemon_pid() is not None and SOCKET_PATH.exists()
+def is_daemon_running(instance_id: str) -> bool:
+    """Check if daemon is running for instance."""
+    return get_daemon_pid(instance_id) is not None and get_socket_path(instance_id).exists()
+
+
+def get_all_instances() -> list[str]:
+    """Get list of all running instance IDs."""
+    instances = []
+    if not STATE_DIR.exists():
+        return instances
+    for pid_file in STATE_DIR.glob("daemon-*.pid"):
+        instance_id = pid_file.stem.replace("daemon-", "")
+        if is_daemon_running(instance_id):
+            instances.append(instance_id)
+        else:
+            # Clean up stale files
+            pid_file.unlink(missing_ok=True)
+            get_socket_path(instance_id).unlink(missing_ok=True)
+    return instances
 
 
 def load_config() -> Dict[str, Any]:
@@ -145,7 +180,10 @@ async def read_mcp_responses():
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """Handle a client connection."""
-    global mcp_writer, pending_requests
+    global mcp_writer, pending_requests, last_activity_time
+
+    # Update activity timestamp
+    last_activity_time = time.time()
 
     try:
         while True:
@@ -222,15 +260,32 @@ async def shutdown_mcp():
         print(f"Error during shutdown: {e}", file=sys.stderr)
 
 
-async def run_daemon():
-    """Run the persistent daemon."""
-    global mcp_proc, mcp_reader, mcp_writer
+async def inactivity_monitor(shutdown_callback):
+    """Monitor for inactivity and trigger shutdown after timeout."""
+    global last_activity_time
 
+    while True:
+        await asyncio.sleep(10)  # Check every 10 seconds for responsive timeout
+        inactive_time = time.time() - last_activity_time
+        if inactive_time > INACTIVITY_TIMEOUT:
+            await shutdown_callback()
+            return
+
+
+async def run_daemon(instance_id: str):
+    """Run the persistent daemon."""
+    global mcp_proc, mcp_reader, mcp_writer, current_instance_id, last_activity_time
+
+    current_instance_id = instance_id
+    last_activity_time = time.time()
     ensure_state_dir()
 
+    socket_path = get_socket_path(instance_id)
+    pid_file = get_pid_file(instance_id)
+
     # Clean up old socket if exists
-    if SOCKET_PATH.exists():
-        SOCKET_PATH.unlink()
+    if socket_path.exists():
+        socket_path.unlink()
 
     # Load config
     config = load_config()
@@ -255,29 +310,38 @@ async def run_daemon():
     mcp_writer = mcp_proc.stdin
 
     # Write PID file
-    PID_FILE.write_text(str(os.getpid()))
+    pid_file.write_text(str(os.getpid()))
 
-    print(f"Starting Unix socket server at {SOCKET_PATH}...", file=sys.stderr)
+    print(f"Starting Unix socket server at {socket_path}...", file=sys.stderr)
 
     # Start Unix socket server
     server = await asyncio.start_unix_server(
         handle_client,
-        path=str(SOCKET_PATH)
+        path=str(socket_path)
     )
 
-    print(f"Daemon ready. PID: {os.getpid()}", file=sys.stderr)
+    print(f"Daemon ready. Instance: {instance_id} PID: {os.getpid()}", file=sys.stderr)
+
+    # Output instance ID to stdout for capture (all other output goes to stderr)
+    print(instance_id)
 
     # Setup signal handlers for graceful shutdown
     loop = asyncio.get_event_loop()
+    shutdown_triggered = asyncio.Event()
 
-    async def handle_shutdown(sig):
-        print(f"\nReceived {sig.name}, shutting down...", file=sys.stderr)
+    async def handle_shutdown(sig=None):
+        if shutdown_triggered.is_set():
+            return
+        shutdown_triggered.set()
+        if sig:
+            print(f"\nReceived {sig.name}, shutting down...", file=sys.stderr)
         await shutdown_mcp()
         server.close()
         await server.wait_closed()
-        SOCKET_PATH.unlink(missing_ok=True)
-        PID_FILE.unlink(missing_ok=True)
-        loop.stop()
+        socket_path.unlink(missing_ok=True)
+        pid_file.unlink(missing_ok=True)
+        # Exit cleanly instead of stopping loop (avoids RuntimeError)
+        os._exit(0)
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(
@@ -285,35 +349,39 @@ async def run_daemon():
             lambda s=sig: asyncio.create_task(handle_shutdown(s))
         )
 
-    # Run both the socket server and MCP response reader
+    # Run socket server, MCP response reader, and inactivity monitor
     try:
         await asyncio.gather(
             server.serve_forever(),
             read_mcp_responses(),
+            inactivity_monitor(handle_shutdown),
         )
     except KeyboardInterrupt:
         print("\nShutting down daemon...", file=sys.stderr)
     finally:
         # Cleanup
-        await shutdown_mcp()
-        server.close()
-        await server.wait_closed()
-        SOCKET_PATH.unlink(missing_ok=True)
-        PID_FILE.unlink(missing_ok=True)
+        if not shutdown_triggered.is_set():
+            await shutdown_mcp()
+            server.close()
+            await server.wait_closed()
+            socket_path.unlink(missing_ok=True)
+            pid_file.unlink(missing_ok=True)
 
 
 # ============================================================================
 # CLIENT MODE - Connect to daemon and send commands
 # ============================================================================
 
-async def send_command(tool_name: str, args: Dict[str, Any]) -> Any:
+async def send_command(instance_id: str, tool_name: str, args: Dict[str, Any]) -> Any:
     """Send a command to the daemon via socket."""
-    if not is_daemon_running():
-        raise RuntimeError("Daemon not running. Start with: bt daemon start")
+    if not is_daemon_running(instance_id):
+        raise RuntimeError(f"Daemon instance '{instance_id}' not running. Start with: browsertools.py daemon start")
+
+    socket_path = get_socket_path(instance_id)
 
     # Connect to daemon's Unix socket with increased limit for large responses
     reader, writer = await asyncio.open_unix_connection(
-        str(SOCKET_PATH),
+        str(socket_path),
         limit=1024 * 1024 * 10  # 10MB limit for large snapshots
     )
 
@@ -372,7 +440,7 @@ def clean_output(result: Any) -> str:
     return str(result)
 
 
-async def execute_command(cmd: str, cmd_args: Dict[str, Any]):
+async def execute_command(instance_id: str, cmd: str, cmd_args: Dict[str, Any]):
     """Execute a single command via daemon."""
 
     # Map commands to MCP tools
@@ -452,7 +520,7 @@ async def execute_command(cmd: str, cmd_args: Dict[str, Any]):
         raise ValueError(f"Unknown command: {cmd}")
 
     # Send to daemon
-    result = await send_command(tool_name, tool_args)
+    result = await send_command(instance_id, tool_name, tool_args)
     return clean_output(result)
 
 
@@ -463,21 +531,21 @@ async def execute_command(cmd: str, cmd_args: Dict[str, Any]):
 async def main():
     parser = argparse.ArgumentParser(
         prog="browsertools.py",
-        description="Chrome DevTools MCP wrapper - persistent daemon mode",
+        description="Chrome DevTools MCP wrapper - multi-instance daemon mode",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=r"""
 browsertools.py - Chrome DevTools automation tool
 
-
 Usage: uv run .agents/tools/chrome-devtools/browsertools.py <command>
 
 DAEMON MANAGEMENT:
-  daemon start          Start persistent daemon + Chrome
-                        IMPORTANT: Run in background with &
-                        Example: uv run .agents/tools/chrome-devtools/browsertools.py daemon start &
-  daemon stop           Stop daemon, kill Chrome cleanly
-  daemon status         Check if daemon running
+  daemon start          Start new daemon instance
+                        Returns: "browsertools daemon started. Instance ID: <id>"
+  daemon stop <id>      Stop daemon. kill chrome cleanly.
   daemon config         Create config file
+
+ALL OTHER COMMANDS REQUIRE --instance <id>:
+  --instance <id>       Required for all browser commands
 
 NAVIGATION:
   nav <url>             Navigate to URL
@@ -491,37 +559,25 @@ INSPECTION:
   shot [path]           Screenshot viewport (optional: save to path)
   eval <js>             Execute JavaScript, returns JSON
     --args <json>       JSON array of element references (advanced)
-                        Simple: "() => document.title"
-                        Complex: "(el) => el.innerText" --args '[{"uid":"1_23"}]'
 
 INTERACTION:
   click <uid>           Click element by UID from snapshot
   fill <uid> <value>    Fill input/textarea or select option
-  key <key>             Press key or combo
-                        Examples: "Enter", "Tab", "Control+A"
+  key <key>             Press key or combo (e.g., "Enter", "Tab", "Control+A")
   hover <uid>           Hover over element
   drag <from> <to>      Drag element from UID to target UID
-  fillform <json>       Fill multiple form fields at once
-                        Example: '[{"uid":"1_1","value":"text"}]'
+  fillform <json>       Fill multiple form fields
 
 DEBUGGING:
-  conslist              List console messages
-    --types error warn  Filter by type
-    --size N            Max messages
-
+  conslist              List console messages (--types, --size)
   consget <msgid>       Get console message details
-
-  netlist               List network requests
-    --types xhr fetch   Filter by resource type
-    --size N            Max requests
-
-  netget [reqid]        Get request details (omit reqid for currently selected)
+  netlist               List network requests (--types, --size)
+  netget [reqid]        Get request details
 
 PAGE MANIPULATION:
-  resize <width> <height>        Resize viewport
-  dialog <accept|dismiss>        Handle alert/confirm/prompt
-    --text <text>                Text for prompt
-  upload <uid> <file_path>       Upload file
+  resize <w> <h>        Resize viewport
+  dialog <action>       Handle alert/confirm/prompt (accept|dismiss)
+  upload <uid> <path>   Upload file
 
 USAGE TIPS:
 **Snapshots** are verbose. Always try to pipe grep first
@@ -535,31 +591,34 @@ Limit output for **debugging** commands
     - Console: conslist --size 5 --types error
 
 EXAMPLES:
-  # Login workflow
-  uv run .agents/tools/chrome-devtools/browsertools.py daemon start &
-  sleep 5  # Wait for daemon to be ready
-  uv run .agents/tools/chrome-devtools/browsertools.py nav http://app.com/login
-  uv run .agents/tools/chrome-devtools/browsertools.py snap | grep -iC5 "email\|username\|login"
-  uv run .agents/tools/chrome-devtools/browsertools.py fill 1_23 user@example.com
-  uv run .agents/tools/chrome-devtools/browsertools.py snap | grep -iC5 "button.*(submit|login|sign.?in)"
-  uv run .agents/tools/chrome-devtools/browsertools.py click 1_25 | grep -iC5 "dashboard\|home\|welcome"
-  uv run .agents/tools/chrome-devtools/browsertools.py daemon stop
+  # Start daemon (backgrounds automatically, prints instance ID)
+  uv run .agents/tools/chrome-devtools/browsertools.py daemon start
+  # Output: browsertools daemon started. Instance ID: a3f7b2c1
 
-IMPORTANT:
-  - UIDs only valid from latest snapshot (interaction commands return fresh ones)
-  - Daemon maintains state (snapshots, network, console) across all commands
-  - Always stop daemon when you are finished to clean up browser resources
+  # Use instance for all commands
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 nav http://app.com/login
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 snap | grep -iC5 "email\|username\|login"
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 fill 1_23 user@example.com
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 snap | grep -iC5 "button.*(submit|login|sign.?in)"
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 click 1_25 | grep -iC5 "dashboard\|home\|welcome"
+
+  # Stop when finished to clean up resources
+  uv run .agents/tools/chrome-devtools/browsertools.py daemon stop a3f7b2c1
         """
     )
+
+    # Global --instance argument
+    parser.add_argument("--instance", "-i", help="Daemon instance ID (required for browser commands)")
 
     subparsers = parser.add_subparsers(dest="cmd", required=True)
 
     # Daemon management
     daemon = subparsers.add_parser("daemon", help="Manage daemon")
     daemon_sub = daemon.add_subparsers(dest="daemon_cmd", required=True)
-    daemon_sub.add_parser("start", help="Start daemon")
-    daemon_sub.add_parser("stop", help="Stop daemon")
-    daemon_sub.add_parser("status", help="Check daemon status")
+    daemon_sub.add_parser("start", help="Start new daemon instance (returns instance ID)")
+    stop_parser = daemon_sub.add_parser("stop", help="Stop daemon instance")
+    stop_parser.add_argument("instance_id", nargs="?", help="Instance ID to stop")
+    stop_parser.add_argument("--all", dest="stop_all", action="store_true", help=argparse.SUPPRESS)  # Hidden
     daemon_sub.add_parser("config", help="Create default config file")
 
     # Browser commands
@@ -636,37 +695,81 @@ IMPORTANT:
     # Handle daemon commands
     if args.cmd == "daemon":
         if args.daemon_cmd == "start":
-            if is_daemon_running():
-                print("Daemon already running", file=sys.stderr)
-                sys.exit(1)
-            await run_daemon()
+            # Generate new instance ID
+            instance_id = generate_instance_id()
+
+            # Fork to background
+            pid = os.fork()
+
+            if pid > 0:
+                # Parent process - print result and exit
+                # Give child a moment to start
+                time.sleep(0.5)
+                print(f"browsertools daemon started. Instance ID: {instance_id}")
+                return  # Exit from async main, let asyncio.run() clean up
+            else:
+                # Child process - detach and run daemon
+                os.setsid()  # Create new session, detach from terminal
+
+                # Redirect stdin/stdout/stderr to /dev/null (daemon runs silently)
+                devnull_r = os.open(os.devnull, os.O_RDONLY)
+                devnull_w = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(devnull_r, sys.stdin.fileno())
+                os.dup2(devnull_w, sys.stdout.fileno())
+                os.dup2(devnull_w, sys.stderr.fileno())
+                os.close(devnull_r)
+                os.close(devnull_w)
+
+                # Create fresh event loop for child (parent's loop is unusable after fork)
+                asyncio.set_event_loop(asyncio.new_event_loop())
+
+                # Run the daemon in the new event loop (this blocks until shutdown)
+                asyncio.run(run_daemon(instance_id))
+                os._exit(0)
 
         elif args.daemon_cmd == "stop":
-            pid = get_daemon_pid()
-            if not pid:
-                print("Daemon not running", file=sys.stderr)
-                sys.exit(1)
-            os.kill(pid, signal.SIGTERM)
-            print(f"Stopped daemon (PID {pid})")
-
-        elif args.daemon_cmd == "status":
-            if is_daemon_running():
-                print(f"Daemon running (PID {get_daemon_pid()})")
-                print(f"Socket: {SOCKET_PATH}")
+            if args.stop_all:
+                # Hidden --all flag: stop all running instances
+                instances = get_all_instances()
+                if not instances:
+                    print("No running instances", file=sys.stderr)
+                    sys.exit(1)
+                for inst_id in instances:
+                    pid = get_daemon_pid(inst_id)
+                    if pid:
+                        os.kill(pid, signal.SIGTERM)
+                        print(f"Stopped instance {inst_id} (PID {pid})", file=sys.stderr)
+            elif args.instance_id:
+                # Stop specific instance
+                pid = get_daemon_pid(args.instance_id)
+                if not pid:
+                    print(f"Instance '{args.instance_id}' not running", file=sys.stderr)
+                    sys.exit(1)
+                os.kill(pid, signal.SIGTERM)
+                print(f"Stopped instance {args.instance_id} (PID {pid})", file=sys.stderr)
             else:
-                print("Daemon not running")
+                print("Error: instance_id required. Usage: daemon stop <instance_id>", file=sys.stderr)
+                sys.exit(1)
 
         elif args.daemon_cmd == "config":
             save_default_config()
-            print(f"\nEdit {CONFIG_FILE} to customize MCP server settings.")
-            print("\nExamples:")
-            print("  Headless mode: --headless=true")
-            print("  Custom Chrome: --executablePath=/path/to/chrome")
-            print("  Sandbox: --headless=true --executablePath=/usr/local/bin/chromium-mcp")
+            print(f"\nEdit {CONFIG_FILE} to customize MCP server settings.", file=sys.stderr)
+            print("\nExamples:", file=sys.stderr)
+            print("  Headless mode: --headless=true", file=sys.stderr)
+            print("  Custom Chrome: --executablePath=/path/to/chrome", file=sys.stderr)
 
         return
 
-    # Execute browser command
+    # Execute browser command - requires --instance
+    if not args.instance:
+        print("Error: --instance <id> is required for browser commands", file=sys.stderr)
+        print("Start a daemon first: uv run browsertools.py daemon start", file=sys.stderr)
+        sys.exit(1)
+
+    if not is_daemon_running(args.instance):
+        print(f"Error: Instance '{args.instance}' is not running", file=sys.stderr)
+        sys.exit(1)
+
     try:
         cmd_args_dict = {}
 
@@ -724,7 +827,7 @@ IMPORTANT:
         elif args.cmd == "fillform":
             cmd_args_dict["elements"] = json.loads(args.elements)
 
-        output = await execute_command(args.cmd, cmd_args_dict)
+        output = await execute_command(args.instance, args.cmd, cmd_args_dict)
         print(output)
 
     except Exception as e:

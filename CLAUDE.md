@@ -83,7 +83,7 @@ TEAM COLLABORATION:
 - All agents in a batch complete independently without waiting for others
 
 Parallel Specialization Examples
-- **Multiple Engineers/Consultants**: Each owns different module/file
+- **Multiple Engineers+Consultants**: Each owns different module/file
 - **Support Roles**: Architect answers questions or researches and suggests solution approachs, Designer creates storybook assets, UAT manually performs user flows and provides feedback
 
 ### Inter-Batch Sequencing (Dependencies)
@@ -124,8 +124,8 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 #### New Feature Workflow
 1. **Discovery Batch**: [Architect, Designer, Consutant]
 2. **Planning Batch**: [Planner] - creates phase-id and WPs
-3. **Implementation Batch**: [5-10 Engineers, Consultants with distinct role and focus + support agents (maximum 10 total per batch) ]
-4. **Review+Refine Batch**: [5-10 Engineers, Consultants with previous batch task (swap Engineers and Consultants so they review/refine each others work) to review+refine + support agents (maximum 10 total per batch) ]
+3. **Implementation Batch**: [Engineers, Gemini and Codex Consultants with distinct role and focus + support agents (maximum 10 total per batch) ]
+4. **Review+Refine Batch**: [Engineers, Codex and Gemini Consultants with previous batch task (alternate Engineers and Consultants so they review/refine each others work) to review+refine + support agents (maximum 10 total per batch) ]
 5. **Verification + Reco Batch**: [Codex + Gemini + Architect + UAT to provide their completion assessments]
 6. **If verificaiton fail**: Loop Review+refine -> Verification Batches until PASS
 
@@ -167,7 +167,7 @@ Research/Architecture → Planning → Implementation → Verification → Next 
 
 ## Consultant Agent
 Consultants come in two variants: Codex and Gemini. leverage them both liberally to diversify.
-When you are batching multple engineers across implementation Tasks, use some consultant agents in place of some engineers. Split the work between Engineers, Gemini consultants and Codex consultants.
+For implementation batches, distribute the tasks across engineers, codex consultants, and gemini consultants. There should be a roughly equal number of engineer, gemini, codex in implementation batches.
 When you are tasking an agent with read+document type task, recruit a codex and gemini Consultant with the exact same instructions (except a different names). Include the consultants in the same batch. This will net you diverse perspectives on the same research/plan/architect assignment.
 
 
