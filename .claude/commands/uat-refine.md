@@ -17,13 +17,13 @@ You must manage and maintain Todos dynamically, refine Todos after every decisio
 Populate your initial Todos with your step by step WORKFLOW:
 
 [WORKFLOW]
-PLAN: ULTRATHINK about the UI/UX pages, features, user flows involved and the dependencies between. Break down ASSIGNMENT into dependency sequenced test scenario batches.
+PLAN: ULTRATHINK about the UI/UX pages, features, user flows involved and the dependencies between. Break down ASSIGNMENT into dependency sequenced test scenarios batches.
 ENABLE: ensure the dev server is running. you may need to kill an old process and start it again `.agents/repo.md`
 
 For each test scenario batch sequence:
-1. FEEDBACK: Launch a batch of UAT agents and a support designer. Each UAT agent should be given a focused test scenario or portion of the app to review. they must visually inspect the UI/UX and provide feedback on: design allignment, expected functionality, issues encountered, error logs. These UAT agents are proxy for the user. Their perspecttive matters!
+1. FEEDBACK: Launch a batch of multiple UAT agents and a support designer. Each UAT agent in the batch should be given a focused test scenario or portion of the app to review. they must visually inspect the UI/UX and provide feedback on: design allignment, expected functionality, issues encountered, error logs. These UAT agents are proxy for the user. Their perspecttive matters!
 2. IMPLEMENT: Launch a blended Implementation batch of engineers + codex consultants + gemini consultants  to implement changes based on UAT FEEDBACK.
-3. REQUEST APPROVAL: Task a batch of UAT agent to manually execute the test scenario, and provide their assessment of changes, design allignment, expected functionality.
+3. REQUEST APPROVAL: Task a batch of one or more (depending on the number of impacted areas/changes) UAT agents. Each UAT agent in this batch should manually execute one of the test scenarios/areas impacted, and provide their assessment of changes, design allignment, expected functionality.
  - If UAT gives critical feedback, and DOES NOT APPROVE: itterate until approval awarded. 
  - When all UAT agents in the batch give signoff approval for deployment, continue to the next to the next batch of test scenarios
 [/WORKFLOW]
@@ -32,7 +32,6 @@ For each test scenario batch sequence:
 ## 🎯 CRITICAL EXECUTION RULES
 
 ### Dependency Laws
-⚡ **NEVER** batch multiple UAT agents together. Focus on one scenario at a time.
 ⚡ **ALWAYS** Take UAT feedback seriously. They are the user's representitive.
 ⚡ **ALWAYS** Add new todos if Approval is not awarded.
 ⚡ **ALWAYS** blend consultants + engineers for implementation/refinement tasks

@@ -569,6 +569,7 @@ def spawn_job(harness: str, assignment: str) -> dict:
     status: Optional[JobStatus] = None
     log_file = None
     buffered_lines: list[str] = []  # Lines read after job_id but before fork
+    first_lines: list[str] = []  # Capture first few lines for error reporting
 
     try:
         # Read stdout until we get the job ID
@@ -577,6 +578,10 @@ def spawn_job(harness: str, assignment: str) -> dict:
                 if process.poll() is not None:
                     break
                 continue
+
+            # Capture first few lines for debugging if we fail
+            if len(first_lines) < 10:
+                first_lines.append(line.rstrip())
 
             # Try to parse as JSON
             event = try_parse_json(line)
@@ -660,7 +665,11 @@ def spawn_job(harness: str, assignment: str) -> dict:
         if log_file:
             log_file.close()
 
-        return {"error": "Failed to extract job ID from harness output"}
+        return {
+            "error": "Failed to extract job ID from harness output",
+            "exit_code": process.poll(),
+            "output": first_lines,
+        }
 
     except Exception as e:
         # Clean up on error
@@ -824,7 +833,7 @@ def main():
             result = spawn_job(args.harness, assignment)
 
             if "error" in result:
-                print(json.dumps(result))
+                print(json.dumps(result, indent=2))
                 sys.exit(1)
 
             # Print user-friendly message with status command

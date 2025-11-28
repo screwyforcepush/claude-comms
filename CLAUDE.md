@@ -221,7 +221,7 @@ When you are tasking an agent with read+document type task, recruit a codex and 
 - **designer**: Creates UI/UX specifications, component libraries
 - **engineer**: Implements features end-to-end with code, writes comprehensive test suites, and documentation. Reviews code for quality, security, and standards compliance. Ensures all builds, tests, and checks pass. Visually inspects the running application against UI/UX design/guide.
 - **gemini|codex consultant**: diverse multi-hat. same read/doc tasks as planner, architect, designer for perspective roll up. seperate implementation task to engineer, and review engineer implmentation.
-- **uat**: uses browser automation to manually test user flows. Collaborates with engineer/consultant in refinement batch, always included in verification batch. Max 1 UAT agent per batch. 
+- **uat**: uses browser automation to manually test user flows. Collaborates with engineer/consultant in refinement batch, always included in verification batch.
 
 ## Critical Reminders
 
