@@ -42,10 +42,12 @@ describe('Installer', () => {
       validatePythonEnvironment: jest.fn().mockResolvedValue(null),
       checkExistingFiles: jest.fn().mockResolvedValue(null),
       validateNetworkAccess: jest.fn().mockResolvedValue(null),
-      // For most tests, paths exist except repo.md (which we want to write)
+      // For most tests, paths exist except user-customizable files (which we want to write)
       pathExists: jest.fn().mockImplementation((pathArg) => {
         // repo.md should not exist (so we copy it)
         if (pathArg.includes('repo.md')) return Promise.resolve(false);
+        // chrome-devtools config.json should not exist (so we copy it)
+        if (pathArg.includes('chrome-devtools/config.json')) return Promise.resolve(false);
         // For settings.local.json, check if it was "written"
         if (pathArg.includes('settings.local.json')) {
           return Promise.resolve(writtenFiles.has('settings.local.json'));
