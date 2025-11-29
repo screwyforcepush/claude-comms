@@ -1,6 +1,6 @@
 {
   "name": "claude-comms",
-  "version": "1.0.43",
+  "version": "1.0.44",
   "description": "NPX installer for Claude Code hooks and observability setup",
   "main": "src/index.js",
   "bin": {
