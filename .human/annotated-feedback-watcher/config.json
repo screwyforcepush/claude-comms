@@ -1,0 +1,5 @@
+{
+  "convexUrl": "https://utmost-llama-56.convex.cloud",
+  "project": "storybook",
+  "command": "claude -p \"/action-feedback-item {id}\""
+}

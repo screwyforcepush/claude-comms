@@ -6,22 +6,30 @@
  * Uses WebSocket subscription - no polling, instant updates.
  * Triggers on startup for existing pending items, plus any new ones.
  *
+ * CONFIG FILE:
+ *   Place config.json in the same directory with:
+ *   {
+ *     "convexUrl": "https://foo.convex.cloud",
+ *     "project": "my-project",
+ *     "command": "claude -p \"respond hello world\""
+ *   }
+ *
  * USAGE:
- *   npx tsx watch-feedback.ts <convex_url> <project> [command]
+ *   npx tsx watch-feedback.ts [convex_url] [project] [command]
  *
  * STANDALONE (no npm install needed):
- *   node watch-feedback-standalone.cjs <convex_url> <project> [command]
+ *   node watch-feedback-standalone.cjs [convex_url] [project] [command]
  *
- * ARGUMENTS:
+ * ARGUMENTS (override config file values):
  *   convex_url  - Convex deployment URL (e.g., https://foo.convex.cloud)
  *   project     - Project name to filter feedback
  *   command     - Shell command to run (default: claude -p "respond hello world")
  *                 The feedback ID is appended as an argument.
  *
  * EXAMPLES:
- *   node watch-feedback-standalone.cjs https://foo.convex.cloud my-project
- *   node watch-feedback-standalone.cjs https://foo.convex.cloud my-project "echo"
- *   node watch-feedback-standalone.cjs https://foo.convex.cloud my-project "./handle.sh"
+ *   npx tsx watch-feedback.ts                                    # uses config.json
+ *   npx tsx watch-feedback.ts https://foo.convex.cloud my-project
+ *   npx tsx watch-feedback.ts https://foo.convex.cloud my-project "echo"
  *
  * OUTPUT:
  *   received new feedback <id>
@@ -31,14 +39,37 @@
 import { spawn } from "child_process";
 import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import { readFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
-const CONVEX_URL = process.argv[2];
-const PROJECT = process.argv[3];
-const COMMAND = process.argv[4] || 'claude -p "respond hello world"';
+// Load config file from same directory as script
+interface Config {
+  convexUrl?: string;
+  project?: string;
+  command?: string;
+}
+
+let config: Config = {};
+try {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const configPath = join(__dirname, "config.json");
+  config = JSON.parse(readFileSync(configPath, "utf-8"));
+} catch {
+  // Config file not found or invalid - that's okay, CLI args can provide values
+}
+
+// CLI args override config file values
+const CONVEX_URL = process.argv[2] || config.convexUrl;
+const PROJECT = process.argv[3] || config.project;
+const COMMAND = process.argv[4] || config.command || 'claude -p "respond hello world"';
 
 if (!CONVEX_URL || !PROJECT) {
   console.error(
-    "Usage: npx tsx watch-feedback.ts <convex_url> <project> [command]"
+    "Usage: npx tsx watch-feedback.ts [convex_url] [project] [command]"
+  );
+  console.error(
+    "  Or configure via config.json in the same directory"
   );
   console.error(
     "Example: npx tsx watch-feedback.ts https://foo.convex.cloud my-project"
@@ -58,7 +89,10 @@ function runCommand(feedbackId: string) {
 
   // Use user's shell with -i (interactive) to source profile (aliases, PATH)
   const userShell = process.env.SHELL || "/bin/sh";
-  const fullCommand = `${COMMAND} ${feedbackId}`;
+  // Support {id} placeholder, otherwise append ID at end
+  const fullCommand = COMMAND.includes("{id}")
+    ? COMMAND.replace(/\{id\}/g, feedbackId)
+    : `${COMMAND} ${feedbackId}`;
 
   const child = spawn(userShell, ["-ic", fullCommand], {
     detached: true,

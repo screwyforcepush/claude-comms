@@ -8085,15 +8085,29 @@ var _systemSchema = defineSchema({
 });
 
 // scripts/watch-feedback.ts
-var CONVEX_URL = process.argv[2];
-var PROJECT = process.argv[3];
-var COMMAND = process.argv[4] || 'claude -p "respond hello world"';
+// Load config file from same directory as script
+var config = {};
+try {
+  var fs = require("fs");
+  var path = require("path");
+  var configPath = path.join(__dirname, "config.json");
+  config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+} catch {
+  // Config file not found or invalid - that's okay, CLI args can provide values
+}
+// CLI args override config file values
+var CONVEX_URL = process.argv[2] || config.convexUrl;
+var PROJECT = process.argv[3] || config.project;
+var COMMAND = process.argv[4] || config.command || 'claude -p "respond hello world"';
 if (!CONVEX_URL || !PROJECT) {
   console.error(
-    "Usage: npx tsx watch-feedback.ts <convex_url> <project> [command]"
+    "Usage: node watch-feedback-standalone.cjs [convex_url] [project] [command]"
   );
   console.error(
-    "Example: npx tsx watch-feedback.ts https://foo.convex.cloud my-project"
+    "  Or configure via config.json in the same directory"
+  );
+  console.error(
+    "Example: node watch-feedback-standalone.cjs https://foo.convex.cloud my-project"
   );
   process.exit(2);
 }
@@ -8104,7 +8118,10 @@ console.log(`Command: ${COMMAND}`);
 function runCommand(feedbackId) {
   console.log(`received new feedback ${feedbackId}`);
   const userShell = process.env.SHELL || "/bin/sh";
-  const fullCommand = `${COMMAND} ${feedbackId}`;
+  // Support {id} placeholder, otherwise append ID at end
+  const fullCommand = COMMAND.includes("{id}")
+    ? COMMAND.replace(/\{id\}/g, feedbackId)
+    : `${COMMAND} ${feedbackId}`;
   const child = (0, import_child_process.spawn)(userShell, ["-ic", fullCommand], {
     detached: true,
     stdio: "inherit",
