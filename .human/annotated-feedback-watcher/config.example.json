@@ -1,0 +1,6 @@
+{
+  "convexUrl": "https://your-deployment.convex.cloud",
+  "project": "your-project-name",
+  "command": "claude -p \"/action-feedback-item {id}\"",
+  "password": "optional-shared-secret"
+}
