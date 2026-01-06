@@ -33,26 +33,10 @@ else
     echo "❌ npm not found"
 fi
 
-# Check Claude Code installation and authentication
+# Check Claude Code installation
 if command -v claude > /dev/null 2>&1; then
     echo "✅ Claude Code CLI is available"
-    
-    # Configure Claude authentication if token is available
-    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-        echo "🔑 Configuring Claude Code authentication..."
-        # Export token for Claude Code to use
-        export CLAUDE_CODE_OAUTH_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN}"
-        
-        # Create .env file in workspace for Claude Code CLI to detect
-        echo "CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}" > .env
-        echo "📝 Created .env file with Claude token in workspace"
-        
-        echo "✅ Claude Code authentication configured"
-        echo "ℹ️  Claude Code is ready to use without manual login"
-    else
-        echo "ℹ️  No Claude token found - manual authentication required"
-        echo "   To authenticate: claude auth login"
-    fi
+    echo "ℹ️  To authenticate: claude auth login"
 else
     echo "❌ Claude Code CLI not found"
 fi
