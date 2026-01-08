@@ -114,10 +114,12 @@ cli.ts unblock <aid>                  # Resume
 
 ## Config
 
+Copy `config.example.json` to `config.json` and edit:
+
 ```json
 {
-  "convexUrl": "https://utmost-vulture-618.convex.cloud",
-  "namespace": "claude-code-hooks-multi-agent-observability",
+  "convexUrl": "https://your-project.convex.cloud",
+  "namespace": "your-repo-name",
   "defaultHarness": "claude",
   "timeoutMs": 600000,
   "pmHarness": "claude"
