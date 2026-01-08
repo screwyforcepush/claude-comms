@@ -1,0 +1,7 @@
+{
+  "convexUrl": "https://your-project.convex.cloud",
+  "namespace": "your-repo-name",
+  "defaultHarness": "claude",
+  "timeoutMs": 600000,
+  "pmHarness": "claude"
+}

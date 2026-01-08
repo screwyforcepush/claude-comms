@@ -1,7 +1,0 @@
-{
-  "convexUrl": "https://utmost-vulture-618.convex.cloud",
-  "namespace": "claude-code-hooks-multi-agent-observability",
-  "defaultHarness": "claude",
-  "timeoutMs": 600000,
-  "pmHarness": "claude"
-}

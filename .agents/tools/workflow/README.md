@@ -20,6 +20,12 @@ Claude/Codex/Gemini headless processes
 
 ### 1. Configure
 
+Copy the example config and edit:
+
+```bash
+cp config.example.json config.json
+```
+
 Edit `config.json`:
 
 ```json
