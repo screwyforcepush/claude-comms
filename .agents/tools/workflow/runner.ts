@@ -50,6 +50,32 @@ interface Job {
   createdAt: number;
 }
 
+// Chat-specific types
+interface ChatThread {
+  _id: string;
+  namespace: string;
+  title: string;
+  mode: "jam" | "cook";
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface ChatMessage {
+  _id: string;
+  threadId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+}
+
+interface ChatJobContext {
+  threadId: string;
+  namespace: string;
+  mode: "jam" | "cook";
+  messages: ChatMessage[];
+  latestUserMessage: string;
+}
+
 // Config
 interface Config {
   convexUrl: string;
@@ -79,21 +105,112 @@ function loadTemplate(jobType: string): string {
   }
 }
 
+// Build job history summary
+function buildJobHistory(jobs: Job[]): string {
+  if (!jobs || jobs.length === 0) return "(no previous jobs)";
+
+  const lines = jobs.map((j, i) => {
+    const status = j.status === 'complete' ? '✓' : j.status === 'failed' ? '✗' : '○';
+    const duration = j.completedAt && j.startedAt
+      ? `${Math.round((j.completedAt - j.startedAt) / 1000)}s`
+      : '-';
+    const resultPreview = j.result
+      ? j.result.slice(0, 150).replace(/\n/g, ' ') + (j.result.length > 150 ? '...' : '')
+      : '-';
+    return `${i + 1}. [${status}] ${j.jobType} (${j.harness}) - ${j.status} - ${duration}\n   Result: ${resultPreview}`;
+  });
+
+  return lines.join('\n\n');
+}
+
 // Prompt building
 function buildPrompt(
   jobType: string,
   assignment: Assignment,
   job: Job,
-  previousResult: string | null
+  previousResult: string | null,
+  jobHistory: Job[] = []
 ): string {
   const template = loadTemplate(jobType);
 
   return template
-    .replace("{{NORTH_STAR}}", assignment.northStar)
-    .replace("{{ARTIFACTS}}", assignment.artifacts || "(none)")
-    .replace("{{DECISIONS}}", assignment.decisions || "(none)")
-    .replace("{{CONTEXT}}", job.context || "(no specific context)")
-    .replace("{{PREVIOUS_RESULT}}", previousResult || "(no previous result)");
+    .replace(/\{\{NORTH_STAR\}\}/g, assignment.northStar)
+    .replace(/\{\{ARTIFACTS\}\}/g, assignment.artifacts || "(none)")
+    .replace(/\{\{DECISIONS\}\}/g, assignment.decisions || "(none)")
+    .replace(/\{\{CONTEXT\}\}/g, job.context || "(no specific context)")
+    .replace(/\{\{PREVIOUS_RESULT\}\}/g, previousResult || "(no previous result)")
+    .replace(/\{\{ASSIGNMENT_ID\}\}/g, assignment._id)
+    .replace(/\{\{CURRENT_JOB_ID\}\}/g, job._id)
+    .replace(/\{\{JOB_HISTORY\}\}/g, buildJobHistory(jobHistory));
+}
+
+// Build formatted conversation history for chat
+function buildChatHistory(messages: ChatMessage[]): string {
+  if (!messages || messages.length === 0) return "(no previous messages)";
+
+  return messages
+    .map((m) => {
+      const role = m.role === "user" ? "**User:**" : "**Assistant:**";
+      return `${role}\n${m.content}`;
+    })
+    .join("\n\n---\n\n");
+}
+
+// Chat prompt building with Handlebars-style conditionals
+function buildChatPrompt(chatContext: ChatJobContext): string {
+  const template = loadTemplate("product-owner");
+
+  // Process Handlebars-style conditionals
+  let processed = template;
+
+  // Handle {{#if COOK_MODE}}...{{else}}...{{/if}}
+  const cookModeRegex = /\{\{#if COOK_MODE\}\}([\s\S]*?)\{\{else\}\}([\s\S]*?)\{\{\/if\}\}/g;
+  processed = processed.replace(cookModeRegex, (_match, cookContent, jamContent) => {
+    return chatContext.mode === "cook" ? cookContent : jamContent;
+  });
+
+  // Handle simple {{#if COOK_MODE}}...{{/if}} without else
+  const simpleCookModeRegex = /\{\{#if COOK_MODE\}\}([\s\S]*?)\{\{\/if\}\}/g;
+  processed = processed.replace(simpleCookModeRegex, (_match, content) => {
+    return chatContext.mode === "cook" ? content : "";
+  });
+
+  // Replace template variables
+  return processed
+    .replace(/\{\{THREAD_ID\}\}/g, chatContext.threadId)
+    .replace(/\{\{NAMESPACE\}\}/g, chatContext.namespace)
+    .replace(/\{\{MODE\}\}/g, chatContext.mode)
+    .replace(/\{\{MESSAGES\}\}/g, buildChatHistory(chatContext.messages.slice(0, -1))) // Exclude latest
+    .replace(/\{\{LATEST_MESSAGE\}\}/g, chatContext.latestUserMessage);
+}
+
+// Parse chat context from job context field
+function parseChatContext(contextStr: string): ChatJobContext | null {
+  try {
+    return JSON.parse(contextStr) as ChatJobContext;
+  } catch {
+    console.error("Failed to parse chat context:", contextStr);
+    return null;
+  }
+}
+
+// Check if a job is a chat job
+function isChatJob(job: Job): boolean {
+  return job.jobType === "chat" || job.jobType === "product-owner";
+}
+
+// Save assistant response to chat thread
+async function saveChatResponse(threadId: string, content: string): Promise<void> {
+  try {
+    await client!.mutation(api.chatMessages.add, {
+      threadId: threadId as any,
+      role: "assistant",
+      content,
+    });
+    console.log(`[Chat] Saved assistant response to thread ${threadId}`);
+  } catch (e) {
+    console.error(`[Chat] Failed to save response:`, e);
+  }
 }
 
 // Harness command building
@@ -241,6 +358,20 @@ function createStreamHandler(harness: string): StreamHandler {
   }
 }
 
+// Fetch job history for an assignment
+async function fetchJobHistory(assignmentId: string): Promise<Job[]> {
+  try {
+    const jobs = await client!.query(api.jobs.list, { assignmentId: assignmentId as any });
+    // Sort by createdAt and filter out pending jobs
+    return jobs
+      .filter((j: Job) => j.status !== 'pending')
+      .sort((a: Job, b: Job) => a.createdAt - b.createdAt);
+  } catch (e) {
+    console.error('Failed to fetch job history:', e);
+    return [];
+  }
+}
+
 // Job execution
 async function executeJob(
   job: Job,
@@ -248,12 +379,39 @@ async function executeJob(
   previousResult: string | null
 ): Promise<void> {
   const jobId = job._id;
-  console.log(`[${jobId}] Starting ${job.jobType} job (${job.harness})`);
+  const isChat = isChatJob(job);
+  let chatContext: ChatJobContext | null = null;
+
+  console.log(`[${jobId}] Starting ${job.jobType} job (${job.harness})${isChat ? ' [CHAT]' : ''}`);
 
   // Mark job as running
   await client!.mutation(api.jobs.start, { id: jobId });
 
-  const prompt = buildPrompt(job.jobType, assignment, job, previousResult);
+  // Build prompt based on job type
+  let prompt: string;
+
+  if (isChat) {
+    // Chat job: parse context and build chat-specific prompt
+    chatContext = parseChatContext(job.context || "{}");
+    if (!chatContext) {
+      console.error(`[${jobId}] Invalid chat context, failing job`);
+      await client!.mutation(api.jobs.fail, {
+        id: jobId,
+        result: "Invalid chat context provided",
+      });
+      return;
+    }
+    prompt = buildChatPrompt(chatContext);
+    console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}`);
+  } else {
+    // Regular job: use standard prompt building
+    let jobHistory: Job[] = [];
+    if (job.jobType === 'pm' || job.jobType === 'retrospect') {
+      jobHistory = await fetchJobHistory(assignment._id);
+    }
+    prompt = buildPrompt(job.jobType, assignment, job, previousResult, jobHistory);
+  }
+
   const { cmd, args } = buildCommand(job.harness, prompt);
 
   return new Promise((resolve) => {
@@ -309,15 +467,25 @@ async function executeJob(
           id: jobId,
           result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
         });
-        // Trigger retrospect
-        await triggerPMJob(job, assignment, true);
+        // Chat jobs: save error to thread, no PM trigger
+        if (isChat && chatContext) {
+          await saveChatResponse(chatContext.threadId,
+            `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${result || "(no output)"}`
+          );
+        } else {
+          // Regular jobs: trigger retrospect
+          await triggerPMJob(job, assignment, true);
+        }
       } else if (code === 0 && handler.isComplete()) {
         await client!.mutation(api.jobs.complete, {
           id: jobId,
           result,
         });
-        // Trigger PM review (unless this was a PM job)
-        if (job.jobType !== "pm") {
+        // Chat jobs: save response to thread, no PM trigger
+        if (isChat && chatContext) {
+          await saveChatResponse(chatContext.threadId, result);
+        } else if (job.jobType !== "pm") {
+          // Regular jobs: trigger PM review
           await triggerPMJob(job, assignment, false);
         }
       } else {
@@ -325,8 +493,15 @@ async function executeJob(
           id: jobId,
           result: result || `Process exited with code ${code}`,
         });
-        // Trigger retrospect
-        await triggerPMJob(job, assignment, true);
+        // Chat jobs: save error to thread, no PM trigger
+        if (isChat && chatContext) {
+          await saveChatResponse(chatContext.threadId,
+            `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${result || `Exit code ${code}`}`
+          );
+        } else {
+          // Regular jobs: trigger retrospect
+          await triggerPMJob(job, assignment, true);
+        }
       }
 
       resolve();

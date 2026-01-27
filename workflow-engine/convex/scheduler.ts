@@ -39,11 +39,11 @@ export const getReadyJobs = query({
         if (job.status === "pending") {
           // This job is ready if:
           // - It's the head (no predecessor), OR
-          // - Previous job is complete
+          // - Previous job is complete or failed (allows recovery)
           const isHead = currentJobId === assignment.headJobId;
-          const prevComplete = prevJob?.status === "complete";
+          const prevDone = prevJob?.status === "complete" || prevJob?.status === "failed";
 
-          if (isHead || prevComplete) {
+          if (isHead || prevDone) {
             readyJobs.push({
               job,
               assignment,
@@ -119,6 +119,37 @@ export const getQueueStatus = query({
   },
 });
 
+// Get all namespaces with aggregated stats
+export const getAllNamespaces = query({
+  args: {},
+  handler: async (ctx) => {
+    const assignments = await ctx.db.query("assignments").collect();
+    const namespaceMap = new Map<
+      string,
+      {
+        name: string;
+        counts: { pending: number; active: number; blocked: number; complete: number };
+        lastActivity: number;
+      }
+    >();
+
+    for (const a of assignments) {
+      if (!namespaceMap.has(a.namespace)) {
+        namespaceMap.set(a.namespace, {
+          name: a.namespace,
+          counts: { pending: 0, active: 0, blocked: 0, complete: 0 },
+          lastActivity: 0,
+        });
+      }
+      const ns = namespaceMap.get(a.namespace)!;
+      ns.counts[a.status]++;
+      ns.lastActivity = Math.max(ns.lastActivity, a.updatedAt);
+    }
+
+    return Array.from(namespaceMap.values());
+  },
+});
+
 // Subscription-friendly: get all active/pending assignments with their job chains
 export const watchQueue = query({
   args: { namespace: v.string() },
@@ -133,6 +164,40 @@ export const watchQueue = query({
     for (const assignment of assignments) {
       if (assignment.status === "complete") continue;
 
+      // Get all jobs for this assignment
+      const jobs: Doc<"jobs">[] = [];
+      let currentJobId = assignment.headJobId;
+      while (currentJobId) {
+        const job = await ctx.db.get(currentJobId);
+        if (!job) break;
+        jobs.push(job);
+        currentJobId = job.nextJobId;
+      }
+
+      result.push({
+        assignment,
+        jobs,
+        hasRunningJob: jobs.some((j) => j.status === "running"),
+        nextPendingJob: jobs.find((j) => j.status === "pending") ?? null,
+      });
+    }
+
+    return result;
+  },
+});
+
+// D2: Get ALL assignments for a namespace (including complete) with their job chains
+export const getAllAssignments = query({
+  args: { namespace: v.string() },
+  handler: async (ctx, args) => {
+    const assignments = await ctx.db
+      .query("assignments")
+      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .collect();
+
+    const result = [];
+
+    for (const assignment of assignments) {
       // Get all jobs for this assignment
       const jobs: Doc<"jobs">[] = [];
       let currentJobId = assignment.headJobId;

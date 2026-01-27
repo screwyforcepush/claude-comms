@@ -48,4 +48,24 @@ export default defineSchema({
     .index("by_assignment", ["assignmentId"])
     .index("by_status", ["status"])
     .index("by_assignment_status", ["assignmentId", "status"]),
+
+  chatThreads: defineTable({
+    namespace: v.string(),
+    title: v.string(),
+    mode: v.union(v.literal("jam"), v.literal("cook")),
+    assignmentId: v.optional(v.id("assignments")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_namespace", ["namespace"])
+    .index("by_namespace_updated", ["namespace", "updatedAt"]),
+
+  chatMessages: defineTable({
+    threadId: v.id("chatThreads"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId"])
+    .index("by_thread_created", ["threadId", "createdAt"]),
 });

@@ -9,6 +9,8 @@
  */
 
 import type * as assignments from "../assignments.js";
+import type * as chatMessages from "../chatMessages.js";
+import type * as chatThreads from "../chatThreads.js";
 import type * as jobs from "../jobs.js";
 import type * as scheduler from "../scheduler.js";
 
@@ -20,6 +22,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   assignments: typeof assignments;
+  chatMessages: typeof chatMessages;
+  chatThreads: typeof chatThreads;
   jobs: typeof jobs;
   scheduler: typeof scheduler;
 }>;
