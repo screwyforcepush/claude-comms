@@ -8,68 +8,107 @@ interface ReadyJob {
   previousResult: string | null;
 }
 
+// Helper: find the next ready job for an assignment (if any)
+async function findReadyJob(
+  ctx: { db: { get: (id: Id<"jobs">) => Promise<Doc<"jobs"> | null> } },
+  assignment: Doc<"assignments">
+): Promise<ReadyJob | null> {
+  if (!assignment.headJobId) return null;
+
+  let currentJobId: Id<"jobs"> | undefined = assignment.headJobId;
+  let prevJob: Doc<"jobs"> | null = null;
+
+  while (currentJobId) {
+    const job = await ctx.db.get(currentJobId);
+    if (!job) break;
+
+    if (job.status === "pending") {
+      // This job is ready if:
+      // - It's the head (no predecessor), OR
+      // - Previous job is complete or failed (allows recovery)
+      const isHead = currentJobId === assignment.headJobId;
+      const prevDone = prevJob?.status === "complete" || prevJob?.status === "failed";
+
+      if (isHead || prevDone) {
+        return {
+          job,
+          assignment,
+          previousResult: prevJob?.result ?? null,
+        };
+      }
+      break;
+    }
+
+    if (job.status === "running") {
+      // Assignment already has a running job
+      break;
+    }
+
+    prevJob = job;
+    currentJobId = job.nextJobId;
+  }
+
+  return null;
+}
+
 // Get all jobs that are ready to run for a namespace
 export const getReadyJobs = query({
   args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args): Promise<ReadyJob[]> => {
-    // Get all non-complete assignments for this namespace
+    // Get all non-complete, non-blocked assignments for this namespace
     const assignments = await ctx.db
       .query("assignments")
       .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
       .collect();
 
-    const activeAssignments = assignments.filter(
+    const workableAssignments = assignments.filter(
       (a) => a.status !== "complete" && a.status !== "blocked"
     );
 
+    // Separate independent vs non-independent (sequential) assignments
+    const independentAssignments = workableAssignments.filter((a) => a.independent);
+    const sequentialAssignments = workableAssignments.filter((a) => !a.independent);
+
     const readyJobs: ReadyJob[] = [];
 
-    for (const assignment of activeAssignments) {
-      if (!assignment.headJobId) continue;
-
-      // Walk the job chain to find the first pending job
-      // whose predecessor (if any) is complete
-      let currentJobId: Id<"jobs"> | undefined = assignment.headJobId;
-      let prevJob: Doc<"jobs"> | null = null;
-
-      while (currentJobId) {
-        const job: Doc<"jobs"> | null = await ctx.db.get(currentJobId);
-        if (!job) break;
-
-        if (job.status === "pending") {
-          // This job is ready if:
-          // - It's the head (no predecessor), OR
-          // - Previous job is complete or failed (allows recovery)
-          const isHead = currentJobId === assignment.headJobId;
-          const prevDone = prevJob?.status === "complete" || prevJob?.status === "failed";
-
-          if (isHead || prevDone) {
-            readyJobs.push({
-              job,
-              assignment,
-              previousResult: prevJob?.result ?? null,
-            });
-          }
-          break; // Only one ready job per assignment
-        }
-
-        if (job.status === "running") {
-          // Assignment already has a running job, skip
-          break;
-        }
-
-        prevJob = job;
-        currentJobId = job.nextJobId;
+    // Independent assignments: always include their ready jobs (can run in parallel)
+    for (const assignment of independentAssignments) {
+      const readyJob = await findReadyJob(ctx, assignment);
+      if (readyJob) {
+        readyJobs.push(readyJob);
       }
     }
 
-    // Sort: oldest createdAt first, then lowest priority
-    readyJobs.sort((a, b) => {
-      const aTime = a.assignment.createdAt;
-      const bTime = b.assignment.createdAt;
-      if (aTime !== bTime) return aTime - bTime;
-      return a.assignment.priority - b.assignment.priority;
-    });
+    // Sequential assignments: only ONE can be active at a time
+    // Check if any sequential assignment is currently active
+    const activeSequential = sequentialAssignments.find((a) => a.status === "active");
+
+    if (activeSequential) {
+      // Try to get a ready job from the active sequential assignment
+      const readyJob = await findReadyJob(ctx, activeSequential);
+      if (readyJob) {
+        readyJobs.push(readyJob);
+      }
+      // If no ready job (all jobs done), this assignment is effectively complete
+      // but we don't pick up a new one until it's explicitly marked complete
+      // This prevents race conditions - the assignment should be marked complete
+      // by the final job handler
+    } else {
+      // No active sequential - pick the first pending one (by priority, then creation time)
+      const pendingSequential = sequentialAssignments
+        .filter((a) => a.status === "pending")
+        .sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority;
+          return a.createdAt - b.createdAt;
+        });
+
+      if (pendingSequential.length > 0) {
+        const readyJob = await findReadyJob(ctx, pendingSequential[0]);
+        if (readyJob) {
+          readyJobs.push(readyJob);
+        }
+      }
+    }
 
     return readyJobs;
   },

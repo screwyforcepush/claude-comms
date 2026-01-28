@@ -537,7 +537,13 @@ async function executeJob(
           if (newSessionId) {
             await saveSessionId(chatContext.threadId, newSessionId);
           }
-        } else if (job.jobType !== "pm") {
+        } else if (job.jobType === "pm") {
+          // PM job completed successfully - mark assignment complete
+          console.log(`[${jobId}] PM complete, marking assignment ${assignment._id} as complete`);
+          await client!.mutation(api.assignments.complete, {
+            id: assignment._id,
+          });
+        } else {
           // Regular jobs: trigger PM review
           await triggerPMJob(job, assignment, false);
         }
@@ -597,26 +603,8 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   const newJobs = readyJobs.filter((r) => !runningJobs.has(r.job._id));
   if (newJobs.length === 0) return;
 
-  // Check parallelism rules
-  const independentJobs = newJobs.filter((r) => r.assignment.independent);
-  const sequentialJobs = newJobs.filter((r) => !r.assignment.independent);
-
-  // Run all independent jobs
-  for (const { job, assignment, previousResult } of independentJobs) {
-    executeJob(job, assignment, previousResult).catch((e) => {
-      console.error(`Error executing job ${job._id}:`, e);
-    });
-  }
-
-  // Run at most one sequential job (if no sequential is already running)
-  const hasRunningSequential = Array.from(runningJobs.keys()).some((id) => {
-    // Check if this running job is from a non-independent assignment
-    // For simplicity, we'll just run one sequential at a time
-    return true; // TODO: track which jobs are sequential
-  });
-
-  if (sequentialJobs.length > 0 && runningJobs.size === independentJobs.length) {
-    const { job, assignment, previousResult } = sequentialJobs[0];
+  // The scheduler handles sequential vs independent logic - just run what it returns
+  for (const { job, assignment, previousResult } of newJobs) {
     executeJob(job, assignment, previousResult).catch((e) => {
       console.error(`Error executing job ${job._id}:`, e);
     });
