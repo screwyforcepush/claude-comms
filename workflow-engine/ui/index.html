@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow Engine - Queue Visualization</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            pending: '#fbbf24',
+            active: '#3b82f6',
+            blocked: '#ef4444',
+            complete: '#22c55e',
+            running: '#8b5cf6',
+            failed: '#dc2626',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-900 min-h-screen text-gray-100">
+  <div id="root"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "convex/browser": "https://esm.sh/convex@1.17.4/browser",
+        "convex/react": "https://esm.sh/convex@1.17.4/react"
+      }
+    }
+  </script>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

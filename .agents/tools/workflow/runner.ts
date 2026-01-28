@@ -13,8 +13,11 @@
 
 import { spawn, ChildProcess } from "child_process";
 import { ConvexClient } from "convex/browser";
-import { api } from "./workflow-engine/convex/_generated/api.js";
+import { anyApi } from "convex/server";
 import { readFileSync } from "fs";
+
+// Use anyApi for dynamic function references (works with ConvexClient)
+const api = anyApi;
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -22,7 +25,7 @@ import { fileURLToPath } from "url";
 interface Assignment {
   _id: string;
   _creationTime: number;
-  namespace: string;
+  namespaceId: string;
   northStar: string;
   status: "pending" | "active" | "blocked" | "complete";
   blockedReason?: string;
@@ -48,6 +51,33 @@ interface Job {
   startedAt?: number;
   completedAt?: number;
   createdAt: number;
+}
+
+// Chat-specific types
+interface ChatThread {
+  _id: string;
+  namespaceId: string;
+  title: string;
+  mode: "jam" | "cook";
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface ChatMessage {
+  _id: string;
+  threadId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+}
+
+interface ChatJobContext {
+  threadId: string;
+  namespaceId: string;
+  mode: "jam" | "cook";
+  messages: ChatMessage[];
+  latestUserMessage: string;
+  claudeSessionId?: string; // For session resume
 }
 
 // Config
@@ -79,38 +109,147 @@ function loadTemplate(jobType: string): string {
   }
 }
 
+// Build job history summary
+function buildJobHistory(jobs: Job[]): string {
+  if (!jobs || jobs.length === 0) return "(no previous jobs)";
+
+  const lines = jobs.map((j, i) => {
+    const status = j.status === 'complete' ? '✓' : j.status === 'failed' ? '✗' : '○';
+    const duration = j.completedAt && j.startedAt
+      ? `${Math.round((j.completedAt - j.startedAt) / 1000)}s`
+      : '-';
+    const resultPreview = j.result
+      ? j.result.slice(0, 150).replace(/\n/g, ' ') + (j.result.length > 150 ? '...' : '')
+      : '-';
+    return `${i + 1}. [${status}] ${j.jobType} (${j.harness}) - ${j.status} - ${duration}\n   Result: ${resultPreview}`;
+  });
+
+  return lines.join('\n\n');
+}
+
 // Prompt building
 function buildPrompt(
   jobType: string,
   assignment: Assignment,
   job: Job,
-  previousResult: string | null
+  previousResult: string | null,
+  jobHistory: Job[] = []
 ): string {
   const template = loadTemplate(jobType);
 
   return template
-    .replace("{{NORTH_STAR}}", assignment.northStar)
-    .replace("{{ARTIFACTS}}", assignment.artifacts || "(none)")
-    .replace("{{DECISIONS}}", assignment.decisions || "(none)")
-    .replace("{{CONTEXT}}", job.context || "(no specific context)")
-    .replace("{{PREVIOUS_RESULT}}", previousResult || "(no previous result)");
+    .replace(/\{\{NORTH_STAR\}\}/g, assignment.northStar)
+    .replace(/\{\{ARTIFACTS\}\}/g, assignment.artifacts || "(none)")
+    .replace(/\{\{DECISIONS\}\}/g, assignment.decisions || "(none)")
+    .replace(/\{\{CONTEXT\}\}/g, job.context || "(no specific context)")
+    .replace(/\{\{PREVIOUS_RESULT\}\}/g, previousResult || "(no previous result)")
+    .replace(/\{\{ASSIGNMENT_ID\}\}/g, assignment._id)
+    .replace(/\{\{CURRENT_JOB_ID\}\}/g, job._id)
+    .replace(/\{\{JOB_HISTORY\}\}/g, buildJobHistory(jobHistory));
+}
+
+// Chat prompt building with Handlebars-style conditionals
+// Note: Conversation history is handled by Claude session resume, not in the prompt
+function buildChatPrompt(chatContext: ChatJobContext): string {
+  const template = loadTemplate("product-owner");
+  const isNewSession = !chatContext.claudeSessionId;
+
+  // Process Handlebars-style conditionals
+  let processed = template;
+
+  // Handle {{#if COOK_MODE}}...{{else}}...{{/if}}
+  const cookModeRegex = /\{\{#if COOK_MODE\}\}([\s\S]*?)\{\{else\}\}([\s\S]*?)\{\{\/if\}\}/g;
+  processed = processed.replace(cookModeRegex, (_match, cookContent, jamContent) => {
+    return chatContext.mode === "cook" ? cookContent : jamContent;
+  });
+
+  // Handle simple {{#if COOK_MODE}}...{{/if}} without else
+  const simpleCookModeRegex = /\{\{#if COOK_MODE\}\}([\s\S]*?)\{\{\/if\}\}/g;
+  processed = processed.replace(simpleCookModeRegex, (_match, content) => {
+    return chatContext.mode === "cook" ? content : "";
+  });
+
+  // Handle {{#if NEW_SESSION}}...{{/if}} for first message only
+  const newSessionRegex = /\{\{#if NEW_SESSION\}\}([\s\S]*?)\{\{\/if\}\}/g;
+  processed = processed.replace(newSessionRegex, (_match, content) => {
+    return isNewSession ? content : "";
+  });
+
+  // Replace template variables
+  // Note: {{MESSAGES}} removed - conversation history handled by Claude session resume
+  // Use config.namespace for display (human-readable name) instead of namespaceId
+  return processed
+    .replace(/\{\{THREAD_ID\}\}/g, chatContext.threadId)
+    .replace(/\{\{NAMESPACE\}\}/g, config.namespace)
+    .replace(/\{\{MODE\}\}/g, chatContext.mode)
+    .replace(/\{\{LATEST_MESSAGE\}\}/g, chatContext.latestUserMessage);
+}
+
+// Parse chat context from job context field
+function parseChatContext(contextStr: string): ChatJobContext | null {
+  try {
+    return JSON.parse(contextStr) as ChatJobContext;
+  } catch {
+    console.error("Failed to parse chat context:", contextStr);
+    return null;
+  }
+}
+
+// Check if a job is a chat job
+function isChatJob(job: Job): boolean {
+  return job.jobType === "chat" || job.jobType === "product-owner";
+}
+
+// Save assistant response to chat thread
+async function saveChatResponse(threadId: string, content: string): Promise<void> {
+  try {
+    await client!.mutation(api.chatMessages.add, {
+      threadId: threadId as any,
+      role: "assistant",
+      content,
+    });
+    console.log(`[Chat] Saved assistant response to thread ${threadId}`);
+  } catch (e) {
+    console.error(`[Chat] Failed to save response:`, e);
+  }
+}
+
+// Save Claude session_id to thread for session resume
+async function saveSessionId(threadId: string, sessionId: string): Promise<void> {
+  try {
+    await client!.mutation(api.chatThreads.updateSessionId, {
+      id: threadId as any,
+      sessionId,
+    });
+    console.log(`[Chat] Saved session_id ${sessionId} to thread ${threadId}`);
+  } catch (e) {
+    console.error(`[Chat] Failed to save session_id:`, e);
+  }
 }
 
 // Harness command building
-function buildCommand(harness: string, prompt: string): { cmd: string; args: string[] } {
+interface CommandOptions {
+  sessionId?: string; // For Claude session resume
+}
+
+function buildCommand(harness: string, prompt: string, options: CommandOptions = {}): { cmd: string; args: string[] } {
   switch (harness) {
-    case "claude":
-      return {
-        cmd: "claude",
-        args: [
-          "--dangerously-skip-permissions",
-          "--verbose",
-          "--output-format",
-          "stream-json",
-          "-p",
-          prompt,
-        ],
-      };
+    case "claude": {
+      const args = [
+        "--dangerously-skip-permissions",
+        "--verbose",
+        "--output-format",
+        "stream-json",
+      ];
+
+      // Add --resume flag for session continuity
+      if (options.sessionId) {
+        args.push("--resume", options.sessionId);
+      }
+
+      args.push("-p", prompt);
+      return { cmd: "claude", args };
+    }
     case "codex":
       return {
         cmd: "codex",
@@ -131,6 +270,7 @@ interface StreamHandler {
   onEvent(event: Record<string, unknown>): void;
   getResult(): string;
   isComplete(): boolean;
+  getSessionId(): string | null; // For Claude session resume
 }
 
 class ClaudeStreamHandler implements StreamHandler {
@@ -138,6 +278,7 @@ class ClaudeStreamHandler implements StreamHandler {
   private finalResult: string | null = null;
   private complete = false;
   private success = false;
+  private sessionId: string | null = null;
 
   onEvent(event: Record<string, unknown>) {
     const type = event.type as string;
@@ -154,12 +295,16 @@ class ClaudeStreamHandler implements StreamHandler {
       }
     }
 
-    // Capture final result
+    // Capture final result and session_id
     if (type === "result") {
       this.complete = true;
       this.success = event.subtype === "success";
       if (event.result) {
         this.finalResult = String(event.result);
+      }
+      // Capture session_id for resume functionality
+      if (event.session_id) {
+        this.sessionId = String(event.session_id);
       }
     }
   }
@@ -171,6 +316,10 @@ class ClaudeStreamHandler implements StreamHandler {
 
   isComplete(): boolean {
     return this.complete && this.success;
+  }
+
+  getSessionId(): string | null {
+    return this.sessionId;
   }
 }
 
@@ -200,6 +349,10 @@ class CodexStreamHandler implements StreamHandler {
   isComplete(): boolean {
     return this.complete;
   }
+
+  getSessionId(): string | null {
+    return null; // Codex doesn't support session resume
+  }
 }
 
 class GeminiStreamHandler implements StreamHandler {
@@ -226,6 +379,10 @@ class GeminiStreamHandler implements StreamHandler {
   isComplete(): boolean {
     return this.complete;
   }
+
+  getSessionId(): string | null {
+    return null; // Gemini doesn't support session resume
+  }
 }
 
 function createStreamHandler(harness: string): StreamHandler {
@@ -241,6 +398,20 @@ function createStreamHandler(harness: string): StreamHandler {
   }
 }
 
+// Fetch job history for an assignment
+async function fetchJobHistory(assignmentId: string): Promise<Job[]> {
+  try {
+    const jobs = await client!.query(api.jobs.list, { assignmentId: assignmentId as any });
+    // Sort by createdAt and filter out pending jobs
+    return jobs
+      .filter((j: Job) => j.status !== 'pending')
+      .sort((a: Job, b: Job) => a.createdAt - b.createdAt);
+  } catch (e) {
+    console.error('Failed to fetch job history:', e);
+    return [];
+  }
+}
+
 // Job execution
 async function executeJob(
   job: Job,
@@ -248,13 +419,48 @@ async function executeJob(
   previousResult: string | null
 ): Promise<void> {
   const jobId = job._id;
-  console.log(`[${jobId}] Starting ${job.jobType} job (${job.harness})`);
+  const isChat = isChatJob(job);
+  let chatContext: ChatJobContext | null = null;
+
+  console.log(`[${jobId}] Starting ${job.jobType} job (${job.harness})${isChat ? ' [CHAT]' : ''}`);
 
   // Mark job as running
   await client!.mutation(api.jobs.start, { id: jobId });
 
-  const prompt = buildPrompt(job.jobType, assignment, job, previousResult);
-  const { cmd, args } = buildCommand(job.harness, prompt);
+  // Build prompt based on job type
+  let prompt: string;
+
+  if (isChat) {
+    // Chat job: parse context and build chat-specific prompt
+    chatContext = parseChatContext(job.context || "{}");
+    if (!chatContext) {
+      console.error(`[${jobId}] Invalid chat context, failing job`);
+      await client!.mutation(api.jobs.fail, {
+        id: jobId,
+        result: "Invalid chat context provided",
+      });
+      return;
+    }
+    prompt = buildChatPrompt(chatContext);
+    const resumeInfo = chatContext.claudeSessionId
+      ? ` (resuming session ${chatContext.claudeSessionId.slice(0, 8)}...)`
+      : ' (new session)';
+    console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}${resumeInfo}`);
+  } else {
+    // Regular job: use standard prompt building
+    let jobHistory: Job[] = [];
+    if (job.jobType === 'pm' || job.jobType === 'retrospect') {
+      jobHistory = await fetchJobHistory(assignment._id);
+    }
+    prompt = buildPrompt(job.jobType, assignment, job, previousResult, jobHistory);
+  }
+
+  // Build command with optional session resume for chat jobs
+  const commandOptions: CommandOptions = {};
+  if (isChat && chatContext?.claudeSessionId && job.harness === "claude") {
+    commandOptions.sessionId = chatContext.claudeSessionId;
+  }
+  const { cmd, args } = buildCommand(job.harness, prompt, commandOptions);
 
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
@@ -309,15 +515,30 @@ async function executeJob(
           id: jobId,
           result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
         });
-        // Trigger retrospect
-        await triggerPMJob(job, assignment, true);
+        // Chat jobs: save error to thread, no PM trigger
+        if (isChat && chatContext) {
+          await saveChatResponse(chatContext.threadId,
+            `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${result || "(no output)"}`
+          );
+        } else {
+          // Regular jobs: trigger retrospect
+          await triggerPMJob(job, assignment, true);
+        }
       } else if (code === 0 && handler.isComplete()) {
         await client!.mutation(api.jobs.complete, {
           id: jobId,
           result,
         });
-        // Trigger PM review (unless this was a PM job)
-        if (job.jobType !== "pm") {
+        // Chat jobs: save response to thread and session_id, no PM trigger
+        if (isChat && chatContext) {
+          await saveChatResponse(chatContext.threadId, result);
+          // Save session_id for future resume (Claude only)
+          const newSessionId = handler.getSessionId();
+          if (newSessionId) {
+            await saveSessionId(chatContext.threadId, newSessionId);
+          }
+        } else if (job.jobType !== "pm") {
+          // Regular jobs: trigger PM review
           await triggerPMJob(job, assignment, false);
         }
       } else {
@@ -325,8 +546,15 @@ async function executeJob(
           id: jobId,
           result: result || `Process exited with code ${code}`,
         });
-        // Trigger retrospect
-        await triggerPMJob(job, assignment, true);
+        // Chat jobs: save error to thread, no PM trigger
+        if (isChat && chatContext) {
+          await saveChatResponse(chatContext.threadId,
+            `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${result || `Exit code ${code}`}`
+          );
+        } else {
+          // Regular jobs: trigger retrospect
+          await triggerPMJob(job, assignment, true);
+        }
       }
 
       resolve();
@@ -396,15 +624,29 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
 }
 
 // Main
-function startRunner() {
+async function startRunner() {
   console.log(`Workflow runner starting for namespace: ${config.namespace}`);
   console.log(`Convex URL: ${config.convexUrl}`);
 
   client = new ConvexClient(config.convexUrl);
 
+  // Look up namespace ID by name
+  const namespace = await client.query(api.namespaces.getByName, {
+    name: config.namespace,
+  });
+
+  if (!namespace) {
+    console.error(`Error: Namespace "${config.namespace}" not found in database.`);
+    console.error("Run 'npx tsx init.ts' to initialize the namespace first.");
+    process.exit(1);
+  }
+
+  const namespaceId = namespace._id;
+  console.log(`Found namespace ID: ${namespaceId}`);
+
   unsubscribe = client.onUpdate(
     api.scheduler.getReadyJobs,
-    { namespace: config.namespace },
+    { namespaceId },
     (readyJobs: ReadyJob[]) => {
       console.log(`Queue update: ${readyJobs.length} ready jobs`);
       processQueue(readyJobs).catch((e) => {

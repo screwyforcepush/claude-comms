@@ -25,6 +25,14 @@
  *   start-job <jobId>                   Mark job as running
  *   complete-job <jobId> --result <str> Mark job as complete
  *   fail-job <jobId> [--result <str>]   Mark job as failed
+ *
+ * Chat Commands:
+ *   chat-threads                        List chat threads
+ *   chat-thread <threadId>              Get thread with messages
+ *   chat-create [--title <title>]       Create a new chat thread
+ *   chat-send <threadId> <message>      Send message and create chat job
+ *   chat-mode <threadId> <jam|cook>     Change thread mode
+ *   chat-title <threadId> <title>       Update thread title
  */
 
 import { ConvexHttpClient } from "convex/browser";
@@ -49,6 +57,24 @@ const configPath = join(__dirname, "config.json");
 const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
 
 const client = new ConvexHttpClient(config.convexUrl);
+
+// Cached namespace ID (resolved at runtime)
+let namespaceId: Id<"namespaces"> | null = null;
+
+async function getNamespaceId(): Promise<Id<"namespaces">> {
+  if (namespaceId) return namespaceId;
+
+  const namespace = await client.query(api.namespaces.getByName, {
+    name: config.namespace,
+  });
+
+  if (!namespace) {
+    error(`Namespace "${config.namespace}" not found. Run 'npx tsx init.ts' first.`);
+  }
+
+  namespaceId = namespace._id as Id<"namespaces">;
+  return namespaceId;
+}
 
 // Argument parsing helpers
 function parseArgs(args: string[]): { flags: Record<string, string>; positional: string[] } {
@@ -87,8 +113,9 @@ async function listAssignments(status?: string) {
     error(`Invalid status. Must be one of: ${validStatuses.join(", ")}`);
   }
 
+  const nsId = await getNamespaceId();
   const result = await client.query(api.assignments.list, {
-    namespace: config.namespace,
+    namespaceId: nsId,
     status: status as any,
   });
   output(result);
@@ -124,15 +151,17 @@ async function getJob(id: string) {
 }
 
 async function getQueueStatus() {
+  const nsId = await getNamespaceId();
   const result = await client.query(api.scheduler.getQueueStatus, {
-    namespace: config.namespace,
+    namespaceId: nsId,
   });
   output(result);
 }
 
 async function createAssignment(northStar: string, priority?: number, independent?: boolean) {
+  const nsId = await getNamespaceId();
   const id = await client.mutation(api.assignments.create, {
-    namespace: config.namespace,
+    namespaceId: nsId,
     northStar,
     priority,
     independent,
@@ -225,6 +254,115 @@ async function failJob(id: string, result?: string) {
   output({ message: "Job failed" });
 }
 
+// Chat commands
+
+async function listChatThreads() {
+  const nsId = await getNamespaceId();
+  const result = await client.query(api.chatThreads.list, {
+    namespaceId: nsId,
+  });
+  output(result);
+}
+
+async function getChatThread(threadId: string) {
+  const thread = await client.query(api.chatThreads.get, {
+    id: threadId as Id<"chatThreads">,
+  });
+  if (!thread) error("Thread not found");
+
+  const messages = await client.query(api.chatMessages.list, {
+    threadId: threadId as Id<"chatThreads">,
+  });
+
+  output({ thread, messages });
+}
+
+async function createChatThread(title?: string) {
+  const nsId = await getNamespaceId();
+  const threadId = await client.mutation(api.chatThreads.create, {
+    namespaceId: nsId,
+    title,
+    mode: "jam", // Default to safe mode
+  });
+  output({ threadId, message: "Chat thread created" });
+}
+
+async function changeChatMode(threadId: string, mode: string) {
+  if (mode !== "jam" && mode !== "cook") {
+    error("Mode must be 'jam' or 'cook'");
+  }
+
+  await client.mutation(api.chatThreads.updateMode, {
+    id: threadId as Id<"chatThreads">,
+    mode: mode as "jam" | "cook",
+  });
+  output({ message: `Thread mode changed to ${mode}` });
+}
+
+async function updateChatTitle(threadId: string, title: string) {
+  await client.mutation(api.chatThreads.updateTitle, {
+    id: threadId as Id<"chatThreads">,
+    title,
+  });
+  output({ message: `Thread title updated to "${title}"` });
+}
+
+async function sendChatMessage(threadId: string, message: string, harness?: string) {
+  const nsId = await getNamespaceId();
+
+  // Get thread to check mode
+  const thread = await client.query(api.chatThreads.get, {
+    id: threadId as Id<"chatThreads">,
+  });
+  if (!thread) error("Thread not found");
+
+  // Add user message to thread
+  await client.mutation(api.chatMessages.add, {
+    threadId: threadId as Id<"chatThreads">,
+    role: "user",
+    content: message,
+  });
+
+  // Get all messages for context
+  const messages = await client.query(api.chatMessages.list, {
+    threadId: threadId as Id<"chatThreads">,
+  });
+
+  // Create a hidden assignment for this thread if it doesn't exist
+  // For simplicity, we create one per chat job (could be optimized to reuse)
+  const assignmentId = await client.mutation(api.assignments.create, {
+    namespaceId: nsId,
+    northStar: `Chat thread: ${thread.title}`,
+    independent: true, // Chat doesn't block other work
+    priority: 0, // High priority for responsiveness
+  });
+
+  // Build chat context for the job
+  const chatContext = {
+    threadId,
+    namespaceId: nsId,
+    mode: thread.mode,
+    messages,
+    latestUserMessage: message,
+  };
+
+  // Create chat job
+  const jobId = await client.mutation(api.jobs.create, {
+    assignmentId: assignmentId as Id<"assignments">,
+    jobType: "chat",
+    harness: (harness || config.defaultHarness) as "claude" | "codex" | "gemini",
+    context: JSON.stringify(chatContext),
+  });
+
+  output({
+    threadId,
+    assignmentId,
+    jobId,
+    mode: thread.mode,
+    message: "Chat message sent, job created",
+  });
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
@@ -315,6 +453,38 @@ async function main() {
       case "fail-job":
         if (!positional[0]) error("Job ID required");
         await failJob(positional[0], flags.result);
+        break;
+
+      // Chat commands
+      case "chat-threads":
+        await listChatThreads();
+        break;
+
+      case "chat-thread":
+        if (!positional[0]) error("Thread ID required");
+        await getChatThread(positional[0]);
+        break;
+
+      case "chat-create":
+        await createChatThread(flags.title);
+        break;
+
+      case "chat-send":
+        if (!positional[0]) error("Thread ID required");
+        if (!positional[1]) error("Message required");
+        await sendChatMessage(positional[0], positional[1], flags.harness);
+        break;
+
+      case "chat-mode":
+        if (!positional[0]) error("Thread ID required");
+        if (!positional[1]) error("Mode required (jam or cook)");
+        await changeChatMode(positional[0], positional[1]);
+        break;
+
+      case "chat-title":
+        if (!positional[0]) error("Thread ID required");
+        if (!positional[1]) error("Title required");
+        await updateChatTitle(positional[0], positional[1]);
         break;
 
       default:
