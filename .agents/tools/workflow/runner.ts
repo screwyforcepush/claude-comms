@@ -555,19 +555,17 @@ async function executeJob(
             await saveSessionId(chatContext.threadId, newSessionId);
           }
         } else {
+          // Check if this job should trigger PM review
           // Re-fetch job to check if nextJobId was added during execution
           const updatedJob = await client!.query(api.jobs.get, { id: jobId });
           const hasNextJob = updatedJob?.nextJobId != null;
 
-          if (!hasNextJob && (job.jobType === "pm" || job.jobType === "retrospect" || job.jobType === "uat")) {
-            // Terminal job types with no successor - mark assignment complete
-            console.log(`[${jobId}] Final ${job.jobType} complete, marking assignment ${assignment._id} as complete`);
-            await client!.mutation(api.assignments.complete, {
-              id: assignment._id,
-            });
-          } else if (!hasNextJob) {
-            // Non-terminal job with no successor - trigger PM review
+          if (!hasNextJob && job.jobType !== "pm" && job.jobType !== "retrospect") {
+            // Regular job with no successor - trigger PM review
             await triggerPMJob(job, assignment, false);
+          } else if (!hasNextJob) {
+            // PM/retrospect with no successor - check if ALL jobs in assignment are done
+            await checkAndCompleteAssignment(assignment._id, jobId);
           }
           // If hasNextJob, the next job will be picked up by the scheduler
         }
@@ -589,6 +587,28 @@ async function executeJob(
 
       resolve();
     });
+  });
+}
+
+// Check if all jobs in assignment are done, if so mark complete
+async function checkAndCompleteAssignment(assignmentId: string, completedJobId: string): Promise<void> {
+  // Fetch all jobs for this assignment
+  const jobs = await client!.query(api.jobs.list, { assignmentId: assignmentId as any });
+
+  // Check if any job is still pending or running
+  const hasIncompleteJobs = jobs.some(
+    (j: Job) => j.status === "pending" || j.status === "running"
+  );
+
+  if (hasIncompleteJobs) {
+    console.log(`[${completedJobId}] Assignment ${assignmentId} still has incomplete jobs, not marking complete`);
+    return;
+  }
+
+  // All jobs are complete or failed - mark assignment complete
+  console.log(`[${completedJobId}] All jobs done, marking assignment ${assignmentId} as complete`);
+  await client!.mutation(api.assignments.complete, {
+    id: assignmentId,
   });
 }
 
