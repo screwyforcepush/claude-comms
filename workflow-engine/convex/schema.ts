@@ -77,4 +77,30 @@ export default defineSchema({
   })
     .index("by_thread", ["threadId"])
     .index("by_thread_created", ["threadId", "createdAt"]),
+
+  // Separate table for chat jobs - not tied to assignments
+  chatJobs: defineTable({
+    threadId: v.id("chatThreads"),
+    namespaceId: v.id("namespaces"),
+    harness: v.union(
+      v.literal("claude"),
+      v.literal("codex"),
+      v.literal("gemini")
+    ),
+    context: v.string(), // JSON with thread info, messages, mode, sessionId
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("complete"),
+      v.literal("failed")
+    ),
+    result: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_namespace", ["namespaceId"])
+    .index("by_status", ["status"])
+    .index("by_namespace_status", ["namespaceId", "status"])
+    .index("by_thread", ["threadId"]),
 });

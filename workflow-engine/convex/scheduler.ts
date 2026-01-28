@@ -2,10 +2,16 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 
+// Assignment-based job (work items)
 interface ReadyJob {
   job: Doc<"jobs">;
   assignment: Doc<"assignments">;
   previousResult: string | null;
+}
+
+// Chat job (separate from assignments)
+interface ReadyChatJob {
+  chatJob: Doc<"chatJobs">;
 }
 
 // Helper: find the next ready job for an assignment (if any)
@@ -265,5 +271,24 @@ export const getAllAssignments = query({
     }
 
     return result;
+  },
+});
+
+// Get all pending chat jobs for a namespace (separate from assignment jobs)
+// Chat jobs are always "independent" - they never block work assignments
+export const getReadyChatJobs = query({
+  args: { namespaceId: v.id("namespaces") },
+  handler: async (ctx, args): Promise<ReadyChatJob[]> => {
+    const pendingChatJobs = await ctx.db
+      .query("chatJobs")
+      .withIndex("by_namespace_status", (q) =>
+        q.eq("namespaceId", args.namespaceId).eq("status", "pending")
+      )
+      .collect();
+
+    // Sort by creation time (oldest first)
+    pendingChatJobs.sort((a, b) => a.createdAt - b.createdAt);
+
+    return pendingChatJobs.map((chatJob) => ({ chatJob }));
   },
 });

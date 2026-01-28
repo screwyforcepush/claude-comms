@@ -80,6 +80,21 @@ interface ChatJobContext {
   claudeSessionId?: string; // For session resume
 }
 
+// Chat job from chatJobs table (separate from assignment jobs)
+interface ChatJob {
+  _id: string;
+  _creationTime: number;
+  threadId: string;
+  namespaceId: string;
+  harness: "claude" | "codex" | "gemini";
+  context: string;
+  status: "pending" | "running" | "complete" | "failed";
+  result?: string;
+  startedAt?: number;
+  completedAt?: number;
+  createdAt: number;
+}
+
 // Config
 interface Config {
   convexUrl: string;
@@ -95,8 +110,10 @@ const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
 
 // State
 let client: ConvexClient | null = null;
-let unsubscribe: (() => void) | null = null;
+let unsubscribeJobs: (() => void) | null = null;
+let unsubscribeChatJobs: (() => void) | null = null;
 const runningJobs = new Map<string, ChildProcess>();
+const runningChatJobs = new Map<string, ChildProcess>();
 
 // Template loading
 function loadTemplate(jobType: string): string {
@@ -596,6 +613,10 @@ interface ReadyJob {
   previousResult: string | null;
 }
 
+interface ReadyChatJob {
+  chatJob: ChatJob;
+}
+
 async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   if (readyJobs.length === 0) return;
 
@@ -607,6 +628,135 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   for (const { job, assignment, previousResult } of newJobs) {
     executeJob(job, assignment, previousResult).catch((e) => {
       console.error(`Error executing job ${job._id}:`, e);
+    });
+  }
+}
+
+// Chat job execution (separate from assignment jobs)
+async function executeChatJob(chatJob: ChatJob): Promise<void> {
+  const jobId = chatJob._id;
+  console.log(`[${jobId}] Starting chat job (${chatJob.harness})`);
+
+  // Mark job as running
+  await client!.mutation(api.chatJobs.start, { id: jobId });
+
+  // Parse chat context
+  const chatContext = parseChatContext(chatJob.context);
+  if (!chatContext) {
+    console.error(`[${jobId}] Invalid chat context, failing job`);
+    await client!.mutation(api.chatJobs.fail, {
+      id: jobId,
+      result: "Invalid chat context provided",
+    });
+    return;
+  }
+
+  const prompt = buildChatPrompt(chatContext);
+  const resumeInfo = chatContext.claudeSessionId
+    ? ` (resuming session ${chatContext.claudeSessionId.slice(0, 8)}...)`
+    : " (new session)";
+  console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}${resumeInfo}`);
+
+  // Build command with optional session resume
+  const commandOptions: CommandOptions = {};
+  if (chatContext.claudeSessionId && chatJob.harness === "claude") {
+    commandOptions.sessionId = chatContext.claudeSessionId;
+  }
+  const { cmd, args } = buildCommand(chatJob.harness, prompt, commandOptions);
+
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env },
+    });
+
+    runningChatJobs.set(jobId, child);
+
+    const handler = createStreamHandler(chatJob.harness);
+    let buffer = "";
+    let timedOut = false;
+
+    // Timeout
+    const timeout = setTimeout(async () => {
+      timedOut = true;
+      console.log(`[${jobId}] Timeout after ${config.timeoutMs}ms`);
+      child.kill("SIGTERM");
+      setTimeout(() => child.kill("SIGKILL"), 5000);
+    }, config.timeoutMs);
+
+    // Parse stdout
+    child.stdout?.on("data", (data: Buffer) => {
+      buffer += data.toString();
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+          handler.onEvent(event);
+        } catch {
+          // Not JSON, ignore
+        }
+      }
+    });
+
+    child.stderr?.on("data", (data: Buffer) => {
+      console.error(`[${jobId}] stderr: ${data.toString()}`);
+    });
+
+    child.on("close", async (code) => {
+      clearTimeout(timeout);
+      runningChatJobs.delete(jobId);
+
+      const result = handler.getResult();
+      console.log(`[${jobId}] Exited with code ${code}`);
+
+      if (timedOut) {
+        await client!.mutation(api.chatJobs.fail, {
+          id: jobId,
+          result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
+        });
+        await saveChatResponse(chatContext.threadId,
+          `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${result || "(no output)"}`
+        );
+      } else if (code === 0 && handler.isComplete()) {
+        await client!.mutation(api.chatJobs.complete, {
+          id: jobId,
+          result,
+        });
+        await saveChatResponse(chatContext.threadId, result);
+        // Save session_id for future resume (Claude only)
+        const newSessionId = handler.getSessionId();
+        if (newSessionId) {
+          await saveSessionId(chatContext.threadId, newSessionId);
+        }
+      } else {
+        await client!.mutation(api.chatJobs.fail, {
+          id: jobId,
+          result: result || `Process exited with code ${code}`,
+        });
+        await saveChatResponse(chatContext.threadId,
+          `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${result || `Exit code ${code}`}`
+        );
+      }
+
+      resolve();
+    });
+  });
+}
+
+async function processChatQueue(readyChatJobs: ReadyChatJob[]): Promise<void> {
+  if (readyChatJobs.length === 0) return;
+
+  // Filter out jobs we're already running
+  const newJobs = readyChatJobs.filter((r) => !runningChatJobs.has(r.chatJob._id));
+  if (newJobs.length === 0) return;
+
+  // Chat jobs are always independent - run them all
+  for (const { chatJob } of newJobs) {
+    executeChatJob(chatJob).catch((e) => {
+      console.error(`Error executing chat job ${chatJob._id}:`, e);
     });
   }
 }
@@ -632,7 +782,8 @@ async function startRunner() {
   const namespaceId = namespace._id;
   console.log(`Found namespace ID: ${namespaceId}`);
 
-  unsubscribe = client.onUpdate(
+  // Subscribe to assignment-based jobs
+  unsubscribeJobs = client.onUpdate(
     api.scheduler.getReadyJobs,
     { namespaceId },
     (readyJobs: ReadyJob[]) => {
@@ -642,8 +793,26 @@ async function startRunner() {
       });
     },
     (error: Error) => {
-      console.error("Subscription error:", error);
-      // Restart after delay
+      console.error("Jobs subscription error:", error);
+      cleanup();
+      setTimeout(startRunner, 5000);
+    }
+  );
+
+  // Subscribe to chat jobs (separate from assignments)
+  unsubscribeChatJobs = client.onUpdate(
+    api.scheduler.getReadyChatJobs,
+    { namespaceId },
+    (readyChatJobs: ReadyChatJob[]) => {
+      if (readyChatJobs.length > 0) {
+        console.log(`Chat queue update: ${readyChatJobs.length} ready chat jobs`);
+      }
+      processChatQueue(readyChatJobs).catch((e) => {
+        console.error("Error processing chat queue:", e);
+      });
+    },
+    (error: Error) => {
+      console.error("Chat jobs subscription error:", error);
       cleanup();
       setTimeout(startRunner, 5000);
     }
@@ -651,15 +820,24 @@ async function startRunner() {
 }
 
 function cleanup() {
-  unsubscribe?.();
-  unsubscribe = null;
+  unsubscribeJobs?.();
+  unsubscribeJobs = null;
+  unsubscribeChatJobs?.();
+  unsubscribeChatJobs = null;
 
-  // Kill running jobs
+  // Kill running assignment jobs
   for (const [id, child] of runningJobs) {
     console.log(`Killing job ${id}`);
     child.kill("SIGTERM");
   }
   runningJobs.clear();
+
+  // Kill running chat jobs
+  for (const [id, child] of runningChatJobs) {
+    console.log(`Killing chat job ${id}`);
+    child.kill("SIGTERM");
+  }
+  runningChatJobs.clear();
 
   client?.close();
   client = null;
