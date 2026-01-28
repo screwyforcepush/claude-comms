@@ -554,15 +554,22 @@ async function executeJob(
           if (newSessionId) {
             await saveSessionId(chatContext.threadId, newSessionId);
           }
-        } else if (job.jobType === "pm") {
-          // PM job completed successfully - mark assignment complete
-          console.log(`[${jobId}] PM complete, marking assignment ${assignment._id} as complete`);
-          await client!.mutation(api.assignments.complete, {
-            id: assignment._id,
-          });
         } else {
-          // Regular jobs: trigger PM review
-          await triggerPMJob(job, assignment, false);
+          // Re-fetch job to check if nextJobId was added during execution
+          const updatedJob = await client!.query(api.jobs.get, { id: jobId });
+          const hasNextJob = updatedJob?.nextJobId != null;
+
+          if (!hasNextJob && (job.jobType === "pm" || job.jobType === "retrospect" || job.jobType === "uat")) {
+            // Terminal job types with no successor - mark assignment complete
+            console.log(`[${jobId}] Final ${job.jobType} complete, marking assignment ${assignment._id} as complete`);
+            await client!.mutation(api.assignments.complete, {
+              id: assignment._id,
+            });
+          } else if (!hasNextJob) {
+            // Non-terminal job with no successor - trigger PM review
+            await triggerPMJob(job, assignment, false);
+          }
+          // If hasNextJob, the next job will be picked up by the scheduler
         }
       } else {
         await client!.mutation(api.jobs.fail, {
