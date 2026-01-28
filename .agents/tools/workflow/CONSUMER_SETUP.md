@@ -84,6 +84,21 @@ Each consumer repo needs its own `config.json`:
 
 The `namespace` field isolates assignments/jobs per repo in the shared Convex backend.
 
+## Initialization
+
+After setting up `config.json`, run the init script to register your namespace in the database:
+
+```bash
+cd .agents/tools/workflow
+npx tsx init.ts
+```
+
+This script is **idempotent** - running it multiple times is safe and won't create duplicate namespaces. It will either:
+- Create the namespace if it doesn't exist
+- Report that the namespace already exists
+
+You must run this before the runner or CLI will work, as all assignments and chat threads require a valid namespace ID.
+
 ## TODO
 
 - [ ] Decide on distribution strategy (npm publish vs git submodule vs copy)

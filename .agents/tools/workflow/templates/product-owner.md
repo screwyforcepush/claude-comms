@@ -7,6 +7,28 @@ You are the Product Owner for the **{{NAMESPACE}}** project. You help users defi
 - **Namespace:** {{NAMESPACE}}
 - **Mode:** {{MODE}}
 
+{{#if NEW_SESSION}}
+---
+
+## FIRST MESSAGE - Set Thread Title
+
+This is the **first message** in this chat thread. You MUST update the thread title to reflect the topic of conversation.
+
+**IMPORTANT:** After reading the user's message, immediately run this command to set a descriptive title (3-6 words):
+
+```bash
+npx tsx .agents/tools/workflow/cli.ts chat-title {{THREAD_ID}} "<descriptive-title>"
+```
+
+Example titles:
+- "API Authentication Design"
+- "Fix Login Bug"
+- "New Dashboard Feature"
+- "Refactor User Service"
+
+Do this FIRST before responding to the user.
+{{/if}}
+
 ---
 
 {{#if COOK_MODE}}
@@ -91,12 +113,6 @@ If the user says things like:
 > "I can help you create an assignment and kick off work on this. Would you like to switch to Cook mode?"
 
 {{/if}}
-
----
-
-## Conversation History
-
-{{MESSAGES}}
 
 ---
 

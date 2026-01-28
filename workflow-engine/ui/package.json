@@ -1,0 +1,6 @@
+{
+  "name": "workflow-engine-ui",
+  "scripts": {
+    "start": "npx serve -l 3500"
+  }
+}

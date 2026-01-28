@@ -5,7 +5,7 @@ import { mutation, query } from "./_generated/server";
 
 export const list = query({
   args: {
-    namespace: v.string(),
+    namespaceId: v.id("namespaces"),
     status: v.optional(
       v.union(
         v.literal("pending"),
@@ -20,13 +20,13 @@ export const list = query({
       return await ctx.db
         .query("assignments")
         .withIndex("by_namespace_status", (q) =>
-          q.eq("namespace", args.namespace).eq("status", args.status!)
+          q.eq("namespaceId", args.namespaceId).eq("status", args.status!)
         )
         .collect();
     }
     return await ctx.db
       .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
       .collect();
   },
 });
@@ -62,7 +62,7 @@ export const getWithJobs = query({
 
 export const create = mutation({
   args: {
-    namespace: v.string(),
+    namespaceId: v.id("namespaces"),
     northStar: v.string(),
     independent: v.optional(v.boolean()),
     priority: v.optional(v.number()),
@@ -70,7 +70,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     return await ctx.db.insert("assignments", {
-      namespace: args.namespace,
+      namespaceId: args.namespaceId,
       northStar: args.northStar,
       status: "pending",
       independent: args.independent ?? false,

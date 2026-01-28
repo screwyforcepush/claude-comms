@@ -2,8 +2,16 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  namespaces: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_name", ["name"]),
+
   assignments: defineTable({
-    namespace: v.string(),
+    namespaceId: v.id("namespaces"),
     northStar: v.string(),
     status: v.union(
       v.literal("pending"),
@@ -20,8 +28,8 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_namespace", ["namespace"])
-    .index("by_namespace_status", ["namespace", "status"])
+    .index("by_namespace", ["namespaceId"])
+    .index("by_namespace_status", ["namespaceId", "status"])
     .index("by_status", ["status"]),
 
   jobs: defineTable({
@@ -50,15 +58,16 @@ export default defineSchema({
     .index("by_assignment_status", ["assignmentId", "status"]),
 
   chatThreads: defineTable({
-    namespace: v.string(),
+    namespaceId: v.id("namespaces"),
     title: v.string(),
     mode: v.union(v.literal("jam"), v.literal("cook")),
     assignmentId: v.optional(v.id("assignments")),
+    claudeSessionId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_namespace", ["namespace"])
-    .index("by_namespace_updated", ["namespace", "updatedAt"]),
+    .index("by_namespace", ["namespaceId"])
+    .index("by_namespace_updated", ["namespaceId", "updatedAt"]),
 
   chatMessages: defineTable({
     threadId: v.id("chatThreads"),

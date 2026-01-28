@@ -8,9 +8,10 @@ import { ChatView } from './ChatView.js';
 /**
  * ChatPanel component - Main container managing chat state
  * @param {Object} props
- * @param {string} props.namespace - Current namespace for thread scoping
+ * @param {string} props.namespaceId - Current namespace ID for thread scoping
+ * @param {string} props.namespaceName - Current namespace name (for display)
  */
-export function ChatPanel({ namespace }) {
+export function ChatPanel({ namespaceId, namespaceName }) {
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -18,7 +19,7 @@ export function ChatPanel({ namespace }) {
   // Fetch threads for this namespace
   const { data: threads, loading: loadingThreads } = useQuery(
     api.chatThreads.list,
-    { namespace }
+    { namespaceId }
   );
 
   // Fetch messages for selected thread
@@ -33,6 +34,7 @@ export function ChatPanel({ namespace }) {
   const updateMode = useMutation(api.chatThreads.updateMode);
   const updateTitle = useMutation(api.chatThreads.updateTitle);
   const removeThread = useMutation(api.chatThreads.remove);
+  const triggerChatJob = useMutation(api.chatJobs.trigger);
 
   // Get selected thread object
   const selectedThread = threads?.find(t => t._id === selectedThreadId) || null;
@@ -40,7 +42,7 @@ export function ChatPanel({ namespace }) {
   // Reset selection when namespace changes
   useEffect(() => {
     setSelectedThreadId(null);
-  }, [namespace]);
+  }, [namespaceId]);
 
   // Auto-select first thread if none selected and threads exist
   useEffect(() => {
@@ -51,18 +53,18 @@ export function ChatPanel({ namespace }) {
 
   // Handle creating a new thread
   const handleCreateThread = useCallback(async () => {
-    if (creating || !namespace) return;
+    if (creating || !namespaceId) return;
 
     setCreating(true);
     try {
-      const newThreadId = await createThread({ namespace });
+      const newThreadId = await createThread({ namespaceId });
       setSelectedThreadId(newThreadId);
     } catch (err) {
       console.error('Failed to create thread:', err);
     } finally {
       setCreating(false);
     }
-  }, [creating, namespace, createThread]);
+  }, [creating, namespaceId, createThread]);
 
   // Handle selecting a thread
   const handleSelectThread = useCallback((thread) => {
@@ -91,39 +93,25 @@ export function ChatPanel({ namespace }) {
 
     setSending(true);
     try {
-      // Add user message
+      // 1. Add user message immediately for instant feedback
       await addMessage({
         threadId: selectedThreadId,
         role: 'user',
         content: content
       });
 
-      // For MVP: simulate a response after a delay
-      // In production, this would trigger a job via the runner
-      // and the response would come from the Product Owner agent
-      setTimeout(async () => {
-        try {
-          const mode = selectedThread?.mode || 'jam';
-          const response = mode === 'cook'
-            ? `I understand you want me to take action. In Cook mode, I can create assignments and insert jobs. For now, this is a placeholder response. The full Product Owner agent will be connected in WP3.\n\nYour message: "${content}"`
-            : `Great idea! Let me help you think through this. In Jam mode, I can help spec out ideas and ask clarifying questions. For now, this is a placeholder response. The full Product Owner agent will be connected in WP3.\n\nYour message: "${content}"`;
-
-          await addMessage({
-            threadId: selectedThreadId,
-            role: 'assistant',
-            content: response
-          });
-        } catch (err) {
-          console.error('Failed to add assistant message:', err);
-        } finally {
-          setSending(false);
-        }
-      }, 1500);
+      // 2. Trigger chat job - runner picks it up and executes Claude
+      //    Response is saved to chatMessages by the runner
+      //    UI updates via Convex real-time subscription
+      await triggerChatJob({
+        threadId: selectedThreadId
+      });
     } catch (err) {
       console.error('Failed to send message:', err);
+    } finally {
       setSending(false);
     }
-  }, [selectedThreadId, sending, addMessage, selectedThread?.mode]);
+  }, [selectedThreadId, sending, addMessage, triggerChatJob]);
 
   // Handle updating thread title
   const handleUpdateTitle = useCallback(async (title) => {
@@ -148,7 +136,7 @@ export function ChatPanel({ namespace }) {
   }, [selectedThreadId, updateMode]);
 
   // No namespace selected
-  if (!namespace) {
+  if (!namespaceId) {
     return React.createElement('div', {
       className: 'flex-1 flex items-center justify-center bg-gray-900'
     },

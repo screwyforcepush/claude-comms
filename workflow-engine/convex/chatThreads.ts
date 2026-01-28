@@ -4,11 +4,11 @@ import { mutation, query } from "./_generated/server";
 // Queries
 
 export const list = query({
-  args: { namespace: v.string() },
+  args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("chatThreads")
-      .withIndex("by_namespace_updated", (q) => q.eq("namespace", args.namespace))
+      .withIndex("by_namespace_updated", (q) => q.eq("namespaceId", args.namespaceId))
       .order("desc")
       .collect();
   },
@@ -25,14 +25,14 @@ export const get = query({
 
 export const create = mutation({
   args: {
-    namespace: v.string(),
+    namespaceId: v.id("namespaces"),
     title: v.optional(v.string()),
     mode: v.optional(v.union(v.literal("jam"), v.literal("cook"))),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     return await ctx.db.insert("chatThreads", {
-      namespace: args.namespace,
+      namespaceId: args.namespaceId,
       title: args.title || "New Chat",
       mode: args.mode || "jam", // Default to safe mode
       createdAt: now,
@@ -62,6 +62,19 @@ export const updateTitle = mutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, {
       title: args.title,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const updateSessionId = mutation({
+  args: {
+    id: v.id("chatThreads"),
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      claudeSessionId: args.sessionId,
       updatedAt: Date.now(),
     });
   },

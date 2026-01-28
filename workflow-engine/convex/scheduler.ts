@@ -10,12 +10,12 @@ interface ReadyJob {
 
 // Get all jobs that are ready to run for a namespace
 export const getReadyJobs = query({
-  args: { namespace: v.string() },
+  args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args): Promise<ReadyJob[]> => {
     // Get all non-complete assignments for this namespace
     const assignments = await ctx.db
       .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
       .collect();
 
     const activeAssignments = assignments.filter(
@@ -33,7 +33,7 @@ export const getReadyJobs = query({
       let prevJob: Doc<"jobs"> | null = null;
 
       while (currentJobId) {
-        const job = await ctx.db.get(currentJobId);
+        const job: Doc<"jobs"> | null = await ctx.db.get(currentJobId);
         if (!job) break;
 
         if (job.status === "pending") {
@@ -77,11 +77,11 @@ export const getReadyJobs = query({
 
 // Get the queue status for a namespace
 export const getQueueStatus = query({
-  args: { namespace: v.string() },
+  args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
     const assignments = await ctx.db
       .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
       .collect();
 
     const runningJobs = await ctx.db
@@ -93,7 +93,7 @@ export const getQueueStatus = query({
     const namespaceRunningJobs = [];
     for (const job of runningJobs) {
       const assignment = await ctx.db.get(job.assignmentId);
-      if (assignment?.namespace === args.namespace) {
+      if (assignment?.namespaceId === args.namespaceId) {
         namespaceRunningJobs.push({ job, assignment });
       }
     }
@@ -123,40 +123,49 @@ export const getQueueStatus = query({
 export const getAllNamespaces = query({
   args: {},
   handler: async (ctx) => {
-    const assignments = await ctx.db.query("assignments").collect();
-    const namespaceMap = new Map<
-      string,
-      {
-        name: string;
-        counts: { pending: number; active: number; blocked: number; complete: number };
-        lastActivity: number;
-      }
-    >();
+    // Get all namespaces from the namespaces table
+    const namespaces = await ctx.db.query("namespaces").collect();
 
-    for (const a of assignments) {
-      if (!namespaceMap.has(a.namespace)) {
-        namespaceMap.set(a.namespace, {
-          name: a.namespace,
-          counts: { pending: 0, active: 0, blocked: 0, complete: 0 },
-          lastActivity: 0,
-        });
-      }
-      const ns = namespaceMap.get(a.namespace)!;
-      ns.counts[a.status]++;
-      ns.lastActivity = Math.max(ns.lastActivity, a.updatedAt);
+    const result = [];
+
+    for (const ns of namespaces) {
+      // Get assignments for this namespace
+      const assignments = await ctx.db
+        .query("assignments")
+        .withIndex("by_namespace", (q) => q.eq("namespaceId", ns._id))
+        .collect();
+
+      const counts = {
+        pending: assignments.filter((a) => a.status === "pending").length,
+        active: assignments.filter((a) => a.status === "active").length,
+        blocked: assignments.filter((a) => a.status === "blocked").length,
+        complete: assignments.filter((a) => a.status === "complete").length,
+      };
+
+      const lastActivity = assignments.length > 0
+        ? Math.max(...assignments.map((a) => a.updatedAt))
+        : ns.updatedAt;
+
+      result.push({
+        _id: ns._id,
+        name: ns.name,
+        description: ns.description,
+        counts,
+        lastActivity,
+      });
     }
 
-    return Array.from(namespaceMap.values());
+    return result;
   },
 });
 
 // Subscription-friendly: get all active/pending assignments with their job chains
 export const watchQueue = query({
-  args: { namespace: v.string() },
+  args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
     const assignments = await ctx.db
       .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
       .collect();
 
     const result = [];
@@ -186,13 +195,13 @@ export const watchQueue = query({
   },
 });
 
-// D2: Get ALL assignments for a namespace (including complete) with their job chains
+// Get ALL assignments for a namespace (including complete) with their job chains
 export const getAllAssignments = query({
-  args: { namespace: v.string() },
+  args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
     const assignments = await ctx.db
       .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
       .collect();
 
     const result = [];

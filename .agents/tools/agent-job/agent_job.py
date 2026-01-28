@@ -299,6 +299,65 @@ class GeminiEventHandler:
         return event.get("type") == "result" and event.get("status") == "success"
 
 
+class ClaudeEventHandler:
+    """Handle Claude CLI JSON stream events."""
+
+    def __init__(self):
+        self._text_chunks: list[str] = []
+        self._final_result: Optional[str] = None
+        self._complete = False
+        self._success = False
+
+    def extract_job_id(self, event: dict) -> Optional[str]:
+        """Extract job ID from initial event."""
+        if event.get("type") == "system" and event.get("subtype") == "init":
+            return event.get("session_id")
+        return None
+
+    def process_event(self, event: dict, status: JobStatus) -> None:
+        """Process a Claude event and update status."""
+        event_type = event.get("type", "")
+
+        # Capture assistant text messages
+        if event_type == "assistant":
+            status.status_reason = "responding"
+            msg = event.get("message", {})
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get("type") == "text" and block.get("text"):
+                            self._text_chunks.append(block["text"])
+                        elif block.get("type") == "tool_use":
+                            tool_name = block.get("name", "tool")
+                            status.status_reason = tool_name
+
+        # Handle tool results
+        elif event_type == "user":
+            status.status_reason = "tool_result"
+
+        # Capture final result
+        elif event_type == "result":
+            self._complete = True
+            self._success = event.get("subtype") == "success"
+            status.status_reason = "completed" if self._success else "failed"
+
+            if event.get("result"):
+                self._final_result = str(event["result"])
+
+            # Extract duration if available
+            if event.get("duration_ms"):
+                status.completion.duration_ms = event["duration_ms"]
+
+    def is_completion_event(self, event: dict) -> bool:
+        """Check if this event indicates completion."""
+        return event.get("type") == "result" and event.get("subtype") == "success"
+
+    def get_result(self) -> str:
+        """Get the accumulated result."""
+        return self._final_result or "\n\n".join(self._text_chunks)
+
+
 # =============================================================================
 # Job Manager
 # =============================================================================
@@ -422,6 +481,15 @@ def build_harness_command(harness: str, assignment: str) -> list[str]:
             "e",
             assignment,
             "--json",
+        ]
+    elif harness == "claude":
+        return [
+            "claude",
+            "--dangerously-skip-permissions",
+            "--verbose",
+            "--output-format", "stream-json",
+            "-p",
+            assignment,
         ]
     else:
         raise ValueError(f"Unknown harness: {harness}")
@@ -562,6 +630,8 @@ def spawn_job(harness: str, assignment: str) -> dict:
     # Create appropriate event handler
     if harness == "gemini":
         handler = GeminiEventHandler()
+    elif harness == "claude":
+        handler = ClaudeEventHandler()
     else:
         handler = CodexEventHandler()
 
@@ -779,7 +849,7 @@ def main():
     spawn_parser.add_argument(
         "--harness",
         required=True,
-        choices=["gemini", "codex"],
+        choices=["gemini", "codex", "claude"],
         help="Agent harness to use"
     )
     spawn_parser.add_argument(

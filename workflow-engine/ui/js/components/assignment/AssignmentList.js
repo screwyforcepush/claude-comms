@@ -89,11 +89,11 @@ function sortAssignments(items) {
  * AssignmentList component - displays assignments for a namespace
  * D2: Show all assignments with filter option
  * @param {Object} props
- * @param {string} props.namespace - Namespace name to show assignments for
+ * @param {string} props.namespaceId - Namespace ID to show assignments for
  * @param {Function} props.onSelectAssignment - Callback when assignment is selected
  * @param {string} props.selectedAssignmentId - Currently selected assignment ID
  */
-export function AssignmentList({ namespace, onSelectAssignment, selectedAssignmentId }) {
+export function AssignmentList({ namespaceId, onSelectAssignment, selectedAssignmentId }) {
   // D1: Status filter state per namespace (resets when namespace changes via key)
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,7 +101,7 @@ export function AssignmentList({ namespace, onSelectAssignment, selectedAssignme
   // D2: Fetch ALL assignments (including complete) with job chains
   const { data: queueData, loading, error } = useQuery(
     api.scheduler.getAllAssignments,
-    { namespace }
+    { namespaceId }
   );
 
   // Calculate counts for filter tabs

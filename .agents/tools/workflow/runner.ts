@@ -13,8 +13,11 @@
 
 import { spawn, ChildProcess } from "child_process";
 import { ConvexClient } from "convex/browser";
-import { api } from "./workflow-engine/convex/_generated/api.js";
+import { anyApi } from "convex/server";
 import { readFileSync } from "fs";
+
+// Use anyApi for dynamic function references (works with ConvexClient)
+const api = anyApi;
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -22,7 +25,7 @@ import { fileURLToPath } from "url";
 interface Assignment {
   _id: string;
   _creationTime: number;
-  namespace: string;
+  namespaceId: string;
   northStar: string;
   status: "pending" | "active" | "blocked" | "complete";
   blockedReason?: string;
@@ -53,7 +56,7 @@ interface Job {
 // Chat-specific types
 interface ChatThread {
   _id: string;
-  namespace: string;
+  namespaceId: string;
   title: string;
   mode: "jam" | "cook";
   createdAt: number;
@@ -70,10 +73,11 @@ interface ChatMessage {
 
 interface ChatJobContext {
   threadId: string;
-  namespace: string;
+  namespaceId: string;
   mode: "jam" | "cook";
   messages: ChatMessage[];
   latestUserMessage: string;
+  claudeSessionId?: string; // For session resume
 }
 
 // Config
@@ -144,21 +148,11 @@ function buildPrompt(
     .replace(/\{\{JOB_HISTORY\}\}/g, buildJobHistory(jobHistory));
 }
 
-// Build formatted conversation history for chat
-function buildChatHistory(messages: ChatMessage[]): string {
-  if (!messages || messages.length === 0) return "(no previous messages)";
-
-  return messages
-    .map((m) => {
-      const role = m.role === "user" ? "**User:**" : "**Assistant:**";
-      return `${role}\n${m.content}`;
-    })
-    .join("\n\n---\n\n");
-}
-
 // Chat prompt building with Handlebars-style conditionals
+// Note: Conversation history is handled by Claude session resume, not in the prompt
 function buildChatPrompt(chatContext: ChatJobContext): string {
   const template = loadTemplate("product-owner");
+  const isNewSession = !chatContext.claudeSessionId;
 
   // Process Handlebars-style conditionals
   let processed = template;
@@ -175,12 +169,19 @@ function buildChatPrompt(chatContext: ChatJobContext): string {
     return chatContext.mode === "cook" ? content : "";
   });
 
+  // Handle {{#if NEW_SESSION}}...{{/if}} for first message only
+  const newSessionRegex = /\{\{#if NEW_SESSION\}\}([\s\S]*?)\{\{\/if\}\}/g;
+  processed = processed.replace(newSessionRegex, (_match, content) => {
+    return isNewSession ? content : "";
+  });
+
   // Replace template variables
+  // Note: {{MESSAGES}} removed - conversation history handled by Claude session resume
+  // Use config.namespace for display (human-readable name) instead of namespaceId
   return processed
     .replace(/\{\{THREAD_ID\}\}/g, chatContext.threadId)
-    .replace(/\{\{NAMESPACE\}\}/g, chatContext.namespace)
+    .replace(/\{\{NAMESPACE\}\}/g, config.namespace)
     .replace(/\{\{MODE\}\}/g, chatContext.mode)
-    .replace(/\{\{MESSAGES\}\}/g, buildChatHistory(chatContext.messages.slice(0, -1))) // Exclude latest
     .replace(/\{\{LATEST_MESSAGE\}\}/g, chatContext.latestUserMessage);
 }
 
@@ -213,21 +214,42 @@ async function saveChatResponse(threadId: string, content: string): Promise<void
   }
 }
 
+// Save Claude session_id to thread for session resume
+async function saveSessionId(threadId: string, sessionId: string): Promise<void> {
+  try {
+    await client!.mutation(api.chatThreads.updateSessionId, {
+      id: threadId as any,
+      sessionId,
+    });
+    console.log(`[Chat] Saved session_id ${sessionId} to thread ${threadId}`);
+  } catch (e) {
+    console.error(`[Chat] Failed to save session_id:`, e);
+  }
+}
+
 // Harness command building
-function buildCommand(harness: string, prompt: string): { cmd: string; args: string[] } {
+interface CommandOptions {
+  sessionId?: string; // For Claude session resume
+}
+
+function buildCommand(harness: string, prompt: string, options: CommandOptions = {}): { cmd: string; args: string[] } {
   switch (harness) {
-    case "claude":
-      return {
-        cmd: "claude",
-        args: [
-          "--dangerously-skip-permissions",
-          "--verbose",
-          "--output-format",
-          "stream-json",
-          "-p",
-          prompt,
-        ],
-      };
+    case "claude": {
+      const args = [
+        "--dangerously-skip-permissions",
+        "--verbose",
+        "--output-format",
+        "stream-json",
+      ];
+
+      // Add --resume flag for session continuity
+      if (options.sessionId) {
+        args.push("--resume", options.sessionId);
+      }
+
+      args.push("-p", prompt);
+      return { cmd: "claude", args };
+    }
     case "codex":
       return {
         cmd: "codex",
@@ -248,6 +270,7 @@ interface StreamHandler {
   onEvent(event: Record<string, unknown>): void;
   getResult(): string;
   isComplete(): boolean;
+  getSessionId(): string | null; // For Claude session resume
 }
 
 class ClaudeStreamHandler implements StreamHandler {
@@ -255,6 +278,7 @@ class ClaudeStreamHandler implements StreamHandler {
   private finalResult: string | null = null;
   private complete = false;
   private success = false;
+  private sessionId: string | null = null;
 
   onEvent(event: Record<string, unknown>) {
     const type = event.type as string;
@@ -271,12 +295,16 @@ class ClaudeStreamHandler implements StreamHandler {
       }
     }
 
-    // Capture final result
+    // Capture final result and session_id
     if (type === "result") {
       this.complete = true;
       this.success = event.subtype === "success";
       if (event.result) {
         this.finalResult = String(event.result);
+      }
+      // Capture session_id for resume functionality
+      if (event.session_id) {
+        this.sessionId = String(event.session_id);
       }
     }
   }
@@ -288,6 +316,10 @@ class ClaudeStreamHandler implements StreamHandler {
 
   isComplete(): boolean {
     return this.complete && this.success;
+  }
+
+  getSessionId(): string | null {
+    return this.sessionId;
   }
 }
 
@@ -317,6 +349,10 @@ class CodexStreamHandler implements StreamHandler {
   isComplete(): boolean {
     return this.complete;
   }
+
+  getSessionId(): string | null {
+    return null; // Codex doesn't support session resume
+  }
 }
 
 class GeminiStreamHandler implements StreamHandler {
@@ -342,6 +378,10 @@ class GeminiStreamHandler implements StreamHandler {
 
   isComplete(): boolean {
     return this.complete;
+  }
+
+  getSessionId(): string | null {
+    return null; // Gemini doesn't support session resume
   }
 }
 
@@ -402,7 +442,10 @@ async function executeJob(
       return;
     }
     prompt = buildChatPrompt(chatContext);
-    console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}`);
+    const resumeInfo = chatContext.claudeSessionId
+      ? ` (resuming session ${chatContext.claudeSessionId.slice(0, 8)}...)`
+      : ' (new session)';
+    console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}${resumeInfo}`);
   } else {
     // Regular job: use standard prompt building
     let jobHistory: Job[] = [];
@@ -412,7 +455,12 @@ async function executeJob(
     prompt = buildPrompt(job.jobType, assignment, job, previousResult, jobHistory);
   }
 
-  const { cmd, args } = buildCommand(job.harness, prompt);
+  // Build command with optional session resume for chat jobs
+  const commandOptions: CommandOptions = {};
+  if (isChat && chatContext?.claudeSessionId && job.harness === "claude") {
+    commandOptions.sessionId = chatContext.claudeSessionId;
+  }
+  const { cmd, args } = buildCommand(job.harness, prompt, commandOptions);
 
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
@@ -481,9 +529,14 @@ async function executeJob(
           id: jobId,
           result,
         });
-        // Chat jobs: save response to thread, no PM trigger
+        // Chat jobs: save response to thread and session_id, no PM trigger
         if (isChat && chatContext) {
           await saveChatResponse(chatContext.threadId, result);
+          // Save session_id for future resume (Claude only)
+          const newSessionId = handler.getSessionId();
+          if (newSessionId) {
+            await saveSessionId(chatContext.threadId, newSessionId);
+          }
         } else if (job.jobType !== "pm") {
           // Regular jobs: trigger PM review
           await triggerPMJob(job, assignment, false);
@@ -571,15 +624,29 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
 }
 
 // Main
-function startRunner() {
+async function startRunner() {
   console.log(`Workflow runner starting for namespace: ${config.namespace}`);
   console.log(`Convex URL: ${config.convexUrl}`);
 
   client = new ConvexClient(config.convexUrl);
 
+  // Look up namespace ID by name
+  const namespace = await client.query(api.namespaces.getByName, {
+    name: config.namespace,
+  });
+
+  if (!namespace) {
+    console.error(`Error: Namespace "${config.namespace}" not found in database.`);
+    console.error("Run 'npx tsx init.ts' to initialize the namespace first.");
+    process.exit(1);
+  }
+
+  const namespaceId = namespace._id;
+  console.log(`Found namespace ID: ${namespaceId}`);
+
   unsubscribe = client.onUpdate(
     api.scheduler.getReadyJobs,
-    { namespace: config.namespace },
+    { namespaceId },
     (readyJobs: ReadyJob[]) => {
       console.log(`Queue update: ${readyJobs.length} ready jobs`);
       processQueue(readyJobs).catch((e) => {

@@ -45,6 +45,20 @@ export const api = {
     list: "chatMessages:list",
     // Add a message to a thread
     add: "chatMessages:add"
+  },
+
+  // Chat jobs API - LEGACY, kept for future cook mode conversion only
+  chatJobs: {
+    // LEGACY: Convert chat thread to assignment+job (creates assignment + job)
+    // NOTE: DO NOT use for normal chat - use chatActions.sendMessage instead
+    // This is for future "Convert to Assignment" feature (cook mode explicit conversion)
+    trigger: "chatJobs:trigger"
+  },
+
+  // Chat actions API - direct Claude execution with session resume
+  chatActions: {
+    // Send message directly to Claude with session resume (no assignment/job)
+    sendMessage: "chatActions:sendMessage"
   }
 };
 
