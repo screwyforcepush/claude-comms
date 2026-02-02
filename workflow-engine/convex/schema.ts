@@ -30,7 +30,7 @@ export default defineSchema({
     priority: v.number(),
     artifacts: v.string(),
     decisions: v.string(),
-    headJobId: v.optional(v.id("jobs")),
+    headGroupId: v.optional(v.id("jobGroups")), // Chain starts at group level
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -38,15 +38,41 @@ export default defineSchema({
     .index("by_namespace_status", ["namespaceId", "status"])
     .index("by_status", ["status"]),
 
-  jobs: defineTable({
+  // Job groups - parallel execution containers
+  // Groups contain 1+ jobs that run in parallel
+  // Chain: assignment.headGroupId → group.nextGroupId → ...
+  jobGroups: defineTable({
     assignmentId: v.id("assignments"),
-    jobType: v.string(),
+    nextGroupId: v.optional(v.id("jobGroups")), // Next group in chain
+    // Group status derived from member jobs:
+    // - pending: all jobs pending
+    // - running: any job running
+    // - complete: all jobs terminal, at least one succeeded
+    // - failed: all jobs terminal, all failed
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("complete"),
+      v.literal("failed")
+    ),
+    aggregatedResult: v.optional(v.string()), // Combined results for PM
+    createdAt: v.number(),
+  })
+    .index("by_assignment", ["assignmentId"])
+    .index("by_status", ["status"]),
+
+  // Jobs - individual work units within a group
+  // Multiple jobs in same group run in parallel
+  // Each job has its own type, harness, and context
+  jobs: defineTable({
+    groupId: v.id("jobGroups"), // FK to parent group
+    jobType: v.string(), // e.g., "review", "pm", "implement", "uat"
     harness: v.union(
       v.literal("claude"),
       v.literal("codex"),
       v.literal("gemini")
     ),
-    context: v.optional(v.string()),
+    context: v.optional(v.string()), // Job-specific context
     prompt: v.optional(v.string()), // Complete prompt sent to agent
     status: v.union(
       v.literal("pending"),
@@ -55,14 +81,13 @@ export default defineSchema({
       v.literal("failed")
     ),
     result: v.optional(v.string()),
-    nextJobId: v.optional(v.id("jobs")),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
-    .index("by_assignment", ["assignmentId"])
-    .index("by_status", ["status"])
-    .index("by_assignment_status", ["assignmentId", "status"]),
+    .index("by_group", ["groupId"])
+    .index("by_group_status", ["groupId", "status"])
+    .index("by_status", ["status"]),
 
   chatThreads: defineTable({
     namespaceId: v.id("namespaces"),

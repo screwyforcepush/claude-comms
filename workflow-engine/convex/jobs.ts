@@ -1,11 +1,14 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
+// ============================================================================
 // Queries
+// ============================================================================
 
 export const list = query({
   args: {
-    assignmentId: v.optional(v.id("assignments")),
+    groupId: v.optional(v.id("jobGroups")),
     status: v.optional(
       v.union(
         v.literal("pending"),
@@ -16,20 +19,18 @@ export const list = query({
     ),
   },
   handler: async (ctx, args) => {
-    if (args.assignmentId && args.status) {
+    if (args.groupId && args.status) {
       return await ctx.db
         .query("jobs")
-        .withIndex("by_assignment_status", (q) =>
-          q.eq("assignmentId", args.assignmentId!).eq("status", args.status!)
+        .withIndex("by_group_status", (q) =>
+          q.eq("groupId", args.groupId!).eq("status", args.status!)
         )
         .collect();
     }
-    if (args.assignmentId) {
+    if (args.groupId) {
       return await ctx.db
         .query("jobs")
-        .withIndex("by_assignment", (q) =>
-          q.eq("assignmentId", args.assignmentId!)
-        )
+        .withIndex("by_group", (q) => q.eq("groupId", args.groupId!))
         .collect();
     }
     if (args.status) {
@@ -49,117 +50,198 @@ export const get = query({
   },
 });
 
-export const getWithAssignment = query({
+export const getWithGroup = query({
   args: { id: v.id("jobs") },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.id);
     if (!job) return null;
 
-    const assignment = await ctx.db.get(job.assignmentId);
-    return { ...job, assignment };
+    const group = await ctx.db.get(job.groupId);
+    if (!group) return null;
+
+    const assignment = await ctx.db.get(group.assignmentId);
+    return { ...job, group, assignment };
   },
 });
 
-// Get the previous job in the chain (for context passing)
-export const getPrevious = query({
-  args: { id: v.id("jobs") },
+// ============================================================================
+// Group Queries
+// ============================================================================
+
+export const getGroup = query({
+  args: { id: v.id("jobGroups") },
   handler: async (ctx, args) => {
-    const job = await ctx.db.get(args.id);
-    if (!job) return null;
+    return await ctx.db.get(args.id);
+  },
+});
 
-    const assignment = await ctx.db.get(job.assignmentId);
-    if (!assignment) return null;
+export const getGroupWithJobs = query({
+  args: { id: v.id("jobGroups") },
+  handler: async (ctx, args) => {
+    const group = await ctx.db.get(args.id);
+    if (!group) return null;
 
-    // Walk chain to find job before this one
-    let currentJobId = assignment.headJobId;
-    let prevJob = null;
-    while (currentJobId) {
-      if (currentJobId === args.id) {
-        return prevJob;
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_group", (q) => q.eq("groupId", args.id))
+      .collect();
+
+    const assignment = await ctx.db.get(group.assignmentId);
+    return { ...group, jobs, assignment };
+  },
+});
+
+export const listGroups = query({
+  args: {
+    assignmentId: v.optional(v.id("assignments")),
+    status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("running"),
+        v.literal("complete"),
+        v.literal("failed")
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    if (args.assignmentId) {
+      const groups = await ctx.db
+        .query("jobGroups")
+        .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId!))
+        .collect();
+      if (args.status) {
+        return groups.filter((g) => g.status === args.status);
       }
-      const currentJob = await ctx.db.get(currentJobId);
-      if (!currentJob) break;
-      prevJob = currentJob;
-      currentJobId = currentJob.nextJobId;
+      return groups;
     }
-    return null;
+    if (args.status) {
+      return await ctx.db
+        .query("jobGroups")
+        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .collect();
+    }
+    return await ctx.db.query("jobGroups").collect();
   },
 });
 
-// Mutations
+// ============================================================================
+// Mutations - Group Creation
+// ============================================================================
 
-export const create = mutation({
+// Job definition for creating groups
+const jobDefValidator = v.object({
+  jobType: v.string(),
+  harness: v.union(
+    v.literal("claude"),
+    v.literal("codex"),
+    v.literal("gemini")
+  ),
+  context: v.optional(v.string()),
+});
+
+// Create a new group with jobs
+// Accepts array of job definitions - all jobs run in parallel within the group
+// Auto-expansion (e.g., review → 3 harnesses) should be handled by CLI before calling
+export const createGroup = mutation({
   args: {
     assignmentId: v.id("assignments"),
-    jobType: v.string(),
-    harness: v.union(
-      v.literal("claude"),
-      v.literal("codex"),
-      v.literal("gemini")
-    ),
-    context: v.optional(v.string()),
+    jobs: v.array(jobDefValidator),
   },
   handler: async (ctx, args) => {
+    if (args.jobs.length === 0) {
+      throw new Error("At least one job required");
+    }
+
     const now = Date.now();
-    const jobId = await ctx.db.insert("jobs", {
+
+    // Create the group (just a container - no jobType/context)
+    const groupId = await ctx.db.insert("jobGroups", {
       assignmentId: args.assignmentId,
-      jobType: args.jobType,
-      harness: args.harness,
-      context: args.context,
       status: "pending",
       createdAt: now,
     });
 
-    // If assignment has no head job, set this as head
+    // Insert jobs as-is (each job has its own type/harness/context)
+    const jobIds: Id<"jobs">[] = [];
+
+    for (const jobDef of args.jobs) {
+      const jobId = await ctx.db.insert("jobs", {
+        groupId,
+        jobType: jobDef.jobType,
+        harness: jobDef.harness,
+        context: jobDef.context,
+        status: "pending",
+        createdAt: now,
+      });
+      jobIds.push(jobId);
+    }
+
+    // If assignment has no head group, set this as head
     const assignment = await ctx.db.get(args.assignmentId);
-    if (assignment && !assignment.headJobId) {
+    if (assignment && !assignment.headGroupId) {
       await ctx.db.patch(args.assignmentId, {
-        headJobId: jobId,
+        headGroupId: groupId,
         updatedAt: now,
       });
     }
 
-    return jobId;
+    return { groupId, jobIds };
   },
 });
 
-// Insert job after a specific job in the chain
-export const insertAfter = mutation({
+// Insert a new group after an existing group in the chain
+// Accepts array of job definitions - all jobs run in parallel within the group
+// Auto-expansion should be handled by CLI before calling
+export const insertGroupAfter = mutation({
   args: {
-    afterJobId: v.id("jobs"),
-    jobType: v.string(),
-    harness: v.union(
-      v.literal("claude"),
-      v.literal("codex"),
-      v.literal("gemini")
-    ),
-    context: v.optional(v.string()),
+    afterGroupId: v.id("jobGroups"),
+    jobs: v.array(jobDefValidator),
   },
   handler: async (ctx, args) => {
-    const afterJob = await ctx.db.get(args.afterJobId);
-    if (!afterJob) throw new Error("Job not found");
+    if (args.jobs.length === 0) {
+      throw new Error("At least one job required");
+    }
+
+    const afterGroup = await ctx.db.get(args.afterGroupId);
+    if (!afterGroup) throw new Error("Group not found");
 
     const now = Date.now();
 
-    // Create new job pointing to what afterJob was pointing to
-    const newJobId = await ctx.db.insert("jobs", {
-      assignmentId: afterJob.assignmentId,
-      jobType: args.jobType,
-      harness: args.harness,
-      context: args.context,
+    // Create new group pointing to what afterGroup was pointing to
+    const groupId = await ctx.db.insert("jobGroups", {
+      assignmentId: afterGroup.assignmentId,
+      nextGroupId: afterGroup.nextGroupId,
       status: "pending",
-      nextJobId: afterJob.nextJobId,
       createdAt: now,
     });
 
-    // Update afterJob to point to new job
-    await ctx.db.patch(args.afterJobId, {
-      nextJobId: newJobId,
+    // Insert jobs as-is
+    const jobIds: Id<"jobs">[] = [];
+
+    for (const jobDef of args.jobs) {
+      const jobId = await ctx.db.insert("jobs", {
+        groupId,
+        jobType: jobDef.jobType,
+        harness: jobDef.harness,
+        context: jobDef.context,
+        status: "pending",
+        createdAt: now,
+      });
+      jobIds.push(jobId);
+    }
+
+    // Update afterGroup to point to new group
+    await ctx.db.patch(args.afterGroupId, {
+      nextGroupId: groupId,
     });
 
-    return newJobId;
+    return { groupId, jobIds };
   },
 });
+
+// ============================================================================
+// Mutations - Job Lifecycle
+// ============================================================================
 
 export const start = mutation({
   args: {
@@ -174,13 +256,21 @@ export const start = mutation({
       prompt: args.prompt,
     });
 
-    // Also mark assignment as active
+    // Update group status to running
     const job = await ctx.db.get(args.id);
     if (job) {
-      await ctx.db.patch(job.assignmentId, {
-        status: "active",
-        updatedAt: now,
+      await ctx.db.patch(job.groupId, {
+        status: "running",
       });
+
+      // Also mark assignment as active
+      const group = await ctx.db.get(job.groupId);
+      if (group) {
+        await ctx.db.patch(group.assignmentId, {
+          status: "active",
+          updatedAt: now,
+        });
+      }
     }
   },
 });
@@ -197,6 +287,12 @@ export const complete = mutation({
       result: args.result,
       completedAt: now,
     });
+
+    // Check if group is done and update status
+    const job = await ctx.db.get(args.id);
+    if (job) {
+      await updateGroupStatus(ctx, job.groupId);
+    }
   },
 });
 
@@ -212,5 +308,102 @@ export const fail = mutation({
       result: args.result,
       completedAt: now,
     });
+
+    // Check if group is done and update status
+    const job = await ctx.db.get(args.id);
+    if (job) {
+      await updateGroupStatus(ctx, job.groupId);
+    }
+  },
+});
+
+// ============================================================================
+// Internal Helpers
+// ============================================================================
+
+// Update group status based on member job statuses
+// Returns true if group just completed (for triggering next steps)
+async function updateGroupStatus(
+  ctx: { db: any },
+  groupId: Id<"jobGroups">
+): Promise<boolean> {
+  const jobs = await ctx.db
+    .query("jobs")
+    .withIndex("by_group", (q: any) => q.eq("groupId", groupId))
+    .collect();
+
+  const statuses = jobs.map((j: any) => j.status);
+  const allTerminal = statuses.every(
+    (s: string) => s === "complete" || s === "failed"
+  );
+
+  if (!allTerminal) {
+    // Group still in progress
+    return false;
+  }
+
+  // All jobs are terminal - determine group status
+  const anySucceeded = statuses.some((s: string) => s === "complete");
+  const newStatus = anySucceeded ? "complete" : "failed";
+
+  // Aggregate results with minimal jobType labels
+  // Format: "review A", "review B", "review C", "uat" etc.
+  const jobsWithResults = jobs.filter((j: any) => j.result);
+
+  // Count occurrences of each jobType to determine if we need A/B/C suffixes
+  const typeCounts: Record<string, number> = {};
+  for (const j of jobsWithResults) {
+    typeCounts[j.jobType] = (typeCounts[j.jobType] || 0) + 1;
+  }
+
+  // Track current index per jobType for labeling
+  const typeIndex: Record<string, number> = {};
+  const results = jobsWithResults
+    .map((j: any) => {
+      const count = typeCounts[j.jobType];
+      let label: string;
+      if (count === 1) {
+        // Single job of this type - no suffix needed
+        label = j.jobType;
+      } else {
+        // Multiple jobs of same type - add A/B/C suffix
+        typeIndex[j.jobType] = (typeIndex[j.jobType] || 0);
+        const suffix = String.fromCharCode(65 + typeIndex[j.jobType]); // A, B, C...
+        typeIndex[j.jobType]++;
+        label = `${j.jobType} ${suffix}`;
+      }
+      return `## ${label}\n${j.result}`;
+    })
+    .join("\n\n---\n\n");
+
+  await ctx.db.patch(groupId, {
+    status: newStatus,
+    aggregatedResult: results || undefined,
+  });
+
+  return true;
+}
+
+// ============================================================================
+// Runner Support
+// ============================================================================
+
+// Get job with its group and assignment (for runner)
+export const getWithAssignment = query({
+  args: { id: v.id("jobs") },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.id);
+    if (!job) return null;
+
+    const group = await ctx.db.get(job.groupId);
+    if (!group) return null;
+
+    const assignment = await ctx.db.get(group.assignmentId);
+    return {
+      ...job,
+      assignmentId: group.assignmentId,
+      assignment,
+      group,
+    };
   },
 });

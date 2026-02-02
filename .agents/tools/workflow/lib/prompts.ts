@@ -21,21 +21,31 @@ export interface Assignment {
   priority: number;
   artifacts: string;
   decisions: string;
-  headJobId?: string;
+  headGroupId?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface JobGroup {
+  _id: string;
+  _creationTime: number;
+  assignmentId: string;
+  nextGroupId?: string;
+  status: "pending" | "running" | "complete" | "failed";
+  aggregatedResult?: string;
+  createdAt: number;
 }
 
 export interface Job {
   _id: string;
   _creationTime: number;
-  assignmentId: string;
+  groupId: string;
   jobType: string;
   harness: "claude" | "codex" | "gemini";
   context?: string;
   status: "pending" | "running" | "complete" | "failed";
   result?: string;
-  nextJobId?: string;
+  prompt?: string;
   startedAt?: number;
   completedAt?: number;
   createdAt: number;
@@ -87,49 +97,64 @@ export function loadTemplate(jobType: string): string {
 // Accumulated job result for PM jobs
 export interface AccumulatedJobResult {
   jobType: string;
+  harness: string; // Kept for internal tracking, not shown to PM
   result: string;
 }
 
 /**
  * Format accumulated results for PM prompt
+ * Uses jobType with A/B/C suffixes for multiple jobs of same type
+ * Does NOT expose harness names - PM sees only jobType labels
  */
 function formatAccumulatedResults(
-  accumulatedResults: AccumulatedJobResult[],
-  previousResult: string | null
+  accumulatedResults: AccumulatedJobResult[]
 ): string {
-  // If no accumulated results, fall back to single previous result
   if (!accumulatedResults || accumulatedResults.length === 0) {
-    return previousResult || "(no previous result)";
+    return "(no previous results)";
   }
 
-  // Single result - use simple format
-  if (accumulatedResults.length === 1) {
-    return accumulatedResults[0].result;
+  // Group by jobType to determine if we need A/B/C suffixes
+  const byJobType = new Map<string, AccumulatedJobResult[]>();
+  for (const r of accumulatedResults) {
+    const list = byJobType.get(r.jobType) || [];
+    list.push(r);
+    byJobType.set(r.jobType, list);
   }
 
-  // Multiple results - format with headers
-  return accumulatedResults
-    .map((r, i) => `### Job ${i + 1}: ${r.jobType}\n\n${r.result}`)
-    .join("\n\n---\n\n");
+  // Build sections with A/B/C suffixes for duplicates
+  const sections: string[] = [];
+  const suffixes = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+  for (const [jobType, results] of byJobType) {
+    if (results.length === 1) {
+      // Single job of this type - no suffix
+      sections.push(`## ${jobType}\n\n${results[0].result}`);
+    } else {
+      // Multiple jobs of same type - add A/B/C suffixes
+      for (let i = 0; i < results.length; i++) {
+        const suffix = suffixes[i] || `${i + 1}`;
+        sections.push(`## ${jobType} ${suffix}\n\n${results[i].result}`);
+      }
+    }
+  }
+
+  return sections.join("\n\n---\n\n");
 }
 
 /**
  * Build prompt for assignment-based jobs
+ * Each job has its own jobType and context
  */
 export function buildPrompt(
-  jobType: string,
+  group: JobGroup,
   assignment: Assignment,
   job: Job,
-  previousResult: string | null,
-  accumulatedResults?: AccumulatedJobResult[]
+  accumulatedResults: AccumulatedJobResult[]
 ): string {
-  const template = loadTemplate(jobType);
+  const template = loadTemplate(job.jobType);
 
-  // For PM/retrospect jobs, use accumulated results; otherwise just previous
-  const isPMJob = jobType === "pm" || jobType === "retrospect";
-  const resultText = isPMJob
-    ? formatAccumulatedResults(accumulatedResults || [], previousResult)
-    : (previousResult || "(no previous result)");
+  // Format accumulated results for PM/retrospect jobs
+  const resultText = formatAccumulatedResults(accumulatedResults);
 
   return template
     .replace(/\{\{NORTH_STAR\}\}/g, assignment.northStar)
@@ -138,7 +163,9 @@ export function buildPrompt(
     .replace(/\{\{CONTEXT\}\}/g, job.context || "(no specific context)")
     .replace(/\{\{PREVIOUS_RESULT\}\}/g, resultText)
     .replace(/\{\{ASSIGNMENT_ID\}\}/g, assignment._id)
-    .replace(/\{\{CURRENT_JOB_ID\}\}/g, job._id);
+    .replace(/\{\{GROUP_ID\}\}/g, group._id)
+    .replace(/\{\{CURRENT_JOB_ID\}\}/g, job._id)
+    .replace(/\{\{HARNESS\}\}/g, job.harness);
 }
 
 /**

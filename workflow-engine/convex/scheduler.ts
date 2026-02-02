@@ -2,13 +2,13 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 
-// Assignment-based job (work items)
+// Ready job info returned to runner
 interface ReadyJob {
   job: Doc<"jobs">;
+  group: Doc<"jobGroups">;
   assignment: Doc<"assignments">;
-  previousResult: string | null;
-  // For PM jobs: accumulated results from all jobs since last PM
-  accumulatedResults: Array<{ jobType: string; result: string }>;
+  // For PM jobs: accumulated results from all groups since last PM
+  accumulatedResults: Array<{ jobType: string; harness: string; result: string }>;
 }
 
 // Chat job (separate from assignments)
@@ -16,62 +16,87 @@ interface ReadyChatJob {
   chatJob: Doc<"chatJobs">;
 }
 
-// Helper: find the next ready job for an assignment (if any)
-async function findReadyJob(
-  ctx: { db: { get: (id: Id<"jobs">) => Promise<Doc<"jobs"> | null> } },
+// ============================================================================
+// Group-based chain navigation
+// ============================================================================
+
+// Find all ready jobs for an assignment by walking the group chain
+async function findReadyJobs(
+  ctx: { db: any },
   assignment: Doc<"assignments">
-): Promise<ReadyJob | null> {
-  if (!assignment.headJobId) return null;
+): Promise<ReadyJob[]> {
+  if (!assignment.headGroupId) return [];
 
-  let currentJobId: Id<"jobs"> | undefined = assignment.headJobId;
-  let prevJob: Doc<"jobs"> | null = null;
+  let currentGroupId: Id<"jobGroups"> | undefined = assignment.headGroupId;
 
-  // Track all completed jobs since the last PM (for accumulated results)
-  const jobsSinceLastPM: Array<{ jobType: string; result: string }> = [];
+  // Track accumulated results from completed groups (for PM context)
+  const accumulatedResults: Array<{ jobType: string; harness: string; result: string }> = [];
 
-  while (currentJobId) {
-    const job = await ctx.db.get(currentJobId);
-    if (!job) break;
+  while (currentGroupId) {
+    const groupId = currentGroupId as Id<"jobGroups">;
+    const group: Doc<"jobGroups"> | null = await ctx.db.get(groupId);
+    if (!group) break;
 
-    if (job.status === "pending") {
-      // This job is ready if:
-      // - It's the head (no predecessor), OR
-      // - Previous job is complete or failed (allows recovery)
-      const isHead = currentJobId === assignment.headJobId;
-      const prevDone = prevJob?.status === "complete" || prevJob?.status === "failed";
+    // Get all jobs in this group
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_group", (q: any) => q.eq("groupId", groupId))
+      .collect();
 
-      if (isHead || prevDone) {
-        return {
-          job,
-          assignment,
-          previousResult: prevJob?.result ?? null,
-          accumulatedResults: jobsSinceLastPM,
-        };
-      }
-      break;
+    // Check group status
+    const pendingJobs = jobs.filter((j: Doc<"jobs">) => j.status === "pending");
+    const runningJobs = jobs.filter((j: Doc<"jobs">) => j.status === "running");
+    const allTerminal = jobs.every(
+      (j: Doc<"jobs">) => j.status === "complete" || j.status === "failed"
+    );
+
+    if (pendingJobs.length > 0 && runningJobs.length === 0) {
+      // Group is ready - return ALL pending jobs for parallel execution
+      return pendingJobs.map((job: Doc<"jobs">) => ({
+        job,
+        group,
+        assignment,
+        accumulatedResults: [...accumulatedResults],
+      }));
     }
 
-    if (job.status === "running") {
-      // Assignment already has a running job
-      break;
+    if (runningJobs.length > 0) {
+      // Group is in progress - wait for it to complete
+      return [];
     }
 
-    // Track completed jobs for accumulation
-    if (job.status === "complete" && job.result) {
-      // Reset accumulator when we hit a PM job (PM already saw previous results)
-      if (job.jobType === "pm" || job.jobType === "retrospect") {
-        jobsSinceLastPM.length = 0;
+    if (allTerminal) {
+      // Group is done - accumulate results and move to next
+      // Check if this group contains PM/retrospect jobs (reset accumulator after these)
+      const hasPMJob = jobs.some(
+        (j: Doc<"jobs">) => j.jobType === "pm" || j.jobType === "retrospect"
+      );
+
+      if (hasPMJob) {
+        // PM already saw previous results, reset accumulator
+        accumulatedResults.length = 0;
       } else {
-        jobsSinceLastPM.push({ jobType: job.jobType, result: job.result });
+        // Add results from all terminal jobs in this group (including failed)
+        for (const job of jobs) {
+          if (job.result) {
+            accumulatedResults.push({
+              jobType: job.jobType,
+              harness: job.harness,
+              result: job.result,
+            });
+          }
+        }
       }
+      currentGroupId = group.nextGroupId;
     }
-
-    prevJob = job;
-    currentJobId = job.nextJobId;
   }
 
-  return null;
+  return [];
 }
+
+// ============================================================================
+// Public Queries
+// ============================================================================
 
 // Get all jobs that are ready to run for a namespace
 export const getReadyJobs = query({
@@ -95,26 +120,17 @@ export const getReadyJobs = query({
 
     // Independent assignments: always include their ready jobs (can run in parallel)
     for (const assignment of independentAssignments) {
-      const readyJob = await findReadyJob(ctx, assignment);
-      if (readyJob) {
-        readyJobs.push(readyJob);
-      }
+      const jobs = await findReadyJobs(ctx, assignment);
+      readyJobs.push(...jobs);
     }
 
     // Sequential assignments: only ONE can be active at a time
-    // Check if any sequential assignment is currently active
     const activeSequential = sequentialAssignments.find((a) => a.status === "active");
 
     if (activeSequential) {
-      // Try to get a ready job from the active sequential assignment
-      const readyJob = await findReadyJob(ctx, activeSequential);
-      if (readyJob) {
-        readyJobs.push(readyJob);
-      }
-      // If no ready job (all jobs done), this assignment is effectively complete
-      // but we don't pick up a new one until it's explicitly marked complete
-      // This prevents race conditions - the assignment should be marked complete
-      // by the final job handler
+      // Try to get ready jobs from the active sequential assignment
+      const jobs = await findReadyJobs(ctx, activeSequential);
+      readyJobs.push(...jobs);
     } else {
       // No active sequential - pick the first pending one (by priority, then creation time)
       const pendingSequential = sequentialAssignments
@@ -125,10 +141,8 @@ export const getReadyJobs = query({
         });
 
       if (pendingSequential.length > 0) {
-        const readyJob = await findReadyJob(ctx, pendingSequential[0]);
-        if (readyJob) {
-          readyJobs.push(readyJob);
-        }
+        const jobs = await findReadyJobs(ctx, pendingSequential[0]);
+        readyJobs.push(...jobs);
       }
     }
 
@@ -150,30 +164,27 @@ export const getQueueStatus = query({
       .withIndex("by_status", (q) => q.eq("status", "running"))
       .collect();
 
-    // Filter running jobs to this namespace
+    // Filter running jobs to this namespace (via group -> assignment)
     const namespaceRunningJobs = [];
     for (const job of runningJobs) {
-      const assignment = await ctx.db.get(job.assignmentId);
+      const group = await ctx.db.get(job.groupId);
+      if (!group) continue;
+      const assignment = await ctx.db.get(group.assignmentId);
       if (assignment?.namespaceId === args.namespaceId) {
-        namespaceRunningJobs.push({ job, assignment });
+        namespaceRunningJobs.push({ job, group, assignment });
       }
     }
 
-    // Check if any non-independent assignment is active
     const hasActiveNonIndependent = assignments.some(
       (a) => a.status === "active" && !a.independent
     );
 
     return {
       totalAssignments: assignments.length,
-      pendingAssignments: assignments.filter((a) => a.status === "pending")
-        .length,
-      activeAssignments: assignments.filter((a) => a.status === "active")
-        .length,
-      blockedAssignments: assignments.filter((a) => a.status === "blocked")
-        .length,
-      completeAssignments: assignments.filter((a) => a.status === "complete")
-        .length,
+      pendingAssignments: assignments.filter((a) => a.status === "pending").length,
+      activeAssignments: assignments.filter((a) => a.status === "active").length,
+      blockedAssignments: assignments.filter((a) => a.status === "blocked").length,
+      completeAssignments: assignments.filter((a) => a.status === "complete").length,
       runningJobs: namespaceRunningJobs.length,
       hasActiveNonIndependent,
     };
@@ -184,13 +195,11 @@ export const getQueueStatus = query({
 export const getAllNamespaces = query({
   args: {},
   handler: async (ctx) => {
-    // Get all namespaces from the namespaces table
     const namespaces = await ctx.db.query("namespaces").collect();
 
     const result = [];
 
     for (const ns of namespaces) {
-      // Get assignments for this namespace
       const assignments = await ctx.db
         .query("assignments")
         .withIndex("by_namespace", (q) => q.eq("namespaceId", ns._id))
@@ -203,9 +212,10 @@ export const getAllNamespaces = query({
         complete: assignments.filter((a) => a.status === "complete").length,
       };
 
-      const lastActivity = assignments.length > 0
-        ? Math.max(...assignments.map((a) => a.updatedAt))
-        : ns.updatedAt;
+      const lastActivity =
+        assignments.length > 0
+          ? Math.max(...assignments.map((a) => a.updatedAt))
+          : ns.updatedAt;
 
       result.push({
         _id: ns._id,
@@ -220,7 +230,7 @@ export const getAllNamespaces = query({
   },
 });
 
-// Subscription-friendly: get all active/pending assignments with their job chains
+// Subscription-friendly: get all active/pending assignments with their group chains
 export const watchQueue = query({
   args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
@@ -234,21 +244,33 @@ export const watchQueue = query({
     for (const assignment of assignments) {
       if (assignment.status === "complete") continue;
 
-      // Get all jobs for this assignment
-      const jobs: Doc<"jobs">[] = [];
-      let currentJobId = assignment.headJobId;
-      while (currentJobId) {
-        const job = await ctx.db.get(currentJobId);
-        if (!job) break;
-        jobs.push(job);
-        currentJobId = job.nextJobId;
+      // Walk the group chain
+      const groups: Array<Doc<"jobGroups"> & { jobs: Doc<"jobs">[] }> = [];
+      let currentGroupId = assignment.headGroupId;
+
+      while (currentGroupId) {
+        const group = await ctx.db.get(currentGroupId);
+        if (!group) break;
+
+        const jobs = await ctx.db
+          .query("jobs")
+          .withIndex("by_group", (q) => q.eq("groupId", currentGroupId as Id<"jobGroups">))
+          .collect();
+
+        groups.push({ ...group, jobs });
+        currentGroupId = group.nextGroupId;
       }
+
+      const hasRunningJob = groups.some((g) =>
+        g.jobs.some((j) => j.status === "running")
+      );
+      const nextPendingGroup = groups.find((g) => g.status === "pending") ?? null;
 
       result.push({
         assignment,
-        jobs,
-        hasRunningJob: jobs.some((j) => j.status === "running"),
-        nextPendingJob: jobs.find((j) => j.status === "pending") ?? null,
+        groups,
+        hasRunningJob,
+        nextPendingGroup,
       });
     }
 
@@ -256,7 +278,7 @@ export const watchQueue = query({
   },
 });
 
-// Get ALL assignments for a namespace (including complete) with their job chains
+// Get ALL assignments for a namespace (including complete) with their group chains
 export const getAllAssignments = query({
   args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
@@ -268,21 +290,33 @@ export const getAllAssignments = query({
     const result = [];
 
     for (const assignment of assignments) {
-      // Get all jobs for this assignment
-      const jobs: Doc<"jobs">[] = [];
-      let currentJobId = assignment.headJobId;
-      while (currentJobId) {
-        const job = await ctx.db.get(currentJobId);
-        if (!job) break;
-        jobs.push(job);
-        currentJobId = job.nextJobId;
+      // Walk the group chain
+      const groups: Array<Doc<"jobGroups"> & { jobs: Doc<"jobs">[] }> = [];
+      let currentGroupId = assignment.headGroupId;
+
+      while (currentGroupId) {
+        const group = await ctx.db.get(currentGroupId as Id<"jobGroups">);
+        if (!group) break;
+
+        const jobs = await ctx.db
+          .query("jobs")
+          .withIndex("by_group", (q) => q.eq("groupId", currentGroupId as Id<"jobGroups">))
+          .collect();
+
+        groups.push({ ...group, jobs });
+        currentGroupId = group.nextGroupId;
       }
+
+      const hasRunningJob = groups.some((g) =>
+        g.jobs.some((j) => j.status === "running")
+      );
+      const nextPendingGroup = groups.find((g) => g.status === "pending") ?? null;
 
       result.push({
         assignment,
-        jobs,
-        hasRunningJob: jobs.some((j) => j.status === "running"),
-        nextPendingJob: jobs.find((j) => j.status === "pending") ?? null,
+        groups,
+        hasRunningJob,
+        nextPendingGroup,
       });
     }
 
@@ -291,7 +325,6 @@ export const getAllAssignments = query({
 });
 
 // Get all pending chat jobs for a namespace (separate from assignment jobs)
-// Chat jobs are always "independent" - they never block work assignments
 export const getReadyChatJobs = query({
   args: { namespaceId: v.id("namespaces") },
   handler: async (ctx, args): Promise<ReadyChatJob[]> => {

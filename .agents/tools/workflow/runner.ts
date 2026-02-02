@@ -5,6 +5,11 @@
  * Subscribes to Convex and executes jobs as they become ready.
  * Runs forever, reacting to database changes.
  *
+ * Supports parallel job execution within groups:
+ * - Scheduler returns ALL pending jobs in a ready group
+ * - Runner executes them in parallel
+ * - When group completes, aggregated results go to PM
+ *
  * Usage:
  *   npx tsx runner.ts
  *
@@ -22,6 +27,7 @@ import { fileURLToPath } from "url";
 import {
   Assignment,
   Job,
+  JobGroup,
   ChatJobContext,
   ChatMessage,
   AccumulatedJobResult,
@@ -92,9 +98,6 @@ let unsubscribeChatJobs: (() => void) | null = null;
 const runningJobs = new Map<string, ChildProcess>();
 const runningChatJobs = new Map<string, ChildProcess>();
 
-// Note: Template loading, prompt building, and chat context parsing
-// have been extracted to ./lib/prompts.ts
-
 // Save assistant response to chat thread
 async function saveChatResponse(threadId: string, content: string): Promise<void> {
   try {
@@ -152,22 +155,18 @@ async function triggerGuardianEvaluation(
   pmResult: string
 ): Promise<void> {
   try {
-    // Use dedicated query to find guardian thread for this assignment
     const guardianThread: ChatThread | null = await client!.query(
       api.chatThreads.getGuardianThread,
       { assignmentId: assignment._id as any }
     );
 
     if (!guardianThread) {
-      // No guardian thread - this is normal for non-guardian assignments
       console.log(`[Guardian] No guardian thread for assignment ${assignment._id}`);
       return;
     }
 
     console.log(`[Guardian] Found guardian thread ${guardianThread._id}, triggering evaluation`);
 
-    // 1. Insert PM response as chatMessage (role: 'pm')
-    // This must succeed before triggering evaluation
     try {
       await client!.mutation(api.chatMessages.add, {
         threadId: guardianThread._id as any,
@@ -177,11 +176,9 @@ async function triggerGuardianEvaluation(
       console.log(`[Guardian] Inserted PM response as message in thread`);
     } catch (msgError) {
       console.error(`[Guardian] Failed to insert PM message:`, msgError);
-      // Don't trigger evaluation if message insert failed
       throw new Error(`Guardian PM message insert failed: ${msgError}`);
     }
 
-    // 2. Trigger chatJob for PO evaluation (with guardian evaluation flag)
     try {
       await client!.mutation(api.chatJobs.trigger, {
         threadId: guardianThread._id as any,
@@ -191,23 +188,18 @@ async function triggerGuardianEvaluation(
       console.log(`[Guardian] Triggered PO evaluation chatJob`);
     } catch (triggerError) {
       console.error(`[Guardian] Failed to trigger evaluation job:`, triggerError);
-      // PM message is in thread but evaluation didn't trigger
-      // This is logged but not fatal - user can see PM message in thread
       throw new Error(`Guardian evaluation trigger failed: ${triggerError}`);
     }
   } catch (e) {
-    // Log with assignment context for debugging
     console.error(`[Guardian] Evaluation failed for assignment ${assignment._id}:`, e);
-    // Don't rethrow - guardian failure shouldn't block assignment completion
-    // But the error is now clearly logged with context
   }
 }
 
 // Job execution
 async function executeJob(
   job: Job,
+  group: JobGroup,
   assignment: Assignment,
-  previousResult: string | null,
   accumulatedResults: AccumulatedJobResult[]
 ): Promise<void> {
   const jobId = job._id;
@@ -220,7 +212,6 @@ async function executeJob(
   let prompt: string;
 
   if (isChat) {
-    // Chat job: parse context and build chat-specific prompt
     chatContext = parseChatContext(job.context || "{}");
     if (!chatContext) {
       console.error(`[${jobId}] Invalid chat context, failing job`);
@@ -236,8 +227,7 @@ async function executeJob(
       : ' (new session)';
     console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}${resumeInfo}`);
   } else {
-    // Regular job: use standard prompt building
-    prompt = buildPrompt(job.jobType, assignment, job, previousResult, accumulatedResults);
+    prompt = buildPrompt(group, assignment, job, accumulatedResults);
   }
 
   // Mark job as running with prompt for visibility
@@ -255,8 +245,8 @@ async function executeJob(
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
-        // Pass assignment and job context so CLI can auto-link
         WORKFLOW_ASSIGNMENT_ID: assignment._id,
+        WORKFLOW_GROUP_ID: group._id,
         WORKFLOW_JOB_ID: job._id,
       },
     });
@@ -287,12 +277,10 @@ async function executeJob(
 
       for (const line of lines) {
         if (!line.trim()) continue;
-        // Log raw JSON to file for debugging
         tracker.logLine(line);
         try {
           const event = JSON.parse(line);
           handler.onEvent(event);
-          // Update tracker with event type as status reason
           const eventType = (event.type as string) || "event";
           tracker.recordEvent(eventType);
         } catch {
@@ -315,19 +303,16 @@ async function executeJob(
 
       try {
         if (timedOut) {
-          // tracker.timeout() already called in timeout handler
           await client!.mutation(api.jobs.fail, {
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
           });
-          // Chat jobs: save error to thread, no PM trigger
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId,
               `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${result || "(no output)"}`
             );
           } else {
-            // Regular jobs: trigger retrospect
-            await triggerPMJob(job, assignment, true);
+            await handleGroupCompletion(group, assignment, true);
           }
         } else if (code === 0 && handler.isComplete()) {
           tracker.complete(result);
@@ -335,35 +320,14 @@ async function executeJob(
             id: jobId,
             result,
           });
-          // Chat jobs: save response to thread and session_id, no PM trigger
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId, result);
-            // Save session_id for future resume (Claude only)
             const newSessionId = handler.getSessionId();
             if (newSessionId) {
               await saveSessionId(chatContext.threadId, newSessionId);
             }
           } else {
-            // Check if this job should trigger PM review
-            // Re-fetch job to check if nextJobId was added during execution
-            const updatedJob = await client!.query(api.jobs.get, { id: jobId });
-            const hasNextJob = updatedJob?.nextJobId != null;
-
-            if (job.jobType === "pm") {
-              // PM job completed - ALWAYS trigger guardian evaluation (if applicable)
-              await triggerGuardianEvaluation(assignment, result);
-              // Then check if assignment is done (only if no next job)
-              if (!hasNextJob) {
-                await checkAndCompleteAssignment(assignment._id, jobId);
-              }
-            } else if (!hasNextJob && job.jobType !== "retrospect") {
-              // Regular job with no successor - trigger PM review
-              await triggerPMJob(job, assignment, false);
-            } else if (!hasNextJob) {
-              // retrospect with no successor - check if ALL jobs in assignment are done
-              await checkAndCompleteAssignment(assignment._id, jobId);
-            }
-            // If hasNextJob, the next job will be picked up by the scheduler
+            await handleGroupCompletion(group, assignment, false);
           }
         } else {
           tracker.fail(`process_exit_${code}`);
@@ -371,20 +335,17 @@ async function executeJob(
             id: jobId,
             result: result || `Process exited with code ${code}`,
           });
-          // Chat jobs: save error to thread, no PM trigger
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId,
               `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${result || `Exit code ${code}`}`
             );
           } else {
-            // Regular jobs: trigger retrospect
-            await triggerPMJob(job, assignment, true);
+            await handleGroupCompletion(group, assignment, true);
           }
         }
       } catch (e) {
         console.error(`[${jobId}] Error completing job:`, e);
         tracker.fail(`error: ${e}`);
-        // Don't crash - log and continue
       }
 
       resolve();
@@ -392,54 +353,104 @@ async function executeJob(
   });
 }
 
-// Check if all jobs in assignment are done, if so mark complete
-async function checkAndCompleteAssignment(assignmentId: string, completedJobId: string): Promise<void> {
-  // Fetch all jobs for this assignment
-  const jobs = await client!.query(api.jobs.list, { assignmentId: assignmentId as any });
-
-  // Check if any job is still pending or running
-  const hasIncompleteJobs = jobs.some(
-    (j: Job) => j.status === "pending" || j.status === "running"
-  );
-
-  if (hasIncompleteJobs) {
-    console.log(`[${completedJobId}] Assignment ${assignmentId} still has incomplete jobs, not marking complete`);
+// Handle group completion - check if all jobs done, trigger PM if needed
+async function handleGroupCompletion(
+  group: JobGroup,
+  assignment: Assignment,
+  anyFailed: boolean
+): Promise<void> {
+  // Re-fetch group with jobs to get current status
+  const currentGroup = await client!.query(api.jobs.getGroupWithJobs, { id: group._id });
+  if (!currentGroup) {
+    console.error(`[${group._id}] Group not found`);
     return;
   }
 
-  // All jobs are complete or failed - mark assignment complete
-  console.log(`[${completedJobId}] All jobs done, marking assignment ${assignmentId} as complete`);
+  // If group not yet complete, another job is still running
+  if (currentGroup.status !== "complete" && currentGroup.status !== "failed") {
+    console.log(`[${group._id}] Group still in progress (status: ${currentGroup.status})`);
+    return;
+  }
+
+  console.log(`[${group._id}] Group completed (status: ${currentGroup.status})`);
+
+  // Check if there's a next group in the chain
+  if (currentGroup.nextGroupId) {
+    console.log(`[${group._id}] Next group exists, scheduler will pick it up`);
+    return;
+  }
+
+  // No next group - this is the end of the chain for now
+  // Check job types in this group to determine behavior
+  const jobs = currentGroup.jobs || [];
+  const hasPMJob = jobs.some((j: Job) => j.jobType === "pm");
+  const hasRetrospectJob = jobs.some((j: Job) => j.jobType === "retrospect");
+
+  if (hasPMJob) {
+    // PM completed - trigger guardian evaluation if applicable
+    // Find the PM job's result (not aggregatedResult with headers)
+    const pmJob = jobs.find((j: Job) => j.jobType === "pm" && j.result);
+    const pmResult = pmJob?.result || "";
+    await triggerGuardianEvaluation(assignment, pmResult);
+    // Then check if assignment is done
+    await checkAndCompleteAssignment(assignment._id, group._id);
+  } else if (hasRetrospectJob) {
+    // Retrospect completed - check if assignment is done
+    await checkAndCompleteAssignment(assignment._id, group._id);
+  } else {
+    // Regular group completed with no successor - trigger PM review
+    const failed = currentGroup.status === "failed";
+    await triggerPMGroup(group, assignment, failed);
+  }
+}
+
+// Check if all groups in assignment are done, if so mark complete
+async function checkAndCompleteAssignment(assignmentId: string, completedGroupId: string): Promise<void> {
+  const groups = await client!.query(api.jobs.listGroups, { assignmentId: assignmentId as any });
+
+  const hasIncompleteGroups = groups.some(
+    (g: JobGroup) => g.status === "pending" || g.status === "running"
+  );
+
+  if (hasIncompleteGroups) {
+    console.log(`[${completedGroupId}] Assignment ${assignmentId} still has incomplete groups`);
+    return;
+  }
+
+  console.log(`[${completedGroupId}] All groups done, marking assignment ${assignmentId} as complete`);
   await client!.mutation(api.assignments.complete, {
     id: assignmentId,
   });
 }
 
-// PM job triggering
-async function triggerPMJob(
-  completedJob: Job,
+// PM group triggering
+async function triggerPMGroup(
+  completedGroup: JobGroup,
   assignment: Assignment,
   failed: boolean
 ): Promise<void> {
   const jobType = failed ? "retrospect" : "pm";
   const context = failed
-    ? `Previous job (${completedJob.jobType}) failed. Analyze and determine recovery path.`
+    ? `Previous group failed. Analyze and determine recovery path.`
     : undefined;
 
-  console.log(`[${completedJob._id}] Triggering ${jobType} job`);
+  console.log(`[${completedGroup._id}] Triggering ${jobType} group`);
 
-  await client!.mutation(api.jobs.insertAfter, {
-    afterJobId: completedJob._id,
-    jobType,
-    harness: getHarnessForJobType(jobType),
-    context,
+  await client!.mutation(api.jobs.insertGroupAfter, {
+    afterGroupId: completedGroup._id,
+    jobs: [{
+      jobType,
+      harness: getHarnessForJobType(jobType),
+      context,
+    }],
   });
 }
 
-// Scheduler
+// Scheduler interfaces
 interface ReadyJob {
   job: Job;
+  group: JobGroup;
   assignment: Assignment;
-  previousResult: string | null;
   accumulatedResults: AccumulatedJobResult[];
 }
 
@@ -454,9 +465,11 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   const newJobs = readyJobs.filter((r) => !runningJobs.has(r.job._id));
   if (newJobs.length === 0) return;
 
-  // The scheduler handles sequential vs independent logic - just run what it returns
-  for (const { job, assignment, previousResult, accumulatedResults } of newJobs) {
-    // Double-check assignment status before executing (handles race with blocking)
+  console.log(`[Queue] ${newJobs.length} new jobs to execute (parallel if same group)`);
+
+  // Execute all ready jobs - scheduler already handles group logic
+  for (const { job, group, assignment, accumulatedResults } of newJobs) {
+    // Double-check assignment status before executing
     const currentAssignment = await client!.query(api.assignments.get, {
       id: assignment._id,
     });
@@ -465,7 +478,7 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
       continue;
     }
 
-    executeJob(job, assignment, previousResult, accumulatedResults).catch((e) => {
+    executeJob(job, group, assignment, accumulatedResults).catch((e) => {
       console.error(`Error executing job ${job._id}:`, e);
     });
   }
@@ -476,7 +489,6 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
   const jobId = chatJob._id;
   console.log(`[${jobId}] Starting chat job (${chatJob.harness})`);
 
-  // Parse chat context FIRST
   const chatContext = parseChatContext(chatJob.context);
   if (!chatContext) {
     console.error(`[${jobId}] Invalid chat context, failing job`);
@@ -487,7 +499,6 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
     return;
   }
 
-  // Build prompt with differential prompting
   const promptType = determinePromptType(chatContext);
   const prompt = buildChatPrompt(chatContext, config.namespace);
   const resumeInfo = chatContext.claudeSessionId
@@ -495,10 +506,8 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
     : " (new session)";
   console.log(`[${jobId}] Chat mode: ${chatContext.mode}, prompt: ${promptType}, thread: ${chatContext.threadId}${resumeInfo}`);
 
-  // Mark job as running with prompt for visibility
   await client!.mutation(api.chatJobs.start, { id: jobId, prompt });
 
-  // Build command with optional session resume
   const commandOptions: CommandOptions = {};
   if (chatContext.claudeSessionId && chatJob.harness === "claude") {
     commandOptions.sessionId = chatContext.claudeSessionId;
@@ -510,7 +519,6 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
-        // Pass thread ID so CLI can auto-link assignments
         WORKFLOW_THREAD_ID: chatContext.threadId,
         WORKFLOW_NAMESPACE_ID: chatContext.namespaceId,
       },
@@ -522,10 +530,8 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
     let buffer = "";
     let timedOut = false;
 
-    // File-based tracking for agent_monitor.py TUI
     const tracker = new JobTracker(jobId, chatJob.harness, child.pid || 0);
 
-    // Timeout
     const timeout = setTimeout(async () => {
       timedOut = true;
       console.log(`[${jobId}] Timeout after ${config.timeoutMs}ms`);
@@ -534,7 +540,6 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
       setTimeout(() => child.kill("SIGKILL"), 5000);
     }, config.timeoutMs);
 
-    // Parse stdout
     child.stdout?.on("data", (data: Buffer) => {
       buffer += data.toString();
       const lines = buffer.split("\n");
@@ -542,12 +547,10 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 
       for (const line of lines) {
         if (!line.trim()) continue;
-        // Log raw JSON to file for debugging
         tracker.logLine(line);
         try {
           const event = JSON.parse(line);
           handler.onEvent(event);
-          // Update tracker with event type as status reason
           const eventType = (event.type as string) || "event";
           tracker.recordEvent(eventType);
         } catch {
@@ -570,7 +573,6 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 
       try {
         if (timedOut) {
-          // tracker.timeout() already called in timeout handler
           await client!.mutation(api.chatJobs.fail, {
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
@@ -585,12 +587,10 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
             result,
           });
           await saveChatResponse(chatContext.threadId, result);
-          // Save session_id for future resume (Claude only)
           const newSessionId = handler.getSessionId();
           if (newSessionId) {
             await saveSessionId(chatContext.threadId, newSessionId);
           }
-          // Save lastPromptMode for differential prompting (skip for guardian eval)
           if (!chatContext.isGuardianEvaluation) {
             await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);
           }
@@ -607,7 +607,6 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
       } catch (e) {
         console.error(`[${jobId}] Error completing chat job:`, e);
         tracker.fail(`error: ${e}`);
-        // Try to save error response to thread even if job update failed
         try {
           await saveChatResponse(chatContext.threadId,
             `I completed processing but encountered a system error saving the result. Please check the logs.`
@@ -625,11 +624,9 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 async function processChatQueue(readyChatJobs: ReadyChatJob[]): Promise<void> {
   if (readyChatJobs.length === 0) return;
 
-  // Filter out jobs we're already running
   const newJobs = readyChatJobs.filter((r) => !runningChatJobs.has(r.chatJob._id));
   if (newJobs.length === 0) return;
 
-  // Chat jobs are always independent - run them all
   for (const { chatJob } of newJobs) {
     executeChatJob(chatJob).catch((e) => {
       console.error(`Error executing chat job ${chatJob._id}:`, e);
@@ -644,7 +641,6 @@ async function startRunner() {
 
   client = new ConvexClient(config.convexUrl);
 
-  // Look up namespace ID by name
   const namespace = await client.query(api.namespaces.getByName, {
     name: config.namespace,
   });
@@ -701,14 +697,12 @@ function cleanup() {
   unsubscribeChatJobs?.();
   unsubscribeChatJobs = null;
 
-  // Kill running assignment jobs
   for (const [id, child] of runningJobs) {
     console.log(`Killing job ${id}`);
     child.kill("SIGTERM");
   }
   runningJobs.clear();
 
-  // Kill running chat jobs
   for (const [id, child] of runningChatJobs) {
     console.log(`Killing chat job ${id}`);
     child.kill("SIGTERM");

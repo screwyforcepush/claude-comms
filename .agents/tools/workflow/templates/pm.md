@@ -111,18 +111,16 @@ npx tsx .agents/tools/workflow/cli.ts update-assignment \
   --decisions "D1: JWT over sessions (stateless scaling). D2: 24hr expiry (security/UX balance)."
 ```
 
-## Insert Next Job
+## Insert Next Job(s)
+
 ```bash
 npx tsx .agents/tools/workflow/cli.ts insert-job \
-  --type <plan|implement|refine|uat|verify|research> \
-  --context "WHAT: [specific deliverable]
-WHY: [reason this job is needed]
-CONTEXT: [relevant background]
-SUCCESS CRITERIA: [how to know it's done]
-FILES: [relevant files to read/modify]"
+  --jobs '[{"jobType":"<type>","context":"WHAT: [deliverable]\nWHY: [reason]\nSUCCESS: [criteria]\nFILES: [paths]"}]'
 ```
 
-> **Note:** Harness is auto-selected from config based on job type. Override with `--harness <claude|codex|gemini>` if needed.
+Jobs in the same array run in **parallel**. Types: `plan`, `implement`, `refine`, `uat`, `verify`, `research`, `review`.
+
+> Harness is auto-selected. Override with `"harness":"codex"` in the job object.
 
 ## Complete (ONLY when north star is fully achieved)
 ```bash

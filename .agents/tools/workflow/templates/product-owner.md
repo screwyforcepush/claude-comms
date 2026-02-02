@@ -101,25 +101,25 @@ When the user wants work to be done:
 # Create a new assignment (auto-linked to this thread)
 npx tsx .agents/tools/workflow/cli.ts create "<north-star-description>" --priority <N>
 
-# Insert initial job into NEW assignment (becomes head)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --type plan --context "<context>"
+# Insert job(s) - jobs in the same array run in parallel
+npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> \
+  --jobs '[{"jobType":"plan","context":"<context>"}]'
 
-# Append job to EXISTING assignment (links to tail of chain)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append --type implement --context "<context>"
+# Append to existing chain (use --append to link after current tail)
+npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append \
+  --jobs '[{"jobType":"implement","context":"Build auth"},{"jobType":"uat","context":"Test login"}]'
 
-# View current assignments
+# View assignments and queue
 npx tsx .agents/tools/workflow/cli.ts assignments
-
-# View queue status
 npx tsx .agents/tools/workflow/cli.ts queue
 
-# Delete assignment and all its jobs
+# Delete assignment
 npx tsx .agents/tools/workflow/cli.ts delete-assignment <assignmentId>
 ```
 
 **NOTES:**
-- Assignments are automatically linked to this chat thread - no need to specify `--thread`
-- Harness is auto-selected from config per job type. Override with `--harness <claude|codex|gemini>` if needed.
+- Assignments are automatically linked to this chat thread.
+- Harness is auto-selected per job type. Override with `"harness":"codex"` in the job object.
 
 ### Job Types You Can Create
 

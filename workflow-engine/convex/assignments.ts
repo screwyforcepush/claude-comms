@@ -38,23 +38,31 @@ export const get = query({
   },
 });
 
-export const getWithJobs = query({
+// Get assignment with its group chain and jobs
+export const getWithGroups = query({
   args: { id: v.id("assignments") },
   handler: async (ctx, args) => {
     const assignment = await ctx.db.get(args.id);
     if (!assignment) return null;
 
-    // Walk the job chain
-    const jobs = [];
-    let currentJobId = assignment.headJobId;
-    while (currentJobId) {
-      const job = await ctx.db.get(currentJobId);
-      if (!job) break;
-      jobs.push(job);
-      currentJobId = job.nextJobId;
+    // Walk the group chain
+    const groups = [];
+    let currentGroupId = assignment.headGroupId;
+    while (currentGroupId) {
+      const group = await ctx.db.get(currentGroupId);
+      if (!group) break;
+
+      // Get all jobs in this group
+      const jobs = await ctx.db
+        .query("jobs")
+        .withIndex("by_group", (q) => q.eq("groupId", currentGroupId!))
+        .collect();
+
+      groups.push({ ...group, jobs });
+      currentGroupId = group.nextGroupId;
     }
 
-    return { ...assignment, jobs };
+    return { ...assignment, groups };
   },
 });
 
@@ -97,7 +105,7 @@ export const update = mutation({
       )
     ),
     blockedReason: v.optional(v.string()),
-    headJobId: v.optional(v.id("jobs")),
+    headGroupId: v.optional(v.id("jobGroups")),
     alignmentStatus: v.optional(
       v.union(
         v.literal("aligned"),
@@ -156,14 +164,27 @@ export const unblock = mutation({
 export const remove = mutation({
   args: { id: v.id("assignments") },
   handler: async (ctx, args) => {
-    // Delete all jobs for this assignment
-    const jobs = await ctx.db
-      .query("jobs")
+    // Delete all groups and their jobs for this assignment
+    const groups = await ctx.db
+      .query("jobGroups")
       .withIndex("by_assignment", (q) => q.eq("assignmentId", args.id))
       .collect();
 
-    for (const job of jobs) {
-      await ctx.db.delete(job._id);
+    let jobsDeleted = 0;
+    for (const group of groups) {
+      // Delete jobs in this group
+      const jobs = await ctx.db
+        .query("jobs")
+        .withIndex("by_group", (q) => q.eq("groupId", group._id))
+        .collect();
+
+      for (const job of jobs) {
+        await ctx.db.delete(job._id);
+        jobsDeleted++;
+      }
+
+      // Delete the group
+      await ctx.db.delete(group._id);
     }
 
     // Unlink from any chat threads
@@ -182,6 +203,6 @@ export const remove = mutation({
     // Delete the assignment
     await ctx.db.delete(args.id);
 
-    return { deleted: true, jobsDeleted: jobs.length };
+    return { deleted: true, groupsDeleted: groups.length, jobsDeleted };
   },
 });

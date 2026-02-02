@@ -2,12 +2,13 @@
 /**
  * Workflow Engine CLI
  *
- * Interface to the Convex backend for managing assignments and jobs.
+ * Interface to the Convex backend for managing assignments and job groups.
  * Primary consumers: PM agent, PO agent
  *
  * Environment Variables (auto-set by runner):
  *   WORKFLOW_ASSIGNMENT_ID   Current assignment (used as default for assignment commands)
- *   WORKFLOW_JOB_ID          Current job (used as default --after for insert-job)
+ *   WORKFLOW_GROUP_ID        Current group (used as default --after for insert-job)
+ *   WORKFLOW_JOB_ID          Current job
  *   WORKFLOW_THREAD_ID       Current chat thread (used for auto-linking assignments)
  *
  * Usage:
@@ -15,21 +16,26 @@
  *
  * Commands:
  *   assignments [--status <status>]     List assignments
- *   assignment <id>                     Get assignment details with jobs
+ *   assignment <id>                     Get assignment details with groups
+ *   groups [--status <status>]          List job groups
+ *   group <id>                          Get group details with jobs
  *   jobs [--status <status>]            List jobs
  *   job <id>                            Get job details
  *   queue                               Show queue status
  *
  *   create <northStar> [--priority N] [--independent] [--thread <threadId>]   Create assignment
- *   insert-job [assignmentId] --type <type> [--harness <harness>] [--context <ctx>] [--after <jobId>] [--append]
+ *   insert-job [assignmentId] [--type <type>] [--jobs <json>] [--harness <harness>] [--context <ctx>] [--after <groupId>] [--append]
  *              assignmentId defaults to WORKFLOW_ASSIGNMENT_ID
- *              --after defaults to WORKFLOW_JOB_ID (auto-links in job context)
- *              --append finds tail job and links there (for PO adding to existing chain)
+ *              --jobs: JSON array of job definitions: [{"jobType":"review"},{"jobType":"implement","harness":"codex"}]
+ *                      Jobs in the same group run in parallel and share a groupId
+ *              --type: single job type (shorthand for --jobs with one entry)
+ *              --after defaults to WORKFLOW_GROUP_ID (auto-links in job context)
+ *              --append finds tail group and links there (for PO adding to existing chain)
  *   update-assignment [id] [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
  *   complete [assignmentId]             Mark assignment complete
  *   block [assignmentId] --reason <str> Block assignment
  *   unblock [assignmentId]              Unblock assignment
- *   delete-assignment <id>              Delete assignment and all its jobs
+ *   delete-assignment <id>              Delete assignment and all its groups/jobs
  *
  *   start-job <jobId>                   Mark job as running
  *   complete-job <jobId> --result <str> Mark job as complete
@@ -64,6 +70,14 @@ interface Config {
     [jobType: string]: Harness;
   };
 }
+
+// Auto-expansion config: job types that automatically fan out to multiple harnesses
+// CLI expands these before sending to Convex (not in Convex mutations)
+const AUTO_EXPAND_CONFIG: Record<string, Harness[]> = {
+  review: ["claude", "codex", "gemini"],
+  "architecture-review": ["claude", "codex", "gemini"],
+  "spec-review": ["claude", "codex", "gemini"],
+};
 
 /**
  * Get the harness for a job type from config
@@ -143,14 +157,35 @@ async function listAssignments(status?: string) {
 }
 
 async function getAssignment(id: string) {
-  const result = await client.query(api.assignments.getWithJobs, {
+  const result = await client.query(api.assignments.getWithGroups, {
     id: id as Id<"assignments">,
   });
   if (!result) error("Assignment not found");
   output(result);
 }
 
-async function listJobs(status?: string, assignmentId?: string) {
+async function listGroups(status?: string, assignmentId?: string) {
+  const validStatuses = ["pending", "running", "complete", "failed"];
+  if (status && !validStatuses.includes(status)) {
+    error(`Invalid status. Must be one of: ${validStatuses.join(", ")}`);
+  }
+
+  const result = await client.query(api.jobs.listGroups, {
+    status: status as any,
+    assignmentId: assignmentId as Id<"assignments"> | undefined,
+  });
+  output(result);
+}
+
+async function getGroup(id: string) {
+  const result = await client.query(api.jobs.getGroupWithJobs, {
+    id: id as Id<"jobGroups">,
+  });
+  if (!result) error("Group not found");
+  output(result);
+}
+
+async function listJobs(status?: string, groupId?: string) {
   const validStatuses = ["pending", "running", "complete", "failed"];
   if (status && !validStatuses.includes(status)) {
     error(`Invalid status. Must be one of: ${validStatuses.join(", ")}`);
@@ -158,13 +193,13 @@ async function listJobs(status?: string, assignmentId?: string) {
 
   const result = await client.query(api.jobs.list, {
     status: status as any,
-    assignmentId: assignmentId as Id<"assignments"> | undefined,
+    groupId: groupId as Id<"jobGroups"> | undefined,
   });
   output(result);
 }
 
 async function getJob(id: string) {
-  const result = await client.query(api.jobs.getWithAssignment, {
+  const result = await client.query(api.jobs.getWithGroup, {
     id: id as Id<"jobs">,
   });
   if (!result) error("Job not found");
@@ -207,71 +242,126 @@ async function createAssignment(
   }
 }
 
-// Find the tail job of an assignment (for --append)
-async function findTailJob(assignmentId: string): Promise<string | null> {
+// Find the tail group of an assignment (for --append)
+async function findTailGroup(assignmentId: string): Promise<string | null> {
   const assignment = await client.query(api.assignments.get, {
     id: assignmentId as Id<"assignments">,
   });
-  if (!assignment || !assignment.headJobId) return null;
+  if (!assignment || !assignment.headGroupId) return null;
 
   // Walk the chain to find the tail
-  let currentJobId: string | undefined = assignment.headJobId;
-  let tailJobId: string = assignment.headJobId;
+  let currentGroupId: string | undefined = assignment.headGroupId;
+  let tailGroupId: string = assignment.headGroupId;
 
-  while (currentJobId) {
-    const job = await client.query(api.jobs.get, {
-      id: currentJobId as Id<"jobs">,
+  while (currentGroupId) {
+    const group = await client.query(api.jobs.getGroup, {
+      id: currentGroupId as Id<"jobGroups">,
     });
-    if (!job) break;
-    tailJobId = job._id;
-    currentJobId = job.nextJobId;
+    if (!group) break;
+    tailGroupId = group._id;
+    currentGroupId = group.nextGroupId;
   }
 
-  return tailJobId;
+  return tailGroupId;
 }
 
-async function insertJob(
+// Job definition for CLI input (before expansion)
+interface JobDefInput {
+  jobType: string;
+  harness?: "claude" | "codex" | "gemini"; // Optional - will use default or expand
+  context?: string;
+}
+
+// Job definition after expansion (ready for mutation)
+interface JobDef {
+  jobType: string;
+  harness: "claude" | "codex" | "gemini";
+  context?: string;
+}
+
+/**
+ * Expand jobs using AUTO_EXPAND_CONFIG
+ * e.g., { jobType: "review" } -> 3 jobs with different harnesses
+ */
+function expandJobs(jobs: JobDefInput[]): JobDef[] {
+  const expanded: JobDef[] = [];
+
+  for (const job of jobs) {
+    const expandHarnesses = AUTO_EXPAND_CONFIG[job.jobType];
+
+    if (expandHarnesses && !job.harness) {
+      // Auto-expand to multiple harnesses
+      for (const harness of expandHarnesses) {
+        expanded.push({
+          jobType: job.jobType,
+          harness,
+          context: job.context,
+        });
+      }
+    } else {
+      // Single job - use specified harness or default
+      expanded.push({
+        jobType: job.jobType,
+        harness: job.harness || getHarnessForJobType(job.jobType),
+        context: job.context,
+      });
+    }
+  }
+
+  return expanded;
+}
+
+async function insertJobs(
   assignmentId: string,
-  jobType: string,
-  harness: string,
-  context?: string,
-  afterJobId?: string,
+  jobs: JobDefInput[],
+  afterGroupId?: string,
   append?: boolean
 ) {
+  if (jobs.length === 0) {
+    error("At least one job required");
+  }
+
+  // Expand jobs (auto-expansion happens here, not in Convex)
+  const expandedJobs = expandJobs(jobs);
+
   const validHarnesses = ["claude", "codex", "gemini"];
-  if (!validHarnesses.includes(harness)) {
-    error(`Invalid harness. Must be one of: ${validHarnesses.join(", ")}`);
+  for (const job of expandedJobs) {
+    if (!validHarnesses.includes(job.harness)) {
+      error(`Invalid harness "${job.harness}". Must be one of: ${validHarnesses.join(", ")}`);
+    }
   }
 
-  // Determine effective afterJobId
-  let effectiveAfterJobId = afterJobId;
+  // Determine effective afterGroupId
+  let effectiveAfterGroupId = afterGroupId;
 
-  if (append && !effectiveAfterJobId) {
-    // --append: find tail job and insert after it
-    effectiveAfterJobId = await findTailJob(assignmentId) || undefined;
+  if (append && !effectiveAfterGroupId) {
+    // --append: find tail group and insert after it
+    effectiveAfterGroupId = await findTailGroup(assignmentId) || undefined;
   }
 
-  let id: string;
+  let result: { groupId: string; jobIds: string[] };
   let linkInfo: string;
 
-  if (effectiveAfterJobId) {
-    id = await client.mutation(api.jobs.insertAfter, {
-      afterJobId: effectiveAfterJobId as Id<"jobs">,
-      jobType,
-      harness: harness as "claude" | "codex" | "gemini",
-      context,
+  if (effectiveAfterGroupId) {
+    result = await client.mutation(api.jobs.insertGroupAfter, {
+      afterGroupId: effectiveAfterGroupId as Id<"jobGroups">,
+      jobs: expandedJobs as any,
     });
-    linkInfo = `linked after ${effectiveAfterJobId.slice(-8)}`;
+    linkInfo = `linked after group ${effectiveAfterGroupId.slice(-8)}`;
   } else {
-    id = await client.mutation(api.jobs.create, {
+    result = await client.mutation(api.jobs.createGroup, {
       assignmentId: assignmentId as Id<"assignments">,
-      jobType,
-      harness: harness as "claude" | "codex" | "gemini",
-      context,
+      jobs: expandedJobs as any,
     });
-    linkInfo = "created as head";
+    linkInfo = "created as head group";
   }
-  output({ id, message: `Job ${linkInfo}` });
+
+  output({
+    groupId: result.groupId,
+    jobIds: result.jobIds,
+    jobs: expandedJobs.map(j => ({ jobType: j.jobType, harness: j.harness })),
+    message: `Group ${linkInfo} with ${result.jobIds.length} job(s)`,
+  });
 }
 
 async function updateAssignment(
@@ -320,7 +410,7 @@ async function deleteAssignment(id: string) {
   const result = await client.mutation(api.assignments.remove, {
     id: id as Id<"assignments">,
   });
-  output({ message: `Assignment deleted (${result.jobsDeleted} jobs removed)` });
+  output({ message: `Assignment deleted (${result.groupsDeleted} groups, ${result.jobsDeleted} jobs removed)` });
 }
 
 async function startJob(id: string) {
@@ -414,9 +504,7 @@ async function updateChatTitle(threadId: string, title: string) {
 }
 
 async function sendChatMessage(threadId: string, message: string, harness?: string) {
-  const nsId = await getNamespaceId();
-
-  // Get thread to check mode
+  // Get thread to check it exists
   const thread = await client.query(api.chatThreads.get, {
     id: threadId as Id<"chatThreads">,
   });
@@ -429,42 +517,17 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
     content: message,
   });
 
-  // Get all messages for context
-  const messages = await client.query(api.chatMessages.list, {
+  // Trigger chat job (uses chatJobs table, not assignments/jobs)
+  // The trigger mutation builds context internally
+  const result = await client.mutation(api.chatJobs.trigger, {
     threadId: threadId as Id<"chatThreads">,
-  });
-
-  // Create a hidden assignment for this thread if it doesn't exist
-  // For simplicity, we create one per chat job (could be optimized to reuse)
-  const assignmentId = await client.mutation(api.assignments.create, {
-    namespaceId: nsId,
-    northStar: `Chat thread: ${thread.title}`,
-    independent: true, // Chat doesn't block other work
-    priority: 0, // High priority for responsiveness
-  });
-
-  // Build chat context for the job
-  const chatContext = {
-    threadId,
-    namespaceId: nsId,
-    mode: thread.mode,
-    messages,
-    latestUserMessage: message,
-  };
-
-  // Create chat job
-  const jobId = await client.mutation(api.jobs.create, {
-    assignmentId: assignmentId as Id<"assignments">,
-    jobType: "chat",
     harness: (harness || getHarnessForJobType("chat")) as Harness,
-    context: JSON.stringify(chatContext),
   });
 
   output({
     threadId,
-    assignmentId,
-    jobId,
-    mode: thread.mode,
+    jobId: result.jobId,
+    mode: result.mode,
     message: "Chat message sent, job created",
   });
 }
@@ -490,8 +553,17 @@ async function main() {
         await getAssignment(positional[0]);
         break;
 
+      case "groups":
+        await listGroups(flags.status, flags.assignment);
+        break;
+
+      case "group":
+        if (!positional[0]) error("Group ID required");
+        await getGroup(positional[0]);
+        break;
+
       case "jobs":
-        await listJobs(flags.status, flags.assignment);
+        await listJobs(flags.status, flags.group);
         break;
 
       case "job":
@@ -517,20 +589,44 @@ async function main() {
         // Assignment ID: positional arg > env var
         const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
         if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
-        if (!flags.type) error("--type required");
 
-        // After job ID: --after flag > env var (auto-link in job context)
-        const afterJobId = flags.after || process.env.WORKFLOW_JOB_ID;
+        // After group ID: --after flag > env var (auto-link in job context)
+        const afterGroupId = flags.after || process.env.WORKFLOW_GROUP_ID;
 
-        // Harness: explicit flag > config per-job-type default > config default
-        const harness = flags.harness || getHarnessForJobType(flags.type);
+        // Build jobs array - either from --jobs JSON or from --type (single job)
+        // Keep harness undefined to allow expandJobs() to handle auto-expansion
+        let jobs: JobDefInput[];
 
-        await insertJob(
+        if (flags.jobs) {
+          // Parse JSON array of jobs: [{"jobType":"review","harness":"claude"},...]
+          try {
+            const parsed = JSON.parse(flags.jobs);
+            if (!Array.isArray(parsed)) {
+              error("--jobs must be a JSON array");
+            }
+            jobs = parsed.map((j: any) => ({
+              jobType: j.jobType,
+              harness: j.harness, // Don't apply default - let expandJobs handle it
+              context: j.context,
+            }));
+          } catch (e) {
+            error(`Invalid --jobs JSON: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        } else if (flags.type) {
+          // Single job via --type (backward compatible)
+          jobs = [{
+            jobType: flags.type,
+            harness: flags.harness as "claude" | "codex" | "gemini" | undefined,
+            context: flags.context,
+          }];
+        } else {
+          error("Either --jobs (JSON array) or --type required");
+        }
+
+        await insertJobs(
           assignmentId,
-          flags.type,
-          harness,
-          flags.context,
-          afterJobId,
+          jobs,
+          afterGroupId,
           flags.append === "true"
         );
         break;
