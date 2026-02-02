@@ -87,14 +87,6 @@ Use this decision tree:
 | `verify` | Need to confirm everything works end-to-end |
 | `research` | Technical questions need answers before proceeding |
 
-### Harness Selection
-
-| Harness | Best For |
-|---------|----------|
-| `claude` | Complex reasoning, architecture, nuanced implementation |
-| `codex` | Quick fixes, straightforward code changes |
-| `gemini` | Alternative perspective, parallel verification |
-
 ---
 
 # 🚨 CRITICAL PM RULES
@@ -123,13 +115,14 @@ npx tsx .agents/tools/workflow/cli.ts update-assignment \
 ```bash
 npx tsx .agents/tools/workflow/cli.ts insert-job \
   --type <plan|implement|refine|uat|verify|research> \
-  --harness <claude|codex|gemini> \
   --context "WHAT: [specific deliverable]
 WHY: [reason this job is needed]
 CONTEXT: [relevant background]
 SUCCESS CRITERIA: [how to know it's done]
 FILES: [relevant files to read/modify]"
 ```
+
+> **Note:** Harness is auto-selected from config based on job type. Override with `--harness <claude|codex|gemini>` if needed.
 
 ## Complete (ONLY when north star is fully achieved)
 ```bash

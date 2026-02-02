@@ -62,12 +62,23 @@ interface ChatJob {
 }
 
 // Config
+type Harness = "claude" | "codex" | "gemini";
+
 interface Config {
   convexUrl: string;
   namespace: string;
-  defaultHarness: "claude" | "codex" | "gemini";
   timeoutMs: number;
-  pmHarness: "claude" | "codex" | "gemini";
+  harnessDefaults: {
+    default: Harness;
+    [jobType: string]: Harness;
+  };
+}
+
+/**
+ * Get the harness for a job type from config
+ */
+function getHarnessForJobType(jobType: string): Harness {
+  return config.harnessDefaults[jobType] || config.harnessDefaults.default;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -174,7 +185,7 @@ async function triggerGuardianEvaluation(
     try {
       await client!.mutation(api.chatJobs.trigger, {
         threadId: guardianThread._id as any,
-        harness: config.pmHarness,
+        harness: getHarnessForJobType("chat"),
         isGuardianEvaluation: true,
       });
       console.log(`[Guardian] Triggered PO evaluation chatJob`);
@@ -419,7 +430,7 @@ async function triggerPMJob(
   await client!.mutation(api.jobs.insertAfter, {
     afterJobId: completedJob._id,
     jobType,
-    harness: config.pmHarness,
+    harness: getHarnessForJobType(jobType),
     context,
   });
 }

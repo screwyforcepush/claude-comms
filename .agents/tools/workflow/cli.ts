@@ -53,12 +53,24 @@ import { fileURLToPath } from "url";
 type Id<T extends string> = string & { __tableName: T };
 
 // Load config
+type Harness = "claude" | "codex" | "gemini";
+
 interface Config {
   convexUrl: string;
   namespace: string;
-  defaultHarness: "claude" | "codex" | "gemini";
   timeoutMs: number;
-  pmHarness: "claude" | "codex" | "gemini";
+  harnessDefaults: {
+    default: Harness;
+    [jobType: string]: Harness;
+  };
+}
+
+/**
+ * Get the harness for a job type from config
+ * Resolution order: config.harnessDefaults[jobType] -> config.harnessDefaults.default
+ */
+function getHarnessForJobType(jobType: string): Harness {
+  return config.harnessDefaults[jobType] || config.harnessDefaults.default;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -444,7 +456,7 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
   const jobId = await client.mutation(api.jobs.create, {
     assignmentId: assignmentId as Id<"assignments">,
     jobType: "chat",
-    harness: (harness || config.defaultHarness) as "claude" | "codex" | "gemini",
+    harness: (harness || getHarnessForJobType("chat")) as Harness,
     context: JSON.stringify(chatContext),
   });
 
@@ -510,10 +522,13 @@ async function main() {
         // After job ID: --after flag > env var (auto-link in job context)
         const afterJobId = flags.after || process.env.WORKFLOW_JOB_ID;
 
+        // Harness: explicit flag > config per-job-type default > config default
+        const harness = flags.harness || getHarnessForJobType(flags.type);
+
         await insertJob(
           assignmentId,
           flags.type,
-          flags.harness || config.defaultHarness,
+          harness,
           flags.context,
           afterJobId,
           flags.append === "true"

@@ -273,10 +273,10 @@ When the user wants work to be done:
 npx tsx .agents/tools/workflow/cli.ts create "<north-star-description>" --priority <N>
 
 # Insert initial job into NEW assignment (becomes head)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --type plan --harness claude --context "<context>"
+npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --type plan --context "<context>"
 
 # Append job to EXISTING assignment (links to tail of chain)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append --type implement --harness claude --context "<context>"
+npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append --type implement --context "<context>"
 
 # View current assignments
 npx tsx .agents/tools/workflow/cli.ts assignments
@@ -287,6 +287,8 @@ npx tsx .agents/tools/workflow/cli.ts queue
 # Delete assignment and all its jobs
 npx tsx .agents/tools/workflow/cli.ts delete-assignment <assignmentId>
 \`\`\`
+
+> Harness is auto-selected from config per job type. Override with \`--harness <claude|codex|gemini>\` if needed.
 
 ### Job Types You Can Create
 
