@@ -1,7 +1,6 @@
 // NamespaceHeader - Header for selected namespace
 import React from 'react';
 import { StatusBadge } from '../shared/StatusBadge.js';
-import { Timestamp } from '../shared/Timestamp.js';
 
 /**
  * Metric card for status counts
@@ -25,38 +24,18 @@ function MetricCard({ label, count, status }) {
 }
 
 /**
- * Refresh icon
- */
-function RefreshIcon() {
-  return React.createElement('svg', {
-    className: 'w-4 h-4',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
-    })
-  );
-}
-
-/**
  * NamespaceHeader component - displays header for selected namespace
  * @param {Object} props
- * @param {Object} props.namespace - Namespace data { name, counts, lastActivity }
- * @param {Function} props.onRefresh - Optional refresh callback
+ * @param {Object} props.namespace - Namespace data { name, counts }
  */
-export function NamespaceHeader({ namespace, onRefresh }) {
+export function NamespaceHeader({ namespace }) {
   if (!namespace) {
     return React.createElement('div', { className: 'p-6 text-center text-gray-500' },
       'Select a namespace to view details'
     );
   }
 
-  const { name, counts = {}, lastActivity } = namespace;
+  const { name, counts = {} } = namespace;
   const total = (counts.pending || 0) + (counts.active || 0) + (counts.blocked || 0) + (counts.complete || 0);
 
   // Determine overall status
@@ -71,21 +50,6 @@ export function NamespaceHeader({ namespace, onRefresh }) {
       React.createElement('div', { className: 'flex items-center gap-3' },
         React.createElement('h1', { className: 'text-2xl font-bold text-white' }, name),
         React.createElement(StatusBadge, { status: overallStatus, size: 'md' })
-      ),
-      React.createElement('div', { className: 'flex items-center gap-2' },
-        // Last activity
-        lastActivity && React.createElement('div', { className: 'text-sm text-gray-500 mr-2' },
-          'Updated ',
-          React.createElement(Timestamp, { date: lastActivity, format: 'relative' })
-        ),
-        // Refresh button
-        onRefresh && React.createElement('button', {
-          onClick: onRefresh,
-          className: 'btn btn-secondary p-2',
-          title: 'Refresh'
-        },
-          React.createElement(RefreshIcon)
-        )
       )
     ),
 

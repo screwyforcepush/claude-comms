@@ -7,6 +7,8 @@ interface ReadyJob {
   job: Doc<"jobs">;
   assignment: Doc<"assignments">;
   previousResult: string | null;
+  // For PM jobs: accumulated results from all jobs since last PM
+  accumulatedResults: Array<{ jobType: string; result: string }>;
 }
 
 // Chat job (separate from assignments)
@@ -24,6 +26,9 @@ async function findReadyJob(
   let currentJobId: Id<"jobs"> | undefined = assignment.headJobId;
   let prevJob: Doc<"jobs"> | null = null;
 
+  // Track all completed jobs since the last PM (for accumulated results)
+  const jobsSinceLastPM: Array<{ jobType: string; result: string }> = [];
+
   while (currentJobId) {
     const job = await ctx.db.get(currentJobId);
     if (!job) break;
@@ -40,6 +45,7 @@ async function findReadyJob(
           job,
           assignment,
           previousResult: prevJob?.result ?? null,
+          accumulatedResults: jobsSinceLastPM,
         };
       }
       break;
@@ -48,6 +54,16 @@ async function findReadyJob(
     if (job.status === "running") {
       // Assignment already has a running job
       break;
+    }
+
+    // Track completed jobs for accumulation
+    if (job.status === "complete" && job.result) {
+      // Reset accumulator when we hit a PM job (PM already saw previous results)
+      if (job.jobType === "pm" || job.jobType === "retrospect") {
+        jobsSinceLastPM.length = 0;
+      } else {
+        jobsSinceLastPM.push({ jobType: job.jobType, result: job.result });
+      }
     }
 
     prevJob = job;

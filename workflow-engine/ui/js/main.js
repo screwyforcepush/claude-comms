@@ -2,13 +2,11 @@
 import React, { useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadConfig, isConfigValid } from './config.js';
-import { ConvexProvider, useConvex } from './hooks/useConvex.js';
+import { ConvexProvider, useConvex, useQuery } from './hooks/useConvex.js';
+import { api } from './api.js';
 import { ErrorBoundary } from './components/shared/ErrorBoundary.js';
 import { LoadingSpinner } from './components/shared/LoadingSkeleton.js';
 import { NamespaceList } from './components/namespace/NamespaceList.js';
-import { NamespaceHeader } from './components/namespace/NamespaceHeader.js';
-import { AssignmentList } from './components/assignment/AssignmentList.js';
-import { AssignmentDetail } from './components/assignment/AssignmentDetail.js';
 import { ChatPanel } from './components/chat/index.js';
 
 /**
@@ -41,22 +39,8 @@ function ConnectionStatus() {
   return null;
 }
 
-/**
- * App header component
- */
-function Header() {
-  return React.createElement('header', { className: 'header h-16 flex items-center px-4' },
-    React.createElement('div', { className: 'flex items-center justify-between w-full max-w-7xl mx-auto' },
-      // Logo/title
-      React.createElement('div', { className: 'flex items-center gap-3' },
-        React.createElement('h1', { className: 'text-xl font-bold text-white' }, 'Workflow Engine'),
-        React.createElement('span', { className: 'text-sm text-gray-500 hidden sm:inline' }, 'Queue Visualization')
-      ),
-      // Connection status
-      React.createElement(ConnectionStatus)
-    )
-  );
-}
+// ConnectionStatus is exported for use in NamespaceList sidebar
+export { ConnectionStatus };
 
 /**
  * Main content when no namespace is selected
@@ -81,130 +65,7 @@ function WelcomeContent() {
         'Select a Namespace'
       ),
       React.createElement('p', { className: 'text-gray-500 max-w-md' },
-        'Choose a namespace from the sidebar to view its assignments and job queues.'
-      )
-    )
-  );
-}
-
-/**
- * Namespace content with assignments and detail view
- */
-function NamespaceContent({ namespace, onRefresh }) {
-  const [selectedItem, setSelectedItem] = useState(null);
-
-  const handleSelectAssignment = useCallback((item) => {
-    setSelectedItem(item);
-  }, []);
-
-  const handleBack = useCallback(() => {
-    setSelectedItem(null);
-  }, []);
-
-  const handleJobSelect = useCallback((job) => {
-    // Job selection is handled within AssignmentDetail
-    console.log('Job selected:', job._id);
-  }, []);
-
-  // Reset selection when namespace changes
-  React.useEffect(() => {
-    setSelectedItem(null);
-  }, [namespace.name]);
-
-  // Show assignment detail if one is selected
-  if (selectedItem) {
-    return React.createElement(React.Fragment, null,
-      React.createElement(NamespaceHeader, {
-        namespace,
-        onRefresh
-      }),
-      React.createElement('div', { className: 'flex-1 overflow-y-auto' },
-        React.createElement(AssignmentDetail, {
-          assignment: selectedItem.assignment,
-          jobs: selectedItem.jobs || [],
-          onBack: handleBack,
-          onJobSelect: handleJobSelect
-        })
-      )
-    );
-  }
-
-  // Show assignment list
-  return React.createElement(React.Fragment, null,
-    React.createElement(NamespaceHeader, {
-      namespace,
-      onRefresh
-    }),
-    React.createElement('div', { className: 'flex-1 overflow-y-auto' },
-      React.createElement(AssignmentList, {
-        key: namespace._id, // Reset filter state when namespace changes (D1)
-        namespaceId: namespace._id,
-        onSelectAssignment: handleSelectAssignment,
-        selectedAssignmentId: null
-      })
-    )
-  );
-}
-
-/**
- * Tab navigation icons
- */
-function AssignmentsIcon() {
-  return React.createElement('svg', {
-    className: 'w-5 h-5',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'
-    })
-  );
-}
-
-function ChatIcon() {
-  return React.createElement('svg', {
-    className: 'w-5 h-5',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
-    })
-  );
-}
-
-/**
- * Tab navigation component
- */
-function TabNavigation({ activeTab, onTabChange }) {
-  const tabs = [
-    { key: 'assignments', label: 'Assignments', icon: AssignmentsIcon },
-    { key: 'chat', label: 'Chat', icon: ChatIcon }
-  ];
-
-  return React.createElement('div', {
-    className: 'flex border-b border-gray-700 bg-gray-800/50'
-  },
-    tabs.map(tab =>
-      React.createElement('button', {
-        key: tab.key,
-        onClick: () => onTabChange(tab.key),
-        className: `flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
-          activeTab === tab.key
-            ? 'text-white border-blue-500 bg-gray-800'
-            : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-800/50'
-        }`
-      },
-        React.createElement(tab.icon),
-        tab.label
+        'Choose a namespace from the sidebar to view chat threads and assignments.'
       )
     )
   );
@@ -214,40 +75,29 @@ function TabNavigation({ activeTab, onTabChange }) {
  * Main application layout with sidebar
  */
 function AppLayout() {
-  const [selectedNamespace, setSelectedNamespace] = useState(null);
-  const [activeTab, setActiveTab] = useState('assignments');
+  // Store only the namespace name to allow live lookup from subscription
+  const [selectedNamespaceName, setSelectedNamespaceName] = useState(null);
 
-  const handleNamespaceSelect = useCallback((namespace) => {
-    setSelectedNamespace(namespace);
+  // Subscribe to live namespace data at the top level so both sidebar and main content
+  // receive realtime updates via the same subscription
+  const { data: namespaces } = useQuery(api.scheduler.getAllNamespaces);
+
+  // Look up the selected namespace from live subscription data
+  const selectedNamespace = namespaces?.find(ns => ns.name === selectedNamespaceName) || null;
+
+  const handleNamespaceSelect = useCallback((namespaceName) => {
+    setSelectedNamespaceName(namespaceName);
   }, []);
 
-  const handleRefresh = useCallback(() => {
-    // Trigger refresh by updating state timestamp
-    if (selectedNamespace) {
-      setSelectedNamespace({ ...selectedNamespace, _refreshed: Date.now() });
-    }
-  }, [selectedNamespace]);
-
-  const handleTabChange = useCallback((tab) => {
-    setActiveTab(tab);
-  }, []);
-
-  // Render main content based on active tab
+  // Render main content - ChatPanel when namespace selected, WelcomeContent otherwise
   const renderMainContent = () => {
     if (!selectedNamespace) {
       return React.createElement(WelcomeContent);
     }
 
-    if (activeTab === 'chat') {
-      return React.createElement(ChatPanel, {
-        namespaceId: selectedNamespace._id,
-        namespaceName: selectedNamespace.name
-      });
-    }
-
-    return React.createElement(NamespaceContent, {
-      namespace: selectedNamespace,
-      onRefresh: handleRefresh
+    return React.createElement(ChatPanel, {
+      namespaceId: selectedNamespace._id,
+      namespaceName: selectedNamespace.name
     });
   };
 
@@ -255,20 +105,14 @@ function AppLayout() {
     // Sidebar with namespace list
     React.createElement('aside', { className: 'sidebar' },
       React.createElement(NamespaceList, {
-        selectedNamespace: selectedNamespace?.name,
+        namespaces: namespaces,
+        selectedNamespace: selectedNamespaceName,
         onSelect: handleNamespaceSelect
       })
     ),
 
-    // Main content area with tab navigation
+    // Main content area - directly shows chat view
     React.createElement('main', { className: 'main-content flex flex-col' },
-      // Tab navigation (only show when namespace is selected)
-      selectedNamespace && React.createElement(TabNavigation, {
-        activeTab: activeTab,
-        onTabChange: handleTabChange
-      }),
-
-      // Content area
       React.createElement('div', { className: 'flex-1 flex flex-col min-h-0' },
         renderMainContent()
       )
@@ -340,11 +184,8 @@ function App() {
   // Main application with providers
   return React.createElement(ConvexProvider, { url: config.convexUrl },
     React.createElement(ErrorBoundary, null,
-      React.createElement('div', { className: 'min-h-screen bg-gray-900 flex flex-col' },
-        React.createElement(Header),
-        React.createElement('div', { className: 'flex-1 flex' },
-          React.createElement(AppLayout)
-        )
+      React.createElement('div', { className: 'h-screen bg-gray-900 flex flex-col' },
+        React.createElement(AppLayout)
       )
     )
   );

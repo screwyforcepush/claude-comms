@@ -40,6 +40,25 @@ function AssistantIcon() {
 }
 
 /**
+ * PM icon for PM report messages
+ */
+function PMIcon() {
+  return React.createElement('svg', {
+    className: 'w-5 h-5',
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'
+    })
+  );
+}
+
+/**
  * Format timestamp to readable time
  */
 function formatTime(timestamp) {
@@ -90,45 +109,73 @@ function renderContent(content) {
 }
 
 /**
+ * Get role configuration for styling
+ */
+function getRoleConfig(role) {
+  switch (role) {
+    case 'user':
+      return {
+        icon: UserIcon,
+        label: 'You',
+        bgColor: 'bg-blue-500',
+        bubbleColor: 'bg-blue-500 text-white rounded-tr-sm',
+        isRight: true,
+      };
+    case 'pm':
+      return {
+        icon: PMIcon,
+        label: 'PM Report',
+        bgColor: 'bg-amber-600',
+        bubbleColor: 'bg-amber-900/50 text-amber-100 rounded-tl-sm border border-amber-700/50',
+        isRight: false,
+      };
+    case 'assistant':
+    default:
+      return {
+        icon: AssistantIcon,
+        label: 'Product Owner',
+        bgColor: 'bg-purple-500',
+        bubbleColor: 'bg-gray-800 text-gray-100 rounded-tl-sm',
+        isRight: false,
+      };
+  }
+}
+
+/**
  * MessageBubble component - Individual message with role styling
  * @param {Object} props
  * @param {Object} props.message - Message object with role, content, createdAt
  * @param {boolean} props.isLast - Whether this is the last message (for styling)
  */
 export function MessageBubble({ message, isLast = false }) {
-  const isUser = message.role === 'user';
+  const config = getRoleConfig(message.role);
+  const Icon = config.icon;
 
   return React.createElement('div', {
-    className: `flex ${isUser ? 'justify-end' : 'justify-start'} ${isLast ? '' : 'mb-4'}`
+    className: `flex ${config.isRight ? 'justify-end' : 'justify-start'} ${isLast ? '' : 'mb-4'} ${message.role === 'pm' ? 'pm-message' : ''}`
   },
     React.createElement('div', {
-      className: `flex gap-3 max-w-[80%] ${isUser ? 'flex-row-reverse' : 'flex-row'}`
+      className: `flex gap-3 max-w-[80%] ${config.isRight ? 'flex-row-reverse' : 'flex-row'}`
     },
       // Avatar
       React.createElement('div', {
-        className: `flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-          isUser ? 'bg-blue-500' : 'bg-purple-500'
-        }`
+        className: `flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${config.bgColor}`
       },
-        isUser ? React.createElement(UserIcon) : React.createElement(AssistantIcon)
+        React.createElement(Icon)
       ),
 
       // Message content
       React.createElement('div', {
-        className: `flex flex-col ${isUser ? 'items-end' : 'items-start'}`
+        className: `flex flex-col ${config.isRight ? 'items-end' : 'items-start'}`
       },
         // Role label
         React.createElement('span', {
-          className: 'text-xs text-gray-500 mb-1 px-1'
-        }, isUser ? 'You' : 'Product Owner'),
+          className: `text-xs mb-1 px-1 ${message.role === 'pm' ? 'text-amber-500' : 'text-gray-500'}`
+        }, config.label),
 
         // Message bubble
         React.createElement('div', {
-          className: `rounded-2xl px-4 py-2.5 ${
-            isUser
-              ? 'bg-blue-500 text-white rounded-tr-sm'
-              : 'bg-gray-800 text-gray-100 rounded-tl-sm'
-          }`
+          className: `rounded-2xl px-4 py-2.5 ${config.bubbleColor}`
         },
           React.createElement('div', {
             className: 'text-sm leading-relaxed whitespace-pre-wrap break-words'

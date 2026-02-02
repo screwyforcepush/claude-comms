@@ -247,3 +247,4 @@ claude-output.json
 specs/
 sa-gemini.json
 .human/annotated-feedback-watcher/config.json
+beads/

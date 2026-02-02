@@ -162,12 +162,16 @@ export const insertAfter = mutation({
 });
 
 export const start = mutation({
-  args: { id: v.id("jobs") },
+  args: {
+    id: v.id("jobs"),
+    prompt: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const now = Date.now();
     await ctx.db.patch(args.id, {
       status: "running",
       startedAt: now,
+      prompt: args.prompt,
     });
 
     // Also mark assignment as active

@@ -98,6 +98,13 @@ export const update = mutation({
     ),
     blockedReason: v.optional(v.string()),
     headJobId: v.optional(v.id("jobs")),
+    alignmentStatus: v.optional(
+      v.union(
+        v.literal("aligned"),
+        v.literal("uncertain"),
+        v.literal("misaligned")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
@@ -143,5 +150,38 @@ export const unblock = mutation({
       blockedReason: undefined,
       updatedAt: Date.now(),
     });
+  },
+});
+
+export const remove = mutation({
+  args: { id: v.id("assignments") },
+  handler: async (ctx, args) => {
+    // Delete all jobs for this assignment
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.id))
+      .collect();
+
+    for (const job of jobs) {
+      await ctx.db.delete(job._id);
+    }
+
+    // Unlink from any chat threads
+    const threads = await ctx.db
+      .query("chatThreads")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.id))
+      .collect();
+
+    for (const thread of threads) {
+      await ctx.db.patch(thread._id, {
+        assignmentId: undefined,
+        updatedAt: Date.now(),
+      });
+    }
+
+    // Delete the assignment
+    await ctx.db.delete(args.id);
+
+    return { deleted: true, jobsDeleted: jobs.length };
   },
 });

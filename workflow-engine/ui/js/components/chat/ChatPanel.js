@@ -22,11 +22,44 @@ export function ChatPanel({ namespaceId, namespaceName }) {
     { namespaceId }
   );
 
+  // Fetch assignments with jobs for assignment visibility (WP-5: unified data flow)
+  const { data: allAssignmentsData } = useQuery(
+    api.scheduler.getAllAssignments,
+    { namespaceId }
+  );
+
+  // Get selected thread object (must be defined before useMemos that reference it)
+  const selectedThread = threads?.find(t => t._id === selectedThreadId) || null;
+
+  // Build assignments map for quick lookup (assignment data only)
+  const assignments = React.useMemo(() => {
+    if (!allAssignmentsData) return {};
+    return allAssignmentsData.reduce((acc, item) => {
+      acc[item.assignment._id] = item.assignment;
+      return acc;
+    }, {});
+  }, [allAssignmentsData]);
+
+  // Get assignment + jobs for selected thread (WP-5: data flow for job chain)
+  const selectedAssignmentWithJobs = React.useMemo(() => {
+    if (!selectedThread?.assignmentId || !allAssignmentsData) return null;
+    return allAssignmentsData.find(item => item.assignment._id === selectedThread.assignmentId);
+  }, [selectedThread?.assignmentId, allAssignmentsData]);
+
   // Fetch messages for selected thread
   const { data: messages, loading: loadingMessages } = useQuery(
     selectedThreadId ? api.chatMessages.list : null,
     selectedThreadId ? { threadId: selectedThreadId } : {}
   );
+
+  // Query for active chatJob to show typing indicator
+  const { data: activeChatJob } = useQuery(
+    selectedThreadId ? api.chatJobs.getActiveForThread : null,
+    selectedThreadId ? { threadId: selectedThreadId } : {}
+  );
+
+  // Show typing indicator when there's an active job (pending or running)
+  const isProcessing = !!activeChatJob;
 
   // Mutations
   const createThread = useMutation(api.chatThreads.create);
@@ -35,9 +68,6 @@ export function ChatPanel({ namespaceId, namespaceName }) {
   const updateTitle = useMutation(api.chatThreads.updateTitle);
   const removeThread = useMutation(api.chatThreads.remove);
   const triggerChatJob = useMutation(api.chatJobs.trigger);
-
-  // Get selected thread object
-  const selectedThread = threads?.find(t => t._id === selectedThreadId) || null;
 
   // Reset selection when namespace changes
   useEffect(() => {
@@ -173,6 +203,7 @@ export function ChatPanel({ namespaceId, namespaceName }) {
     },
       React.createElement(ChatSidebar, {
         threads: threads || [],
+        assignments: assignments,
         selectedThreadId: selectedThreadId,
         onSelectThread: handleSelectThread,
         onCreateThread: handleCreateThread,
@@ -182,15 +213,17 @@ export function ChatPanel({ namespaceId, namespaceName }) {
       })
     ),
 
-    // Main chat view
+    // Main chat view (WP-5: pass jobs data for assignment pane)
     React.createElement(ChatView, {
       thread: selectedThread,
+      assignment: selectedAssignmentWithJobs?.assignment || null,
+      jobs: selectedAssignmentWithJobs?.jobs || [],
       messages: messages || [],
       onSendMessage: handleSendMessage,
       onUpdateTitle: handleUpdateTitle,
       onUpdateMode: handleUpdateMode,
       loadingMessages: loadingMessages,
-      sending: sending
+      sending: sending || isProcessing
     })
   );
 }

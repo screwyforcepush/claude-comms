@@ -3,7 +3,12 @@
  * Workflow Engine CLI
  *
  * Interface to the Convex backend for managing assignments and jobs.
- * Primary consumer: PM agent
+ * Primary consumers: PM agent, PO agent
+ *
+ * Environment Variables (auto-set by runner):
+ *   WORKFLOW_ASSIGNMENT_ID   Current assignment (used as default for assignment commands)
+ *   WORKFLOW_JOB_ID          Current job (used as default --after for insert-job)
+ *   WORKFLOW_THREAD_ID       Current chat thread (used for auto-linking assignments)
  *
  * Usage:
  *   npx tsx cli.ts <command> [args]
@@ -15,12 +20,16 @@
  *   job <id>                            Get job details
  *   queue                               Show queue status
  *
- *   create <northStar> [--priority N] [--independent]   Create assignment
- *   insert-job <assignmentId> --type <type> --harness <harness> [--context <ctx>] [--after <jobId>]
- *   update-assignment <id> [--artifacts <str>] [--decisions <str>]
- *   complete <assignmentId>             Mark assignment complete
- *   block <assignmentId> --reason <str> Block assignment
- *   unblock <assignmentId>              Unblock assignment
+ *   create <northStar> [--priority N] [--independent] [--thread <threadId>]   Create assignment
+ *   insert-job [assignmentId] --type <type> [--harness <harness>] [--context <ctx>] [--after <jobId>] [--append]
+ *              assignmentId defaults to WORKFLOW_ASSIGNMENT_ID
+ *              --after defaults to WORKFLOW_JOB_ID (auto-links in job context)
+ *              --append finds tail job and links there (for PO adding to existing chain)
+ *   update-assignment [id] [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
+ *   complete [assignmentId]             Mark assignment complete
+ *   block [assignmentId] --reason <str> Block assignment
+ *   unblock [assignmentId]              Unblock assignment
+ *   delete-assignment <id>              Delete assignment and all its jobs
  *
  *   start-job <jobId>                   Mark job as running
  *   complete-job <jobId> --result <str> Mark job as complete
@@ -31,7 +40,7 @@
  *   chat-thread <threadId>              Get thread with messages
  *   chat-create [--title <title>]       Create a new chat thread
  *   chat-send <threadId> <message>      Send message and create chat job
- *   chat-mode <threadId> <jam|cook>     Change thread mode
+ *   chat-mode <threadId> <jam|cook|guardian>  Change thread mode
  *   chat-title <threadId> <title>       Update thread title
  */
 
@@ -158,7 +167,12 @@ async function getQueueStatus() {
   output(result);
 }
 
-async function createAssignment(northStar: string, priority?: number, independent?: boolean) {
+async function createAssignment(
+  northStar: string,
+  priority?: number,
+  independent?: boolean,
+  threadId?: string
+) {
   const nsId = await getNamespaceId();
   const id = await client.mutation(api.assignments.create, {
     namespaceId: nsId,
@@ -166,7 +180,42 @@ async function createAssignment(northStar: string, priority?: number, independen
     priority,
     independent,
   });
-  output({ id, message: "Assignment created" });
+
+  // Link to thread if provided, or use env var (set by runner for chat jobs)
+  const effectiveThreadId = threadId || process.env.WORKFLOW_THREAD_ID;
+  if (effectiveThreadId) {
+    await client.mutation(api.chatThreads.linkAssignment, {
+      id: effectiveThreadId as Id<"chatThreads">,
+      assignmentId: id as Id<"assignments">,
+    });
+    const source = threadId ? "explicit" : "env";
+    output({ id, threadId: effectiveThreadId, message: `Assignment created and linked to thread (${source})` });
+  } else {
+    output({ id, message: "Assignment created" });
+  }
+}
+
+// Find the tail job of an assignment (for --append)
+async function findTailJob(assignmentId: string): Promise<string | null> {
+  const assignment = await client.query(api.assignments.get, {
+    id: assignmentId as Id<"assignments">,
+  });
+  if (!assignment || !assignment.headJobId) return null;
+
+  // Walk the chain to find the tail
+  let currentJobId: string | undefined = assignment.headJobId;
+  let tailJobId: string = assignment.headJobId;
+
+  while (currentJobId) {
+    const job = await client.query(api.jobs.get, {
+      id: currentJobId as Id<"jobs">,
+    });
+    if (!job) break;
+    tailJobId = job._id;
+    currentJobId = job.nextJobId;
+  }
+
+  return tailJobId;
 }
 
 async function insertJob(
@@ -174,21 +223,33 @@ async function insertJob(
   jobType: string,
   harness: string,
   context?: string,
-  afterJobId?: string
+  afterJobId?: string,
+  append?: boolean
 ) {
   const validHarnesses = ["claude", "codex", "gemini"];
   if (!validHarnesses.includes(harness)) {
     error(`Invalid harness. Must be one of: ${validHarnesses.join(", ")}`);
   }
 
+  // Determine effective afterJobId
+  let effectiveAfterJobId = afterJobId;
+
+  if (append && !effectiveAfterJobId) {
+    // --append: find tail job and insert after it
+    effectiveAfterJobId = await findTailJob(assignmentId) || undefined;
+  }
+
   let id: string;
-  if (afterJobId) {
+  let linkInfo: string;
+
+  if (effectiveAfterJobId) {
     id = await client.mutation(api.jobs.insertAfter, {
-      afterJobId: afterJobId as Id<"jobs">,
+      afterJobId: effectiveAfterJobId as Id<"jobs">,
       jobType,
       harness: harness as "claude" | "codex" | "gemini",
       context,
     });
+    linkInfo = `linked after ${effectiveAfterJobId.slice(-8)}`;
   } else {
     id = await client.mutation(api.jobs.create, {
       assignmentId: assignmentId as Id<"assignments">,
@@ -196,15 +257,27 @@ async function insertJob(
       harness: harness as "claude" | "codex" | "gemini",
       context,
     });
+    linkInfo = "created as head";
   }
-  output({ id, message: "Job created" });
+  output({ id, message: `Job ${linkInfo}` });
 }
 
-async function updateAssignment(id: string, artifacts?: string, decisions?: string) {
+async function updateAssignment(
+  id: string,
+  artifacts?: string,
+  decisions?: string,
+  alignment?: string
+) {
+  const validAlignments = ["aligned", "uncertain", "misaligned"];
+  if (alignment && !validAlignments.includes(alignment)) {
+    error(`Invalid alignment status. Must be one of: ${validAlignments.join(", ")}`);
+  }
+
   await client.mutation(api.assignments.update, {
     id: id as Id<"assignments">,
     artifacts,
     decisions,
+    alignmentStatus: alignment as "aligned" | "uncertain" | "misaligned" | undefined,
   });
   output({ message: "Assignment updated" });
 }
@@ -229,6 +302,13 @@ async function unblockAssignment(id: string) {
     id: id as Id<"assignments">,
   });
   output({ message: "Assignment unblocked" });
+}
+
+async function deleteAssignment(id: string) {
+  const result = await client.mutation(api.assignments.remove, {
+    id: id as Id<"assignments">,
+  });
+  output({ message: `Assignment deleted (${result.jobsDeleted} jobs removed)` });
 }
 
 async function startJob(id: string) {
@@ -287,9 +367,23 @@ async function createChatThread(title?: string) {
   output({ threadId, message: "Chat thread created" });
 }
 
-async function changeChatMode(threadId: string, mode: string) {
-  if (mode !== "jam" && mode !== "cook") {
-    error("Mode must be 'jam' or 'cook'");
+async function changeChatMode(threadId: string, mode: string, assignmentId?: string) {
+  if (mode !== "jam" && mode !== "cook" && mode !== "guardian") {
+    error("Mode must be 'jam', 'cook', or 'guardian'");
+  }
+
+  // Guardian mode requires an assignment link and uses atomic mutation
+  if (mode === "guardian") {
+    if (!assignmentId) {
+      error("Guardian mode requires --assignment <id> to link to an assignment");
+    }
+    // Use atomic mutation to link, set alignment, and change mode
+    await client.mutation(api.chatThreads.enableGuardianMode, {
+      threadId: threadId as Id<"chatThreads">,
+      assignmentId: assignmentId as Id<"assignments">,
+    });
+    output({ message: `Thread mode changed to guardian, linked to assignment ${assignmentId}` });
+    return;
   }
 
   await client.mutation(api.chatThreads.updateMode, {
@@ -402,42 +496,65 @@ async function main() {
         await createAssignment(
           positional[0],
           flags.priority ? parseInt(flags.priority) : undefined,
-          flags.independent === "true"
+          flags.independent === "true",
+          flags.thread
         );
         break;
 
-      case "insert-job":
-        if (!positional[0]) error("Assignment ID required");
+      case "insert-job": {
+        // Assignment ID: positional arg > env var
+        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
+        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
         if (!flags.type) error("--type required");
+
+        // After job ID: --after flag > env var (auto-link in job context)
+        const afterJobId = flags.after || process.env.WORKFLOW_JOB_ID;
+
         await insertJob(
-          positional[0],
+          assignmentId,
           flags.type,
           flags.harness || config.defaultHarness,
           flags.context,
-          flags.after
+          afterJobId,
+          flags.append === "true"
         );
         break;
+      }
 
-      case "update-assignment":
-        if (!positional[0]) error("Assignment ID required");
-        await updateAssignment(positional[0], flags.artifacts, flags.decisions);
+      case "update-assignment": {
+        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
+        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
+        await updateAssignment(assignmentId, flags.artifacts, flags.decisions, flags.alignment);
         break;
+      }
 
-      case "complete":
-        if (!positional[0]) error("Assignment ID required");
-        await completeAssignment(positional[0]);
+      case "complete": {
+        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
+        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
+        await completeAssignment(assignmentId);
         break;
+      }
 
-      case "block":
-        if (!positional[0]) error("Assignment ID required");
+      case "block": {
+        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
+        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
         if (!flags.reason) error("--reason required");
-        await blockAssignment(positional[0], flags.reason);
+        await blockAssignment(assignmentId, flags.reason);
         break;
+      }
 
-      case "unblock":
-        if (!positional[0]) error("Assignment ID required");
-        await unblockAssignment(positional[0]);
+      case "unblock": {
+        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
+        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
+        await unblockAssignment(assignmentId);
         break;
+      }
+
+      case "delete-assignment": {
+        if (!positional[0]) error("Assignment ID required");
+        await deleteAssignment(positional[0]);
+        break;
+      }
 
       case "start-job":
         if (!positional[0]) error("Job ID required");
@@ -477,8 +594,8 @@ async function main() {
 
       case "chat-mode":
         if (!positional[0]) error("Thread ID required");
-        if (!positional[1]) error("Mode required (jam or cook)");
-        await changeChatMode(positional[0], positional[1]);
+        if (!positional[1]) error("Mode required (jam, cook, or guardian)");
+        await changeChatMode(positional[0], positional[1], flags.assignment);
         break;
 
       case "chat-title":

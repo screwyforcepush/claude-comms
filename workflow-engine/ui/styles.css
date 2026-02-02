@@ -16,7 +16,8 @@ html {
 }
 
 body {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -36,7 +37,9 @@ p, h1, h2, h3, h4, h5, h6 {
 
 /* Root element */
 #root {
-  min-height: 100vh;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Animations */
@@ -293,6 +296,7 @@ p, h1, h2, h3, h4, h5, h6 {
 
 .json-string {
   color: #86efac; /* green-300 */
+  white-space: pre-wrap;
 }
 
 .json-number {
@@ -323,19 +327,18 @@ p, h1, h2, h3, h4, h5, h6 {
   background-color: #111827;
 }
 
-/* Header */
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: #1f2937;
+/* Sidebar branding header */
+.sidebar-branding {
+  flex-shrink: 0;
+  background-color: rgba(31, 41, 55, 0.5);
   border-bottom: 1px solid #374151;
 }
 
 /* Layout container */
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Responsive adjustments */
@@ -533,4 +536,138 @@ p, h1, h2, h3, h4, h5, h6 {
 
 .tab-button.active::after {
   background-color: #3b82f6;
+}
+
+/* Guardian Mode Styles */
+
+/* PM message styling - distinct from user/assistant */
+.pm-message {
+  position: relative;
+}
+
+.pm-message::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
+  border-radius: 2px;
+}
+
+/* Guardian mode thread indicator */
+.guardian-thread {
+  position: relative;
+}
+
+.guardian-thread::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.guardian-thread.uncertain::after {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+}
+
+.guardian-thread.misaligned::after {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+  animation: pulse-alert 2s ease-in-out infinite;
+}
+
+@keyframes pulse-alert {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+/* Alignment status badge */
+.alignment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.alignment-badge.aligned {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.alignment-badge.uncertain {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.alignment-badge.misaligned {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* Guardian mode header indicator */
+.guardian-mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);
+  border-left: 3px solid #10b981;
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-size: 0.875rem;
+  color: #34d399;
+}
+
+.guardian-mode-indicator svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* PM report card styling */
+.pm-report-card {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.1) 0%, rgba(146, 64, 14, 0.1) 100%);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin: 0.5rem 0;
+}
+
+.pm-report-card .report-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #fbbf24;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+/* Traffic light response styling */
+.traffic-light-response {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  padding: 0.5rem;
+}
+
+.traffic-light-response.with-rationale {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.traffic-light-response .rationale {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  text-align: center;
+  max-width: 400px;
 }

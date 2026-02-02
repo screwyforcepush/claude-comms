@@ -20,6 +20,12 @@ export default defineSchema({
       v.literal("complete")
     ),
     blockedReason: v.optional(v.string()),
+    // Guardian mode alignment status
+    alignmentStatus: v.optional(v.union(
+      v.literal("aligned"),
+      v.literal("uncertain"),
+      v.literal("misaligned")
+    )),
     independent: v.boolean(),
     priority: v.number(),
     artifacts: v.string(),
@@ -41,6 +47,7 @@ export default defineSchema({
       v.literal("gemini")
     ),
     context: v.optional(v.string()),
+    prompt: v.optional(v.string()), // Complete prompt sent to agent
     status: v.union(
       v.literal("pending"),
       v.literal("running"),
@@ -60,18 +67,19 @@ export default defineSchema({
   chatThreads: defineTable({
     namespaceId: v.id("namespaces"),
     title: v.string(),
-    mode: v.union(v.literal("jam"), v.literal("cook")),
+    mode: v.union(v.literal("jam"), v.literal("cook"), v.literal("guardian")),
     assignmentId: v.optional(v.id("assignments")),
     claudeSessionId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_namespace", ["namespaceId"])
-    .index("by_namespace_updated", ["namespaceId", "updatedAt"]),
+    .index("by_namespace_updated", ["namespaceId", "updatedAt"])
+    .index("by_assignment", ["assignmentId"]),
 
   chatMessages: defineTable({
     threadId: v.id("chatThreads"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("pm")),
     content: v.string(),
     createdAt: v.number(),
   })
@@ -88,6 +96,7 @@ export default defineSchema({
       v.literal("gemini")
     ),
     context: v.string(), // JSON with thread info, messages, mode, sessionId
+    prompt: v.optional(v.string()), // Complete prompt sent to agent
     status: v.union(
       v.literal("pending"),
       v.literal("running"),

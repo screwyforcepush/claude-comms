@@ -8,11 +8,12 @@ import { EmptyState } from '../shared/EmptyState.js';
  * ThreadList component - List of chat threads
  * @param {Object} props
  * @param {Array} props.threads - Array of thread objects
+ * @param {Object} props.assignments - Map of assignmentId -> assignment for guardian mode
  * @param {string} props.selectedThreadId - Currently selected thread ID
  * @param {Function} props.onSelectThread - Callback when thread is selected
  * @param {boolean} props.loading - Whether threads are loading
  */
-export function ThreadList({ threads = [], selectedThreadId, onSelectThread, loading = false }) {
+export function ThreadList({ threads = [], assignments = {}, selectedThreadId, onSelectThread, loading = false }) {
   // Loading state
   if (loading && threads.length === 0) {
     return React.createElement('div', { className: 'p-3' },
@@ -51,6 +52,7 @@ export function ThreadList({ threads = [], selectedThreadId, onSelectThread, loa
       React.createElement(ThreadItem, {
         key: thread._id,
         thread: thread,
+        assignment: thread.assignmentId ? assignments[thread.assignmentId] : null,
         isSelected: selectedThreadId === thread._id,
         onClick: () => onSelectThread && onSelectThread(thread)
       })

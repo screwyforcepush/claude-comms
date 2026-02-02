@@ -23,6 +23,14 @@ export const api = {
     getReadyJobs: "scheduler:getReadyJobs"
   },
 
+  // Assignments API (for guardian mode)
+  assignments: {
+    // List assignments for a namespace
+    list: "assignments:list",
+    // Get assignment by ID
+    get: "assignments:get",
+  },
+
   // Chat threads API
   chatThreads: {
     // List all threads for a namespace
@@ -52,14 +60,11 @@ export const api = {
     // LEGACY: Convert chat thread to assignment+job (creates assignment + job)
     // NOTE: DO NOT use for normal chat - use chatActions.sendMessage instead
     // This is for future "Convert to Assignment" feature (cook mode explicit conversion)
-    trigger: "chatJobs:trigger"
+    trigger: "chatJobs:trigger",
+    // Get active (pending/running) chat job for typing indicator
+    getActiveForThread: "chatJobs:getActiveForThread"
   },
 
-  // Chat actions API - direct Claude execution with session resume
-  chatActions: {
-    // Send message directly to Claude with session resume (no assignment/job)
-    sendMessage: "chatActions:sendMessage"
-  }
 };
 
 // Status color mappings for consistent styling

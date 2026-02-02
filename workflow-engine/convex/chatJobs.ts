@@ -17,6 +17,8 @@ export const trigger = mutation({
     harness: v.optional(
       v.union(v.literal("claude"), v.literal("codex"), v.literal("gemini"))
     ),
+    // Guardian mode: if true, this is a PO evaluation of PM report
+    isGuardianEvaluation: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const harness = args.harness ?? "claude";
@@ -38,11 +40,23 @@ export const trigger = mutation({
       throw new Error("No messages in thread");
     }
 
-    // Get the latest user message
-    const userMessages = messages.filter((m) => m.role === "user");
-    const latestUserMessage = userMessages[userMessages.length - 1];
-    if (!latestUserMessage) {
-      throw new Error("No user message found");
+    // For guardian evaluation, find the latest PM message
+    // Otherwise, find the latest user message
+    let latestMessage: string;
+    if (args.isGuardianEvaluation) {
+      const pmMessages = messages.filter((m) => m.role === "pm");
+      const latestPmMessage = pmMessages[pmMessages.length - 1];
+      if (!latestPmMessage) {
+        throw new Error("No PM message found for guardian evaluation");
+      }
+      latestMessage = latestPmMessage.content;
+    } else {
+      const userMessages = messages.filter((m) => m.role === "user");
+      const latestUserMessage = userMessages[userMessages.length - 1];
+      if (!latestUserMessage) {
+        throw new Error("No user message found");
+      }
+      latestMessage = latestUserMessage.content;
     }
 
     // 3. Build chat context (including session ID for resume)
@@ -57,8 +71,11 @@ export const trigger = mutation({
         content: m.content,
         createdAt: m.createdAt,
       })),
-      latestUserMessage: latestUserMessage.content,
+      latestUserMessage: latestMessage,
       claudeSessionId: thread.claudeSessionId,
+      // Guardian mode fields
+      assignmentId: thread.assignmentId,
+      isGuardianEvaluation: args.isGuardianEvaluation ?? false,
     };
 
     // 4. Create chat job (no assignment!)
@@ -79,11 +96,15 @@ export const trigger = mutation({
  * Mark a chat job as running
  */
 export const start = mutation({
-  args: { id: v.id("chatJobs") },
+  args: {
+    id: v.id("chatJobs"),
+    prompt: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, {
       status: "running",
       startedAt: Date.now(),
+      prompt: args.prompt,
     });
   },
 });
@@ -144,5 +165,27 @@ export const get = query({
   args: { id: v.id("chatJobs") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.id);
+  },
+});
+
+/**
+ * Get active (pending or running) chat job for a thread
+ * Used for showing typing indicator while job is processing
+ */
+export const getActiveForThread = query({
+  args: { threadId: v.id("chatThreads") },
+  handler: async (ctx, args) => {
+    // Get all chatJobs for this thread
+    const jobs = await ctx.db
+      .query("chatJobs")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .collect();
+
+    // Find any that are pending or running (most recent first)
+    const activeJob = jobs
+      .filter((job) => job.status === "pending" || job.status === "running")
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+
+    return activeJob ?? null;
   },
 });

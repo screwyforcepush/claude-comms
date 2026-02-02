@@ -2,11 +2,19 @@
 import React, { useState, useCallback } from 'react';
 
 /**
+ * Check if a string contains newlines
+ */
+function isMultiLine(value) {
+  return typeof value === 'string' && value.includes('\n');
+}
+
+/**
  * Syntax highlight JSON value based on type
  * @param {any} value - Value to render
+ * @param {boolean} block - Whether to render as block element
  * @returns {React.Element}
  */
-function renderValue(value) {
+function renderValue(value, block = false) {
   if (value === null) {
     return React.createElement('span', { className: 'json-null' }, 'null');
   }
@@ -17,6 +25,13 @@ function renderValue(value) {
     return React.createElement('span', { className: 'json-number' }, String(value));
   }
   if (typeof value === 'string') {
+    // For multi-line strings, use pre to preserve formatting
+    if (value.includes('\n')) {
+      return React.createElement('pre', {
+        className: 'json-string whitespace-pre-wrap m-0',
+        style: { display: block ? 'block' : 'inline', fontFamily: 'inherit' }
+      }, `"${value}"`);
+    }
     return React.createElement('span', { className: 'json-string' }, `"${value}"`);
   }
   return React.createElement('span', null, String(value));
@@ -42,6 +57,15 @@ function JsonNode({ data, keyName, defaultCollapsed = false, depth = 0 }) {
 
   // Primitive values
   if (!isObject) {
+    // Multi-line strings need block layout to display properly
+    if (isMultiLine(data)) {
+      return React.createElement('div', {
+        style: { paddingLeft: depth > 0 ? '1rem' : 0 }
+      },
+        keyName && React.createElement('span', { className: 'json-key' }, `"${keyName}": `),
+        renderValue(data, true)
+      );
+    }
     return React.createElement('div', {
       className: 'flex',
       style: { paddingLeft: depth > 0 ? '1rem' : 0 }

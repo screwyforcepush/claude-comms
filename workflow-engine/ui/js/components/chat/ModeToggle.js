@@ -1,14 +1,15 @@
-// ModeToggle - Binary segmented control for Jam/Cook mode
+// ModeToggle - Three-way segmented control for Jam/Cook/Guardian modes
 import React from 'react';
 
 /**
- * ModeToggle component - Binary segmented control for switching between Jam and Cook modes
+ * ModeToggle component - Segmented control for switching between Jam, Cook, and Guardian modes
  * @param {Object} props
- * @param {'jam' | 'cook'} props.mode - Current mode
+ * @param {'jam' | 'cook' | 'guardian'} props.mode - Current mode
  * @param {Function} props.onChange - Callback when mode changes
  * @param {boolean} props.disabled - Whether the toggle is disabled
+ * @param {boolean} props.hasAssignment - Whether thread has linked assignment (enables guardian)
  */
-export function ModeToggle({ mode, onChange, disabled = false }) {
+export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = false }) {
   const handleModeChange = (newMode) => {
     if (!disabled && newMode !== mode && onChange) {
       onChange(newMode);
@@ -80,6 +81,40 @@ export function ModeToggle({ mode, onChange, disabled = false }) {
           })
         ),
         'Cook'
+      )
+    ),
+
+    // Guardian button (only enabled when assignment is linked)
+    React.createElement('button', {
+      type: 'button',
+      onClick: () => handleModeChange('guardian'),
+      disabled: disabled || !hasAssignment,
+      className: `px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+        mode === 'guardian'
+          ? 'bg-emerald-500 text-white shadow-sm'
+          : hasAssignment
+            ? 'text-gray-400 hover:text-gray-200'
+            : 'text-gray-600 cursor-not-allowed'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
+      title: hasAssignment
+        ? 'Guardian mode: PO monitors alignment during assignment execution'
+        : 'Guardian mode requires a linked assignment'
+    },
+      React.createElement('span', { className: 'flex items-center gap-1.5' },
+        React.createElement('svg', {
+          className: 'w-4 h-4',
+          fill: 'none',
+          stroke: 'currentColor',
+          viewBox: '0 0 24 24',
+          strokeWidth: '2'
+        },
+          React.createElement('path', {
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+            d: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+          })
+        ),
+        'Guardian'
       )
     )
   );

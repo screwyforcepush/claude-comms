@@ -45,6 +45,7 @@ function TrashIcon() {
  * ChatSidebar component - Sidebar with thread list and new chat button
  * @param {Object} props
  * @param {Array} props.threads - Array of thread objects
+ * @param {Object} props.assignments - Map of assignmentId -> assignment for guardian mode
  * @param {string} props.selectedThreadId - Currently selected thread ID
  * @param {Function} props.onSelectThread - Callback when thread is selected
  * @param {Function} props.onCreateThread - Callback to create new thread
@@ -54,6 +55,7 @@ function TrashIcon() {
  */
 export function ChatSidebar({
   threads = [],
+  assignments = {},
   selectedThreadId,
   onSelectThread,
   onCreateThread,
@@ -110,6 +112,7 @@ export function ChatSidebar({
     // Thread list
     React.createElement(ThreadList, {
       threads: threads,
+      assignments: assignments,
       selectedThreadId: selectedThreadId,
       onSelectThread: onSelectThread,
       loading: loading

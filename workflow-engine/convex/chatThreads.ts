@@ -1,7 +1,16 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 // Queries
+
+// Debug: list all without index
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("chatThreads").collect();
+  },
+});
 
 export const list = query({
   args: { namespaceId: v.id("namespaces") },
@@ -44,13 +53,67 @@ export const create = mutation({
 export const updateMode = mutation({
   args: {
     id: v.id("chatThreads"),
-    mode: v.union(v.literal("jam"), v.literal("cook")),
+    mode: v.union(v.literal("jam"), v.literal("cook"), v.literal("guardian")),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, {
       mode: args.mode,
       updatedAt: Date.now(),
     });
+  },
+});
+
+export const linkAssignment = mutation({
+  args: {
+    id: v.id("chatThreads"),
+    assignmentId: v.id("assignments"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      assignmentId: args.assignmentId,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// Query thread linked to an assignment in guardian mode
+export const getGuardianThread = query({
+  args: { assignmentId: v.id("assignments") },
+  handler: async (ctx, args) => {
+    // Use index to efficiently find thread by assignmentId
+    const thread = await ctx.db
+      .query("chatThreads")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
+      .filter((q) => q.eq(q.field("mode"), "guardian"))
+      .first();
+
+    return thread ?? null;
+  },
+});
+
+// Atomically enable guardian mode (link + align + mode change)
+export const enableGuardianMode = mutation({
+  args: {
+    threadId: v.id("chatThreads"),
+    assignmentId: v.id("assignments"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // 1. Link assignment to thread
+    await ctx.db.patch(args.threadId, {
+      assignmentId: args.assignmentId,
+      mode: "guardian",
+      updatedAt: now,
+    });
+
+    // 2. Set alignment status to aligned on assignment
+    await ctx.db.patch(args.assignmentId, {
+      alignmentStatus: "aligned",
+      updatedAt: now,
+    });
+
+    return { success: true };
   },
 });
 
@@ -75,6 +138,20 @@ export const updateSessionId = mutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, {
       claudeSessionId: args.sessionId,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// Bypass ID validation - for manual DB fixes
+export const linkAssignmentRaw = mutation({
+  args: {
+    threadId: v.string(),
+    assignmentId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.threadId as any, {
+      assignmentId: args.assignmentId as any,
       updatedAt: Date.now(),
     });
   },

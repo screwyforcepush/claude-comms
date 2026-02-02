@@ -19,7 +19,7 @@ export const list = query({
 export const add = mutation({
   args: {
     threadId: v.id("chatThreads"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("pm")),
     content: v.string(),
   },
   handler: async (ctx, args) => {

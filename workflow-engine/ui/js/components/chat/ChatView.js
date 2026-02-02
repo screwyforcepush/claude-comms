@@ -1,13 +1,17 @@
 // ChatView - Main chat area for selected thread
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ChatHeader } from './ChatHeader.js';
 import { MessageList } from './MessageList.js';
 import { ChatInput } from './ChatInput.js';
+import { AssignmentPane } from './AssignmentPane.js';
+import { JobDetail } from '../job/JobDetail.js';
 
 /**
  * ChatView component - Main chat area with header, messages, and input
  * @param {Object} props
  * @param {Object} props.thread - Selected thread object
+ * @param {Object} props.assignment - Linked assignment (for guardian mode)
+ * @param {Array} props.jobs - Jobs for this assignment (WP-3: integration)
  * @param {Array} props.messages - Array of message objects
  * @param {Function} props.onSendMessage - Callback when message is sent
  * @param {Function} props.onUpdateTitle - Callback to update thread title
@@ -17,6 +21,8 @@ import { ChatInput } from './ChatInput.js';
  */
 export function ChatView({
   thread,
+  assignment = null,
+  jobs = [],
   messages = [],
   onSendMessage,
   onUpdateTitle,
@@ -24,6 +30,37 @@ export function ChatView({
   loadingMessages = false,
   sending = false
 }) {
+  // WP-3: State for assignment pane visibility (D1: default closed)
+  const [paneOpen, setPaneOpen] = useState(false);
+
+  // WP-4: State for selected job modal
+  const [selectedJob, setSelectedJob] = useState(null);
+
+  // D2: Close pane when switching threads (fresh context)
+  useEffect(() => {
+    setPaneOpen(false);
+    setSelectedJob(null);
+  }, [thread?._id]);
+
+  // Toggle pane callback for header
+  const handleTogglePane = useCallback(() => {
+    setPaneOpen(prev => !prev);
+  }, []);
+
+  // Close pane callback
+  const handleClosePane = useCallback(() => {
+    setPaneOpen(false);
+  }, []);
+
+  // WP-4: Job selection callback for modal
+  const handleJobSelect = useCallback((job) => {
+    setSelectedJob(job);
+  }, []);
+
+  // WP-4: Close job modal callback
+  const handleCloseJobModal = useCallback(() => {
+    setSelectedJob(null);
+  }, []);
   // No thread selected state
   if (!thread) {
     return React.createElement('div', {
@@ -63,6 +100,12 @@ export function ChatView({
               className: 'px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-medium'
             }, 'Cook'),
             React.createElement('span', null, 'Full autonomy to create assignments')
+          ),
+          React.createElement('div', { className: 'flex items-center gap-2 justify-center' },
+            React.createElement('span', {
+              className: 'px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-medium'
+            }, 'Guardian'),
+            React.createElement('span', null, 'PO monitors assignment alignment')
           )
         )
       )
@@ -70,30 +113,56 @@ export function ChatView({
   }
 
   return React.createElement('div', {
-    className: 'flex-1 flex flex-col bg-gray-900 min-h-0'
+    className: 'flex-1 flex min-h-0'
   },
-    // Header with title and mode toggle
-    React.createElement(ChatHeader, {
-      thread: thread,
-      onUpdateTitle: onUpdateTitle,
-      onUpdateMode: onUpdateMode,
-      disabled: sending
+    // Main chat column (header + messages + input)
+    React.createElement('div', {
+      className: 'flex-1 flex flex-col bg-gray-900 min-h-0 min-w-0'
+    },
+      // Header with title, mode toggle, and pane toggle
+      React.createElement(ChatHeader, {
+        thread: thread,
+        assignment: assignment,
+        onUpdateTitle: onUpdateTitle,
+        onUpdateMode: onUpdateMode,
+        onTogglePane: handleTogglePane,
+        paneOpen: paneOpen,
+        disabled: sending
+      }),
+
+      // Message list (scrollable)
+      React.createElement(MessageList, {
+        messages: messages,
+        loading: loadingMessages,
+        sending: sending
+      }),
+
+      // Input area
+      React.createElement(ChatInput, {
+        onSend: onSendMessage,
+        disabled: sending,
+        placeholder: thread.mode === 'guardian'
+          ? 'Discuss alignment with the Product Owner...'
+          : thread.mode === 'cook'
+            ? 'Tell the Product Owner what to build...'
+            : 'Discuss ideas with the Product Owner...'
+      })
+    ),
+
+    // WP-3: Assignment pane (collapsible right sidebar)
+    assignment && React.createElement(AssignmentPane, {
+      assignment: assignment,
+      jobs: jobs,
+      isOpen: paneOpen,
+      onClose: handleClosePane,
+      onJobSelect: handleJobSelect
     }),
 
-    // Message list (scrollable)
-    React.createElement(MessageList, {
-      messages: messages,
-      loading: loadingMessages,
-      sending: sending
-    }),
-
-    // Input area
-    React.createElement(ChatInput, {
-      onSend: onSendMessage,
-      disabled: sending,
-      placeholder: thread.mode === 'cook'
-        ? 'Tell the Product Owner what to build...'
-        : 'Discuss ideas with the Product Owner...'
+    // WP-4: Job detail modal
+    selectedJob && React.createElement(JobDetail, {
+      job: selectedJob,
+      onClose: handleCloseJobModal,
+      isModal: true
     })
   );
 }
