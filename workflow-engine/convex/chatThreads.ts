@@ -143,6 +143,20 @@ export const updateSessionId = mutation({
   },
 });
 
+// Update the last prompt mode sent (for differential prompting)
+export const updateLastPromptMode = mutation({
+  args: {
+    id: v.id("chatThreads"),
+    lastPromptMode: v.union(v.literal("jam"), v.literal("cook")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      lastPromptMode: args.lastPromptMode,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 // Bypass ID validation - for manual DB fixes
 export const linkAssignmentRaw = mutation({
   args: {

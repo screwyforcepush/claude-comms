@@ -68,6 +68,9 @@ export default defineSchema({
     namespaceId: v.id("namespaces"),
     title: v.string(),
     mode: v.union(v.literal("jam"), v.literal("cook"), v.literal("guardian")),
+    // Last prompt mode sent to Claude (for differential prompting)
+    // Only jam/cook - guardian is handled separately as an eval injection
+    lastPromptMode: v.optional(v.union(v.literal("jam"), v.literal("cook"))),
     assignmentId: v.optional(v.id("assignments")),
     claudeSessionId: v.optional(v.string()),
     createdAt: v.number(),

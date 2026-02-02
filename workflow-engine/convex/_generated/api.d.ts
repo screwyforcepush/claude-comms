@@ -9,8 +9,6 @@
  */
 
 import type * as assignments from "../assignments.js";
-import type * as chatActions from "../chatActions.js";
-import type * as chatActionsHelpers from "../chatActionsHelpers.js";
 import type * as chatJobs from "../chatJobs.js";
 import type * as chatMessages from "../chatMessages.js";
 import type * as chatThreads from "../chatThreads.js";
@@ -26,8 +24,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   assignments: typeof assignments;
-  chatActions: typeof chatActions;
-  chatActionsHelpers: typeof chatActionsHelpers;
   chatJobs: typeof chatJobs;
   chatMessages: typeof chatMessages;
   chatThreads: typeof chatThreads;

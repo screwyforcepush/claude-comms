@@ -60,10 +60,16 @@ export const trigger = mutation({
     }
 
     // 3. Build chat context (including session ID for resume)
+    // Determine effective prompt mode (guardian uses cook for normal interactions)
+    const effectivePromptMode = thread.mode === "guardian" ? "cook" : thread.mode;
+
     const chatContext = {
       threadId: args.threadId,
       namespaceId: thread.namespaceId,
       mode: thread.mode,
+      // For differential prompting
+      effectivePromptMode,
+      lastPromptMode: thread.lastPromptMode,
       messages: messages.map((m) => ({
         _id: m._id,
         threadId: m.threadId,

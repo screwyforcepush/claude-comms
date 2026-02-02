@@ -14,10 +14,9 @@
 import { spawn, ChildProcess } from "child_process";
 import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
-import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from "fs";
+import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { tmpdir } from "os";
 
 // Prompt building (extracted module)
 import {
@@ -30,7 +29,19 @@ import {
   buildChatPrompt,
   parseChatContext,
   isChatJob,
+  determinePromptType,
 } from "./lib/prompts.js";
+
+// Stream handlers (extracted module)
+import {
+  StreamHandler,
+  CommandOptions,
+  createStreamHandler,
+  buildCommand,
+} from "./lib/streams.js";
+
+// File-based job tracking (for agent_monitor.py TUI)
+import { JobTracker } from "./lib/file-tracker.js";
 
 // Use anyApi for dynamic function references (works with ConvexClient)
 const api = anyApi;
@@ -62,93 +73,6 @@ interface Config {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "config.json");
 const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
-
-// =============================================================================
-// File-based job tracking (compatible with agent_monitor.py TUI)
-// =============================================================================
-
-interface FileJobStatus {
-  job_id: string;
-  harness: string;
-  agent_id: string | null;
-  pid: number | null;
-  logs: string | null;
-  status: "running" | "complete" | "error" | "timeout";
-  status_reason: string | null;
-  start_time: string | null;
-  last_event_time: string | null;
-  end_time: string | null;
-  operations: number;
-  completion: {
-    messages: string[];
-    final_message: string | null;
-    tokens: {
-      input: number | null;
-      output: number | null;
-      total: number | null;
-    };
-    duration_ms: number | null;
-  };
-}
-
-function getJobsRoot(): string {
-  if (process.env.AGENT_JOBS_ROOT) {
-    return process.env.AGENT_JOBS_ROOT;
-  }
-  const user = process.env.USER || "unknown";
-  return join(tmpdir(), "agent_jobs", user);
-}
-
-function utcNowIso(): string {
-  return new Date().toISOString().replace(/\.\d{3}Z$/, ".000Z");
-}
-
-function createFileJobStatus(jobId: string, harness: string, pid: number): FileJobStatus {
-  return {
-    job_id: jobId,
-    harness,
-    agent_id: jobId,
-    pid,
-    logs: null, // Set after dir creation
-    status: "running",
-    status_reason: "initializing",
-    start_time: utcNowIso(),
-    last_event_time: utcNowIso(),
-    end_time: null,
-    operations: 0,
-    completion: {
-      messages: [],
-      final_message: null,
-      tokens: { input: null, output: null, total: null },
-      duration_ms: null,
-    },
-  };
-}
-
-function getJobDir(jobId: string): string {
-  return join(getJobsRoot(), jobId);
-}
-
-function ensureJobDir(jobId: string): { statusPath: string; logPath: string } {
-  const jobDir = getJobDir(jobId);
-  mkdirSync(jobDir, { recursive: true });
-  return {
-    statusPath: join(jobDir, "status.json"),
-    logPath: join(jobDir, "agent.log"),
-  };
-}
-
-function writeJobStatus(statusPath: string, status: FileJobStatus): void {
-  const tmpPath = statusPath + ".tmp";
-  writeFileSync(tmpPath, JSON.stringify(status, null, 2));
-  // Atomic rename
-  const { renameSync } = require("fs");
-  renameSync(tmpPath, statusPath);
-}
-
-function appendToLog(logPath: string, line: string): void {
-  appendFileSync(logPath, line + "\n");
-}
 
 // State
 let client: ConvexClient | null = null;
@@ -184,6 +108,22 @@ async function saveSessionId(threadId: string, sessionId: string): Promise<void>
     console.log(`[Chat] Saved session_id ${sessionId} to thread ${threadId}`);
   } catch (e) {
     console.error(`[Chat] Failed to save session_id:`, e);
+  }
+}
+
+// Save lastPromptMode to thread for differential prompting
+async function saveLastPromptMode(
+  threadId: string,
+  mode: "jam" | "cook"
+): Promise<void> {
+  try {
+    await client!.mutation(api.chatThreads.updateLastPromptMode, {
+      id: threadId as any,
+      lastPromptMode: mode,
+    });
+    console.log(`[Chat] Saved lastPromptMode ${mode} to thread ${threadId}`);
+  } catch (e) {
+    console.error(`[Chat] Failed to save lastPromptMode:`, e);
   }
 }
 
@@ -252,177 +192,6 @@ async function triggerGuardianEvaluation(
   }
 }
 
-// Harness command building
-interface CommandOptions {
-  sessionId?: string; // For Claude session resume
-}
-
-function buildCommand(harness: string, prompt: string, options: CommandOptions = {}): { cmd: string; args: string[] } {
-  switch (harness) {
-    case "claude": {
-      const args = [
-        "--dangerously-skip-permissions",
-        "--verbose",
-        "--output-format",
-        "stream-json",
-      ];
-
-      // Add --resume flag for session continuity
-      if (options.sessionId) {
-        args.push("--resume", options.sessionId);
-      }
-
-      args.push("-p", prompt);
-      return { cmd: "claude", args };
-    }
-    case "codex":
-      return {
-        cmd: "codex",
-        args: ["--yolo", "e", prompt, "--json"],
-      };
-    case "gemini":
-      return {
-        cmd: "gemini",
-        args: ["--yolo", "-m", "gemini-2.5-pro", "--output-format", "stream-json", prompt],
-      };
-    default:
-      throw new Error(`Unknown harness: ${harness}`);
-  }
-}
-
-// JSON stream parsing for different harnesses
-interface StreamHandler {
-  onEvent(event: Record<string, unknown>): void;
-  getResult(): string;
-  isComplete(): boolean;
-  getSessionId(): string | null; // For Claude session resume
-}
-
-class ClaudeStreamHandler implements StreamHandler {
-  private textChunks: string[] = [];
-  private finalResult: string | null = null;
-  private complete = false;
-  private success = false;
-  private sessionId: string | null = null;
-
-  onEvent(event: Record<string, unknown>) {
-    const type = event.type as string;
-
-    // Capture assistant text messages
-    if (type === "assistant" && event.message) {
-      const msg = event.message as { content?: Array<{ type?: string; text?: string }> };
-      if (msg.content) {
-        for (const block of msg.content) {
-          if (block.type === "text" && block.text) {
-            this.textChunks.push(block.text);
-          }
-        }
-      }
-    }
-
-    // Capture final result and session_id
-    if (type === "result") {
-      this.complete = true;
-      this.success = event.subtype === "success";
-      if (event.result) {
-        this.finalResult = String(event.result);
-      }
-      // Capture session_id for resume functionality
-      if (event.session_id) {
-        this.sessionId = String(event.session_id);
-      }
-    }
-  }
-
-  getResult(): string {
-    // Prefer the final result field, fall back to accumulated text
-    return this.finalResult || this.textChunks.join("\n\n");
-  }
-
-  isComplete(): boolean {
-    return this.complete && this.success;
-  }
-
-  getSessionId(): string | null {
-    return this.sessionId;
-  }
-}
-
-class CodexStreamHandler implements StreamHandler {
-  private messages: string[] = [];
-  private complete = false;
-
-  onEvent(event: Record<string, unknown>) {
-    const type = event.type as string;
-
-    if (type === "item.completed") {
-      const item = event.item as { type?: string; text?: string } | undefined;
-      if (item?.type === "agent_message" && item.text) {
-        this.messages.push(item.text);
-      }
-    }
-
-    if (type === "turn.completed") {
-      this.complete = true;
-    }
-  }
-
-  getResult(): string {
-    return this.messages.join("\n\n");
-  }
-
-  isComplete(): boolean {
-    return this.complete;
-  }
-
-  getSessionId(): string | null {
-    return null; // Codex doesn't support session resume
-  }
-}
-
-class GeminiStreamHandler implements StreamHandler {
-  private buffer = "";
-  private complete = false;
-
-  onEvent(event: Record<string, unknown>) {
-    const type = event.type as string;
-
-    if (type === "message" && event.role === "assistant") {
-      const content = event.content as string | undefined;
-      if (content) this.buffer += content;
-    }
-
-    if (type === "result") {
-      this.complete = true;
-    }
-  }
-
-  getResult(): string {
-    return this.buffer;
-  }
-
-  isComplete(): boolean {
-    return this.complete;
-  }
-
-  getSessionId(): string | null {
-    return null; // Gemini doesn't support session resume
-  }
-}
-
-function createStreamHandler(harness: string): StreamHandler {
-  switch (harness) {
-    case "claude":
-      return new ClaudeStreamHandler();
-    case "codex":
-      return new CodexStreamHandler();
-    case "gemini":
-      return new GeminiStreamHandler();
-    default:
-      return new ClaudeStreamHandler();
-  }
-}
-
 // Job execution
 async function executeJob(
   job: Job,
@@ -487,10 +256,14 @@ async function executeJob(
     let buffer = "";
     let timedOut = false;
 
+    // File-based tracking for agent_monitor.py TUI
+    const tracker = new JobTracker(jobId, job.harness, child.pid || 0);
+
     // Timeout
     const timeout = setTimeout(async () => {
       timedOut = true;
       console.log(`[${jobId}] Timeout after ${config.timeoutMs}ms`);
+      tracker.timeout();
       child.kill("SIGTERM");
       setTimeout(() => child.kill("SIGKILL"), 5000);
     }, config.timeoutMs);
@@ -503,9 +276,14 @@ async function executeJob(
 
       for (const line of lines) {
         if (!line.trim()) continue;
+        // Log raw JSON to file for debugging
+        tracker.logLine(line);
         try {
           const event = JSON.parse(line);
           handler.onEvent(event);
+          // Update tracker with event type as status reason
+          const eventType = (event.type as string) || "event";
+          tracker.recordEvent(eventType);
         } catch {
           // Not JSON, ignore
         }
@@ -514,6 +292,7 @@ async function executeJob(
 
     child.stderr?.on("data", (data: Buffer) => {
       console.error(`[${jobId}] stderr: ${data.toString()}`);
+      tracker.logLine(`[stderr] ${data.toString()}`);
     });
 
     child.on("close", async (code) => {
@@ -525,6 +304,7 @@ async function executeJob(
 
       try {
         if (timedOut) {
+          // tracker.timeout() already called in timeout handler
           await client!.mutation(api.jobs.fail, {
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
@@ -539,6 +319,7 @@ async function executeJob(
             await triggerPMJob(job, assignment, true);
           }
         } else if (code === 0 && handler.isComplete()) {
+          tracker.complete(result);
           await client!.mutation(api.jobs.complete, {
             id: jobId,
             result,
@@ -574,6 +355,7 @@ async function executeJob(
             // If hasNextJob, the next job will be picked up by the scheduler
           }
         } else {
+          tracker.fail(`process_exit_${code}`);
           await client!.mutation(api.jobs.fail, {
             id: jobId,
             result: result || `Process exited with code ${code}`,
@@ -590,6 +372,7 @@ async function executeJob(
         }
       } catch (e) {
         console.error(`[${jobId}] Error completing job:`, e);
+        tracker.fail(`error: ${e}`);
         // Don't crash - log and continue
       }
 
@@ -693,12 +476,13 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
     return;
   }
 
-  // Build prompt
+  // Build prompt with differential prompting
+  const promptType = determinePromptType(chatContext);
   const prompt = buildChatPrompt(chatContext, config.namespace);
   const resumeInfo = chatContext.claudeSessionId
     ? ` (resuming session ${chatContext.claudeSessionId.slice(0, 8)}...)`
     : " (new session)";
-  console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}${resumeInfo}`);
+  console.log(`[${jobId}] Chat mode: ${chatContext.mode}, prompt: ${promptType}, thread: ${chatContext.threadId}${resumeInfo}`);
 
   // Mark job as running with prompt for visibility
   await client!.mutation(api.chatJobs.start, { id: jobId, prompt });
@@ -727,10 +511,14 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
     let buffer = "";
     let timedOut = false;
 
+    // File-based tracking for agent_monitor.py TUI
+    const tracker = new JobTracker(jobId, chatJob.harness, child.pid || 0);
+
     // Timeout
     const timeout = setTimeout(async () => {
       timedOut = true;
       console.log(`[${jobId}] Timeout after ${config.timeoutMs}ms`);
+      tracker.timeout();
       child.kill("SIGTERM");
       setTimeout(() => child.kill("SIGKILL"), 5000);
     }, config.timeoutMs);
@@ -743,9 +531,14 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 
       for (const line of lines) {
         if (!line.trim()) continue;
+        // Log raw JSON to file for debugging
+        tracker.logLine(line);
         try {
           const event = JSON.parse(line);
           handler.onEvent(event);
+          // Update tracker with event type as status reason
+          const eventType = (event.type as string) || "event";
+          tracker.recordEvent(eventType);
         } catch {
           // Not JSON, ignore
         }
@@ -754,6 +547,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 
     child.stderr?.on("data", (data: Buffer) => {
       console.error(`[${jobId}] stderr: ${data.toString()}`);
+      tracker.logLine(`[stderr] ${data.toString()}`);
     });
 
     child.on("close", async (code) => {
@@ -765,6 +559,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 
       try {
         if (timedOut) {
+          // tracker.timeout() already called in timeout handler
           await client!.mutation(api.chatJobs.fail, {
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
@@ -773,6 +568,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
             `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${result || "(no output)"}`
           );
         } else if (code === 0 && handler.isComplete()) {
+          tracker.complete(result);
           await client!.mutation(api.chatJobs.complete, {
             id: jobId,
             result,
@@ -783,7 +579,12 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           if (newSessionId) {
             await saveSessionId(chatContext.threadId, newSessionId);
           }
+          // Save lastPromptMode for differential prompting (skip for guardian eval)
+          if (!chatContext.isGuardianEvaluation) {
+            await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);
+          }
         } else {
+          tracker.fail(`process_exit_${code}`);
           await client!.mutation(api.chatJobs.fail, {
             id: jobId,
             result: result || `Process exited with code ${code}`,
@@ -794,6 +595,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
         }
       } catch (e) {
         console.error(`[${jobId}] Error completing chat job:`, e);
+        tracker.fail(`error: ${e}`);
         // Try to save error response to thread even if job update failed
         try {
           await saveChatResponse(chatContext.threadId,
