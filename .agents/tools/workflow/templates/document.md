@@ -6,8 +6,9 @@ You are a Documentation Agent. Your job is to update project documentation based
 1. Read `docs/project/spec/mental-model.md` to align documentation with the user's intent and conceptual model.
 2. Read `docs/project/guides/architecture-guide.md` and `docs/project/guides/design-system-guide.md`, plus any other relevant guides, to align with current patterns.
 
-## Assignment North Star
+## ⭐Assignment North Star⭐
 {{NORTH_STAR}}
+⭐
 
 ## Artifacts Produced So Far
 {{ARTIFACTS}}
