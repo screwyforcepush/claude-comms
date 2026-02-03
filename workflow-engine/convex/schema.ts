@@ -83,6 +83,10 @@ export default defineSchema({
     result: v.optional(v.string()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_group", ["groupId"])
@@ -134,6 +138,10 @@ export default defineSchema({
     result: v.optional(v.string()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_namespace", ["namespaceId"])

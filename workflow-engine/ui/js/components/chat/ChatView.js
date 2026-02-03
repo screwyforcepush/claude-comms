@@ -156,7 +156,7 @@ export function ChatView({
   }
 
   return React.createElement('div', {
-    className: 'flex-1 flex min-h-0'
+    className: 'flex-1 flex min-h-0 min-w-0'
   },
     // Main chat column (header + messages + input)
     React.createElement('div', {

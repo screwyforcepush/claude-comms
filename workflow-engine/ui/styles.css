@@ -1,5 +1,170 @@
 /* Workflow Engine UI - Global Styles */
 
+/* ============================================
+   CLAUDE COMMS III - Q PALETTE & T TOKENS
+   Quake-inspired brand identity system
+   ============================================ */
+:root {
+  /* Q Palette - Color System (source: brandkit.jsx) */
+  --q-void0: #060504;
+  --q-void1: #0c0a07;
+  --q-stone0: #16120d;
+  --q-stone1: #1e1813;
+  --q-stone2: #28211a;
+  --q-stone3: #342a20;
+  --q-copper0: #5c3a1e;
+  --q-copper1: #7a4e28;
+  --q-copper2: #946232;
+  --q-copper3: #b07840;
+  --q-torch: #d4a030;
+  --q-torch-hot: #e8b840;
+  --q-lava0: #8c2814;
+  --q-lava1: #c43818;
+  --q-slime0: #2c5418;
+  --q-slime1: #3c7420;
+  --q-teleport: #5c3c7c;
+  --q-teleport-bright: #7c58a0;
+  --q-blood: #7c1c10;
+  --q-bone0: #6c6454;
+  --q-bone1: #908474;
+  --q-bone2: #b4a890;
+  --q-bone3: #d0c4a8;
+  --q-bone4: #e4dcc4;
+  --q-iron0: #3c3830;
+  --q-iron1: #504c40;
+  --q-iron2: #686050;
+
+  /* Q Palette - Pre-computed Alpha Variants (hex alpha notation) */
+  --q-stone0-40: #16120d66;   /* 40% - grid lines */
+  --q-stone0-30: #16120d4d;   /* 30% - horizontal grid */
+  --q-copper1-06: #7a4e280f;  /* 6% - scanline tint */
+  --q-iron1-33: #504c4054;    /* 33% - rivet highlight */
+  --q-iron1-44: #504c4070;    /* 44% - top border tint */
+  --q-copper0-30: #5c3a1e4d;  /* 30% - highlights */
+  --q-copper1-20: #7a4e2833;  /* 20% - medium texture */
+  --q-copper0-15: #5c3a1e26;  /* 15% - raised texture */
+  --q-torch-33: #d4a03054;    /* 33% - hover glow */
+  --q-torch-22: #d4a03038;    /* 22% - text shadow */
+  --q-slime0-08: #2c541814;   /* 8% - running inset */
+  --q-slime0-10: #2c54181a;   /* 10% - running glow */
+  --q-slime1-44: #3c742070;   /* 44% - glow bar */
+  --q-slime1-88: #3c7420e0;   /* 88% - health bar gradient */
+  --q-lava0-08: #8c281414;    /* 8% - failed inset */
+  --q-lava0-10: #8c28141a;    /* 10% - failed glow */
+  --q-lava1-44: #c4381870;    /* 44% - glow bar */
+  --q-copper1-44: #7a4e2870;  /* 44% - default glow bar */
+  --q-copper1-88: #7a4e28e0;  /* 88% - tokens bar gradient */
+  --q-copper2-88: #946232e0;  /* 88% - button border top */
+  --q-copper3-44: #b0784070;  /* 44% - button text shadow */
+
+  /* T Tokens - Border tokens */
+  --t-border-radius: 0;
+  --t-border-width-standard: 1px;
+  --t-border-width-depth: 2px;
+
+  /* T Tokens - Spacing tokens (4px base grid) */
+  --t-space-unit: 4px;
+  --t-space-xs: 4px;
+  --t-space-sm: 8px;
+  --t-space-md: 12px;
+  --t-space-lg: 16px;
+  --t-space-xl: 20px;
+  --t-space-xxl: 24px;
+  --t-space-section: 72px;
+
+  /* T Tokens - Typography tokens */
+  --t-type-size-hero: 36px;
+  --t-type-size-title: 24px;
+  --t-type-size-heading: 16px;
+  --t-type-size-subheading: 14px;
+  --t-type-size-body: 14px;
+  --t-type-size-body-small: 13px;
+  --t-type-size-label: 10px;
+  --t-type-size-label-small: 9px;
+  --t-type-size-badge: 8px;
+  --t-type-size-micro: 7px;
+  --t-type-size-stat: 28px;
+  --t-type-size-stat-medium: 20px;
+  --t-type-size-stat-small: 12px;
+  --t-type-size-console: 11px;
+  --t-type-size-console-command: 15px;
+
+  --t-type-tracking-tight: 1px;
+  --t-type-tracking-normal: 2px;
+  --t-type-tracking-wide: 3px;
+  --t-type-tracking-xwide: 4px;
+  --t-type-tracking-hero: 6px;
+
+  --t-type-leading-tight: 1;
+  --t-type-leading-snug: 1.2;
+  --t-type-leading-normal: 1.5;
+  --t-type-leading-relaxed: 1.7;
+  --t-type-leading-loose: 1.8;
+  --t-type-leading-console-line: 1.9;
+
+  /* T Tokens - Animation tokens */
+  --t-anim-transition-fast: 0.1s;
+  --t-anim-transition-normal: 0.15s;
+  --t-anim-transition-slow: 0.2s;
+  --t-anim-meter-duration: 0.5s;
+  --t-anim-pulse-duration: 2.5s;
+  --t-anim-cursor-duration: 1s;
+  --t-anim-hover-lift: -1px;
+  --t-anim-press-depth: 1px;
+
+  /* T Tokens - Effects tokens */
+  --t-fx-grain-opacity: 0.7;
+  --t-fx-glow-sm: 6px;
+  --t-fx-glow-md: 12px;
+  --t-fx-glow-lg: 20px;
+  --t-fx-glow-xl: 30px;
+  --t-fx-surface-grid-size: 64px;
+  --t-fx-rivet-size: 2px;
+  --t-fx-rivet-offset: 8px;
+
+  /* T Tokens - Button tokens */
+  --t-button-px-sm: 10px;
+  --t-button-py-sm: 5px;
+  --t-button-fs-sm: 10px;
+  --t-button-px-md: 16px;
+  --t-button-py-md: 8px;
+  --t-button-fs-md: 12px;
+  --t-button-px-lg: 24px;
+  --t-button-py-lg: 12px;
+  --t-button-fs-lg: 14px;
+  --t-button-disabled-opacity: 0.4;
+
+  /* T Tokens - Bar tokens */
+  --t-bar-height-health: 6px;
+  --t-bar-height-meter: 10px;
+
+  /* Font Stack Custom Properties */
+  --font-display: 'Silkscreen', monospace;
+  --font-console: 'IBM Plex Mono', monospace;
+  --font-body: 'Chakra Petch', sans-serif;
+
+  /* Semantic Color Mappings */
+  --color-success: var(--q-slime1);
+  --color-success-dark: var(--q-slime0);
+  --color-danger: var(--q-lava1);
+  --color-danger-dark: var(--q-lava0);
+  --color-warning: var(--q-torch);
+  --color-info: var(--q-copper3);
+  --color-highlight: var(--q-torch-hot);
+  --color-special: var(--q-teleport-bright);
+}
+
+/* Accessibility - Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* CSS Reset/Normalize */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -20,6 +185,7 @@ body {
   overflow: hidden;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  background-color: var(--q-void0);
 }
 
 img, picture, video, canvas, svg {
@@ -120,30 +286,30 @@ p, h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling - Q Palette */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937; /* gray-800 */
+  background: var(--q-void0);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563; /* gray-600 */
+  background: var(--q-stone3);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280; /* gray-500 */
+  background: var(--q-iron1);
 }
 
-/* Firefox scrollbar */
+/* Firefox scrollbar - Q Palette */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #4b5563 #1f2937;
+  scrollbar-color: var(--q-stone3) var(--q-void0);
 }
 
 /* Loading skeleton */
@@ -377,7 +543,9 @@ p, h1, h2, h3, h4, h5, h6 {
 .main-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   background-color: #111827;
+  min-width: 0;
 }
 
 /* Sidebar branding header */
@@ -486,6 +654,7 @@ p, h1, h2, h3, h4, h5, h6 {
 .chat-panel {
   display: flex;
   height: 100%;
+  min-width: 0;
 }
 
 .chat-sidebar {

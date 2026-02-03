@@ -15,6 +15,22 @@ interface ReadyJob {
     groupId: Id<"jobGroups">;
     groupIndex: number;
   }>;
+  // For non-PM jobs: results from the most recent non-PM group
+  previousNonPmGroupResults: Array<{
+    jobType: string;
+    harness: string;
+    result: string;
+    groupId: Id<"jobGroups">;
+    groupIndex: number;
+  }>;
+  // For PM post-review decision: group before the latest review group (non-PM)
+  r1GroupResults: Array<{
+    jobType: string;
+    harness: string;
+    result: string;
+    groupId: Id<"jobGroups">;
+    groupIndex: number;
+  }>;
 }
 
 // Chat job (separate from assignments)
@@ -43,7 +59,24 @@ async function findReadyJobs(
     groupId: Id<"jobGroups">;
     groupIndex: number;
   }> = [];
+  let lastNonPmGroupResults: Array<{
+    jobType: string;
+    harness: string;
+    result: string;
+    groupId: Id<"jobGroups">;
+    groupIndex: number;
+  }> = [];
+  let r1GroupResults: Array<{
+    jobType: string;
+    harness: string;
+    result: string;
+    groupId: Id<"jobGroups">;
+    groupIndex: number;
+  }> = [];
   let groupIndex = 0;
+
+  const isReviewJobType = (jobType: string): boolean =>
+    jobType === "review" || jobType.endsWith("review");
 
   while (currentGroupId) {
     const groupId = currentGroupId as Id<"jobGroups">;
@@ -70,6 +103,8 @@ async function findReadyJobs(
         group,
         assignment,
         accumulatedResults: [...accumulatedResults],
+        previousNonPmGroupResults: [...lastNonPmGroupResults],
+        r1GroupResults: [...r1GroupResults],
       }));
     }
 
@@ -80,29 +115,37 @@ async function findReadyJobs(
 
     if (allTerminal) {
       // Group is done - accumulate results and move to next
-      // Check if this group contains PM jobs
       const hasPMJob = jobs.some((j: Doc<"jobs">) => j.jobType === "pm");
+      const hasReviewJob = jobs.some((j: Doc<"jobs">) => isReviewJobType(j.jobType));
+
+      const groupResults = jobs.flatMap((job: Doc<"jobs">) => {
+        if (!job.result) return [];
+        return [{
+          jobType: job.jobType,
+          harness: job.harness,
+          result: job.result,
+          groupId,
+          groupIndex,
+        }];
+      });
 
       if (hasPMJob) {
-        // PM already processed prior results, reset accumulator first
-        // Then add PM's own output so next job sees what PM decided
+        // PM groups should not pollute downstream context.
         accumulatedResults.length = 0;
         groupIndex = 0;
+      } else {
+        if (hasReviewJob) {
+          // Capture the non-PM group immediately before the review group.
+          r1GroupResults = [...lastNonPmGroupResults];
+        }
+
+        if (groupResults.length > 0) {
+          accumulatedResults.push(...groupResults);
+        }
+        lastNonPmGroupResults = groupResults;
+        groupIndex += 1;
       }
 
-      // Always add this group's results (PM output goes to next job like UAT)
-      for (const job of jobs) {
-        if (job.result) {
-          accumulatedResults.push({
-            jobType: job.jobType,
-            harness: job.harness,
-            result: job.result,
-            groupId,
-            groupIndex,
-          });
-        }
-      }
-      groupIndex += 1;
       currentGroupId = group.nextGroupId;
     }
   }

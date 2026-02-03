@@ -122,13 +122,22 @@ export const complete = mutation({
   args: {
     id: v.id("chatJobs"),
     result: v.string(),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, {
+    const update: Record<string, any> = {
       status: "complete",
       result: args.result,
       completedAt: Date.now(),
-    });
+    };
+    if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
+    if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
+    if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
+    if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    await ctx.db.patch(args.id, update);
   },
 });
 
@@ -139,13 +148,41 @@ export const fail = mutation({
   args: {
     id: v.id("chatJobs"),
     result: v.optional(v.string()),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, {
+    const update: Record<string, any> = {
       status: "failed",
       result: args.result,
       completedAt: Date.now(),
-    });
+    };
+    if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
+    if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
+    if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
+    if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    await ctx.db.patch(args.id, update);
+  },
+});
+
+export const updateMetrics = mutation({
+  args: {
+    id: v.id("chatJobs"),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const update: Record<string, any> = {};
+    if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
+    if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
+    if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
+    if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    if (Object.keys(update).length === 0) return;
+    await ctx.db.patch(args.id, update);
   },
 });
 

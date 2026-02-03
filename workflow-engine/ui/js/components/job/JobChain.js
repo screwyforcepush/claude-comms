@@ -47,6 +47,80 @@ function ProviderLogo({ harness }) {
   });
 }
 
+function MiniProviderLogo({ harness }) {
+  const provider = providerConfig[harness] || providerConfig.claude;
+
+  return React.createElement('img', {
+    src: provider.logoSrc,
+    alt: `${provider.name} logo`,
+    className: 'w-3 h-3 object-contain',
+    draggable: false
+  });
+}
+
+function ClockIcon() {
+  return React.createElement('svg', {
+    className: 'w-3 h-3',
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M12 8v4l2 2m6-2a8 8 0 11-16 0 8 8 0 0116 0z'
+    })
+  );
+}
+
+function ToolIcon() {
+  return React.createElement('svg', {
+    className: 'w-3 h-3',
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M10.325 4.317a1 1 0 011.15-.747 8 8 0 016.691 6.69 1 1 0 01-.748 1.15l-2.79.697a1 1 0 01-1.073-.517l-1.1-1.913-4.243 4.243a2 2 0 01-1.415.586H5a1 1 0 01-1-1v-1.797a2 2 0 01.586-1.414l4.243-4.243-1.913-1.1a1 1 0 01-.517-1.074l.697-2.79z'
+    })
+  );
+}
+
+function TokenIcon() {
+  return React.createElement('svg', {
+    className: 'w-3 h-3',
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M4 7h16M4 12h16M4 17h16'
+    })
+  );
+}
+
+function formatCount(value) {
+  if (value === null || value === undefined) return '—';
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return String(value);
+}
+
+function formatIdleDuration(ms) {
+  if (ms === null || ms === undefined) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${Math.floor(ms / 1000)}s`;
+  if (ms < 3600000) return `${Math.floor(ms / 60000)}m`;
+  return `${Math.floor(ms / 3600000)}h`;
+}
+
 /**
  * Helper: chunk array into rows of specified size
  */
@@ -63,8 +137,8 @@ function chunkArray(arr, size) {
  * D1: Provider logos replace StatusDot+shortId
  * D3: Preserve harness border colors
  */
-function JobNode({ job, isSelected, isCurrent, onClick }) {
-  const { _id, jobType, harness, status } = job;
+function JobNode({ job, isSelected, isCurrent, onClick, now }) {
+  const { _id, jobType, harness, status, toolCallCount, subagentCount, totalTokens, lastEventAt, startedAt } = job;
 
   // Status-based border colors
   const statusBorderColors = {
@@ -89,6 +163,12 @@ function JobNode({ job, isSelected, isCurrent, onClick }) {
 
   const pulseClass = status === 'running' ? 'running-border-pulse' : '';
 
+  const idleBase = lastEventAt || startedAt || null;
+  const idleMs = idleBase ? Math.max(0, now - idleBase) : null;
+  const idleValue = status === 'running' ? formatIdleDuration(idleMs) : null;
+
+  const subagentTotal = typeof subagentCount === 'number' ? subagentCount : 0;
+
   return React.createElement('button', {
     onClick: () => onClick && onClick(job),
     className: `job-node flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-pointer hover:bg-gray-750 ${
@@ -97,9 +177,47 @@ function JobNode({ job, isSelected, isCurrent, onClick }) {
   },
     // Provider logo (no status prop needed)
     React.createElement(ProviderLogo, { harness }),
-    React.createElement('span', {
-      className: `text-xs font-medium uppercase ${typeColors[jobType] || 'text-gray-400'}`
-    }, jobType || 'job')
+    React.createElement('div', { className: 'flex flex-col items-start gap-1 min-w-0' },
+      React.createElement('span', {
+        className: `text-xs font-medium uppercase ${typeColors[jobType] || 'text-gray-400'}`
+      }, jobType || 'job'),
+      React.createElement('div', { className: 'flex items-center gap-2 text-[10px] text-gray-500' },
+        status === 'running' && React.createElement('span', {
+          className: 'flex items-center gap-1',
+          title: 'Idle time'
+        },
+          React.createElement(ClockIcon),
+          React.createElement('span', null, idleValue)
+        ),
+        React.createElement('span', {
+          className: 'flex items-center gap-1',
+          title: 'Tool calls'
+        },
+          React.createElement(ToolIcon),
+          React.createElement('span', null, formatCount(toolCallCount))
+        ),
+        React.createElement('span', {
+          className: 'flex items-center gap-1',
+          title: 'Total tokens'
+        },
+          React.createElement(TokenIcon),
+          React.createElement('span', null, formatCount(totalTokens))
+        )
+      ),
+      subagentTotal > 0 && React.createElement('div', {
+        className: 'flex items-center gap-1 text-[10px] text-gray-500',
+        title: 'Subagents'
+      },
+        subagentTotal > 5
+          ? React.createElement(React.Fragment, null,
+              React.createElement(MiniProviderLogo, { harness }),
+              React.createElement('span', { className: 'ml-0.5' }, `x ${subagentTotal}`)
+            )
+          : Array.from({ length: subagentTotal }).map((_, index) =>
+              React.createElement(MiniProviderLogo, { key: index, harness })
+            )
+      )
+    )
   );
 }
 
@@ -306,7 +424,7 @@ function GroupConnector({ prevJobCount, nextJobCount }) {
 /**
  * Horizontal row of parallel jobs
  */
-function ParallelJobRow({ jobs, selectedJobId, onJobSelect }) {
+function ParallelJobRow({ jobs, selectedJobId, onJobSelect, now }) {
   return React.createElement('div', {
     className: 'flex flex-wrap justify-center gap-2'
   },
@@ -316,7 +434,8 @@ function ParallelJobRow({ jobs, selectedJobId, onJobSelect }) {
         job,
         isSelected: selectedJobId === job._id,
         isCurrent: job.status === 'running',
-        onClick: onJobSelect
+        onClick: onJobSelect,
+        now
       })
     )
   );
@@ -325,7 +444,7 @@ function ParallelJobRow({ jobs, selectedJobId, onJobSelect }) {
 /**
  * Render a single group - handles wrapping for 5+ jobs
  */
-function GroupRow({ group, selectedJobId, onJobSelect }) {
+function GroupRow({ group, selectedJobId, onJobSelect, now }) {
   const jobs = group.jobs || [];
 
   // Single job: render as single node (unchanged behavior)
@@ -337,7 +456,8 @@ function GroupRow({ group, selectedJobId, onJobSelect }) {
         job: jobs[0],
         isSelected: selectedJobId === jobs[0]._id,
         isCurrent: jobs[0].status === 'running',
-        onClick: onJobSelect
+        onClick: onJobSelect,
+        now
       })
     );
   }
@@ -347,7 +467,8 @@ function GroupRow({ group, selectedJobId, onJobSelect }) {
     return React.createElement(ParallelJobRow, {
       jobs,
       selectedJobId,
-      onJobSelect
+      onJobSelect,
+      now
     });
   }
 
@@ -362,7 +483,8 @@ function GroupRow({ group, selectedJobId, onJobSelect }) {
         React.createElement(ParallelJobRow, {
           jobs: rowJobs,
           selectedJobId,
-          onJobSelect
+          onJobSelect,
+          now
         }),
         // Add subtle row connector between wrapped rows
         rowIndex < rows.length - 1 && React.createElement('div', {
@@ -376,7 +498,7 @@ function GroupRow({ group, selectedJobId, onJobSelect }) {
 /**
  * Main group chain - renders groups vertically with connectors between
  */
-function GroupChain({ groups, selectedJobId, onJobSelect }) {
+function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
   return React.createElement('div', {
     className: 'flex flex-col items-center'
   },
@@ -395,7 +517,8 @@ function GroupChain({ groups, selectedJobId, onJobSelect }) {
         React.createElement(GroupRow, {
           group,
           selectedJobId,
-          onJobSelect
+          onJobSelect,
+          now
         })
       );
     })
@@ -413,6 +536,7 @@ function GroupChain({ groups, selectedJobId, onJobSelect }) {
 export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 'vertical' }) {
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [now, setNow] = useState(Date.now());
 
   // Flatten all jobs for stats and lookup
   const allJobs = useMemo(() => {
@@ -453,6 +577,12 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
     return { completed, running, pending, failed, total: allJobs.length, groupCount: groups.length };
   }, [allJobs, groups.length]);
 
+  React.useEffect(() => {
+    if (stats.running === 0) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [stats.running]);
+
   return React.createElement('div', { className: 'space-y-4' },
     // Chain summary
     React.createElement('div', {
@@ -480,7 +610,8 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
       React.createElement(GroupChain, {
         groups,
         selectedJobId,
-        onJobSelect: handleJobClick
+        onJobSelect: handleJobClick,
+        now
       })
     ),
 

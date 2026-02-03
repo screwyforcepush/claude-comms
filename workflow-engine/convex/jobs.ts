@@ -279,14 +279,23 @@ export const complete = mutation({
   args: {
     id: v.id("jobs"),
     result: v.string(),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    await ctx.db.patch(args.id, {
+    const update: Record<string, any> = {
       status: "complete",
       result: args.result,
       completedAt: now,
-    });
+    };
+    if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
+    if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
+    if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
+    if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    await ctx.db.patch(args.id, update);
 
     // Check if group is done and update status
     const job = await ctx.db.get(args.id);
@@ -300,20 +309,48 @@ export const fail = mutation({
   args: {
     id: v.id("jobs"),
     result: v.optional(v.string()),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    await ctx.db.patch(args.id, {
+    const update: Record<string, any> = {
       status: "failed",
       result: args.result,
       completedAt: now,
-    });
+    };
+    if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
+    if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
+    if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
+    if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    await ctx.db.patch(args.id, update);
 
     // Check if group is done and update status
     const job = await ctx.db.get(args.id);
     if (job) {
       await updateGroupStatus(ctx, job.groupId);
     }
+  },
+});
+
+export const updateMetrics = mutation({
+  args: {
+    id: v.id("jobs"),
+    toolCallCount: v.optional(v.number()),
+    subagentCount: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    lastEventAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const update: Record<string, any> = {};
+    if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
+    if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
+    if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
+    if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    if (Object.keys(update).length === 0) return;
+    await ctx.db.patch(args.id, update);
   },
 });
 

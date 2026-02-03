@@ -158,12 +158,17 @@ export function JobDetail({ job, onClose, isModal = true }) {
     nextJobId,
     startedAt,
     completedAt,
-    createdAt
+    createdAt,
+    toolCallCount,
+    subagentCount,
+    totalTokens,
+    lastEventAt
   } = job;
 
   const shortId = _id ? _id.slice(-12) : 'unknown';
   const shortAssignmentId = assignmentId ? assignmentId.slice(-8) : 'unknown';
   const shortNextJobId = nextJobId ? nextJobId.slice(-8) : null;
+  const [now, setNow] = React.useState(Date.now());
 
   // Calculate duration
   const duration = React.useMemo(() => {
@@ -176,6 +181,23 @@ export function JobDetail({ job, onClose, isModal = true }) {
     if (durationMs < 3600000) return `${Math.floor(durationMs / 60000)}m ${Math.floor((durationMs % 60000) / 1000)}s`;
     return `${Math.floor(durationMs / 3600000)}h ${Math.floor((durationMs % 3600000) / 60000)}m`;
   }, [startedAt, completedAt]);
+
+  const idleTime = React.useMemo(() => {
+    if (status !== 'running') return null;
+    const idleBase = lastEventAt || startedAt || null;
+    if (!idleBase) return null;
+    const idleMs = Math.max(0, now - idleBase);
+    if (idleMs < 1000) return `${idleMs}ms`;
+    if (idleMs < 60000) return `${Math.floor(idleMs / 1000)}s`;
+    if (idleMs < 3600000) return `${Math.floor(idleMs / 60000)}m ${Math.floor((idleMs % 60000) / 1000)}s`;
+    return `${Math.floor(idleMs / 3600000)}h ${Math.floor((idleMs % 3600000) / 60000)}m`;
+  }, [lastEventAt, startedAt, status, now]);
+
+  React.useEffect(() => {
+    if (status !== 'running') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [status]);
 
   const content = React.createElement(React.Fragment, null,
     // Header
@@ -219,6 +241,22 @@ export function JobDetail({ job, onClose, isModal = true }) {
         duration && React.createElement('div', null,
           React.createElement('p', { className: 'text-xs text-gray-500 uppercase' }, 'Duration'),
           React.createElement('p', { className: 'text-sm text-gray-300' }, duration)
+        ),
+        status === 'running' && React.createElement('div', null,
+          React.createElement('p', { className: 'text-xs text-gray-500 uppercase' }, 'Idle Time'),
+          React.createElement('p', { className: 'text-sm text-gray-300' }, idleTime || '—')
+        ),
+        React.createElement('div', null,
+          React.createElement('p', { className: 'text-xs text-gray-500 uppercase' }, 'Tool Calls'),
+          React.createElement('p', { className: 'text-sm text-gray-300' }, toolCallCount ?? '—')
+        ),
+        React.createElement('div', null,
+          React.createElement('p', { className: 'text-xs text-gray-500 uppercase' }, 'Subagents'),
+          React.createElement('p', { className: 'text-sm text-gray-300' }, subagentCount ?? '—')
+        ),
+        React.createElement('div', null,
+          React.createElement('p', { className: 'text-xs text-gray-500 uppercase' }, 'Tokens'),
+          React.createElement('p', { className: 'text-sm text-gray-300' }, totalTokens ?? '—')
         ),
         React.createElement('div', null,
           React.createElement('p', { className: 'text-xs text-gray-500 uppercase' }, 'Status'),
