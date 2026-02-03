@@ -32,9 +32,17 @@ Edit `config.json`:
 {
   "convexUrl": "https://utmost-vulture-618.convex.cloud",
   "namespace": "your-repo-name",
-  "defaultHarness": "claude",
   "timeoutMs": 600000,
-  "pmHarness": "claude"
+  "harnessDefaults": {
+    "default": "claude",
+    "plan": "claude",
+    "implement": "claude",
+    "review": "claude",
+    "uat": "claude",
+    "document": "claude",
+    "pm": "claude",
+    "chat": "claude"
+  }
 }
 ```
 
@@ -90,7 +98,7 @@ cli.ts create "<north_star>" [--priority N] [--independent]
 
 # Insert job
 cli.ts insert-job <assignment_id> \
-  --type <plan|implement|refine|uat|verify|research> \
+  --type <plan|implement|review|uat|document> \
   --harness <claude|codex|gemini> \
   [--context "instructions"] \
   [--after <job_id>]
@@ -119,14 +127,12 @@ cli.ts fail-job <job_id> [--result "error"]
 
 | Type | Purpose |
 |------|---------|
-| `plan` | Break down assignment into tasks |
-| `implement` | Write code for specific task |
-| `refine` | Review and improve implementation |
+| `plan` | Create spec doc + work packages |
+| `implement` | Build implementation via engineer batches |
+| `review` | Read-only engineering quality review |
 | `uat` | User acceptance testing |
-| `verify` | Final verification against north star |
-| `research` | Investigation and information gathering |
+| `document` | Update docs and finalize assignment |
 | `pm` | (Shadow job) Review result, decide next |
-| `retrospect` | Analyze failures, determine recovery |
 
 ## How It Works
 
@@ -150,12 +156,10 @@ cli.ts fail-job <job_id> [--result "error"]
 Prompt templates live in `templates/`:
 - `plan.md`
 - `implement.md`
-- `refine.md`
+- `review.md`
 - `uat.md`
-- `verify.md`
-- `research.md`
+- `document.md`
 - `pm.md`
-- `retrospect.md`
 
 Templates use placeholders:
 - `{{NORTH_STAR}}` - Assignment goal

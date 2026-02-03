@@ -8,7 +8,13 @@ interface ReadyJob {
   group: Doc<"jobGroups">;
   assignment: Doc<"assignments">;
   // For PM jobs: accumulated results from all groups since last PM
-  accumulatedResults: Array<{ jobType: string; harness: string; result: string }>;
+  accumulatedResults: Array<{
+    jobType: string;
+    harness: string;
+    result: string;
+    groupId: Id<"jobGroups">;
+    groupIndex: number;
+  }>;
 }
 
 // Chat job (separate from assignments)
@@ -30,7 +36,14 @@ async function findReadyJobs(
   let currentGroupId: Id<"jobGroups"> | undefined = assignment.headGroupId;
 
   // Track accumulated results from completed groups (for PM context)
-  const accumulatedResults: Array<{ jobType: string; harness: string; result: string }> = [];
+  const accumulatedResults: Array<{
+    jobType: string;
+    harness: string;
+    result: string;
+    groupId: Id<"jobGroups">;
+    groupIndex: number;
+  }> = [];
+  let groupIndex = 0;
 
   while (currentGroupId) {
     const groupId = currentGroupId as Id<"jobGroups">;
@@ -67,26 +80,29 @@ async function findReadyJobs(
 
     if (allTerminal) {
       // Group is done - accumulate results and move to next
-      // Check if this group contains PM/retrospect jobs (reset accumulator after these)
-      const hasPMJob = jobs.some(
-        (j: Doc<"jobs">) => j.jobType === "pm" || j.jobType === "retrospect"
-      );
+      // Check if this group contains PM jobs
+      const hasPMJob = jobs.some((j: Doc<"jobs">) => j.jobType === "pm");
 
       if (hasPMJob) {
-        // PM already saw previous results, reset accumulator
+        // PM already processed prior results, reset accumulator first
+        // Then add PM's own output so next job sees what PM decided
         accumulatedResults.length = 0;
-      } else {
-        // Add results from all terminal jobs in this group (including failed)
-        for (const job of jobs) {
-          if (job.result) {
-            accumulatedResults.push({
-              jobType: job.jobType,
-              harness: job.harness,
-              result: job.result,
-            });
-          }
+        groupIndex = 0;
+      }
+
+      // Always add this group's results (PM output goes to next job like UAT)
+      for (const job of jobs) {
+        if (job.result) {
+          accumulatedResults.push({
+            jobType: job.jobType,
+            harness: job.harness,
+            result: job.result,
+            groupId,
+            groupIndex,
+          });
         }
       }
+      groupIndex += 1;
       currentGroupId = group.nextGroupId;
     }
   }

@@ -1,55 +1,98 @@
 // ChatView - Main chat area for selected thread
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatHeader } from './ChatHeader.js';
 import { MessageList } from './MessageList.js';
 import { ChatInput } from './ChatInput.js';
 import { AssignmentPane } from './AssignmentPane.js';
 import { JobDetail } from '../job/JobDetail.js';
 
+// localStorage key for assignment pane collapse state (D8: namespaced key)
+const ASSIGNMENT_PANE_COLLAPSED_KEY = 'workflow-engine:assignment-pane-collapsed';
+
+/**
+ * Get initial collapsed state from localStorage
+ * Note: We store "collapsed" state, but the component uses "open" state (inverted)
+ */
+function getInitialPaneOpen() {
+  try {
+    const stored = localStorage.getItem(ASSIGNMENT_PANE_COLLAPSED_KEY);
+    // If stored as 'true' (collapsed), paneOpen should be false
+    return stored !== 'true';
+  } catch {
+    return false; // Default to closed (collapsed = true)
+  }
+}
+
 /**
  * ChatView component - Main chat area with header, messages, and input
  * @param {Object} props
  * @param {Object} props.thread - Selected thread object
  * @param {Object} props.assignment - Linked assignment (for guardian mode)
- * @param {Array} props.jobs - Jobs for this assignment (WP-3: integration)
+ * @param {Array} props.groups - Job groups for this assignment (each group contains jobs array)
  * @param {Array} props.messages - Array of message objects
  * @param {Function} props.onSendMessage - Callback when message is sent
  * @param {Function} props.onUpdateTitle - Callback to update thread title
  * @param {Function} props.onUpdateMode - Callback to update thread mode
  * @param {boolean} props.loadingMessages - Whether messages are loading
  * @param {boolean} props.sending - Whether a message is being sent
+ * @param {Object} props.responsive - Responsive mode info (WP-5)
+ * @param {Function} props.onToggleThreadsPane - Callback to toggle threads pane on mobile (WP-5)
  */
 export function ChatView({
   thread,
   assignment = null,
-  jobs = [],
+  groups = [],
   messages = [],
   onSendMessage,
   onUpdateTitle,
   onUpdateMode,
   loadingMessages = false,
-  sending = false
+  sending = false,
+  responsive,
+  onToggleThreadsPane
 }) {
-  // WP-3: State for assignment pane visibility (D1: default closed)
-  const [paneOpen, setPaneOpen] = useState(false);
+  // WP-3: State for assignment pane visibility with localStorage persistence
+  const [paneOpen, setPaneOpen] = useState(getInitialPaneOpen);
 
   // WP-4: State for selected job modal
   const [selectedJob, setSelectedJob] = useState(null);
 
+  // Ref to toggle button for focus management
+  const toggleButtonRef = useRef(null);
+
   // D2: Close pane when switching threads (fresh context)
+  // Note: We still reset on thread change but don't persist this reset
   useEffect(() => {
     setPaneOpen(false);
     setSelectedJob(null);
   }, [thread?._id]);
 
-  // Toggle pane callback for header
+  // Toggle pane callback for header - with localStorage persistence
   const handleTogglePane = useCallback(() => {
-    setPaneOpen(prev => !prev);
+    setPaneOpen(prev => {
+      const newValue = !prev;
+      try {
+        // Store collapsed state (inverted from open state)
+        localStorage.setItem(ASSIGNMENT_PANE_COLLAPSED_KEY, String(!newValue));
+      } catch {
+        // Ignore localStorage errors
+      }
+      return newValue;
+    });
   }, []);
 
-  // Close pane callback
+  // Close pane callback - with focus management and localStorage persistence
   const handleClosePane = useCallback(() => {
     setPaneOpen(false);
+    try {
+      localStorage.setItem(ASSIGNMENT_PANE_COLLAPSED_KEY, 'true');
+    } catch {
+      // Ignore localStorage errors
+    }
+    // Return focus to toggle button when pane closes
+    if (toggleButtonRef.current) {
+      toggleButtonRef.current.focus();
+    }
   }, []);
 
   // WP-4: Job selection callback for modal
@@ -127,6 +170,7 @@ export function ChatView({
         onUpdateMode: onUpdateMode,
         onTogglePane: handleTogglePane,
         paneOpen: paneOpen,
+        toggleButtonRef: toggleButtonRef,
         disabled: sending
       }),
 
@@ -149,13 +193,21 @@ export function ChatView({
       })
     ),
 
-    // WP-3: Assignment pane (collapsible right sidebar)
+    // WP-5: Assignment pane overlay for mobile
+    responsive?.isMobile && paneOpen && React.createElement('div', {
+      className: 'assignment-overlay visible',
+      onClick: handleClosePane,
+      'aria-hidden': 'true'
+    }),
+
+    // WP-3: Assignment pane (collapsible right sidebar, drawer on mobile)
     assignment && React.createElement(AssignmentPane, {
       assignment: assignment,
-      jobs: jobs,
+      groups: groups,
       isOpen: paneOpen,
       onClose: handleClosePane,
-      onJobSelect: handleJobSelect
+      onJobSelect: handleJobSelect,
+      responsive: responsive
     }),
 
     // WP-4: Job detail modal

@@ -269,7 +269,7 @@ The scheduler walks the group chain to find ready jobs:
    - If pending + no running jobs: return ALL pending jobs (parallel dispatch)
    - If any jobs running: wait (return empty)
    - If all terminal: accumulate results, advance to nextGroupId
-3. Reset accumulated results at PM/retrospect groups
+3. Reset accumulated results at PM groups
 ```
 
 ### Ready Job Selection
@@ -283,6 +283,8 @@ interface ReadyJob {
     jobType: string;
     harness: string;
     result: string;
+    groupId: Id<"jobGroups">;
+    groupIndex: number;
   }>;
 }
 ```
@@ -476,7 +478,7 @@ When a group completes, job results are aggregated with minimal jobType labels:
 This aggregated result is:
 1. Stored on `group.aggregatedResult`
 2. Included in `accumulatedResults` for subsequent PM jobs (reads from individual job results)
-3. Reset when PM/retrospect jobs complete (prevents duplicate context)
+3. Reset when PM jobs complete (prevents duplicate context)
 
 ---
 

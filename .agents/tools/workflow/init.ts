@@ -22,9 +22,11 @@ const __dirname = dirname(__filename);
 interface Config {
   convexUrl: string;
   namespace: string;
-  defaultHarness?: string;
   timeoutMs?: number;
-  pmHarness?: string;
+  harnessDefaults?: {
+    default: "claude" | "codex" | "gemini";
+    [jobType: string]: "claude" | "codex" | "gemini";
+  };
 }
 
 function loadConfig(): Config {

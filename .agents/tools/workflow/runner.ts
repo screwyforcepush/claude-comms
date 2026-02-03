@@ -374,34 +374,42 @@ async function handleGroupCompletion(
 
   console.log(`[${group._id}] Group completed (status: ${currentGroup.status})`);
 
-  // Check if there's a next group in the chain
-  if (currentGroup.nextGroupId) {
-    console.log(`[${group._id}] Next group exists, scheduler will pick it up`);
-    return;
-  }
-
-  // No next group - this is the end of the chain for now
   // Check job types in this group to determine behavior
   const jobs = currentGroup.jobs || [];
   const hasPMJob = jobs.some((j: Job) => j.jobType === "pm");
-  const hasRetrospectJob = jobs.some((j: Job) => j.jobType === "retrospect");
+  const hasDocumentJob = jobs.some((j: Job) => j.jobType === "document");
 
+  // PM groups: always trigger guardian evaluation (even if PM inserted next job)
   if (hasPMJob) {
     // PM completed - trigger guardian evaluation if applicable
     // Find the PM job's result (not aggregatedResult with headers)
     const pmJob = jobs.find((j: Job) => j.jobType === "pm" && j.result);
     const pmResult = pmJob?.result || "";
     await triggerGuardianEvaluation(assignment, pmResult);
-    // Then check if assignment is done
-    await checkAndCompleteAssignment(assignment._id, group._id);
-  } else if (hasRetrospectJob) {
-    // Retrospect completed - check if assignment is done
-    await checkAndCompleteAssignment(assignment._id, group._id);
-  } else {
-    // Regular group completed with no successor - trigger PM review
-    const failed = currentGroup.status === "failed";
-    await triggerPMGroup(group, assignment, failed);
+    // If PM didn't insert a next job, check if assignment is done
+    if (!currentGroup.nextGroupId) {
+      await checkAndCompleteAssignment(assignment._id, group._id);
+    }
+    return;
   }
+
+  if (hasDocumentJob) {
+    // Document job auto-completes the assignment
+    if (!currentGroup.nextGroupId) {
+      await checkAndCompleteAssignment(assignment._id, group._id);
+    }
+    return;
+  }
+
+  // Regular group: if next group exists, let scheduler handle it
+  if (currentGroup.nextGroupId) {
+    console.log(`[${group._id}] Next group exists, scheduler will pick it up`);
+    return;
+  }
+
+  // No next group and not PM/document - trigger PM review
+  const failed = currentGroup.status === "failed";
+  await triggerPMGroup(group, assignment, failed);
 }
 
 // Check if all groups in assignment are done, if so mark complete
@@ -429,9 +437,9 @@ async function triggerPMGroup(
   assignment: Assignment,
   failed: boolean
 ): Promise<void> {
-  const jobType = failed ? "retrospect" : "pm";
+  const jobType = "pm";
   const context = failed
-    ? `Previous group failed. Analyze and determine recovery path.`
+    ? `Previous group failed. Diagnose issues, decide recovery, and choose next job(s).`
     : undefined;
 
   console.log(`[${completedGroup._id}] Triggering ${jobType} group`);

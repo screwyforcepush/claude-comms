@@ -5,16 +5,76 @@ import { api } from '../../api.js';
 import { ChatSidebar } from './ChatSidebar.js';
 import { ChatView } from './ChatView.js';
 
+// localStorage key for threads pane collapse state
+const THREADS_PANE_COLLAPSED_KEY = 'workflow-engine:threads-pane-collapsed';
+
+/**
+ * Get initial collapsed state from localStorage
+ */
+function getInitialCollapsedState() {
+  try {
+    const stored = localStorage.getItem(THREADS_PANE_COLLAPSED_KEY);
+    return stored === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Chevron icon for collapse toggle
+ */
+function CollapseChevron({ collapsed }) {
+  return React.createElement('svg', {
+    className: `w-4 h-4 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`,
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M15 19l-7-7 7-7'
+    })
+  );
+}
+
+/**
+ * Chat icon for collapsed state
+ */
+function ChatIcon() {
+  return React.createElement('svg', {
+    className: 'w-5 h-5',
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
+    })
+  );
+}
+
 /**
  * ChatPanel component - Main container managing chat state
  * @param {Object} props
  * @param {string} props.namespaceId - Current namespace ID for thread scoping
  * @param {string} props.namespaceName - Current namespace name (for display)
+ * @param {Object} props.responsive - Responsive mode info (optional, for WP-5)
  */
-export function ChatPanel({ namespaceId, namespaceName }) {
+export function ChatPanel({ namespaceId, namespaceName, responsive }) {
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // WP-3: Threads pane collapse state with localStorage persistence
+  const [threadsPaneCollapsed, setThreadsPaneCollapsed] = useState(getInitialCollapsedState);
+
+  // WP-5: Mobile drawer state for threads pane
+  const [threadsMobileOpen, setThreadsMobileOpen] = useState(false);
 
   // Fetch threads for this namespace
   const { data: threads, loading: loadingThreads } = useQuery(
@@ -165,6 +225,29 @@ export function ChatPanel({ namespaceId, namespaceName }) {
     }
   }, [selectedThreadId, updateMode]);
 
+  // WP-3: Handle toggling threads pane collapse
+  const handleToggleThreadsPane = useCallback(() => {
+    // WP-5: On mobile, toggle drawer instead of collapse
+    if (responsive?.isMobile) {
+      setThreadsMobileOpen(prev => !prev);
+      return;
+    }
+    setThreadsPaneCollapsed(prev => {
+      const newValue = !prev;
+      try {
+        localStorage.setItem(THREADS_PANE_COLLAPSED_KEY, String(newValue));
+      } catch {
+        // Ignore localStorage errors
+      }
+      return newValue;
+    });
+  }, [responsive?.isMobile]);
+
+  // WP-5: Close mobile threads drawer
+  const handleCloseThreadsMobile = useCallback(() => {
+    setThreadsMobileOpen(false);
+  }, []);
+
   // No namespace selected
   if (!namespaceId) {
     return React.createElement('div', {
@@ -194,36 +277,109 @@ export function ChatPanel({ namespaceId, namespaceName }) {
     );
   }
 
+  // WP-5: Build threads pane classes based on responsive mode
+  const threadsPaneClasses = [
+    'threads-pane',
+    'flex-shrink-0',
+    'border-r',
+    'border-gray-700',
+    'bg-gray-900',
+    'overflow-hidden',
+    'transition-all',
+    'duration-300',
+    'ease-in-out',
+    threadsPaneCollapsed ? 'threads-pane-collapsed' : 'threads-pane-expanded',
+    responsive?.isMobile && threadsMobileOpen ? 'threads-mobile-open' : ''
+  ].filter(Boolean).join(' ');
+
   return React.createElement('div', {
     className: 'chat-panel flex flex-1 min-h-0'
   },
-    // Thread sidebar
+    // WP-5: Mobile threads overlay
+    responsive?.isMobile && React.createElement('div', {
+      className: `threads-overlay ${threadsMobileOpen ? 'visible' : ''}`,
+      onClick: handleCloseThreadsMobile,
+      'aria-hidden': 'true'
+    }),
+
+    // WP-3: Collapsible thread sidebar container
     React.createElement('div', {
-      className: 'w-64 flex-shrink-0'
+      className: threadsPaneClasses,
+      'aria-hidden': responsive?.isMobile && !threadsMobileOpen
     },
-      React.createElement(ChatSidebar, {
-        threads: threads || [],
-        assignments: assignments,
-        selectedThreadId: selectedThreadId,
-        onSelectThread: handleSelectThread,
-        onCreateThread: handleCreateThread,
-        onDeleteThread: handleDeleteThread,
-        loading: loadingThreads,
-        creating: creating
-      })
+      // Collapsed state: icon-only strip with expand button
+      threadsPaneCollapsed && React.createElement('div', {
+        className: 'threads-pane-collapsed-content h-full flex flex-col items-center py-3 gap-3'
+      },
+        // Expand button - uses threads-toggle class to survive CSS visibility rules
+        React.createElement('button', {
+          type: 'button',
+          onClick: handleToggleThreadsPane,
+          className: 'threads-toggle p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-lg transition-colors',
+          title: 'Expand conversations',
+          'aria-label': 'Expand conversations'
+        },
+          React.createElement(CollapseChevron, { collapsed: true })
+        ),
+        // Chat icon indicator
+        React.createElement('div', {
+          className: 'p-2 text-gray-500'
+        },
+          React.createElement(ChatIcon)
+        ),
+        // Thread count badge
+        threads && threads.length > 0 && React.createElement('div', {
+          className: 'text-xs text-gray-500 font-medium'
+        }, threads.length)
+      ),
+
+      // Expanded state: full sidebar
+      !threadsPaneCollapsed && React.createElement('div', {
+        className: 'threads-pane-expanded-content h-full flex flex-col'
+      },
+        // Collapse button in header area
+        React.createElement('div', {
+          className: 'flex items-center justify-between px-3 py-2 border-b border-gray-700'
+        },
+          React.createElement('span', {
+            className: 'text-xs font-semibold text-gray-500 uppercase tracking-wide'
+          }, 'Threads'),
+          React.createElement('button', {
+            type: 'button',
+            onClick: handleToggleThreadsPane,
+            className: 'p-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded transition-colors',
+            title: 'Collapse conversations'
+          },
+            React.createElement(CollapseChevron, { collapsed: false })
+          )
+        ),
+        // ChatSidebar content (without its own header)
+        React.createElement(ChatSidebar, {
+          threads: threads || [],
+          assignments: assignments,
+          selectedThreadId: selectedThreadId,
+          onSelectThread: handleSelectThread,
+          onCreateThread: handleCreateThread,
+          onDeleteThread: handleDeleteThread,
+          loading: loadingThreads,
+          creating: creating
+        })
+      )
     ),
 
-    // Main chat view (WP-5: pass jobs data for assignment pane)
+    // Main chat view (WP-5: pass groups data for assignment pane + responsive mode)
     React.createElement(ChatView, {
       thread: selectedThread,
       assignment: selectedAssignmentWithJobs?.assignment || null,
-      jobs: selectedAssignmentWithJobs?.jobs || [],
+      groups: selectedAssignmentWithJobs?.groups || [],
       messages: messages || [],
       onSendMessage: handleSendMessage,
       onUpdateTitle: handleUpdateTitle,
       onUpdateMode: handleUpdateMode,
       loadingMessages: loadingMessages,
-      sending: sending || isProcessing
+      sending: sending || isProcessing,
+      responsive: responsive,
+      onToggleThreadsPane: handleToggleThreadsPane
     })
   );
 }

@@ -1,5 +1,11 @@
 # Sessions Tab Requirements Traceability Matrix
 
+> **ARCHIVE NOTICE:** This traceability matrix is for the Multi-Agent Observability Dashboard,
+> a separate system from the Workflow Engine. For current workflow documentation, see
+> `workflow-engine-spec.md`.
+
+---
+
 ## Overview
 This matrix maps requirements to implementation components, test cases, and verification methods to ensure complete coverage of the Sessions tab functionality.
 

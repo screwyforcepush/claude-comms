@@ -64,7 +64,7 @@ A job queue system for orchestrating sequential Claude/Codex/Gemini headless run
 | Field | Type | Description |
 |-------|------|-------------|
 | `assignmentId` | Id<"assignments"> | Parent assignment |
-| `jobType` | string | Template key: "plan", "implement", "refine", "uat", "verify", "research", "pm", "retrospect" |
+| `jobType` | string | Template key: "plan", "implement", "review", "uat", "document", "pm" |
 | `harness` | "claude" \| "codex" \| "gemini" | Which CLI to run |
 | `context` | string? | PM instruction for this specific job |
 | `status` | "pending" \| "running" \| "complete" \| "failed" | Current state |
@@ -80,14 +80,12 @@ A job queue system for orchestrating sequential Claude/Codex/Gemini headless run
 
 ```
 .agents/tools/workflow/templates/
-├── plan.md          # Break down assignment into tasks
-├── implement.md     # Write code for specific task
-├── refine.md        # Review and improve implementation
+├── plan.md          # Create spec doc + work packages
+├── implement.md     # Orchestrated implementation
+├── review.md        # Read-only engineering review
 ├── uat.md           # Manual testing, user flow validation
-├── verify.md        # Final verification against north star
-├── research.md      # Investigation, codebase exploration
-├── pm.md            # Shadow job: review result, decide next
-└── retrospect.md    # Failure analysis, determine recovery
+├── document.md      # Update docs and finalize assignment (auto-completes)
+└── pm.md            # Shadow job: review result, decide next
 ```
 
 ---
@@ -116,7 +114,7 @@ Each job prompt is assembled from:
 | `{{ARTIFACTS}}` | `assignment.artifacts` |
 | `{{DECISIONS}}` | `assignment.decisions` |
 | `{{CONTEXT}}` | `job.context` (PM wrote this) |
-| `{{PREVIOUS_RESULT}}` | Previous job in chain's `result` |
+| `{{PREVIOUS_RESULT}}` | Accumulated results since last PM |
 
 ---
 
@@ -212,13 +210,13 @@ trigger_pm(completed_job):
 on job timeout or harness crash:
   1. Update job.status = "failed"
 
-  2. Create retrospect job:
+  2. Create PM job with failure context:
      {
-       jobType: "retrospect",
-       context: "Previous job failed: {failure_reason}"
+       jobType: "pm",
+       context: "Previous group failed. Diagnose issues, decide recovery, and choose next job(s)."
      }
 
-  3. Retrospect analyzes, PM follows to determine recovery
+  3. PM analyzes and determines recovery path
 ```
 
 ---
@@ -294,9 +292,17 @@ Per-repo config file:
 {
   "convexUrl": "https://your-project.convex.cloud",
   "namespace": "claude-code-hooks-multi-agent-observability",
-  "defaultHarness": "claude",
   "timeoutMs": 600000,
-  "pmHarness": "claude"
+  "harnessDefaults": {
+    "default": "claude",
+    "plan": "claude",
+    "implement": "claude",
+    "review": "claude",
+    "uat": "claude",
+    "document": "claude",
+    "pm": "claude",
+    "chat": "claude"
+  }
 }
 ```
 
@@ -358,5 +364,4 @@ Also update artifacts and decisions as needed:
 4. Runner daemon (subscription + scheduler)
 5. Harness execution (claude JSON stream parsing)
 6. PM shadow job trigger
-7. Templates (plan, implement, refine, uat, verify, pm)
-8. Retrospect flow
+7. Templates (plan, implement, review, uat, document, pm)

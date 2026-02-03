@@ -25,7 +25,7 @@ PM Shadow Job                         ← Reviews, decides next step
 ### Key Concepts
 
 - **Assignment**: User intent (north star). Has linked list of jobs.
-- **Job**: Single Claude/Codex/Gemini run. Types: plan, implement, refine, uat, verify, research, pm, retrospect.
+- **Job**: Single Claude/Codex/Gemini run. Types: plan, implement, review, uat, document, pm.
 - **PM Agent**: Runs after each job. Reviews result, inserts next job or completes/blocks assignment.
 - **Namespace**: Isolates assignments per repo in shared Convex backend.
 
@@ -120,9 +120,17 @@ Copy `config.example.json` to `config.json` and edit:
 {
   "convexUrl": "https://your-project.convex.cloud",
   "namespace": "your-repo-name",
-  "defaultHarness": "claude",
   "timeoutMs": 600000,
-  "pmHarness": "claude"
+  "harnessDefaults": {
+    "default": "claude",
+    "plan": "claude",
+    "implement": "claude",
+    "review": "claude",
+    "uat": "claude",
+    "document": "claude",
+    "pm": "claude",
+    "chat": "claude"
+  }
 }
 ```
 

@@ -76,9 +76,17 @@ Each consumer repo needs its own `config.json`:
 {
   "convexUrl": "https://your-project-123.convex.cloud",
   "namespace": "consumer-repo-name",
-  "defaultHarness": "claude",
   "timeoutMs": 600000,
-  "pmHarness": "claude"
+  "harnessDefaults": {
+    "default": "claude",
+    "plan": "claude",
+    "implement": "claude",
+    "review": "claude",
+    "uat": "claude",
+    "document": "claude",
+    "pm": "claude",
+    "chat": "claude"
+  }
 }
 ```
 

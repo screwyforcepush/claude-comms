@@ -1,9 +1,13 @@
 # Multi-Agent Observability System - Architecture Guide
 
-**Version:** 1.0  
-**Author:** FrankPulsar  
-**Date:** 2025-08-16  
-**Status:** Active  
+> **ARCHIVE NOTICE:** This architecture guide is for the Multi-Agent Observability Dashboard,
+> a separate system from the Workflow Engine. For current workflow documentation, see
+> `docs/project/spec/workflow-engine-spec.md` and `parallel-job-groups-architecture.md`.
+
+**Version:** 1.0
+**Author:** FrankPulsar
+**Date:** 2025-08-16
+**Status:** Archived  
 
 ## Executive Summary
 

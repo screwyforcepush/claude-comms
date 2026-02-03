@@ -56,13 +56,60 @@ function SearchIcon() {
 }
 
 /**
+ * Collapse toggle button - chevron icon that points left when expanded, right when collapsed
+ */
+function CollapseToggleButton({ isCollapsed, onToggle }) {
+  return React.createElement('button', {
+    onClick: onToggle,
+    className: 'sidebar-collapse-btn p-1 rounded hover:bg-gray-700 transition-colors',
+    title: isCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+    'aria-label': isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+  },
+    React.createElement('svg', {
+      className: `w-4 h-4 text-gray-400 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`,
+      fill: 'none',
+      stroke: 'currentColor',
+      viewBox: '0 0 24 24',
+      strokeWidth: '2'
+    },
+      React.createElement('path', {
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        d: 'M15 19l-7-7 7-7'  // Chevron pointing left
+      })
+    )
+  );
+}
+
+/**
+ * Folder icon for collapsed state
+ */
+function FolderIcon() {
+  return React.createElement('svg', {
+    className: 'w-5 h-5 text-gray-400',
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '1.5'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z'
+    })
+  );
+}
+
+/**
  * NamespaceList component - displays all namespaces with filtering
  * @param {Object} props
  * @param {Array} props.namespaces - Live namespaces data from parent subscription
  * @param {string} props.selectedNamespace - Currently selected namespace name
  * @param {Function} props.onSelect - Callback when namespace is selected (receives namespace name)
+ * @param {boolean} props.isCollapsed - Whether the sidebar is collapsed
+ * @param {Function} props.onToggleCollapse - Callback to toggle collapse state
  */
-export function NamespaceList({ namespaces, selectedNamespace, onSelect }) {
+export function NamespaceList({ namespaces, selectedNamespace, onSelect, isCollapsed, onToggleCollapse }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fallback: If namespaces not provided from parent, fetch directly
@@ -126,12 +173,61 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect }) {
     );
   }
 
+  // Collapsed view - show minimal icons
+  if (isCollapsed) {
+    return React.createElement('div', { className: 'flex flex-col h-full' },
+      // Collapsed header with expand button
+      React.createElement('div', { className: 'p-2 border-b border-gray-700 bg-gray-800/50 flex justify-center' },
+        React.createElement(CollapseToggleButton, {
+          isCollapsed: true,
+          onToggle: onToggleCollapse
+        })
+      ),
+
+      // Connection status indicator (icon only)
+      React.createElement('div', { className: 'p-2 border-b border-gray-700 flex justify-center' },
+        React.createElement(SidebarConnectionStatus)
+      ),
+
+      // Collapsed namespace icons
+      React.createElement('div', { className: 'flex-1 overflow-y-auto' },
+        sortedNamespaces.map(ns =>
+          React.createElement('button', {
+            key: ns.name,
+            onClick: () => onSelect && onSelect(ns.name),
+            className: `w-full p-2 flex justify-center items-center hover:bg-gray-800 transition-colors ${
+              selectedNamespace === ns.name ? 'bg-blue-500/20 border-l-2 border-blue-500' : ''
+            }`,
+            title: ns.name
+          },
+            React.createElement('div', {
+              className: `w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold ${
+                (ns.counts?.active || 0) > 0
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'bg-gray-700 text-gray-400'
+              }`
+            },
+              ns.name.substring(0, 2).toUpperCase()
+            )
+          )
+        )
+      )
+    );
+  }
+
+  // Expanded view - full content
   return React.createElement('div', { className: 'flex flex-col h-full' },
-    // Branding header
+    // Branding header with collapse toggle
     React.createElement('div', { className: 'p-3 border-b border-gray-700 bg-gray-800/50' },
       React.createElement('div', { className: 'flex items-center justify-between' },
         React.createElement('h1', { className: 'text-lg font-bold text-white' }, 'Workflow Engine'),
-        React.createElement(SidebarConnectionStatus)
+        React.createElement('div', { className: 'flex items-center gap-2' },
+          React.createElement(SidebarConnectionStatus),
+          React.createElement(CollapseToggleButton, {
+            isCollapsed: false,
+            onToggle: onToggleCollapse
+          })
+        )
       )
     ),
 

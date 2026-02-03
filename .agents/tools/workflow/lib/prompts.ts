@@ -99,6 +99,8 @@ export interface AccumulatedJobResult {
   jobType: string;
   harness: string; // Kept for internal tracking, not shown to PM
   result: string;
+  groupId?: string;
+  groupIndex?: number;
 }
 
 /**
@@ -141,6 +143,99 @@ function formatAccumulatedResults(
   return sections.join("\n\n---\n\n");
 }
 
+interface GroupedResults {
+  groupId: string;
+  groupIndex: number;
+  results: AccumulatedJobResult[];
+}
+
+function groupAccumulatedResults(
+  accumulatedResults: AccumulatedJobResult[]
+): GroupedResults[] {
+  if (!accumulatedResults || accumulatedResults.length === 0) {
+    return [];
+  }
+
+  const groups = new Map<string, GroupedResults>();
+  let fallbackIndex = 0;
+
+  for (const result of accumulatedResults) {
+    const groupId = result.groupId || `unknown-${fallbackIndex}`;
+    const groupIndex =
+      typeof result.groupIndex === "number" ? result.groupIndex : fallbackIndex;
+
+    if (!groups.has(groupId)) {
+      groups.set(groupId, {
+        groupId,
+        groupIndex,
+        results: [],
+      });
+    }
+
+    groups.get(groupId)!.results.push(result);
+    fallbackIndex += 1;
+  }
+
+  return Array.from(groups.values()).sort((a, b) => a.groupIndex - b.groupIndex);
+}
+
+function isReviewJobType(jobType: string): boolean {
+  return jobType === "review" || jobType.endsWith("review");
+}
+
+function includesJobType(results: AccumulatedJobResult[], jobType: string): boolean {
+  return results.some((r) => r.jobType === jobType);
+}
+
+function inferPrimaryJobType(results: AccumulatedJobResult[]): string {
+  if (includesJobType(results, "implement")) return "implement";
+  if (includesJobType(results, "plan")) return "plan";
+  if (includesJobType(results, "document")) return "document";
+  if (includesJobType(results, "uat")) return "uat";
+  return results[0]?.jobType || "unknown";
+}
+
+function buildPmModules(accumulatedResults: AccumulatedJobResult[]): string {
+  const grouped = groupAccumulatedResults(accumulatedResults);
+  if (grouped.length === 0) {
+    return "No prior job results found. Ask clarifying questions if needed and decide the first actionable job.";
+  }
+
+  const latestGroup = grouped[grouped.length - 1];
+  const latestHasReview = latestGroup.results.some((r) => isReviewJobType(r.jobType));
+  const latestHasImplement = latestGroup.results.some((r) => r.jobType === "implement");
+  const latestHasPlan = latestGroup.results.some((r) => r.jobType === "plan");
+
+  if (latestHasReview) {
+    let reviewGroupIndex = -1;
+    for (let i = grouped.length - 1; i >= 0; i--) {
+      if (grouped[i].results.some((r) => isReviewJobType(r.jobType))) {
+        reviewGroupIndex = i;
+        break;
+      }
+    }
+
+    const priorGroup =
+      reviewGroupIndex > 0 ? grouped[reviewGroupIndex - 1] : undefined;
+    const p1JobType = priorGroup ? inferPrimaryJobType(priorGroup.results) : "unknown";
+    const priorResults = priorGroup
+      ? formatAccumulatedResults(priorGroup.results)
+      : "(no prior group found)";
+
+    return `### Post-Review Decision Module\n\n#### R-1 Context (Group Before Review)\n${priorResults}\n\n#### Decision Logic (P-1 = ${p1JobType})\n1. **If fundamental decisions are required** (cannot be inferred from mental-model + north star with high confidence):\n   - Ask clarifying questions\n   - Block the assignment until resolved\n2. **If high-severity issues have a clear optimal solution and reviewers concur**:\n   - Append a new **${p1JobType}** job to address/refine\n   - Include the issues raised and rationale in your PM response\n3. **If only medium/low/no issues and reviewers (and UAT, if present) approve**:\n   - Filter issues for alignment with mental model and real product value\n   - If **P-1 = plan**: update the plan doc yourself, then append **implement** (or complete if planning-only)\n   - If **P-1 = implement**: append **implement** to address items, or append **document** if no further changes are warranted\n\nAlways include the issues raised and your decision rationale.\n`;
+  }
+
+  if (latestHasImplement) {
+    return `### Post-Implement Decision Module\n\n- Append a **review** job to assess the implementation quality and alignment.\n- If the implementation impacts UX, include **uat** in the same job group.\n- Provide clear context for reviewers/UAT (what changed, success criteria, files/flows).\n`;
+  }
+
+  if (latestHasPlan) {
+    return `### Post-Plan Decision Module\n\n- If the plan/spec represents **non-trivial change** (5+ files, backend + frontend, foundational schema, or core system building blocks), append a **review** job.\n- If the plan is **trivial** or already reviewed and approved, append **implement** to execute the full plan.\n- Ensure the plan doc path is recorded in artifacts.\n`;
+  }
+
+  return "No matching PM module found. Decide next steps based on the latest results and north star alignment.";
+}
+
 /**
  * Build prompt for assignment-based jobs
  * Each job has its own jobType and context
@@ -155,6 +250,8 @@ export function buildPrompt(
 
   // Format accumulated results for PM/retrospect jobs
   const resultText = formatAccumulatedResults(accumulatedResults);
+  const pmModules =
+    job.jobType === "pm" ? buildPmModules(accumulatedResults) : "";
 
   return template
     .replace(/\{\{NORTH_STAR\}\}/g, assignment.northStar)
@@ -165,7 +262,8 @@ export function buildPrompt(
     .replace(/\{\{ASSIGNMENT_ID\}\}/g, assignment._id)
     .replace(/\{\{GROUP_ID\}\}/g, group._id)
     .replace(/\{\{CURRENT_JOB_ID\}\}/g, job._id)
-    .replace(/\{\{HARNESS\}\}/g, job.harness);
+    .replace(/\{\{HARNESS\}\}/g, job.harness)
+    .replace(/\{\{PM_MODULES\}\}/g, pmModules);
 }
 
 /**

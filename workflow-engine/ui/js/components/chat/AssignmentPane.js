@@ -152,18 +152,24 @@ function DecisionItem({ decision, index }) {
  * AssignmentPane component - collapsible right sidebar showing assignment details + job chain
  * @param {Object} props
  * @param {Object} props.assignment - Assignment data
- * @param {Array} props.jobs - Jobs for this assignment
+ * @param {Array} props.groups - Job groups (each group contains jobs array)
  * @param {boolean} props.isOpen - Whether the pane is open
  * @param {Function} props.onClose - Callback to close the pane
  * @param {Function} props.onJobSelect - Callback when a job is selected
+ * @param {Object} props.responsive - Responsive mode info (WP-5)
  */
-export function AssignmentPane({ assignment, jobs = [], isOpen, onClose, onJobSelect }) {
+export function AssignmentPane({ assignment, groups = [], isOpen, onClose, onJobSelect, responsive }) {
   const [artifactsOpen, setArtifactsOpen] = useState(false);
   const [decisionsOpen, setDecisionsOpen] = useState(false);
 
   // Parse artifacts and decisions from JSON strings
   const artifactList = useMemo(() => parseJson(assignment?.artifacts), [assignment?.artifacts]);
   const decisionList = useMemo(() => parseJson(assignment?.decisions), [assignment?.decisions]);
+
+  // Compute total job count across all groups
+  const totalJobCount = useMemo(() => {
+    return groups.reduce((sum, group) => sum + (group.jobs?.length || 0), 0);
+  }, [groups]);
 
   if (!assignment) return null;
 
@@ -177,13 +183,22 @@ export function AssignmentPane({ assignment, jobs = [], isOpen, onClose, onJobSe
 
   const shortId = _id ? _id.slice(-8) : 'unknown';
 
+  // When collapsed, hide content from accessibility tree and prevent focus
+  const isCollapsed = !isOpen;
+
   return React.createElement('div', {
+    id: 'assignment-pane',
     className: `assignment-pane flex-shrink-0 border-l border-gray-700 bg-gray-900 overflow-hidden transition-all duration-300 ease-in-out ${
-      isOpen ? 'w-80' : 'w-0'
-    }`
+      isOpen ? '' : 'collapsed'
+    }`,
+    'aria-hidden': isCollapsed ? 'true' : undefined
   },
+    // When collapsed, add tabindex=-1 and inert-like behavior to prevent focus trap
     React.createElement('div', {
-      className: 'w-80 h-full flex flex-col overflow-hidden'
+      className: 'assignment-pane-inner h-full flex flex-col overflow-hidden',
+      tabIndex: isCollapsed ? -1 : undefined,
+      // CSS will handle visibility:hidden for collapsed state to fully remove from tab order
+      style: isCollapsed ? { visibility: 'hidden' } : undefined
     },
       // Header with close button
       React.createElement('div', {
@@ -234,12 +249,12 @@ export function AssignmentPane({ assignment, jobs = [], isOpen, onClose, onJobSe
         ),
 
         // Job Chain
-        jobs.length > 0 && React.createElement('div', { className: 'space-y-2' },
+        groups.length > 0 && React.createElement('div', { className: 'space-y-2' },
           React.createElement('h3', {
             className: 'text-xs font-semibold text-gray-500 uppercase tracking-wide'
-          }, `Job Chain (${jobs.length})`),
+          }, `Job Chain (${totalJobCount})`),
           React.createElement(JobChain, {
-            jobs,
+            groups,
             onJobSelect,
             layout: 'vertical'
           })

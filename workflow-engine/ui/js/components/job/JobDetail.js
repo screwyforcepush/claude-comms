@@ -45,10 +45,9 @@ function JobTypeBadge({ jobType }) {
   const colors = {
     plan: 'bg-purple-500/20 text-purple-400',
     implement: 'bg-blue-500/20 text-blue-400',
-    refine: 'bg-cyan-500/20 text-cyan-400',
+    review: 'bg-yellow-500/20 text-yellow-400',
     uat: 'bg-green-500/20 text-green-400',
-    verify: 'bg-yellow-500/20 text-yellow-400',
-    research: 'bg-pink-500/20 text-pink-400'
+    document: 'bg-teal-500/20 text-teal-400'
   };
 
   return React.createElement('span', {
@@ -153,7 +152,7 @@ export function JobDetail({ job, onClose, isModal = true }) {
     assignmentId,
     jobType,
     harness,
-    context,
+    prompt,
     status,
     result,
     nextJobId,
@@ -227,10 +226,10 @@ export function JobDetail({ job, onClose, isModal = true }) {
         )
       ),
 
-      // Context/Instructions
+      // Prompt
       React.createElement(ContentViewer, {
-        content: context,
-        label: 'Context / Instructions'
+        content: prompt,
+        label: 'Prompt'
       }),
 
       // Result or Error

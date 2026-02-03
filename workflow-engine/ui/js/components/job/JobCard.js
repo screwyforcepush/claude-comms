@@ -25,10 +25,9 @@ function JobTypeBadge({ jobType }) {
   const colors = {
     plan: 'text-purple-400',
     implement: 'text-blue-400',
-    refine: 'text-cyan-400',
+    review: 'text-yellow-400',
     uat: 'text-green-400',
-    verify: 'text-yellow-400',
-    research: 'text-pink-400'
+    document: 'text-teal-400'
   };
 
   return React.createElement('span', {

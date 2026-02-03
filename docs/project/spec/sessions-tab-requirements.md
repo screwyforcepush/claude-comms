@@ -1,5 +1,11 @@
 # Sessions Tab Visualization Requirements Specification
 
+> **ARCHIVE NOTICE:** This specification is for the Multi-Agent Observability Dashboard,
+> a separate system from the Workflow Engine. For current workflow documentation, see
+> `workflow-engine-spec.md`.
+
+---
+
 ## 1. Executive Summary
 
 ### 1.1 Purpose

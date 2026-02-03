@@ -87,9 +87,10 @@ function DetailsIcon() {
  * @param {Function} props.onUpdateMode - Callback when mode is changed
  * @param {Function} props.onTogglePane - Callback to toggle assignment pane (WP-3)
  * @param {boolean} props.paneOpen - Whether the pane is currently open (WP-3)
+ * @param {Object} props.toggleButtonRef - Ref to the toggle button for focus management
  * @param {boolean} props.disabled - Whether controls are disabled
  */
-export function ChatHeader({ thread, assignment, onUpdateTitle, onUpdateMode, onTogglePane, paneOpen = false, disabled = false }) {
+export function ChatHeader({ thread, assignment, onUpdateTitle, onUpdateMode, onTogglePane, paneOpen = false, toggleButtonRef, disabled = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
 
@@ -200,12 +201,15 @@ export function ChatHeader({ thread, assignment, onUpdateTitle, onUpdateMode, on
       // WP-3: Details toggle button (visible when assignment exists)
       onTogglePane && React.createElement('button', {
         type: 'button',
+        ref: toggleButtonRef,
         onClick: onTogglePane,
         className: `p-1.5 rounded transition-colors ${
           paneOpen
             ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
             : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700'
         }`,
+        'aria-expanded': paneOpen,
+        'aria-controls': 'assignment-pane',
         title: paneOpen ? 'Hide assignment details' : 'Show assignment details'
       }, React.createElement(DetailsIcon))
     ),

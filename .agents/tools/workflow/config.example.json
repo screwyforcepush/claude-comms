@@ -1,15 +1,14 @@
 {
   "convexUrl": "https://your-project.convex.cloud",
-  "namespace": "your-repo-name",
+  "namespace": "my-project",
   "timeoutMs": 600000,
   "harnessDefaults": {
     "default": "claude",
     "plan": "claude",
     "implement": "claude",
-    "refine": "claude",
+    "review": "claude",
     "uat": "claude",
-    "verify": "codex",
-    "research": "gemini",
+    "document": "claude",
     "pm": "claude",
     "chat": "claude"
   }

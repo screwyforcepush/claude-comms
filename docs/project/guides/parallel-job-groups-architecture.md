@@ -266,10 +266,8 @@ async function findReadyJobs(ctx, assignment): Promise<ReadyJob[]> {
     }
 
     if (allTerminal) {
-      // Accumulate results, check for PM/retrospect to reset
-      const hasPMJob = jobs.some(j =>
-        j.jobType === "pm" || j.jobType === "retrospect"
-      );
+      // Accumulate results, reset on PM groups
+      const hasPMJob = jobs.some(j => j.jobType === "pm");
 
       if (hasPMJob) {
         accumulatedResults.length = 0;
