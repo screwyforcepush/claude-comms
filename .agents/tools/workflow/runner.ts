@@ -16,7 +16,6 @@
  * Config via config.json in same directory.
  */
 
-import { spawn, ChildProcess } from "child_process";
 import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
 import { readFileSync } from "fs";
@@ -29,7 +28,6 @@ import {
   Job,
   JobGroup,
   ChatJobContext,
-  ChatMessage,
   AccumulatedJobResult,
   buildPrompt,
   buildChatPrompt,
@@ -38,16 +36,8 @@ import {
   determinePromptType,
 } from "./lib/prompts.js";
 
-// Stream handlers (extracted module)
-import {
-  StreamHandler,
-  CommandOptions,
-  createStreamHandler,
-  buildCommand,
-} from "./lib/streams.js";
-
-// File-based job tracking (for agent_monitor.py TUI)
-import { JobTracker } from "./lib/file-tracker.js";
+// Harness executor (file-based event streaming for crash resilience)
+import { HarnessExecutor, Harness } from "./lib/harness-executor.js";
 
 // Use anyApi for dynamic function references (works with ConvexClient)
 const api = anyApi;
@@ -68,8 +58,6 @@ interface ChatJob {
 }
 
 // Config
-type Harness = "claude" | "codex" | "gemini";
-
 interface Config {
   convexUrl: string;
   namespace: string;
@@ -91,12 +79,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "config.json");
 const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
 
+// Project root is 3 levels up from .agents/tools/workflow
+const projectRoot = join(__dirname, "..", "..", "..");
+
 // State
 let client: ConvexClient | null = null;
 let unsubscribeJobs: (() => void) | null = null;
 let unsubscribeChatJobs: (() => void) | null = null;
-const runningJobs = new Map<string, ChildProcess>();
-const runningChatJobs = new Map<string, ChildProcess>();
+
+// Harness executor (handles process spawning, file-based event streaming, orphan recovery)
+const executor = new HarnessExecutor({
+  timeoutMs: config.timeoutMs,
+  cwd: projectRoot,
+});
 
 // Save assistant response to chat thread
 async function saveChatResponse(threadId: string, content: string): Promise<void> {
@@ -195,7 +190,7 @@ async function triggerGuardianEvaluation(
   }
 }
 
-// Job execution
+// Job execution (uses HarnessExecutor for crash-resilient file-based streaming)
 async function executeJob(
   job: Job,
   group: JobGroup,
@@ -233,124 +228,71 @@ async function executeJob(
   // Mark job as running with prompt for visibility
   await client!.mutation(api.jobs.start, { id: jobId, prompt });
 
-  // Build command with optional session resume for chat jobs
-  const commandOptions: CommandOptions = {};
-  if (isChat && chatContext?.claudeSessionId && job.harness === "claude") {
-    commandOptions.sessionId = chatContext.claudeSessionId;
-  }
-  const { cmd, args } = buildCommand(job.harness, prompt, commandOptions);
-
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+  // Execute via HarnessExecutor (file-based streaming, crash-resilient)
+  executor.execute(
+    {
+      jobId,
+      harness: job.harness as Harness,
+      prompt,
+      sessionId: isChat && chatContext?.claudeSessionId ? chatContext.claudeSessionId : undefined,
       env: {
-        ...process.env,
         WORKFLOW_ASSIGNMENT_ID: assignment._id,
         WORKFLOW_GROUP_ID: group._id,
         WORKFLOW_JOB_ID: job._id,
       },
-    });
-
-    runningJobs.set(jobId, child);
-
-    const handler = createStreamHandler(job.harness);
-    let buffer = "";
-    let timedOut = false;
-
-    // File-based tracking for agent_monitor.py TUI
-    const tracker = new JobTracker(jobId, job.harness, child.pid || 0);
-
-    // Timeout
-    const timeout = setTimeout(async () => {
-      timedOut = true;
-      console.log(`[${jobId}] Timeout after ${config.timeoutMs}ms`);
-      tracker.timeout();
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 5000);
-    }, config.timeoutMs);
-
-    // Parse stdout
-    child.stdout?.on("data", (data: Buffer) => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        tracker.logLine(line);
+    },
+    {
+      onComplete: async (result, sessionId) => {
         try {
-          const event = JSON.parse(line);
-          handler.onEvent(event);
-          const eventType = (event.type as string) || "event";
-          tracker.recordEvent(eventType);
-        } catch {
-          // Not JSON, ignore
-        }
-      }
-    });
-
-    child.stderr?.on("data", (data: Buffer) => {
-      console.error(`[${jobId}] stderr: ${data.toString()}`);
-      tracker.logLine(`[stderr] ${data.toString()}`);
-    });
-
-    child.on("close", async (code) => {
-      clearTimeout(timeout);
-      runningJobs.delete(jobId);
-
-      const result = handler.getResult();
-      console.log(`[${jobId}] Exited with code ${code}`);
-
-      try {
-        if (timedOut) {
-          await client!.mutation(api.jobs.fail, {
-            id: jobId,
-            result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
-          });
-          if (isChat && chatContext) {
-            await saveChatResponse(chatContext.threadId,
-              `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${result || "(no output)"}`
-            );
-          } else {
-            await handleGroupCompletion(group, assignment, true);
-          }
-        } else if (code === 0 && handler.isComplete()) {
-          tracker.complete(result);
-          await client!.mutation(api.jobs.complete, {
-            id: jobId,
-            result,
-          });
+          await client!.mutation(api.jobs.complete, { id: jobId, result });
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId, result);
-            const newSessionId = handler.getSessionId();
-            if (newSessionId) {
-              await saveSessionId(chatContext.threadId, newSessionId);
+            if (sessionId) {
+              await saveSessionId(chatContext.threadId, sessionId);
             }
           } else {
             await handleGroupCompletion(group, assignment, false);
           }
-        } else {
-          tracker.fail(`process_exit_${code}`);
+        } catch (e) {
+          console.error(`[${jobId}] Error in onComplete:`, e);
+        }
+      },
+      onFail: async (reason, partialResult) => {
+        try {
           await client!.mutation(api.jobs.fail, {
             id: jobId,
-            result: result || `Process exited with code ${code}`,
+            result: partialResult || reason,
           });
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId,
-              `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${result || `Exit code ${code}`}`
+              `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${partialResult || reason}`
             );
           } else {
             await handleGroupCompletion(group, assignment, true);
           }
+        } catch (e) {
+          console.error(`[${jobId}] Error in onFail:`, e);
         }
-      } catch (e) {
-        console.error(`[${jobId}] Error completing job:`, e);
-        tracker.fail(`error: ${e}`);
-      }
-
-      resolve();
-    });
-  });
+      },
+      onTimeout: async (partialResult) => {
+        try {
+          await client!.mutation(api.jobs.fail, {
+            id: jobId,
+            result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
+          });
+          if (isChat && chatContext) {
+            await saveChatResponse(chatContext.threadId,
+              `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${partialResult || "(no output)"}`
+            );
+          } else {
+            await handleGroupCompletion(group, assignment, true);
+          }
+        } catch (e) {
+          console.error(`[${jobId}] Error in onTimeout:`, e);
+        }
+      },
+    }
+  );
 }
 
 // Handle group completion - check if all jobs done, trigger PM if needed
@@ -469,8 +411,8 @@ interface ReadyChatJob {
 async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   if (readyJobs.length === 0) return;
 
-  // Filter out jobs we're already running
-  const newJobs = readyJobs.filter((r) => !runningJobs.has(r.job._id));
+  // Filter out jobs we're already running (tracked by executor)
+  const newJobs = readyJobs.filter((r) => !executor.isTracking(r.job._id));
   if (newJobs.length === 0) return;
 
   console.log(`[Queue] ${newJobs.length} new jobs to execute (parallel if same group)`);
@@ -492,7 +434,7 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   }
 }
 
-// Chat job execution (separate from assignment jobs)
+// Chat job execution (separate from assignment jobs, uses HarnessExecutor)
 async function executeChatJob(chatJob: ChatJob): Promise<void> {
   const jobId = chatJob._id;
   console.log(`[${jobId}] Starting chat job (${chatJob.harness})`);
@@ -516,123 +458,75 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 
   await client!.mutation(api.chatJobs.start, { id: jobId, prompt });
 
-  const commandOptions: CommandOptions = {};
-  if (chatContext.claudeSessionId && chatJob.harness === "claude") {
-    commandOptions.sessionId = chatContext.claudeSessionId;
-  }
-  const { cmd, args } = buildCommand(chatJob.harness, prompt, commandOptions);
-
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+  // Execute via HarnessExecutor (file-based streaming, crash-resilient)
+  executor.execute(
+    {
+      jobId,
+      harness: chatJob.harness as Harness,
+      prompt,
+      sessionId: chatContext.claudeSessionId || undefined,
       env: {
-        ...process.env,
         WORKFLOW_THREAD_ID: chatContext.threadId,
         WORKFLOW_NAMESPACE_ID: chatContext.namespaceId,
       },
-    });
-
-    runningChatJobs.set(jobId, child);
-
-    const handler = createStreamHandler(chatJob.harness);
-    let buffer = "";
-    let timedOut = false;
-
-    const tracker = new JobTracker(jobId, chatJob.harness, child.pid || 0);
-
-    const timeout = setTimeout(async () => {
-      timedOut = true;
-      console.log(`[${jobId}] Timeout after ${config.timeoutMs}ms`);
-      tracker.timeout();
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 5000);
-    }, config.timeoutMs);
-
-    child.stdout?.on("data", (data: Buffer) => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        tracker.logLine(line);
+    },
+    {
+      onComplete: async (result, sessionId) => {
         try {
-          const event = JSON.parse(line);
-          handler.onEvent(event);
-          const eventType = (event.type as string) || "event";
-          tracker.recordEvent(eventType);
-        } catch {
-          // Not JSON, ignore
-        }
-      }
-    });
-
-    child.stderr?.on("data", (data: Buffer) => {
-      console.error(`[${jobId}] stderr: ${data.toString()}`);
-      tracker.logLine(`[stderr] ${data.toString()}`);
-    });
-
-    child.on("close", async (code) => {
-      clearTimeout(timeout);
-      runningChatJobs.delete(jobId);
-
-      const result = handler.getResult();
-      console.log(`[${jobId}] Exited with code ${code}`);
-
-      try {
-        if (timedOut) {
-          await client!.mutation(api.chatJobs.fail, {
-            id: jobId,
-            result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${result}`,
-          });
-          await saveChatResponse(chatContext.threadId,
-            `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${result || "(no output)"}`
-          );
-        } else if (code === 0 && handler.isComplete()) {
-          tracker.complete(result);
-          await client!.mutation(api.chatJobs.complete, {
-            id: jobId,
-            result,
-          });
+          await client!.mutation(api.chatJobs.complete, { id: jobId, result });
           await saveChatResponse(chatContext.threadId, result);
-          const newSessionId = handler.getSessionId();
-          if (newSessionId) {
-            await saveSessionId(chatContext.threadId, newSessionId);
+          if (sessionId) {
+            await saveSessionId(chatContext.threadId, sessionId);
           }
           if (!chatContext.isGuardianEvaluation) {
             await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);
           }
-        } else {
-          tracker.fail(`process_exit_${code}`);
+        } catch (e) {
+          console.error(`[${jobId}] Error in onComplete:`, e);
+          try {
+            await saveChatResponse(chatContext.threadId,
+              `I completed processing but encountered a system error saving the result. Please check the logs.`
+            );
+          } catch {
+            // Ignore - best effort
+          }
+        }
+      },
+      onFail: async (reason, partialResult) => {
+        try {
           await client!.mutation(api.chatJobs.fail, {
             id: jobId,
-            result: result || `Process exited with code ${code}`,
+            result: partialResult || reason,
           });
           await saveChatResponse(chatContext.threadId,
-            `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${result || `Exit code ${code}`}`
+            `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${partialResult || reason}`
           );
+        } catch (e) {
+          console.error(`[${jobId}] Error in onFail:`, e);
         }
-      } catch (e) {
-        console.error(`[${jobId}] Error completing chat job:`, e);
-        tracker.fail(`error: ${e}`);
+      },
+      onTimeout: async (partialResult) => {
         try {
+          await client!.mutation(api.chatJobs.fail, {
+            id: jobId,
+            result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
+          });
           await saveChatResponse(chatContext.threadId,
-            `I completed processing but encountered a system error saving the result. Please check the logs.`
+            `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${partialResult || "(no output)"}`
           );
-        } catch {
-          // Ignore - best effort
+        } catch (e) {
+          console.error(`[${jobId}] Error in onTimeout:`, e);
         }
-      }
-
-      resolve();
-    });
-  });
+      },
+    }
+  );
 }
 
 async function processChatQueue(readyChatJobs: ReadyChatJob[]): Promise<void> {
   if (readyChatJobs.length === 0) return;
 
-  const newJobs = readyChatJobs.filter((r) => !runningChatJobs.has(r.chatJob._id));
+  // Filter out jobs we're already running (tracked by executor)
+  const newJobs = readyChatJobs.filter((r) => !executor.isTracking(r.chatJob._id));
   if (newJobs.length === 0) return;
 
   for (const { chatJob } of newJobs) {
@@ -661,6 +555,14 @@ async function startRunner() {
 
   const namespaceId = namespace._id;
   console.log(`Found namespace ID: ${namespaceId}`);
+
+  // Reconcile any orphaned jobs from previous runner crash
+  await executor.reconcileOrphans(async (result) => {
+    console.log(`[Reconcile] ${result.jobId}: ${result.finalStatus}`);
+    // Note: We don't update Convex here because orphaned jobs may have already
+    // been marked as failed/timed out by the scheduler. The file-based status
+    // is the authoritative record for the TUI monitor.
+  });
 
   // Subscribe to assignment-based jobs
   unsubscribeJobs = client.onUpdate(
@@ -705,17 +607,8 @@ function cleanup() {
   unsubscribeChatJobs?.();
   unsubscribeChatJobs = null;
 
-  for (const [id, child] of runningJobs) {
-    console.log(`Killing job ${id}`);
-    child.kill("SIGTERM");
-  }
-  runningJobs.clear();
-
-  for (const [id, child] of runningChatJobs) {
-    console.log(`Killing chat job ${id}`);
-    child.kill("SIGTERM");
-  }
-  runningChatJobs.clear();
+  // Kill all active jobs via executor
+  executor.killAll();
 
   client?.close();
   client = null;
