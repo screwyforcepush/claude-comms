@@ -222,15 +222,15 @@ function buildPmModules(accumulatedResults: AccumulatedJobResult[]): string {
       ? formatAccumulatedResults(priorGroup.results)
       : "(no prior group found)";
 
-    return `### Post-Review Decision Module\n\n#### R-1 Context (Group Before Review)\n${priorResults}\n\n#### Decision Logic (P-1 = ${p1JobType})\n1. **If fundamental decisions are required** (cannot be inferred from mental-model + north star with high confidence):\n   - Ask clarifying questions\n   - Block the assignment until resolved\n2. **If high-severity issues have a clear optimal solution and reviewers concur**:\n   - Append a new **${p1JobType}** job to address/refine\n   - Include the issues raised and rationale in your PM response\n3. **If only medium/low/no issues and reviewers (and UAT, if present) approve**:\n   - Filter issues for alignment with mental model and real product value\n   - If **P-1 = plan**: update the plan doc yourself, then append **implement** (or complete if planning-only)\n   - If **P-1 = implement**: append **implement** to address items, or append **document** if no further changes are warranted\n\nAlways include the issues raised and your decision rationale.\n`;
+    return `### Post-Review Decision\n\n#### R-1 Context (Group Before Review)\n${priorResults}\n\n#### Decision Logic (P-1 = ${p1JobType})\n1. **If fundamental decisions are required** (cannot be inferred from mental-model + north star with high confidence):\n   - Ask clarifying questions\n   - Block the assignment until resolved\n2. **If high-severity issues have a clear optimal solution and reviewers concur**:\n   - Append a new **${p1JobType}** job to address/refine\n   - Include the issues raised and rationale in your PM response\n3. **If only medium/low/no issues and reviewers (and UAT, if present) approve**:\n   - Filter issues for alignment with mental model and real product value\n   - If **P-1 = plan**: update the plan doc yourself, then append **implement** (or complete if planning-only)\n   - If **P-1 = implement**: append **implement** to address items, or append **document** if no further changes are warranted\n\nAlways include the issues raised and your decision rationale.\n`;
   }
 
   if (latestHasImplement) {
-    return `### Post-Implement Decision Module\n\n- Append a **review** job to assess the implementation quality and alignment.\n- If the implementation impacts UX, include **uat** in the same job group.\n- Provide clear context for reviewers/UAT (what changed, success criteria, files/flows).\n`;
+    return `### Post-Implement Decision\n\n- Append a **review** job to assess the implementation quality and alignment.\n- If the implementation impacts UX, include **uat** in the same job group.\n- Provide clear context for reviewers/UAT (what changed, success criteria, files/flows).\n`;
   }
 
   if (latestHasPlan) {
-    return `### Post-Plan Decision Module\n\n- If the plan/spec represents **non-trivial change** (5+ files, backend + frontend, foundational schema, or core system building blocks), append a **review** job.\n- If the plan is **trivial** or already reviewed and approved, append **implement** to execute the full plan.\n- Ensure the plan doc path is recorded in artifacts.\n`;
+    return `### Post-Plan Decision\n\n- If the plan/spec represents **non-trivial change** (5+ files, backend + frontend, foundational schema, or core system building blocks), append a **review** job.\n- If the plan is **trivial** or already reviewed and approved, append **implement** to execute the full plan.\n- Ensure the plan doc path is recorded in artifacts.\n`;
   }
 
   return "No matching PM module found. Decide next steps based on the latest results and north star alignment.";
@@ -387,9 +387,10 @@ You now have **FULL AUTONOMY** to take action. Adopt COOK mode behavior until ex
 
 When the user wants work to be done:
 1. **Confirm** your understanding of requirements
-2. **Create** an assignment with a clear North Star
+2. **Create** an assignment with a **verbose north star** (include user perspective + success criteria)
 3. **Insert** an initial job to begin work (usually \`plan\` type)
-4. **Inform** the user what you've initiated
+4. **Immediately update** \`docs/project/spec/mental-model.md\` with new insights from the conversation
+5. **Inform** the user what you've initiated
 
 ### CLI Commands Available
 
@@ -397,32 +398,31 @@ When the user wants work to be done:
 # Create a new assignment (auto-linked to this thread)
 npx tsx .agents/tools/workflow/cli.ts create "<north-star-description>" --priority <N>
 
-# Insert initial job into NEW assignment (becomes head)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --type plan --context "<context>"
+# Insert job(s) - jobs in the same array run in parallel
+npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> \\
+  --jobs '[{"jobType":"plan","context":"<context>"}]'
 
-# Append job to EXISTING assignment (links to tail of chain)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append --type implement --context "<context>"
+# Append to existing chain (use --append to link after current tail)
+npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append \\
+  --jobs '[{"jobType":"implement","context":"Build auth"},{"jobType":"uat","context":"Test login"}]'
 
-# View current assignments
+# View assignments and queue
 npx tsx .agents/tools/workflow/cli.ts assignments
-
-# View queue status
 npx tsx .agents/tools/workflow/cli.ts queue
 
-# Delete assignment and all its jobs
+# Delete assignment
 npx tsx .agents/tools/workflow/cli.ts delete-assignment <assignmentId>
 \`\`\`
-
-> Harness is auto-selected from config per job type. Override with \`--harness <claude|codex|gemini>\` if needed.
 
 ### Job Types You Can Create
 
 | Type | Use When |
 |------|----------|
-| \`plan\` | Breaking down complex requirements into work packages |
-| \`implement\` | Clear requirements ready for coding |
-| \`research\` | Technical questions need answers first |
-| \`uat\` | Need to test user-facing functionality |`;
+| \`plan\` | Need a spec doc and work-package breakdown |
+| \`implement\` | Clear requirements ready for implementation |
+| \`review\` | Engineering quality review of plan/spec or implementation |
+| \`uat\` | Need user-perspective testing |
+| \`document\` | Update docs and finalize assignment |`;
   } else {
     modeContent = `## JAM MODE ACTIVATED
 

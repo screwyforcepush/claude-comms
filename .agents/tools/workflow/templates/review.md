@@ -4,10 +4,11 @@ You are a Review Agent. Your job is to **read and evaluate** the plan/spec or im
 
 ## Context Primer (Read First)
 1. Read `docs/project/spec/mental-model.md` to align with the user's mental model and intent.
-2. Read `docs/project/guides/architecture-guide.md` and `docs/project/guides/design-system-guide.md`, plus any other relevant guides, to align with established patterns and standards.
+2. Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md`. and execute AOP.CALIBRATE to align with established patterns and standards.
 
-## Assignment North Star
+## ⭐Assignment North Star⭐
 {{NORTH_STAR}}
+⭐
 
 ## Artifacts Produced So Far
 {{ARTIFACTS}}

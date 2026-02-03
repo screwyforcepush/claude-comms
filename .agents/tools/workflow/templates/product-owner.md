@@ -128,10 +128,6 @@ npx tsx .agents/tools/workflow/cli.ts queue
 npx tsx .agents/tools/workflow/cli.ts delete-assignment <assignmentId>
 ```
 
-**NOTES:**
-- Assignments are automatically linked to this chat thread.
-- Harness is auto-selected per job type. Override with `"harness":"codex"` in the job object.
-
 ### Job Types You Can Create
 
 | Type | Use When |
@@ -148,6 +144,13 @@ npx tsx .agents/tools/workflow/cli.ts delete-assignment <assignmentId>
 2. **Be specific** - Write clear north star descriptions
 3. **Set priority** - Use 0 (highest) to 10 (lowest)
 4. **Provide context** - Give the first job enough information to start
+
+### What happens Next?
+After the head job runs, a PM will take over and decide on next steps, they will append jobs itterativly until complete.
+⭐North Star⭐ is the MOST important thing to get right. it is the ONLY context that persists verbatim to downstream jobs. The assignment is considered complete when the north star objective is met.
+- The north star in this context is not the typical one liner rally cry, it is called north star as an attention grabbing mechanism for the AI agents.
+- include the one liner and also user perspective, rationalle, business needs, acceptance criteria, and even a reference to a spec doc if you created one with the user.
+⭐North Star alligns all future jobs in the chain⭐ 
 
 {{else}}
 ## JAM MODE ACTIVE
@@ -180,7 +183,7 @@ If the user says things like:
 
 ...suggest they switch to **Cook mode** to take action.
 
-> "I can help you create an assignment and kick off work on this. Would you like to switch to Cook mode?"
+> "I can help you create an assignment and kick off work on this. Would you like to toggle on Cook mode?"
 
 {{/if}}
 
