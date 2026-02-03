@@ -111,6 +111,65 @@ function getAlignmentEmoji(status) {
 }
 
 /**
+ * ThreadIcon component - Visual icon for thread (used in collapsed view and list)
+ * @param {Object} props
+ * @param {Object} props.thread - Thread object
+ * @param {Object} props.assignment - Linked assignment
+ * @param {boolean} props.isSelected - Whether selected
+ * @param {Function} props.onClick - Click handler
+ */
+export function ThreadIcon({ thread, assignment, isSelected, onClick }) {
+  const modeConfig = getModeConfig(thread.mode);
+  const Icon = modeConfig.icon;
+  
+  // Alignment emoji (Guardian mode)
+  const alignmentEmoji = thread.mode === 'guardian' && assignment
+    ? getAlignmentEmoji(assignment.alignmentStatus)
+    : null;
+
+  // Status dot color (Assignment status)
+  let statusDotColor = null;
+  if (assignment?.status) {
+    switch (assignment.status) {
+      case 'blocked': statusDotColor = 'bg-red-500'; break;
+      case 'active': statusDotColor = 'bg-blue-500'; break;
+      case 'pending': statusDotColor = 'bg-yellow-500'; break;
+      case 'complete': statusDotColor = 'bg-green-500'; break;
+      case 'running': statusDotColor = 'bg-purple-500'; break;
+      case 'failed': statusDotColor = 'bg-red-600'; break;
+      default: statusDotColor = 'bg-gray-500';
+    }
+  }
+
+  return React.createElement('button', {
+    type: 'button',
+    onClick: onClick,
+    title: thread.title || 'New Chat',
+    className: `relative flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
+      isSelected ? 'bg-gray-800 ring-2 ring-blue-500' : 'hover:bg-gray-800'
+    }`
+  },
+    React.createElement('div', {
+      className: `w-8 h-8 rounded-lg flex items-center justify-center ${modeConfig.bgColor}`
+    },
+      React.createElement(Icon)
+    ),
+    
+    // Alignment status indicator (guardian mode only) - Top Right
+    alignmentEmoji && React.createElement('span', {
+      className: 'absolute -top-1 -right-1 text-xs',
+      title: `Alignment: ${assignment.alignmentStatus}`
+    }, alignmentEmoji),
+
+    // Assignment status dot - Bottom Right
+    statusDotColor && React.createElement('span', {
+      className: `absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-gray-900 ${statusDotColor}`,
+      title: `Status: ${assignment.status}`
+    })
+  );
+}
+
+/**
  * ThreadItem component - Single thread in sidebar list
  * @param {Object} props
  * @param {Object} props.thread - Thread object
@@ -120,7 +179,6 @@ function getAlignmentEmoji(status) {
  */
 export function ThreadItem({ thread, assignment, isSelected, onClick }) {
   const modeConfig = getModeConfig(thread.mode);
-  const Icon = modeConfig.icon;
   const alignmentEmoji = thread.mode === 'guardian' && assignment
     ? getAlignmentEmoji(assignment.alignmentStatus)
     : null;
@@ -135,21 +193,13 @@ export function ThreadItem({ thread, assignment, isSelected, onClick }) {
     }`
   },
     React.createElement('div', { className: 'flex items-start gap-3' },
-      // Icon with alignment indicator overlay
-      React.createElement('div', {
-        className: 'relative flex-shrink-0'
-      },
-        React.createElement('div', {
-          className: `w-8 h-8 rounded-lg flex items-center justify-center ${modeConfig.bgColor}`
-        },
-          React.createElement(Icon)
-        ),
-        // Alignment status indicator (guardian mode only)
-        alignmentEmoji && React.createElement('span', {
-          className: 'absolute -top-1 -right-1 text-xs',
-          title: `Alignment: ${assignment.alignmentStatus}`
-        }, alignmentEmoji)
-      ),
+      // Icon
+      React.createElement(ThreadIcon, {
+        thread,
+        assignment,
+        isSelected: false, // Don't show ring inside the item, the item itself is highlighted
+        onClick: null // Let parent button handle click
+      }),
 
       // Content
       React.createElement('div', { className: 'flex-1 min-w-0' },

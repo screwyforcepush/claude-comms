@@ -207,7 +207,13 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
                   : 'bg-gray-700 text-gray-400'
               }`
             },
-              ns.name.substring(0, 2).toUpperCase()
+              (() => {
+                const parts = ns.name.split(/[-_ ]+/);
+                if (parts.length >= 2) {
+                  return (parts[0][0] + parts[1][0]).toUpperCase();
+                }
+                return ns.name.substring(0, 2).toUpperCase();
+              })()
             )
           )
         )

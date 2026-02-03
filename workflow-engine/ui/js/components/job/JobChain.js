@@ -21,7 +21,7 @@ const providerConfig = {
   },
   codex: {
     name: 'OpenAI',
-    logoSrc: './public/openaidark.svg',
+    logoSrc: './public/openai.svg',
     color: 'text-green-400'
   },
   gemini: {
@@ -36,29 +36,15 @@ const providerConfig = {
  * D2: Status via glow (muted=pending, pulse=running, green=complete, red=failed)
  * D15: Provider logo glow uses CSS pseudo-element (::before) positioned behind the image
  */
-function ProviderLogo({ harness, status }) {
+function ProviderLogo({ harness }) {
   const provider = providerConfig[harness] || providerConfig.claude;
 
-  // D2: Map status to glow class
-  const statusGlowClass = {
-    pending: 'job-glow-pending',
-    running: 'job-glow-running',
-    complete: 'job-glow-complete',
-    failed: 'job-glow-failed'
-  }[status] || 'job-glow-pending';
-
-  return React.createElement('div', {
-    className: `provider-logo ${provider.color} ${statusGlowClass}`,
-    title: `${provider.name} (${status})`
-  },
-    React.createElement('img', {
-      src: provider.logoSrc,
-      alt: `${provider.name} logo`,
-      className: 'provider-logo-img',
-      // Prevent image dragging for better UX
-      draggable: false
-    })
-  );
+  return React.createElement('img', {
+    src: provider.logoSrc,
+    alt: `${provider.name} logo`,
+    className: 'w-6 h-6 object-contain',
+    draggable: false
+  });
 }
 
 /**
@@ -80,11 +66,13 @@ function chunkArray(arr, size) {
 function JobNode({ job, isSelected, isCurrent, onClick }) {
   const { _id, jobType, harness, status } = job;
 
-  // D3: Preserve harness border colors
-  const harnessColors = {
-    claude: 'border-orange-500/50',
-    codex: 'border-green-500/50',
-    gemini: 'border-blue-500/50'
+  // Status-based border colors
+  const statusBorderColors = {
+    pending: 'border-yellow-500/50',
+    running: 'border-purple-500',
+    complete: 'border-green-500',
+    failed: 'border-red-500',
+    blocked: 'border-red-500'
   };
 
   const typeColors = {
@@ -99,14 +87,16 @@ function JobNode({ job, isSelected, isCurrent, onClick }) {
     ? 'ring-2 ring-blue-500'
     : '';
 
+  const pulseClass = status === 'running' ? 'running-border-pulse' : '';
+
   return React.createElement('button', {
     onClick: () => onClick && onClick(job),
     className: `job-node flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-pointer hover:bg-gray-750 ${
-      harnessColors[harness] || 'border-gray-600'
-    } ${selectedClass} bg-gray-800`
+      statusBorderColors[status] || 'border-gray-600'
+    } ${selectedClass} ${pulseClass} bg-gray-800`
   },
-    // D1: Provider logo with status glow replaces StatusDot+shortId
-    React.createElement(ProviderLogo, { harness, status }),
+    // Provider logo (no status prop needed)
+    React.createElement(ProviderLogo, { harness }),
     React.createElement('span', {
       className: `text-xs font-medium uppercase ${typeColors[jobType] || 'text-gray-400'}`
     }, jobType || 'job')

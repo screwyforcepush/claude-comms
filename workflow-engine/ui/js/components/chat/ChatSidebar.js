@@ -70,7 +70,7 @@ export function ChatSidebar({
   }, [creating, onCreateThread]);
 
   return React.createElement('div', {
-    className: 'chat-sidebar flex flex-col h-full bg-gray-900 border-r border-gray-700'
+    className: 'chat-sidebar flex flex-col flex-1 min-h-0 bg-gray-900'
   },
     // Header with new chat button
     React.createElement('div', {

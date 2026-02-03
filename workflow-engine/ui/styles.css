@@ -1479,7 +1479,7 @@ p, h1, h2, h3, h4, h5, h6 {
 .sidebar-collapsed a,
 .sidebar-collapsed input,
 .threads-pane-collapsed [tabindex]:not([class*="toggle"]),
-.threads-pane-collapsed button:not([class*="toggle"]),
+.threads-pane-collapsed button:not([class*="toggle"]):not([title]),
 .threads-pane-collapsed a,
 .threads-pane-collapsed input {
   visibility: hidden;
@@ -1494,4 +1494,29 @@ p, h1, h2, h3, h4, h5, h6 {
 .threads-pane-collapsed button.threads-toggle,
 .threads-pane-collapsed .threads-toggle {
   visibility: visible;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Running border pulse animation */
+@keyframes running-border-pulse {
+  0%, 100% { 
+    border-color: rgba(168, 85, 247, 1);
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4);
+  }
+  50% { 
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0);
+  }
+}
+
+.running-border-pulse {
+  animation: running-border-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

@@ -101,3 +101,22 @@ Scope: `convex/jobs.ts`, `convex/scheduler.ts`, `.agents/tools/workflow/cli.ts`
 - Introduce an explicit assignment completion update when the terminal group completes (or ensure the runner does so).
 - Validate/createGroup chaining behavior in CLI by requiring `--after`/`--append` when the assignment already has a head.
 - Enforce single jobType/context per group (or store jobType/context at the job level if heterogeneity is intended).
+
+---
+
+## Review Notes (ElenaVortex, 2026-02-03)
+Scope: `.agents/tools/workflow/lib/harness-executor.ts`, `.agents/tools/workflow/lib/file-tracker.ts`
+
+### Critical Issues
+- **LogTailer read position drift / partial-line loss**: `LogTailer.processNewContent` increments `bytesRead` using `Buffer.byteLength(line) + 1` and does not buffer partial lines. If the last line is incomplete or uses CRLF, `read_position` will drift and can skip bytes or drop JSON events (lines 246-263; `lineBuffer` is unused at line 114). This can cause missed completion events and incorrect recovery.
+- **Spawn error handling missing**: `execute()` does not handle `child.on("error")` or a spawn failure. `pid` becomes `0`, status stays `"running"`, and callbacks may never fire if `close` is never emitted (lines 322-333).
+
+### Warnings
+- **PID reuse kill risk**: `reconcileOrphan` kills any process with `status.pid` if it appears alive, but does not verify identity. If a PID is reused between orphan scan and reconcile, an unrelated process could be killed (lines 465-471).
+- **Flush can return early**: `flush()` exits if `processing` is true, then `tailer.stop()` is called immediately on close. This can drop trailing events if a read is in-flight (lines 194-221, 376-382).
+- **Truncation/replace handling**: If the log file is truncated or replaced, `stats.size <= position` causes an early return without resetting position; tailer can get stuck ignoring new content (lines 229-233).
+- **Integration env risk**: `HarnessExecutor.execute()` relies on the caller to pass `env` (e.g., `WORKFLOW_*`), so runner integration must supply these or behavior may regress (lines 321-325).
+
+### Suggestions / Testing Gaps
+- Track bytes by stream data or advance to last newline only; keep partial line in `lineBuffer` and prepend on next read.
+- Add tests for CRLF/newline-less tailing, mid-line writes, duplicate/partial events, spawn failures, PID reuse during reconciliation, and read_position recovery.
