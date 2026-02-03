@@ -11,7 +11,7 @@
  * - When group completes, aggregated results go to PM
  *
  * Usage:
- *   npx tsx runner.ts
+ *   nohup npx tsx runner.ts > /tmp/runner.log 2>&1 &
  *
  * Config via config.json in same directory.
  */
@@ -92,6 +92,195 @@ const executor = new HarnessExecutor({
   timeoutMs: config.timeoutMs,
   cwd: projectRoot,
 });
+
+const METRICS_HEARTBEAT_MS = 10_000;
+const CODEX_TOOL_ITEM_TYPES = new Set([
+  "command_execution",
+  "tool_call",
+  "tool_use",
+  "function_call",
+]);
+
+interface MetricsState {
+  toolCallCount: number;
+  subagentCount: number;
+  totalTokens: number | null;
+  lastEventAt: number | null;
+  lastFlushedToolCallCount: number;
+  lastFlushedSubagentCount: number;
+  lastFlushedEventAt: number | null;
+  heartbeat: NodeJS.Timeout | null;
+  seenToolIds: Set<string>;
+  seenSubagentIds: Set<string>;
+}
+
+function createMetricsState(): MetricsState {
+  return {
+    toolCallCount: 0,
+    subagentCount: 0,
+    totalTokens: null,
+    lastEventAt: null,
+    lastFlushedToolCallCount: 0,
+    lastFlushedSubagentCount: 0,
+    lastFlushedEventAt: null,
+    heartbeat: null,
+    seenToolIds: new Set(),
+    seenSubagentIds: new Set(),
+  };
+}
+
+function extractToolCallInfo(
+  harness: Harness,
+  event: Record<string, unknown>
+): { ids: string[]; hadToolUse: boolean } {
+  const type = event.type as string | undefined;
+  switch (harness) {
+    case "claude": {
+      if (type !== "assistant") return { ids: [], hadToolUse: false };
+      const message = event.message as { content?: Array<{ type?: string; id?: string }> } | undefined;
+      if (!message?.content) return { ids: [], hadToolUse: false };
+      const ids: string[] = [];
+      let hadToolUse = false;
+      for (const block of message.content) {
+        if (block?.type === "tool_use") {
+          hadToolUse = true;
+          if (block.id) ids.push(String(block.id));
+        }
+      }
+      return { ids, hadToolUse };
+    }
+    case "codex": {
+      if (type !== "item.started" && type !== "item.completed") {
+        return { ids: [], hadToolUse: false };
+      }
+      const item = event.item as { type?: string; id?: string } | undefined;
+      if (!item?.type || !CODEX_TOOL_ITEM_TYPES.has(item.type)) {
+        return { ids: [], hadToolUse: false };
+      }
+      const ids = item.id ? [String(item.id)] : [];
+      return { ids, hadToolUse: true };
+    }
+    case "gemini": {
+      if (type !== "tool_use") return { ids: [], hadToolUse: false };
+      const toolId =
+        (event.tool_id as string | undefined) ??
+        (event.toolId as string | undefined) ??
+        (event.toolID as string | undefined);
+      return { ids: toolId ? [String(toolId)] : [], hadToolUse: true };
+    }
+    default:
+      return { ids: [], hadToolUse: false };
+  }
+}
+
+function extractSubagentInfo(
+  harness: Harness,
+  event: Record<string, unknown>
+): { ids: string[]; hadSubagent: boolean } {
+  const type = event.type as string | undefined;
+  switch (harness) {
+    case "claude": {
+      if (type !== "assistant") return { ids: [], hadSubagent: false };
+      const message = event.message as { content?: Array<{ type?: string; id?: string; name?: string }> } | undefined;
+      if (!message?.content) return { ids: [], hadSubagent: false };
+      const ids: string[] = [];
+      let hadSubagent = false;
+      for (const block of message.content) {
+        if (block?.type === "tool_use" && block.name === "Task") {
+          hadSubagent = true;
+          if (block.id) ids.push(String(block.id));
+        }
+      }
+      return { ids, hadSubagent };
+    }
+    case "gemini": {
+      if (type !== "tool_use") return { ids: [], hadSubagent: false };
+      const toolName = event.tool_name as string | undefined;
+      if (toolName !== "delegate_to_agent") return { ids: [], hadSubagent: false };
+      const toolId =
+        (event.tool_id as string | undefined) ??
+        (event.toolId as string | undefined) ??
+        (event.toolID as string | undefined);
+      return { ids: toolId ? [String(toolId)] : [], hadSubagent: true };
+    }
+    case "codex":
+    default:
+      return { ids: [], hadSubagent: false };
+  }
+}
+
+function extractTotalTokens(
+  harness: Harness,
+  event: Record<string, unknown>
+): number | null {
+  const type = event.type as string | undefined;
+  if (harness === "claude" && type === "result") {
+    const usage = event.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+    if (typeof usage?.input_tokens === "number" && typeof usage?.output_tokens === "number") {
+      return usage.input_tokens + usage.output_tokens;
+    }
+  }
+
+  if (harness === "codex" && type === "turn.completed") {
+    const usage = event.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+    if (typeof usage?.input_tokens === "number" && typeof usage?.output_tokens === "number") {
+      return usage.input_tokens + usage.output_tokens;
+    }
+  }
+
+  if (harness === "gemini" && type === "result") {
+    const stats = event.stats as {
+      total_tokens?: number;
+      input_tokens?: number;
+      output_tokens?: number;
+    } | undefined;
+    if (typeof stats?.total_tokens === "number") return stats.total_tokens;
+    if (typeof stats?.input_tokens === "number" && typeof stats?.output_tokens === "number") {
+      return stats.input_tokens + stats.output_tokens;
+    }
+  }
+
+  return null;
+}
+
+function recordMetricsEvent(
+  harness: Harness,
+  event: Record<string, unknown>,
+  metrics: MetricsState
+): void {
+  metrics.lastEventAt = Date.now();
+
+  const toolInfo = extractToolCallInfo(harness, event);
+  if (toolInfo.hadToolUse) {
+    if (toolInfo.ids.length === 0) {
+      metrics.toolCallCount += 1;
+    } else {
+      for (const id of toolInfo.ids) {
+        if (metrics.seenToolIds.has(id)) continue;
+        metrics.seenToolIds.add(id);
+        metrics.toolCallCount += 1;
+      }
+    }
+  }
+
+  const subagentInfo = extractSubagentInfo(harness, event);
+  if (subagentInfo.hadSubagent) {
+    if (subagentInfo.ids.length === 0) {
+      metrics.subagentCount += 1;
+    } else {
+      for (const id of subagentInfo.ids) {
+        if (metrics.seenSubagentIds.has(id)) continue;
+        metrics.seenSubagentIds.add(id);
+        metrics.subagentCount += 1;
+      }
+    }
+  }
+
+  const totalTokens = extractTotalTokens(harness, event);
+  if (totalTokens !== null) {
+    metrics.totalTokens = totalTokens;
+  }
+}
 
 // Save assistant response to chat thread
 async function saveChatResponse(threadId: string, content: string): Promise<void> {
@@ -195,7 +384,9 @@ async function executeJob(
   job: Job,
   group: JobGroup,
   assignment: Assignment,
-  accumulatedResults: AccumulatedJobResult[]
+  accumulatedResults: AccumulatedJobResult[],
+  previousNonPmGroupResults: AccumulatedJobResult[],
+  r1GroupResults: AccumulatedJobResult[]
 ): Promise<void> {
   const jobId = job._id;
   const isChat = isChatJob(job);
@@ -222,11 +413,70 @@ async function executeJob(
       : ' (new session)';
     console.log(`[${jobId}] Chat mode: ${chatContext.mode}, thread: ${chatContext.threadId}${resumeInfo}`);
   } else {
-    prompt = buildPrompt(group, assignment, job, accumulatedResults);
+    prompt = buildPrompt(
+      group,
+      assignment,
+      job,
+      accumulatedResults,
+      previousNonPmGroupResults,
+      r1GroupResults
+    );
   }
 
   // Mark job as running with prompt for visibility
   await client!.mutation(api.jobs.start, { id: jobId, prompt });
+
+  const metrics = createMetricsState();
+
+  const flushMetrics = async (): Promise<void> => {
+    if (!client) return;
+    const update: {
+      id: string;
+      toolCallCount?: number;
+      subagentCount?: number;
+      lastEventAt?: number;
+    } = { id: jobId };
+    let changed = false;
+
+    if (metrics.toolCallCount !== metrics.lastFlushedToolCallCount) {
+      update.toolCallCount = metrics.toolCallCount;
+      metrics.lastFlushedToolCallCount = metrics.toolCallCount;
+      changed = true;
+    }
+
+    if (metrics.subagentCount !== metrics.lastFlushedSubagentCount) {
+      update.subagentCount = metrics.subagentCount;
+      metrics.lastFlushedSubagentCount = metrics.subagentCount;
+      changed = true;
+    }
+
+    if (metrics.lastEventAt !== metrics.lastFlushedEventAt) {
+      update.lastEventAt = metrics.lastEventAt ?? undefined;
+      metrics.lastFlushedEventAt = metrics.lastEventAt;
+      changed = true;
+    }
+
+    if (!changed) return;
+
+    try {
+      await client!.mutation(api.jobs.updateMetrics, update);
+    } catch (e) {
+      console.error(`[${jobId}] Failed to update job metrics:`, e);
+    }
+  };
+
+  const ensureHeartbeat = (): void => {
+    if (metrics.heartbeat) return;
+    metrics.heartbeat = setInterval(() => {
+      void flushMetrics();
+    }, METRICS_HEARTBEAT_MS);
+  };
+
+  const stopHeartbeat = (): void => {
+    if (!metrics.heartbeat) return;
+    clearInterval(metrics.heartbeat);
+    metrics.heartbeat = null;
+  };
 
   // Execute via HarnessExecutor (file-based streaming, crash-resilient)
   executor.execute(
@@ -242,9 +492,21 @@ async function executeJob(
       },
     },
     {
+      onEvent: (event) => {
+        recordMetricsEvent(job.harness as Harness, event, metrics);
+        ensureHeartbeat();
+      },
       onComplete: async (result, sessionId) => {
+        stopHeartbeat();
         try {
-          await client!.mutation(api.jobs.complete, { id: jobId, result });
+          await client!.mutation(api.jobs.complete, {
+            id: jobId,
+            result,
+            toolCallCount: metrics.toolCallCount,
+            subagentCount: metrics.subagentCount,
+            totalTokens: metrics.totalTokens ?? undefined,
+            lastEventAt: metrics.lastEventAt ?? undefined,
+          });
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId, result);
             if (sessionId) {
@@ -258,10 +520,15 @@ async function executeJob(
         }
       },
       onFail: async (reason, partialResult) => {
+        stopHeartbeat();
         try {
           await client!.mutation(api.jobs.fail, {
             id: jobId,
             result: partialResult || reason,
+            toolCallCount: metrics.toolCallCount,
+            subagentCount: metrics.subagentCount,
+            totalTokens: metrics.totalTokens ?? undefined,
+            lastEventAt: metrics.lastEventAt ?? undefined,
           });
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId,
@@ -275,10 +542,15 @@ async function executeJob(
         }
       },
       onTimeout: async (partialResult) => {
+        stopHeartbeat();
         try {
           await client!.mutation(api.jobs.fail, {
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
+            toolCallCount: metrics.toolCallCount,
+            subagentCount: metrics.subagentCount,
+            totalTokens: metrics.totalTokens ?? undefined,
+            lastEventAt: metrics.lastEventAt ?? undefined,
           });
           if (isChat && chatContext) {
             await saveChatResponse(chatContext.threadId,
@@ -402,6 +674,8 @@ interface ReadyJob {
   group: JobGroup;
   assignment: Assignment;
   accumulatedResults: AccumulatedJobResult[];
+  previousNonPmGroupResults: AccumulatedJobResult[];
+  r1GroupResults: AccumulatedJobResult[];
 }
 
 interface ReadyChatJob {
@@ -418,7 +692,14 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   console.log(`[Queue] ${newJobs.length} new jobs to execute (parallel if same group)`);
 
   // Execute all ready jobs - scheduler already handles group logic
-  for (const { job, group, assignment, accumulatedResults } of newJobs) {
+  for (const {
+    job,
+    group,
+    assignment,
+    accumulatedResults,
+    previousNonPmGroupResults,
+    r1GroupResults,
+  } of newJobs) {
     // Double-check assignment status before executing
     const currentAssignment = await client!.query(api.assignments.get, {
       id: assignment._id,
@@ -428,7 +709,14 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
       continue;
     }
 
-    executeJob(job, group, assignment, accumulatedResults).catch((e) => {
+    executeJob(
+      job,
+      group,
+      assignment,
+      accumulatedResults,
+      previousNonPmGroupResults,
+      r1GroupResults
+    ).catch((e) => {
       console.error(`Error executing job ${job._id}:`, e);
     });
   }
@@ -458,6 +746,58 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
 
   await client!.mutation(api.chatJobs.start, { id: jobId, prompt });
 
+  const metrics = createMetricsState();
+
+  const flushMetrics = async (): Promise<void> => {
+    if (!client) return;
+    const update: {
+      id: string;
+      toolCallCount?: number;
+      subagentCount?: number;
+      lastEventAt?: number;
+    } = { id: jobId };
+    let changed = false;
+
+    if (metrics.toolCallCount !== metrics.lastFlushedToolCallCount) {
+      update.toolCallCount = metrics.toolCallCount;
+      metrics.lastFlushedToolCallCount = metrics.toolCallCount;
+      changed = true;
+    }
+
+    if (metrics.subagentCount !== metrics.lastFlushedSubagentCount) {
+      update.subagentCount = metrics.subagentCount;
+      metrics.lastFlushedSubagentCount = metrics.subagentCount;
+      changed = true;
+    }
+
+    if (metrics.lastEventAt !== metrics.lastFlushedEventAt) {
+      update.lastEventAt = metrics.lastEventAt ?? undefined;
+      metrics.lastFlushedEventAt = metrics.lastEventAt;
+      changed = true;
+    }
+
+    if (!changed) return;
+
+    try {
+      await client!.mutation(api.chatJobs.updateMetrics, update);
+    } catch (e) {
+      console.error(`[${jobId}] Failed to update chat job metrics:`, e);
+    }
+  };
+
+  const ensureHeartbeat = (): void => {
+    if (metrics.heartbeat) return;
+    metrics.heartbeat = setInterval(() => {
+      void flushMetrics();
+    }, METRICS_HEARTBEAT_MS);
+  };
+
+  const stopHeartbeat = (): void => {
+    if (!metrics.heartbeat) return;
+    clearInterval(metrics.heartbeat);
+    metrics.heartbeat = null;
+  };
+
   // Execute via HarnessExecutor (file-based streaming, crash-resilient)
   executor.execute(
     {
@@ -471,9 +811,21 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
       },
     },
     {
+      onEvent: (event) => {
+        recordMetricsEvent(chatJob.harness as Harness, event, metrics);
+        ensureHeartbeat();
+      },
       onComplete: async (result, sessionId) => {
+        stopHeartbeat();
         try {
-          await client!.mutation(api.chatJobs.complete, { id: jobId, result });
+          await client!.mutation(api.chatJobs.complete, {
+            id: jobId,
+            result,
+            toolCallCount: metrics.toolCallCount,
+            subagentCount: metrics.subagentCount,
+            totalTokens: metrics.totalTokens ?? undefined,
+            lastEventAt: metrics.lastEventAt ?? undefined,
+          });
           await saveChatResponse(chatContext.threadId, result);
           if (sessionId) {
             await saveSessionId(chatContext.threadId, sessionId);
@@ -493,10 +845,15 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
         }
       },
       onFail: async (reason, partialResult) => {
+        stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.fail, {
             id: jobId,
             result: partialResult || reason,
+            toolCallCount: metrics.toolCallCount,
+            subagentCount: metrics.subagentCount,
+            totalTokens: metrics.totalTokens ?? undefined,
+            lastEventAt: metrics.lastEventAt ?? undefined,
           });
           await saveChatResponse(chatContext.threadId,
             `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${partialResult || reason}`
@@ -506,10 +863,15 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
         }
       },
       onTimeout: async (partialResult) => {
+        stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.fail, {
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
+            toolCallCount: metrics.toolCallCount,
+            subagentCount: metrics.subagentCount,
+            totalTokens: metrics.totalTokens ?? undefined,
+            lastEventAt: metrics.lastEventAt ?? undefined,
           });
           await saveChatResponse(chatContext.threadId,
             `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${partialResult || "(no output)"}`

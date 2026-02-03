@@ -18,6 +18,8 @@ export interface StreamHandler {
   isComplete(): boolean;
   /** Get session ID for resume functionality (Claude only) */
   getSessionId(): string | null;
+  /** Get a failure reason if a terminal error was observed */
+  getFailureReason(): string | null;
 }
 
 export interface CommandOptions {
@@ -40,6 +42,7 @@ export class ClaudeStreamHandler implements StreamHandler {
   private complete = false;
   private success = false;
   private sessionId: string | null = null;
+  private failureReason: string | null = null;
 
   onEvent(event: Record<string, unknown>): void {
     const type = event.type as string;
@@ -61,13 +64,19 @@ export class ClaudeStreamHandler implements StreamHandler {
     // Capture final result and session_id
     if (type === "result") {
       this.complete = true;
-      this.success = event.subtype === "success";
+      const subtype = event.subtype as string | undefined;
+      const isError = Boolean(event.is_error);
+      this.success = subtype === "success" && !isError;
       if (event.result) {
         this.finalResult = String(event.result);
       }
       // Capture session_id for resume functionality
       if (event.session_id) {
         this.sessionId = String(event.session_id);
+      }
+      if (!this.success) {
+        const reason = subtype || "error";
+        this.failureReason = `claude_result_${reason}`;
       }
     }
   }
@@ -83,6 +92,10 @@ export class ClaudeStreamHandler implements StreamHandler {
 
   getSessionId(): string | null {
     return this.sessionId;
+  }
+
+  getFailureReason(): string | null {
+    return this.failureReason;
   }
 }
 
@@ -120,6 +133,10 @@ export class CodexStreamHandler implements StreamHandler {
   getSessionId(): string | null {
     return null; // Codex doesn't support session resume
   }
+
+  getFailureReason(): string | null {
+    return null;
+  }
 }
 
 // ============================================================================
@@ -129,6 +146,7 @@ export class CodexStreamHandler implements StreamHandler {
 export class GeminiStreamHandler implements StreamHandler {
   private buffer = "";
   private complete = false;
+  private failureReason: string | null = null;
 
   onEvent(event: Record<string, unknown>): void {
     const type = event.type as string;
@@ -140,6 +158,10 @@ export class GeminiStreamHandler implements StreamHandler {
 
     if (type === "result") {
       this.complete = true;
+      const status = event.status as string | undefined;
+      if (status && status !== "success") {
+        this.failureReason = `gemini_result_${status}`;
+      }
     }
   }
 
@@ -153,6 +175,10 @@ export class GeminiStreamHandler implements StreamHandler {
 
   getSessionId(): string | null {
     return null; // Gemini doesn't support session resume
+  }
+
+  getFailureReason(): string | null {
+    return this.failureReason;
   }
 }
 

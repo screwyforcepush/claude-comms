@@ -195,7 +195,10 @@ function inferPrimaryJobType(results: AccumulatedJobResult[]): string {
   return results[0]?.jobType || "unknown";
 }
 
-function buildPmModules(accumulatedResults: AccumulatedJobResult[]): string {
+function buildPmModules(
+  accumulatedResults: AccumulatedJobResult[],
+  r1GroupResults?: AccumulatedJobResult[]
+): string {
   const grouped = groupAccumulatedResults(accumulatedResults);
   if (grouped.length === 0) {
     return "No prior job results found. Ask clarifying questions if needed and decide the first actionable job.";
@@ -215,12 +218,19 @@ function buildPmModules(accumulatedResults: AccumulatedJobResult[]): string {
       }
     }
 
+    const hasR1Override = r1GroupResults && r1GroupResults.length > 0;
     const priorGroup =
       reviewGroupIndex > 0 ? grouped[reviewGroupIndex - 1] : undefined;
-    const p1JobType = priorGroup ? inferPrimaryJobType(priorGroup.results) : "unknown";
-    const priorResults = priorGroup
-      ? formatAccumulatedResults(priorGroup.results)
-      : "(no prior group found)";
+    const p1JobType = hasR1Override
+      ? inferPrimaryJobType(r1GroupResults!)
+      : priorGroup
+        ? inferPrimaryJobType(priorGroup.results)
+        : "unknown";
+    const priorResults = hasR1Override
+      ? formatAccumulatedResults(r1GroupResults!)
+      : priorGroup
+        ? formatAccumulatedResults(priorGroup.results)
+        : "(no prior group found)";
 
     return `### Post-Review Decision\n\n#### R-1 Context (Group Before Review)\n${priorResults}\n\n#### Decision Logic (P-1 = ${p1JobType})\n1. **If fundamental decisions are required** (cannot be inferred from mental-model + north star with high confidence):\n   - Ask clarifying questions\n   - Block the assignment until resolved\n2. **If high-severity issues have a clear optimal solution and reviewers concur**:\n   - Append a new **${p1JobType}** job to address/refine\n   - Include the issues raised and rationale in your PM response\n3. **If only medium/low/no issues and reviewers (and UAT, if present) approve**:\n   - Filter issues for alignment with mental model and real product value\n   - If **P-1 = plan**: update the plan doc yourself, then append **implement** (or complete if planning-only)\n   - If **P-1 = implement**: append **implement** to address items, or append **document** if no further changes are warranted\n\nAlways include the issues raised and your decision rationale.\n`;
   }
@@ -244,14 +254,18 @@ export function buildPrompt(
   group: JobGroup,
   assignment: Assignment,
   job: Job,
-  accumulatedResults: AccumulatedJobResult[]
+  accumulatedResults: AccumulatedJobResult[],
+  previousNonPmGroupResults: AccumulatedJobResult[],
+  r1GroupResults: AccumulatedJobResult[]
 ): string {
   const template = loadTemplate(job.jobType);
 
   // Format accumulated results for PM/retrospect jobs
-  const resultText = formatAccumulatedResults(accumulatedResults);
+  const previousResults =
+    job.jobType === "pm" ? accumulatedResults : previousNonPmGroupResults;
+  const resultText = formatAccumulatedResults(previousResults);
   const pmModules =
-    job.jobType === "pm" ? buildPmModules(accumulatedResults) : "";
+    job.jobType === "pm" ? buildPmModules(accumulatedResults, r1GroupResults) : "";
 
   return template
     .replace(/\{\{NORTH_STAR\}\}/g, assignment.northStar)

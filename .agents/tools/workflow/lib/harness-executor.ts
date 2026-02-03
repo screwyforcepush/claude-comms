@@ -435,7 +435,10 @@ export class HarnessExecutor {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined);
       } else {
-        const reason = `process_exit_${code}`;
+        const failureReason = handler.getFailureReason();
+        const reason = failureReason
+          ? `process_exit_${code} (${failureReason})`
+          : `process_exit_${code}`;
         tracker.fail(reason);
         callbacks.onFail(reason, result);
       }
