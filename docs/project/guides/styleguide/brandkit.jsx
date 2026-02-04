@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 /*
-  CLAUDE COMMS III — WORKFLOW ENGINE BRAND KIT
+  CRANKSHAFT v3 — QUAKE EDITION BRAND KIT
   
   Aesthetic pillars drawn from id Software's Quake (1996):
   - "Nine Inch Nails palette" — copper, runic metal, industrial brown (American McGee's term)
@@ -120,6 +120,13 @@ const T = {
     scanlineGap: 2,                     // px between scanline stripes
   },
 
+  // --- ICONOGRAPHY ---
+  icon: {
+    size: { xs: 14, sm: 18, md: 24, lg: 32, xl: 48 },
+    stroke: { thin: 1.5, normal: 2, bold: 2.5 },
+    viewBox: "0 0 24 24",              // standard viewbox
+  },
+
   // --- SEMANTIC COLORS (derived from Q) ---
   semantic: {
     success: Q.slime1,    successDark: Q.slime0,
@@ -200,6 +207,233 @@ const QuakeSymbol = ({ size = 28, color = Q.copper3, glow = false }) => (
     </g>
   </svg>
 );
+
+
+// =============================================================
+//  ICON SYSTEM — QIcon
+//  All icons share a 24x24 viewBox, stroke-based, no fills
+//  unless explicitly needed. Designed for the runic/medieval
+//  Quake aesthetic — angular, sharp, no rounded corners.
+// =============================================================
+const ICON_PATHS = {
+  // --- Navigation & Routing ---
+  slipgate: (sw) => (
+    <>
+      <ellipse cx="12" cy="12" rx="7" ry="10" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <ellipse cx="12" cy="12" rx="3" ry="6" stroke="currentColor" strokeWidth={sw * 0.7} fill="none" opacity="0.5" />
+      <line x1="12" y1="2" x2="12" y2="4" stroke="currentColor" strokeWidth={sw} />
+      <line x1="12" y1="20" x2="12" y2="22" stroke="currentColor" strokeWidth={sw} />
+    </>
+  ),
+  route: (sw) => (
+    <>
+      <polyline points="4,12 8,6 16,18 20,12" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+      <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="20" cy="12" r="1.5" fill="currentColor" />
+    </>
+  ),
+  dispatch: (sw) => (
+    <>
+      <path d="M4 12h12" stroke="currentColor" strokeWidth={sw} />
+      <path d="M14 7l6 5-6 5" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+    </>
+  ),
+
+  // --- Weapons / Actions ---
+  axe: (sw) => (
+    <>
+      <line x1="6" y1="18" x2="18" y2="6" stroke="currentColor" strokeWidth={sw} />
+      <path d="M14 4 L20 4 L20 10 L17 8 L16 7Z" stroke="currentColor" strokeWidth={sw * 0.7} fill="currentColor" opacity="0.7" />
+    </>
+  ),
+  nailgun: (sw) => (
+    <>
+      <rect x="6" y="9" width="12" height="6" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth={sw} />
+      <line x1="10" y1="9" x2="10" y2="15" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="14" y1="9" x2="14" y2="15" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <rect x="2" y="10" width="4" height="4" stroke="currentColor" strokeWidth={sw * 0.7} fill="none" />
+    </>
+  ),
+  rocket: (sw) => (
+    <>
+      <path d="M12 3 L16 10 L14 10 L14 19 L10 19 L10 10 L8 10Z" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+      <line x1="10" y1="19" x2="8" y2="22" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="14" y1="19" x2="16" y2="22" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="12" y1="19" x2="12" y2="22" stroke="currentColor" strokeWidth={sw * 0.7} />
+    </>
+  ),
+  lightning: (sw) => (
+    <path d="M13 2 L8 11 L12 11 L11 22 L16 13 L12 13Z" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+  ),
+
+  // --- Status / HUD ---
+  health: (sw) => (
+    <>
+      <rect x="4" y="4" width="16" height="16" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" strokeWidth={sw + 0.5} />
+      <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth={sw + 0.5} />
+    </>
+  ),
+  armor: (sw) => (
+    <path d="M12 3 L4 7 L4 13 C4 17 7 20 12 22 C17 20 20 17 20 13 L20 7Z" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+  ),
+  skull: (sw) => (
+    <>
+      <path d="M6 14 C6 7, 18 7, 18 14 L18 16 L15 16 L14 18 L10 18 L9 16 L6 16Z" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <circle cx="10" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="14" cy="12" r="1.5" fill="currentColor" />
+    </>
+  ),
+  pentagram: (sw) => {
+    const pts = [0,1,2,3,4].map(i => {
+      const a = (i * 72 - 90) * Math.PI / 180;
+      return [12 + 9 * Math.cos(a), 12 + 9 * Math.sin(a)];
+    });
+    const order = [0,2,4,1,3,0];
+    const d = order.map((idx, i) => `${i === 0 ? "M" : "L"}${pts[idx][0].toFixed(1)},${pts[idx][1].toFixed(1)}`).join(" ") + "Z";
+    return <path d={d} stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />;
+  },
+
+  // --- Keys & Access ---
+  keyGold: (sw) => (
+    <>
+      <circle cx="8" cy="8" r="4" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <circle cx="8" cy="8" r="1.5" fill="currentColor" opacity="0.4" />
+      <line x1="12" y1="8" x2="20" y2="8" stroke="currentColor" strokeWidth={sw} />
+      <line x1="18" y1="8" x2="18" y2="12" stroke="currentColor" strokeWidth={sw} />
+      <line x1="15" y1="8" x2="15" y2="11" stroke="currentColor" strokeWidth={sw * 0.7} />
+    </>
+  ),
+  rune: (sw) => (
+    <>
+      <rect x="5" y="3" width="14" height="18" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <path d="M9 7 L12 10 L15 7" stroke="currentColor" strokeWidth={sw * 0.8} fill="none" />
+      <line x1="12" y1="10" x2="12" y2="17" stroke="currentColor" strokeWidth={sw * 0.8} />
+      <line x1="9" y1="14" x2="15" y2="14" stroke="currentColor" strokeWidth={sw * 0.8} />
+    </>
+  ),
+
+  // --- System UI ---
+  eye: (sw) => (
+    <>
+      <path d="M2 12 C5 7, 19 7, 22 12 C19 17, 5 17, 2 12Z" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" />
+    </>
+  ),
+  search: (sw) => (
+    <>
+      <circle cx="10" cy="10" r="6" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" strokeWidth={sw + 0.5} />
+    </>
+  ),
+  config: (sw) => (
+    <>
+      <rect x="4" y="4" width="16" height="16" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <line x1="8" y1="4" x2="8" y2="20" stroke="currentColor" strokeWidth={sw * 0.6} opacity="0.4" />
+      <line x1="16" y1="4" x2="16" y2="20" stroke="currentColor" strokeWidth={sw * 0.6} opacity="0.4" />
+      <line x1="4" y1="8" x2="20" y2="8" stroke="currentColor" strokeWidth={sw * 0.6} opacity="0.4" />
+      <line x1="4" y1="16" x2="20" y2="16" stroke="currentColor" strokeWidth={sw * 0.6} opacity="0.4" />
+      <rect x="10" y="10" width="4" height="4" fill="currentColor" opacity="0.6" />
+    </>
+  ),
+  add: (sw) => (
+    <>
+      <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth={sw} />
+      <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth={sw} />
+    </>
+  ),
+  close: (sw) => (
+    <>
+      <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth={sw} />
+      <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth={sw} />
+    </>
+  ),
+  check: (sw) => (
+    <polyline points="5,13 10,18 19,6" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+  ),
+  warning: (sw) => (
+    <>
+      <path d="M12 3 L2 21 L22 21Z" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+      <line x1="12" y1="10" x2="12" y2="15" stroke="currentColor" strokeWidth={sw} />
+      <rect x="11" y="17" width="2" height="2" fill="currentColor" />
+    </>
+  ),
+  info: (sw) => (
+    <>
+      <rect x="4" y="4" width="16" height="16" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <rect x="11" y="6" width="2" height="2" fill="currentColor" />
+      <line x1="12" y1="10" x2="12" y2="18" stroke="currentColor" strokeWidth={sw} />
+    </>
+  ),
+  chevronRight: (sw) => (
+    <polyline points="9,4 17,12 9,20" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+  ),
+  chevronDown: (sw) => (
+    <polyline points="4,9 12,17 20,9" stroke="currentColor" strokeWidth={sw} fill="none" strokeLinejoin="miter" />
+  ),
+  menu: (sw) => (
+    <>
+      <line x1="4" y1="7" x2="20" y2="7" stroke="currentColor" strokeWidth={sw} />
+      <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth={sw} />
+      <line x1="4" y1="17" x2="20" y2="17" stroke="currentColor" strokeWidth={sw} />
+    </>
+  ),
+  spawn: (sw) => (
+    <>
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth={sw} fill="none" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth={sw * 0.7} fill="none" />
+      <line x1="12" y1="4" x2="12" y2="7" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="12" y1="17" x2="12" y2="20" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="4" y1="12" x2="7" y2="12" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="17" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth={sw * 0.7} />
+    </>
+  ),
+  frag: (sw) => (
+    <>
+      <line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth={sw * 0.7} />
+      <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth={sw * 0.5} opacity="0.5" />
+      <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth={sw * 0.5} opacity="0.5" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    </>
+  ),
+  quad: (sw) => (
+    <>
+      <rect x="4" y="4" width="16" height="16" stroke="currentColor" strokeWidth={sw} fill="none" transform="rotate(45 12 12)" />
+      <rect x="8" y="8" width="8" height="8" stroke="currentColor" strokeWidth={sw * 0.6} fill="none" transform="rotate(45 12 12)" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    </>
+  ),
+};
+
+const QIcon = ({ name, size = T.icon.size.md, color = "currentColor", strokeWidth, glow }) => {
+  const sw = strokeWidth || T.icon.stroke.normal;
+  const pathFn = ICON_PATHS[name];
+  if (!pathFn) return null;
+  const glowId = glow ? `icon-glow-${name}-${Math.random().toString(36).slice(2, 6)}` : null;
+  return (
+    <svg
+      width={size} height={size}
+      viewBox={T.icon.viewBox}
+      fill="none"
+      style={{ color, display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}
+    >
+      {glow && (
+        <defs>
+          <filter id={glowId}>
+            <feGaussianBlur stdDeviation="1.5" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+      )}
+      <g filter={glow ? `url(#${glowId})` : undefined}>
+        {pathFn(sw)}
+      </g>
+    </svg>
+  );
+};
 
 
 // =============================================================
@@ -832,11 +1066,11 @@ export default function QuakeBrandKit() {
               letterSpacing: T.type.tracking.hero, textTransform: "uppercase", margin: 0,
               textShadow: `0 0 ${T.fx.glow.xl}px ${Q.torch}22, 0 ${T.border.width.depth}px ${T.space.xs}px ${Q.void0}`,
               animation: `torchFlicker ${T.anim.flicker.duration} infinite`,
-            }}>CLAUDE COMMS III</h1>
+            }}>CRANKSHAFT v3</h1>
             <div style={{
               fontFamily: FONT.console, fontSize: T.type.size.label, color: Q.bone0,
               letterSpacing: T.type.tracking.wide, marginTop: T.space.xs - 1,
-            }}>WORKFLOW ENGINE</div>
+            }}>AGENT ORCHESTRATION — QUAKE EDITION</div>
           </div>
         </div>
         <p style={{
@@ -942,14 +1176,141 @@ export default function QuakeBrandKit() {
           </div>
         </Section>
 
+        {/* ===== ICONOGRAPHY ===== */}
+        <Section title="Iconography" subtitle={`${Object.keys(ICON_PATHS).length} custom SVGs. Stroke-based, ${T.icon.viewBox} viewBox, angular/miter joins. No rounded corners.`}>
+          {/* Full icon grid */}
+          <div style={{ marginBottom: T.space.xl }}>
+            <div style={{ fontFamily: FONT.display, fontSize: T.type.size.labelSmall, color: Q.copper1, letterSpacing: T.type.tracking.normal, marginBottom: T.space.md - 2 }}>FULL SET — DEFAULT ({T.icon.size.md}px)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 1 }}>
+              {Object.keys(ICON_PATHS).map(name => (
+                <CopperTexture key={name} variant="dark" style={{
+                  padding: `${T.space.lg}px ${T.space.sm}px ${T.space.sm}px`,
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: T.space.sm,
+                }}>
+                  <QIcon name={name} color={Q.bone2} />
+                  <span style={{ fontFamily: FONT.console, fontSize: T.type.size.badge, color: Q.bone0, letterSpacing: T.type.tracking.tight }}>{name}</span>
+                </CopperTexture>
+              ))}
+            </div>
+          </div>
+
+          {/* Size scale */}
+          <div style={{ marginBottom: T.space.xl }}>
+            <div style={{ fontFamily: FONT.display, fontSize: T.type.size.labelSmall, color: Q.copper1, letterSpacing: T.type.tracking.normal, marginBottom: T.space.md - 2 }}>SIZE SCALE</div>
+            <RivetedPanel style={{ padding: T.space.xl }}>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: T.space.xl }}>
+                {Object.entries(T.icon.size).map(([label, px]) => (
+                  <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: T.space.sm }}>
+                    <QIcon name="axe" size={px} color={Q.copper3} />
+                    <div style={{ fontFamily: FONT.display, fontSize: T.type.size.badge, color: Q.bone0, letterSpacing: T.type.tracking.tight }}>{label.toUpperCase()}</div>
+                    <div style={{ fontFamily: FONT.console, fontSize: T.type.size.micro, color: Q.iron2 }}>{px}px</div>
+                  </div>
+                ))}
+              </div>
+            </RivetedPanel>
+          </div>
+
+          {/* Stroke weight */}
+          <div style={{ marginBottom: T.space.xl }}>
+            <div style={{ fontFamily: FONT.display, fontSize: T.type.size.labelSmall, color: Q.copper1, letterSpacing: T.type.tracking.normal, marginBottom: T.space.md - 2 }}>STROKE WEIGHTS</div>
+            <RivetedPanel style={{ padding: T.space.xl }}>
+              <div style={{ display: "flex", gap: T.space.xxl }}>
+                {Object.entries(T.icon.stroke).map(([label, sw]) => (
+                  <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: T.space.sm }}>
+                    <div style={{ display: "flex", gap: T.space.md }}>
+                      <QIcon name="armor" size={T.icon.size.lg} color={Q.bone2} strokeWidth={sw} />
+                      <QIcon name="lightning" size={T.icon.size.lg} color={Q.bone2} strokeWidth={sw} />
+                      <QIcon name="slipgate" size={T.icon.size.lg} color={Q.bone2} strokeWidth={sw} />
+                    </div>
+                    <div style={{ fontFamily: FONT.display, fontSize: T.type.size.badge, color: Q.bone0, letterSpacing: T.type.tracking.tight }}>{label.toUpperCase()}</div>
+                    <div style={{ fontFamily: FONT.console, fontSize: T.type.size.micro, color: Q.iron2 }}>{sw}px</div>
+                  </div>
+                ))}
+              </div>
+            </RivetedPanel>
+          </div>
+
+          {/* Color variants + glow */}
+          <div style={{ marginBottom: T.space.xl }}>
+            <div style={{ fontFamily: FONT.display, fontSize: T.type.size.labelSmall, color: Q.copper1, letterSpacing: T.type.tracking.normal, marginBottom: T.space.md - 2 }}>COLOR VARIANTS & FULLBRIGHT GLOW</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 1 }}>
+              {[
+                { name: "health", color: T.semantic.success, label: "Success", glow: true },
+                { name: "warning", color: T.semantic.warning, label: "Warning", glow: true },
+                { name: "skull", color: T.semantic.danger, label: "Danger", glow: true },
+                { name: "slipgate", color: T.semantic.special, label: "Special", glow: true },
+                { name: "config", color: Q.copper3, label: "Copper", glow: false },
+                { name: "eye", color: Q.bone1, label: "Muted", glow: false },
+              ].map(({ name, color, label, glow: g }) => (
+                <CopperTexture key={label} variant="dark" style={{
+                  padding: T.space.lg, display: "flex", flexDirection: "column", alignItems: "center", gap: T.space.sm,
+                }}>
+                  <QIcon name={name} size={T.icon.size.lg} color={color} glow={g} />
+                  <span style={{ fontFamily: FONT.console, fontSize: T.type.size.badge, color: Q.bone0 }}>{label}</span>
+                </CopperTexture>
+              ))}
+            </div>
+          </div>
+
+          {/* Icons in context — inline with text, in buttons, in badges */}
+          <div>
+            <div style={{ fontFamily: FONT.display, fontSize: T.type.size.labelSmall, color: Q.copper1, letterSpacing: T.type.tracking.normal, marginBottom: T.space.md - 2 }}>IN CONTEXT</div>
+            <CopperTexture style={{ padding: T.space.xl }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: T.space.lg }}>
+                {/* Icon buttons */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: T.space.sm }}>
+                  <QButton variant="primary" icon={<QIcon name="spawn" size={T.icon.size.sm} />}>Spawn Agent</QButton>
+                  <QButton variant="lava" icon={<QIcon name="skull" size={T.icon.size.sm} />}>Terminate</QButton>
+                  <QButton variant="slime" icon={<QIcon name="check" size={T.icon.size.sm} />}>Verified</QButton>
+                  <QButton variant="teleport" icon={<QIcon name="slipgate" size={T.icon.size.sm} />}>Warp</QButton>
+                  <QButton variant="runic" icon={<QIcon name="config" size={T.icon.size.sm} />}>Settings</QButton>
+                </div>
+                {/* Inline with text */}
+                <div style={{ display: "flex", alignItems: "center", gap: T.space.sm, fontFamily: FONT.console, fontSize: T.type.size.console, color: Q.bone2 }}>
+                  <QIcon name="dispatch" size={T.icon.size.sm} color={Q.copper3} />
+                  <span>Lead #4821 routed through slipgate</span>
+                  <QIcon name="chevronRight" size={T.icon.size.xs} color={Q.iron2} />
+                  <span style={{ color: T.semantic.success }}>qualified</span>
+                  <QIcon name="chevronRight" size={T.icon.size.xs} color={Q.iron2} />
+                  <span style={{ color: T.semantic.highlight }}>dispatched to arena</span>
+                </div>
+                {/* Nav-style row */}
+                <div style={{ display: "flex", gap: 1 }}>
+                  {[
+                    { icon: "route", label: "Routes" },
+                    { icon: "rune", label: "Runes" },
+                    { icon: "frag", label: "Arenas" },
+                    { icon: "eye", label: "Monitor" },
+                    { icon: "config", label: "Config" },
+                  ].map(({ icon, label }) => (
+                    <div key={label} style={{
+                      flex: 1, padding: `${T.space.md}px ${T.space.sm}px`,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: T.space.xs,
+                      background: Q.stone1, cursor: "pointer",
+                      borderBottom: `${T.border.width.depth}px solid ${label === "Routes" ? Q.torch : "transparent"}`,
+                    }}>
+                      <QIcon name={icon} size={T.icon.size.sm} color={label === "Routes" ? Q.torch : Q.bone0} />
+                      <span style={{
+                        fontFamily: FONT.display, fontSize: T.type.size.micro,
+                        color: label === "Routes" ? Q.torch : Q.bone0,
+                        letterSpacing: T.type.tracking.tight,
+                      }}>{label.toUpperCase()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CopperTexture>
+          </div>
+        </Section>
+
         {/* ===== BUTTONS ===== */}
         <Section title="Buttons" subtitle={`Copper gradient, ${T.border.width.depth}px bottom depth, ${T.anim.pressDepth} press offset. Sizes: ${Object.keys(T.button.sizes).join("/")}.`}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: T.space.md - 2, marginBottom: T.space.lg }}>
-            <QButton variant="primary">Deploy Agent</QButton>
-            <QButton variant="runic">Configure</QButton>
-            <QButton variant="lava">Terminate</QButton>
-            <QButton variant="slime">Connected</QButton>
-            <QButton variant="teleport">Warp</QButton>
+            <QButton variant="primary" icon={<QIcon name="spawn" size={T.icon.size.sm} />}>Deploy Agent</QButton>
+            <QButton variant="runic" icon={<QIcon name="config" size={T.icon.size.sm} />}>Configure</QButton>
+            <QButton variant="lava" icon={<QIcon name="close" size={T.icon.size.sm} />}>Terminate</QButton>
+            <QButton variant="slime" icon={<QIcon name="check" size={T.icon.size.sm} />}>Connected</QButton>
+            <QButton variant="teleport" icon={<QIcon name="slipgate" size={T.icon.size.sm} />}>Warp</QButton>
             <QButton variant="ghost">Dismiss</QButton>
             <QButton variant="primary" disabled>Sealed</QButton>
           </div>
@@ -1025,7 +1386,7 @@ export default function QuakeBrandKit() {
         {/* ===== CONSOLE ===== */}
         <Section title="Console" subtitle={`Font ${T.type.size.console}px, line-height ${T.type.leading.consoleLine}, cursor blink ${T.anim.cursor.duration}.`}>
           <QuakeConsole lines={[
-            { t: "14:32:01", lv: "---", msg: "Claude Comms III — Workflow Engine initialized" },
+            { t: "14:32:01", lv: "---", msg: "Crankshaft v3.0 — Quake Edition initialized" },
             { t: "14:32:01", lv: "OK", msg: "4 agents spawned across 3 dimensions" },
             { t: "14:32:03", lv: "---", msg: "RANGER routing lead #4821 → qualifier slipgate" },
             { t: "14:32:04", lv: "OK", msg: "FIEND applied rune qualification — score: 87/100" },
@@ -1078,7 +1439,7 @@ export default function QuakeBrandKit() {
           <div style={{ display: "flex", alignItems: "center", gap: T.space.md - 2 }}>
             <QuakeSymbol size={16} color={Q.iron1} />
             <span style={{ fontFamily: FONT.console, fontSize: T.type.size.labelSmall, color: Q.bone0, letterSpacing: T.type.tracking.normal }}>
-              CLAUDE COMMS III — WORKFLOW ENGINE — 2026
+              CRANKSHAFT v3 — QUAKE EDITION — 2026
             </span>
           </div>
           <span style={{ fontFamily: FONT.console, fontSize: T.type.size.labelSmall, color: Q.iron2, fontStyle: "italic" }}>
