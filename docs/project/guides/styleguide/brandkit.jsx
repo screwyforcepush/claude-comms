@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 /*
-  CRANKSHAFT v3 — QUAKE EDITION BRAND KIT
+  CLAUDE COMMS III — QUAKE EDITION BRAND KIT
   
   Aesthetic pillars drawn from id Software's Quake (1996):
   - "Nine Inch Nails palette" — copper, runic metal, industrial brown (American McGee's term)
@@ -1066,11 +1066,11 @@ export default function QuakeBrandKit() {
               letterSpacing: T.type.tracking.hero, textTransform: "uppercase", margin: 0,
               textShadow: `0 0 ${T.fx.glow.xl}px ${Q.torch}22, 0 ${T.border.width.depth}px ${T.space.xs}px ${Q.void0}`,
               animation: `torchFlicker ${T.anim.flicker.duration} infinite`,
-            }}>CRANKSHAFT v3</h1>
+            }}>CLAUDE COMMS III</h1>
             <div style={{
               fontFamily: FONT.console, fontSize: T.type.size.label, color: Q.bone0,
               letterSpacing: T.type.tracking.wide, marginTop: T.space.xs - 1,
-            }}>AGENT ORCHESTRATION — QUAKE EDITION</div>
+            }}>WORKFLOW ENGINE</div>
           </div>
         </div>
         <p style={{
@@ -1386,7 +1386,7 @@ export default function QuakeBrandKit() {
         {/* ===== CONSOLE ===== */}
         <Section title="Console" subtitle={`Font ${T.type.size.console}px, line-height ${T.type.leading.consoleLine}, cursor blink ${T.anim.cursor.duration}.`}>
           <QuakeConsole lines={[
-            { t: "14:32:01", lv: "---", msg: "Crankshaft v3.0 — Quake Edition initialized" },
+            { t: "14:32:01", lv: "---", msg: "CLAUDE COMMS III.0 — Quake Edition initialized" },
             { t: "14:32:01", lv: "OK", msg: "4 agents spawned across 3 dimensions" },
             { t: "14:32:03", lv: "---", msg: "RANGER routing lead #4821 → qualifier slipgate" },
             { t: "14:32:04", lv: "OK", msg: "FIEND applied rune qualification — score: 87/100" },
@@ -1439,7 +1439,7 @@ export default function QuakeBrandKit() {
           <div style={{ display: "flex", alignItems: "center", gap: T.space.md - 2 }}>
             <QuakeSymbol size={16} color={Q.iron1} />
             <span style={{ fontFamily: FONT.console, fontSize: T.type.size.labelSmall, color: Q.bone0, letterSpacing: T.type.tracking.normal }}>
-              CRANKSHAFT v3 — QUAKE EDITION — 2026
+              CLAUDE COMMS III — QUAKE EDITION — 2026
             </span>
           </div>
           <span style={{ fontFamily: FONT.console, fontSize: T.type.size.labelSmall, color: Q.iron2, fontStyle: "italic" }}>
