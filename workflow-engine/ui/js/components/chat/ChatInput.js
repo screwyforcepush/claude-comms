@@ -29,6 +29,7 @@ function SendIcon() {
  */
 export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...' }) {
   const [message, setMessage] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef(null);
 
   // Auto-resize textarea
@@ -65,11 +66,23 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
     setMessage(e.target.value);
   }, []);
 
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+  }, []);
+
   const canSend = message.trim().length > 0 && !disabled;
 
   return React.createElement('form', {
     onSubmit: handleSubmit,
-    className: 'chat-input-container border-t border-gray-700 p-4 bg-gray-900'
+    className: 'chat-input-container border-t p-4',
+    style: {
+      backgroundColor: 'var(--q-stone1)',
+      borderColor: 'var(--q-stone3)'
+    }
   },
     React.createElement('div', {
       className: 'flex items-end gap-3'
@@ -81,13 +94,25 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
           value: message,
           onChange: handleChange,
           onKeyDown: handleKeyDown,
+          onFocus: handleFocus,
+          onBlur: handleBlur,
           placeholder: placeholder,
           disabled: disabled,
           rows: 1,
-          className: `w-full resize-none bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors ${
+          className: `w-full resize-none px-4 py-3 focus:outline-none transition-all ${
             disabled ? 'opacity-50 cursor-not-allowed' : ''
           }`,
-          style: { minHeight: '48px', maxHeight: '150px' }
+          style: {
+            minHeight: '48px',
+            maxHeight: '150px',
+            backgroundColor: 'var(--q-void1)',
+            border: `1px solid ${isFocused ? 'var(--q-copper1)' : 'var(--q-stone3)'}`,
+            borderBottom: `2px solid ${isFocused ? 'var(--q-copper0)' : 'var(--q-void0)'}`,
+            borderRadius: 0,
+            color: 'var(--q-bone3)',
+            fontFamily: 'var(--font-console)',
+            boxShadow: isFocused ? '0 0 12px var(--q-copper1-44), inset 0 0 20px var(--q-copper0-15)' : 'none'
+          }
         })
       ),
 
@@ -95,11 +120,17 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
       React.createElement('button', {
         type: 'submit',
         disabled: !canSend,
-        className: `flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center transition-all ${
-          canSend
-            ? 'bg-blue-500 hover:bg-blue-600 text-white'
-            : 'bg-gray-800 text-gray-600 cursor-not-allowed'
-        }`,
+        className: 'flex-shrink-0 w-12 h-12 flex items-center justify-center transition-all',
+        style: {
+          background: canSend
+            ? 'linear-gradient(180deg, var(--q-copper1), var(--q-copper0))'
+            : 'var(--q-stone2)',
+          border: `1px solid ${canSend ? 'var(--q-copper2)' : 'var(--q-stone3)'}`,
+          borderBottom: `2px solid ${canSend ? 'var(--q-void0)' : 'var(--q-void0)'}`,
+          borderRadius: 0,
+          color: canSend ? 'var(--q-void0)' : 'var(--q-bone0)',
+          cursor: canSend ? 'pointer' : 'not-allowed'
+        },
         title: canSend ? 'Send message' : disabled ? 'Sending...' : 'Type a message to send'
       },
         React.createElement(SendIcon)
@@ -108,7 +139,10 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
 
     // Hint text
     React.createElement('p', {
-      className: 'text-xs text-gray-600 mt-2 pl-1'
+      className: 'text-xs mt-2 pl-1',
+      style: {
+        color: 'var(--q-bone0)'
+      }
     }, 'Press Enter to send, Shift+Enter for new line')
   );
 }

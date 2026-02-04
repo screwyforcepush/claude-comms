@@ -105,13 +105,44 @@ export function ChatView({
     setSelectedJob(null);
   }, []);
   // No thread selected state
+  // WP-8: Transformed to Q palette styling
   if (!thread) {
+    // Mode badge styles using Q palette (matches ModeToggle.js pattern)
+    const modeBadgeStyles = {
+      jam: {
+        backgroundColor: 'rgba(92, 60, 124, 0.2)',
+        color: 'var(--q-teleport)',
+        fontFamily: 'var(--font-display)',
+        padding: '4px 8px',
+        borderRadius: 0,
+        fontSize: '12px'
+      },
+      cook: {
+        backgroundColor: 'rgba(212, 160, 48, 0.2)',
+        color: 'var(--q-torch)',
+        fontFamily: 'var(--font-display)',
+        padding: '4px 8px',
+        borderRadius: 0,
+        fontSize: '12px'
+      },
+      guardian: {
+        backgroundColor: 'rgba(60, 116, 32, 0.2)',
+        color: 'var(--q-slime1)',
+        fontFamily: 'var(--font-display)',
+        padding: '4px 8px',
+        borderRadius: 0,
+        fontSize: '12px'
+      }
+    };
+
     return React.createElement('div', {
-      className: 'flex-1 flex items-center justify-center bg-gray-900'
+      className: 'flex-1 flex items-center justify-center',
+      style: { backgroundColor: 'var(--q-void1)' }
     },
       React.createElement('div', { className: 'text-center max-w-md p-8' },
         React.createElement('svg', {
-          className: 'w-20 h-20 text-gray-700 mx-auto mb-4',
+          className: 'w-20 h-20 mx-auto mb-4',
+          style: { color: 'var(--q-iron1)' },
           fill: 'none',
           stroke: 'currentColor',
           viewBox: '0 0 24 24',
@@ -124,29 +155,32 @@ export function ChatView({
           })
         ),
         React.createElement('h2', {
-          className: 'text-xl font-semibold text-gray-400 mb-2'
+          className: 'text-xl font-semibold mb-2',
+          style: { color: 'var(--q-bone2)' }
         }, 'Product Owner Chat'),
         React.createElement('p', {
-          className: 'text-gray-600 mb-6'
+          className: 'mb-6',
+          style: { color: 'var(--q-bone0)' }
         }, 'Select a conversation from the sidebar or create a new one to start chatting with the Product Owner.'),
         React.createElement('div', {
-          className: 'flex flex-col gap-3 text-sm text-gray-500'
+          className: 'flex flex-col gap-3 text-sm',
+          style: { color: 'var(--q-bone0)' }
         },
           React.createElement('div', { className: 'flex items-center gap-2 justify-center' },
             React.createElement('span', {
-              className: 'px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium'
+              style: modeBadgeStyles.jam
             }, 'Jam'),
             React.createElement('span', null, 'Read-only ideation mode')
           ),
           React.createElement('div', { className: 'flex items-center gap-2 justify-center' },
             React.createElement('span', {
-              className: 'px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-medium'
+              style: modeBadgeStyles.cook
             }, 'Cook'),
             React.createElement('span', null, 'Full autonomy to create assignments')
           ),
           React.createElement('div', { className: 'flex items-center gap-2 justify-center' },
             React.createElement('span', {
-              className: 'px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-medium'
+              style: modeBadgeStyles.guardian
             }, 'Guardian'),
             React.createElement('span', null, 'PO monitors assignment alignment')
           )
@@ -159,8 +193,10 @@ export function ChatView({
     className: 'flex-1 flex min-h-0 min-w-0'
   },
     // Main chat column (header + messages + input)
+    // WP-8: Q palette background
     React.createElement('div', {
-      className: 'flex-1 flex flex-col bg-gray-900 min-h-0 min-w-0'
+      className: 'flex-1 flex flex-col min-h-0 min-w-0',
+      style: { backgroundColor: 'var(--q-void1)' }
     },
       // Header with title, mode toggle, and pane toggle
       React.createElement(ChatHeader, {

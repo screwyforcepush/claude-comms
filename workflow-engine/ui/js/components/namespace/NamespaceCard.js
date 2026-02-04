@@ -1,28 +1,65 @@
 // NamespaceCard - Individual namespace card in the sidebar list
+// WP-5: Transformed to Q palette brandkit styling with riveted panel aesthetic
 import React from 'react';
 import { StatusDot } from '../shared/StatusBadge.js';
 import { Timestamp } from '../shared/Timestamp.js';
 
 /**
  * Count badge for status counts
+ * WP-5: Uses Q palette colors with CSS variables
+ * - pending: torch (warning/yellow)
+ * - active: slime1 (success/green)
+ * - blocked: lava1 (danger/red)
+ * - complete: slime0 bg alpha, slime1 text (success muted)
  */
 function CountBadge({ count, status }) {
   if (count === 0) return null;
 
-  const colors = {
-    pending: 'bg-yellow-500/20 text-yellow-400',
-    active: 'bg-blue-500/20 text-blue-400',
-    blocked: 'bg-red-500/20 text-red-400',
-    complete: 'bg-green-500/20 text-green-400'
+  // Q palette color mapping using CSS variables
+  const colorStyles = {
+    pending: {
+      backgroundColor: 'rgba(212, 160, 48, 0.15)', // --q-torch with alpha
+      color: 'var(--q-torch)',
+    },
+    active: {
+      backgroundColor: 'rgba(60, 116, 32, 0.15)', // --q-slime1 with alpha
+      color: 'var(--q-slime1)',
+    },
+    blocked: {
+      backgroundColor: 'rgba(196, 56, 24, 0.15)', // --q-lava1 with alpha
+      color: 'var(--q-lava1)',
+    },
+    complete: {
+      backgroundColor: 'rgba(44, 84, 24, 0.15)', // --q-slime0 with alpha
+      color: 'var(--q-slime1)', // success muted - slime1 text
+    },
   };
 
+  const fallbackStyle = {
+    backgroundColor: 'rgba(80, 76, 64, 0.15)', // --q-iron1 with alpha
+    color: 'var(--q-iron1)',
+  };
+
+  const badgeStyle = colorStyles[status] || fallbackStyle;
+
   return React.createElement('span', {
-    className: `text-xs px-1.5 py-0.5 rounded-full ${colors[status] || 'bg-gray-600 text-gray-400'}`
+    style: {
+      ...badgeStyle,
+      fontFamily: 'var(--font-display)',
+      fontSize: 'var(--t-type-size-badge)',
+      paddingLeft: '6px',
+      paddingRight: '6px',
+      paddingTop: '2px',
+      paddingBottom: '2px',
+      borderRadius: '9999px', // Keep pill shape for badges
+      letterSpacing: 'var(--t-type-tracking-tight)',
+    }
   }, count);
 }
 
 /**
  * NamespaceCard component - displays a single namespace in the sidebar
+ * WP-5: Transformed to Q palette brandkit styling
  * @param {Object} props
  * @param {Object} props.namespace - Namespace data { name, counts, lastActivity }
  * @param {boolean} props.isSelected - Whether this namespace is currently selected
@@ -40,18 +77,55 @@ export function NamespaceCard({ namespace, isSelected = false, onClick }) {
   else if (counts.active > 0) primaryStatus = 'active';
   else if (counts.pending > 0) primaryStatus = 'pending';
 
-  const selectedClass = isSelected
-    ? 'bg-gray-700 border-l-2 border-blue-500'
-    : 'border-l-2 border-transparent hover:bg-gray-800';
+  // WP-5: Q palette button styling using inline styles with CSS variables
+  // Selected: stone2 background, torch left border
+  // Hover: stone1 background
+  // Focus: stone2 background
+  const buttonStyle = {
+    width: '100%',
+    textAlign: 'left',
+    padding: '12px',
+    transition: 'background-color var(--t-anim-transition-fast), border-color var(--t-anim-transition-fast)',
+    backgroundColor: isSelected ? 'var(--q-stone2)' : 'transparent',
+    outline: 'none',
+    cursor: 'pointer',
+    border: 'none',
+    borderLeftWidth: '2px',
+    borderLeftStyle: 'solid',
+    borderLeftColor: isSelected ? 'var(--q-torch)' : 'transparent',
+  };
 
   return React.createElement('button', {
     onClick: () => onClick && onClick(namespace),
-    className: `w-full text-left p-3 transition-colors ${selectedClass} focus:outline-none focus:bg-gray-700`
+    className: 'w-full text-left p-3 transition-colors focus:outline-none',
+    style: buttonStyle,
+    onMouseEnter: (e) => {
+      if (!isSelected) {
+        e.currentTarget.style.backgroundColor = 'var(--q-stone1)';
+      }
+    },
+    onMouseLeave: (e) => {
+      if (!isSelected) {
+        e.currentTarget.style.backgroundColor = 'transparent';
+      }
+    },
+    onFocus: (e) => {
+      e.currentTarget.style.backgroundColor = 'var(--q-stone2)';
+    },
+    onBlur: (e) => {
+      if (!isSelected) {
+        e.currentTarget.style.backgroundColor = 'transparent';
+      }
+    }
   },
     // Header row: name + active indicator
+    // WP-5: Q palette text colors - bone3 (bright) for selected, bone2 (normal) for unselected
     React.createElement('div', { className: 'flex items-center justify-between mb-2' },
       React.createElement('span', {
-        className: `font-medium truncate ${isSelected ? 'text-white' : 'text-gray-200'}`
+        className: 'font-medium truncate',
+        style: {
+          color: isSelected ? 'var(--q-bone3)' : 'var(--q-bone2)',
+        }
       }, name),
       activeCount > 0 && React.createElement(StatusDot, {
         status: primaryStatus,

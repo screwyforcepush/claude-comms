@@ -1,0 +1,67 @@
+{
+  "name": "annotated-feedback",
+  "version": "0.1.18",
+  "description": "Universal feedback widget with visual annotations - standalone Convex backend + widget + MCP",
+  "private": false,
+  "type": "module",
+  "exports": {
+    "./widget": {
+      "types": "./widget/dist/index.d.ts",
+      "import": "./widget/dist/index.mjs",
+      "require": "./widget/dist/index.js"
+    },
+    "./widget/styles": "./widget/dist/styles.css",
+    "./mcp": "./mcp/dist/server.js"
+  },
+  "bin": {
+    "annotated-feedback": "./mcp/dist/server.js"
+  },
+  "files": [
+    "convex",
+    "widget/dist",
+    "mcp/dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy --prod",
+    "convex:codegen": "convex codegen",
+    "widget:build": "cd widget && pnpm build",
+    "mcp:build": "cd mcp && pnpm build",
+    "build": "pnpm convex:codegen && pnpm widget:build && pnpm mcp:build",
+    "test": "echo 'Tests moved to workspace root'"
+  },
+  "keywords": [
+    "feedback",
+    "widget",
+    "annotation",
+    "convex",
+    "mcp",
+    "visual-feedback"
+  ],
+  "author": "Annotated Feedback Maintainers",
+  "license": "MIT",
+  "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
+    "@modelcontextprotocol/sdk": "^1.20.1",
+    "convex": "^1.25.4",
+    "html-to-image": "^1.11.11",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/screwyforcepush/annotated-feedback"
+  },
+  "homepage": "https://github.com/screwyforcepush/annotated-feedback#readme",
+  "bugs": {
+    "url": "https://github.com/screwyforcepush/annotated-feedback/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

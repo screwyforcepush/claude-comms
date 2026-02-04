@@ -1,4 +1,5 @@
 // ChatHeader - Thread title and mode toggle
+// WP-6: Transformed to Q palette brandkit styling
 import React, { useState, useCallback } from 'react';
 import { ModeToggle } from './ModeToggle.js';
 
@@ -130,14 +131,24 @@ export function ChatHeader({ thread, assignment, onUpdateTitle, onUpdateMode, on
 
   if (!thread) {
     return React.createElement('div', {
-      className: 'chat-header flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-900'
+      className: 'chat-header flex items-center justify-between px-4 py-3',
+      style: {
+        backgroundColor: 'var(--q-stone1)',
+        borderBottom: '1px solid var(--q-stone3)'
+      }
     },
-      React.createElement('span', { className: 'text-gray-500' }, 'Select a conversation')
+      React.createElement('span', {
+        style: { color: 'var(--q-bone0)' }
+      }, 'Select a conversation')
     );
   }
 
   return React.createElement('div', {
-    className: 'chat-header flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-900'
+    className: 'chat-header flex items-center justify-between px-4 py-3',
+    style: {
+      backgroundColor: 'var(--q-stone1)',
+      borderBottom: '1px solid var(--q-stone3)'
+    }
   },
     // Title section
     React.createElement('div', { className: 'flex items-center gap-2 min-w-0 flex-1' },
@@ -149,30 +160,55 @@ export function ChatHeader({ thread, assignment, onUpdateTitle, onUpdateMode, on
               onChange: (e) => setEditTitle(e.target.value),
               onKeyDown: handleKeyDown,
               autoFocus: true,
-              className: 'flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-lg font-semibold focus:outline-none focus:border-blue-500',
+              className: 'flex-1 px-2 py-1 text-lg focus:outline-none',
+              style: {
+                backgroundColor: 'var(--q-void1)',
+                border: '1px solid var(--q-stone3)',
+                borderRadius: 0,
+                color: 'var(--q-bone3)',
+                fontFamily: 'var(--font-display)',
+                letterSpacing: '2px'
+              },
               placeholder: 'Chat title...'
             }),
             React.createElement('button', {
               type: 'button',
               onClick: saveTitle,
-              className: 'p-1.5 text-green-400 hover:text-green-300 hover:bg-gray-800 rounded transition-colors',
+              className: 'chat-header-save-btn p-1.5 transition-colors',
+              style: {
+                color: 'var(--q-slime1)',
+                borderRadius: 0
+              },
               title: 'Save'
             }, React.createElement(CheckIcon)),
             React.createElement('button', {
               type: 'button',
               onClick: cancelEditing,
-              className: 'p-1.5 text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded transition-colors',
+              className: 'chat-header-cancel-btn p-1.5 transition-colors',
+              style: {
+                color: 'var(--q-bone0)',
+                borderRadius: 0
+              },
               title: 'Cancel'
             }, React.createElement(XIcon))
           )
         : React.createElement('div', { className: 'flex items-center gap-2 min-w-0' },
             React.createElement('h2', {
-              className: 'text-lg font-semibold text-white truncate'
+              className: 'text-lg truncate',
+              style: {
+                fontFamily: 'var(--font-display)',
+                color: 'var(--q-bone3)',
+                letterSpacing: '2px'
+              }
             }, thread.title || 'New Chat'),
             !disabled && React.createElement('button', {
               type: 'button',
               onClick: startEditing,
-              className: 'p-1 text-gray-500 hover:text-gray-300 hover:bg-gray-800 rounded transition-colors flex-shrink-0',
+              className: 'chat-header-edit-btn p-1 transition-colors flex-shrink-0',
+              style: {
+                color: 'var(--q-bone0)',
+                borderRadius: 0
+              },
               title: 'Edit title'
             }, React.createElement(EditIcon))
           )
@@ -188,26 +224,43 @@ export function ChatHeader({ thread, assignment, onUpdateTitle, onUpdateMode, on
         title: `Alignment: ${assignment.alignmentStatus || 'aligned'}`
       }, assignment.alignmentStatus === 'misaligned' ? '🔴' :
          assignment.alignmentStatus === 'uncertain' ? '🟠' : '🟢'),
-      // Status badge (ALL modes)
+      // Status badge (ALL modes) - Q palette
       React.createElement('span', {
-        className: `text-xs px-1.5 py-0.5 rounded ${
-          assignment.status === 'blocked'
-            ? 'bg-red-500/20 text-red-400'
-            : assignment.status === 'active'
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-gray-500/20 text-gray-400'
-        }`
+        className: 'text-xs px-1.5 py-0.5',
+        style: assignment.status === 'blocked'
+          ? {
+              backgroundColor: 'rgba(196, 56, 24, 0.2)',
+              color: 'var(--q-lava1)',
+              borderRadius: 0
+            }
+          : assignment.status === 'active'
+            ? {
+                backgroundColor: 'rgba(60, 116, 32, 0.2)',
+                color: 'var(--q-slime1)',
+                borderRadius: 0
+              }
+            : {
+                backgroundColor: 'rgba(80, 76, 64, 0.2)',
+                color: 'var(--q-iron1)',
+                borderRadius: 0
+              }
       }, assignment.status),
-      // WP-3: Details toggle button (visible when assignment exists)
+      // WP-3: Details toggle button (visible when assignment exists) - Q palette
       onTogglePane && React.createElement('button', {
         type: 'button',
         ref: toggleButtonRef,
         onClick: onTogglePane,
-        className: `p-1.5 rounded transition-colors ${
-          paneOpen
-            ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
-            : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700'
-        }`,
+        className: 'chat-header-details-btn p-1.5 transition-colors',
+        style: paneOpen
+          ? {
+              backgroundColor: 'rgba(122, 78, 40, 0.2)',
+              color: 'var(--q-copper2)',
+              borderRadius: 0
+            }
+          : {
+              color: 'var(--q-bone0)',
+              borderRadius: 0
+            },
         'aria-expanded': paneOpen,
         'aria-controls': 'assignment-pane',
         title: paneOpen ? 'Hide assignment details' : 'Show assignment details'

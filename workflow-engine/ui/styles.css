@@ -56,6 +56,16 @@
   --q-copper1-88: #7a4e28e0;  /* 88% - tokens bar gradient */
   --q-copper2-88: #946232e0;  /* 88% - button border top */
   --q-copper3-44: #b0784070;  /* 44% - button text shadow */
+  --q-copper1-08: #7a4e2814;  /* 8% - copper glow inset */
+  --q-copper1-10: #7a4e281a;  /* 10% - copper glow outer */
+  --q-torch-08: #d4a03014;    /* 8% - torch glow inset */
+  --q-torch-10: #d4a0301a;    /* 10% - torch glow outer */
+
+  /* Additional WP-7 alpha variants */
+  --q-torch-hot-33: #e8b84054;  /* 33% - torch hot glow */
+  --q-bone0-12: #6c64541f;      /* 12% - bone background */
+  --q-copper3-12: #b078401f;    /* 12% - copper light bg */
+  --q-copper3-33: #b0784054;    /* 33% - copper border */
 
   /* T Tokens - Border tokens */
   --t-border-radius: 0;
@@ -165,6 +175,75 @@
   }
 }
 
+/* ============================================
+   WP-2: SURFACE PRIMITIVES
+   Copper textures, riveted panels, and glow utilities
+   ============================================ */
+
+/* Copper Texture Surface - 64px grid overlay pattern */
+.copper-texture {
+  background:
+    repeating-linear-gradient(90deg, transparent 0px, transparent 63px,
+      var(--q-stone0-40) 63px, var(--q-stone0-40) 64px),
+    repeating-linear-gradient(0deg, transparent 0px, transparent 63px,
+      var(--q-stone0-30) 63px, var(--q-stone0-30) 64px),
+    linear-gradient(180deg, var(--copper-highlight, transparent), transparent 2px),
+    linear-gradient(135deg, var(--copper-bg, var(--q-stone1)) 0%, var(--q-void1) 100%);
+  border: var(--t-border-width-standard) solid var(--copper-border, var(--q-stone3));
+  border-top-color: var(--q-iron1-44);
+  border-radius: var(--t-border-radius);
+}
+
+/* Copper Texture Variants */
+.copper-texture--dark {
+  --copper-bg: var(--q-stone1);
+  --copper-border: var(--q-stone3);
+  --copper-highlight: var(--q-copper0-30);
+}
+
+.copper-texture--medium {
+  --copper-bg: var(--q-stone2);
+  --copper-border: var(--q-iron0);
+  --copper-highlight: var(--q-copper1-20);
+}
+
+.copper-texture--raised {
+  --copper-bg: var(--q-stone3);
+  --copper-border: var(--q-iron1);
+  --copper-highlight: var(--q-copper0-15);
+}
+
+/* Riveted Panel Surface - 4 corner rivets (2px dots at 8px offset) */
+.riveted-panel {
+  background:
+    radial-gradient(circle at 8px 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at 8px calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    linear-gradient(180deg, var(--q-stone2) 0%, var(--q-stone1) 100%);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-top-color: var(--q-iron1-33);
+  border-bottom: 2px solid var(--q-void0);
+  border-radius: var(--t-border-radius);
+}
+
+/* Glow Utility Classes - Status-based panel glows */
+.glow--slime {
+  box-shadow: inset 0 0 30px var(--q-slime0-08), 0 0 20px var(--q-slime0-10);
+}
+
+.glow--lava {
+  box-shadow: inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10);
+}
+
+.glow--copper {
+  box-shadow: inset 0 0 30px var(--q-copper1-08), 0 0 20px var(--q-copper1-10);
+}
+
+.glow--torch {
+  box-shadow: inset 0 0 30px var(--q-torch-08), 0 0 20px var(--q-torch-10);
+}
+
 /* CSS Reset/Normalize */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -185,7 +264,8 @@ body {
   overflow: hidden;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  background-color: var(--q-void0);
+  background-color: var(--q-void1);
+  color: var(--q-bone2);
 }
 
 img, picture, video, canvas, svg {
@@ -751,6 +831,23 @@ p, h1, h2, h3, h4, h5, h6 {
   border-left: 2px solid #3b82f6;
 }
 
+/* WP-6: Q palette thread item styling */
+.thread-item-q {
+  background-color: transparent;
+  transition: background-color var(--t-anim-transition-fast);
+}
+
+/* Copper texture hover state for thread items */
+.thread-item-q:hover {
+  background-color: var(--q-copper1-08);
+}
+
+/* Selected thread uses torch accent (applied via inline styles) */
+.thread-item-q:focus-visible {
+  outline: 2px solid var(--q-torch);
+  outline-offset: -2px;
+}
+
 /* Chat input textarea focus state */
 .chat-input-container textarea:focus {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
@@ -809,7 +906,8 @@ p, h1, h2, h3, h4, h5, h6 {
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
+  /* Q palette torch/copper gradient - maps amber to brandkit */
+  background: linear-gradient(180deg, var(--q-torch) 0%, var(--q-copper1) 100%);
   border-radius: 2px;
 }
 
@@ -1689,3 +1787,992 @@ p, h1, h2, h3, h4, h5, h6 {
 .running-border-pulse {
   animation: running-border-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ============================================
+   WP-3: EFFECTS LAYER
+   Grain overlay, scanline sweep, torch flicker, fullbright pulse
+   ============================================ */
+
+/* Torch flicker - organic flame-like opacity variation */
+@keyframes torch-flicker {
+  0%, 90%, 100% {
+    opacity: 1;
+  }
+  91% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 0.85;
+  }
+  93% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.92;
+  }
+  97% {
+    opacity: 1;
+  }
+}
+
+/* Fullbright pulse - status indicator glow cycling */
+@keyframes fullbright-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Cursor blink - console cursor animation */
+@keyframes cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Scanline movement - vertical sweep */
+@keyframes scanline-move {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+/* Utility class for torch flicker effect */
+.torch-flicker {
+  animation: torch-flicker 6s infinite;
+}
+
+/* Utility class for fullbright pulse effect */
+.fullbright-pulse {
+  animation: fullbright-pulse 2.5s ease-in-out infinite;
+}
+
+/* Utility class for cursor blink */
+.cursor-blink {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+/* Grain overlay positioning - fixed fullscreen */
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--t-fx-grain-opacity, 0.7);
+  mix-blend-mode: overlay;
+}
+
+/* Scanline sweep - animated horizontal line */
+.scanline-sweep {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 1px;
+  top: 0;
+  background: linear-gradient(90deg,
+    transparent 5%,
+    var(--q-copper1-06) 30%,
+    var(--q-copper1-06) 70%,
+    transparent 95%);
+  z-index: 9998;
+  pointer-events: none;
+  animation: scanline-move 5s linear infinite;
+  will-change: transform;
+}
+
+/* Mobile: Disable effects for performance */
+@media (max-width: 767px) {
+  .grain-overlay {
+    display: none;
+  }
+
+  .scanline-sweep {
+    display: none;
+  }
+}
+
+/* Reduced motion: Disable all effect animations and hide overlays */
+@media (prefers-reduced-motion: reduce) {
+  .torch-flicker {
+    animation: none;
+  }
+
+  .fullbright-pulse {
+    animation: none;
+    opacity: 1;
+  }
+
+  .cursor-blink {
+    animation: none;
+    opacity: 1;
+  }
+
+  .grain-overlay {
+    display: none;
+  }
+
+  .scanline-sweep {
+    animation: none;
+    display: none;
+  }
+}
+
+/* ============================================
+   WP-4: SHARED COMPONENT STYLES
+   StatusRune, QButton, RuneInput patterns
+   ============================================ */
+
+/* StatusRune - Fullbright status indicator pattern */
+.status-rune {
+  font-family: var(--font-display);
+  font-size: var(--t-type-size-badge);
+  letter-spacing: var(--t-type-tracking-normal);
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--t-space-xs) + 1px);
+  padding: calc(var(--t-space-xs) - 1px) var(--t-space-sm);
+}
+
+.status-rune--active,
+.status-rune--running {
+  color: var(--q-slime1);
+  background: rgba(60, 116, 32, 0.12);
+  border: 1px solid rgba(60, 116, 32, 0.33);
+}
+
+.status-rune--pending,
+.status-rune--idle {
+  color: var(--q-torch);
+  background: rgba(212, 160, 48, 0.12);
+  border: 1px solid rgba(212, 160, 48, 0.33);
+}
+
+.status-rune--blocked,
+.status-rune--failed,
+.status-rune--error {
+  color: var(--q-lava1);
+  background: rgba(196, 56, 24, 0.12);
+  border: 1px solid rgba(196, 56, 24, 0.33);
+}
+
+.status-rune--complete {
+  color: var(--q-slime1);
+  background: rgba(60, 116, 32, 0.12);
+  border: 1px solid rgba(60, 116, 32, 0.33);
+}
+
+.status-rune--offline,
+.status-rune--unknown {
+  color: var(--q-iron1);
+  background: rgba(80, 76, 64, 0.12);
+  border: 1px solid rgba(80, 76, 64, 0.33);
+}
+
+.status-rune--warp {
+  color: var(--q-teleport-bright);
+  background: rgba(124, 88, 160, 0.12);
+  border: 1px solid rgba(124, 88, 160, 0.33);
+}
+
+/* Fullbright dot - glowing status indicator */
+.fullbright-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 7px currentColor, 0 0 14px currentColor;
+}
+
+.fullbright-dot--sm {
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+}
+
+.fullbright-dot--lg {
+  width: 9px;
+  height: 9px;
+  box-shadow: 0 0 9px currentColor, 0 0 18px currentColor;
+}
+
+/* QButton styles - Quake-inspired button patterns */
+.q-btn {
+  font-family: var(--font-display);
+  letter-spacing: var(--t-type-tracking-normal);
+  text-transform: uppercase;
+  border-radius: var(--t-border-radius);
+  cursor: pointer;
+  transition: all var(--t-anim-transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.q-btn--sm {
+  padding: var(--t-button-py-sm) var(--t-button-px-sm);
+  font-size: var(--t-button-fs-sm);
+}
+
+.q-btn--md {
+  padding: var(--t-button-py-md) var(--t-button-px-md);
+  font-size: var(--t-button-fs-md);
+}
+
+.q-btn--lg {
+  padding: var(--t-button-py-lg) var(--t-button-px-lg);
+  font-size: var(--t-button-fs-lg);
+}
+
+.q-btn--primary {
+  background: linear-gradient(180deg, var(--q-copper1), var(--q-copper0));
+  border: var(--t-border-width-standard) solid var(--q-copper2);
+  border-top-color: var(--q-copper2-88);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  color: var(--q-void0);
+  text-shadow: 0 1px 0 var(--q-copper3-44);
+}
+
+.q-btn--primary:hover {
+  background: linear-gradient(180deg, var(--q-copper2), var(--q-copper1));
+  box-shadow: 0 0 var(--t-fx-glow-md) var(--q-torch-33);
+}
+
+.q-btn--primary:active {
+  transform: translateY(var(--t-anim-press-depth));
+}
+
+.q-btn--runic {
+  background: linear-gradient(180deg, var(--q-stone2), var(--q-stone1));
+  border: var(--t-border-width-standard) solid var(--q-iron1);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  color: var(--q-bone2);
+}
+
+.q-btn--runic:hover {
+  background: linear-gradient(180deg, var(--q-stone3), var(--q-stone2));
+}
+
+.q-btn--lava {
+  background: linear-gradient(180deg, var(--q-lava0), var(--q-blood));
+  border: var(--t-border-width-standard) solid var(--q-lava1);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  color: var(--q-bone4);
+  text-shadow: 0 1px 2px rgba(6, 5, 4, 0.53);
+}
+
+.q-btn--lava:hover {
+  background: linear-gradient(180deg, var(--q-lava1), var(--q-lava0));
+  box-shadow: 0 0 var(--t-fx-glow-md) var(--q-lava1-44);
+}
+
+.q-btn--slime {
+  background: linear-gradient(180deg, var(--q-slime0), #1c3c10);
+  border: var(--t-border-width-standard) solid var(--q-slime1);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  color: var(--q-bone4);
+  text-shadow: 0 1px 2px rgba(6, 5, 4, 0.53);
+}
+
+.q-btn--slime:hover {
+  background: linear-gradient(180deg, var(--q-slime1), var(--q-slime0));
+  box-shadow: 0 0 calc(var(--t-fx-glow-md) - 2px) rgba(60, 116, 32, 0.33);
+}
+
+.q-btn--teleport {
+  background: linear-gradient(180deg, var(--q-teleport), #3c2858);
+  border: var(--t-border-width-standard) solid var(--q-teleport-bright);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  color: var(--q-bone4);
+}
+
+.q-btn--teleport:hover {
+  background: linear-gradient(180deg, var(--q-teleport-bright), var(--q-teleport));
+  box-shadow: 0 0 calc(var(--t-fx-glow-md) + 2px) rgba(92, 60, 124, 0.44);
+}
+
+.q-btn--ghost {
+  background: transparent;
+  border: var(--t-border-width-standard) solid transparent;
+  color: var(--q-bone1);
+}
+
+.q-btn--ghost:hover {
+  background: rgba(40, 33, 26, 0.53);
+  border-color: var(--q-iron0);
+}
+
+.q-btn:disabled {
+  background: var(--q-stone2);
+  border-color: var(--q-stone3);
+  color: var(--q-bone0);
+  cursor: not-allowed;
+  opacity: var(--t-button-disabled-opacity);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Skeleton loading - Q palette */
+.skeleton-q {
+  background: linear-gradient(
+    90deg,
+    var(--q-stone1) 25%,
+    var(--q-stone2) 50%,
+    var(--q-stone1) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* JSON Viewer - Q palette syntax highlighting */
+.json-viewer-q {
+  font-family: var(--font-console);
+  font-size: var(--t-type-size-console);
+  line-height: var(--t-type-leading-console-line);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: var(--q-void1);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-radius: var(--t-border-radius);
+}
+
+.json-key-q { color: var(--q-copper3); }
+.json-string-q { color: var(--q-slime1); }
+.json-number-q { color: var(--q-torch); }
+.json-boolean-q { color: var(--q-teleport-bright); }
+.json-null-q { color: var(--q-bone0); }
+
+/* EmptyState - Q palette */
+.empty-state-q {
+  color: var(--q-bone0);
+}
+
+.empty-state-q .empty-state-icon {
+  color: var(--q-bone0);
+}
+
+.empty-state-q .empty-state-title {
+  color: var(--q-bone3);
+}
+
+.empty-state-q .empty-state-description {
+  color: var(--q-bone0);
+}
+
+/* ErrorBoundary - Q palette lava/danger theme */
+.error-boundary-q {
+  background-color: var(--q-stone1);
+  border: var(--t-border-width-standard) solid var(--q-lava1-44);
+  border-radius: var(--t-border-radius);
+}
+
+.error-boundary-q .error-icon {
+  color: var(--q-lava1);
+}
+
+.error-boundary-q .error-title {
+  color: var(--q-lava1);
+}
+
+.error-boundary-q .error-message {
+  color: var(--q-bone1);
+}
+
+.error-boundary-q .error-details {
+  background-color: var(--q-void1);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  color: var(--q-bone0);
+}
+
+.error-boundary-q .error-details summary {
+  color: var(--q-bone0);
+}
+
+.error-boundary-q .error-details summary:hover {
+  color: var(--q-bone1);
+}
+
+/* Timestamp - Q palette bone colors */
+.timestamp-q {
+  color: var(--q-bone1);
+}
+
+.timestamp-q--muted {
+  color: var(--q-bone0);
+}
+
+.timestamp-q .timestamp-secondary {
+  color: var(--q-bone0);
+}
+
+/* Tooltip - Q palette */
+.tooltip-q .tooltip-content {
+  background-color: var(--q-stone1);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  color: var(--q-bone2);
+}
+
+/* ============================================
+   WP-5: NAMESPACE COMPONENT STYLES
+   Sidebar, cards, search, metrics
+   ============================================ */
+
+/* RuneInput - Styled text input with copper focus glow */
+.rune-input {
+  width: 100%;
+  padding: calc(var(--t-space-sm) + 1px) var(--t-space-md);
+  font-family: var(--font-console);
+  font-size: var(--t-type-size-stat-small);
+  color: var(--q-bone3);
+  background: var(--q-void1);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  border-radius: var(--t-border-radius);
+  outline: none;
+  transition: all var(--t-anim-transition-normal);
+  box-sizing: border-box;
+}
+
+.rune-input:focus {
+  border-color: var(--q-copper1);
+  border-bottom-color: var(--q-copper0);
+  box-shadow: 0 0 var(--t-fx-glow-md) rgba(122, 78, 40, 0.09), inset 0 0 var(--t-fx-glow-lg) rgba(92, 58, 30, 0.05);
+}
+
+.rune-input::placeholder {
+  color: var(--q-bone0);
+  opacity: 0.6;
+}
+
+/* Sidebar container with copper texture */
+.sidebar-q {
+  background: var(--q-stone0);
+}
+
+/* Branded sidebar header */
+.sidebar-header-q {
+  background: linear-gradient(180deg, var(--q-stone1) 0%, var(--q-stone0) 100%);
+  border-bottom: var(--t-border-width-standard) solid var(--q-stone3);
+  position: relative;
+}
+
+.sidebar-header-q::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--q-copper1-44), var(--q-copper0-30), transparent);
+}
+
+/* "Workflow Engine" title */
+.sidebar-title-q {
+  font-family: var(--font-display);
+  font-size: var(--t-type-size-heading);
+  color: var(--q-torch);
+  letter-spacing: var(--t-type-tracking-wide);
+  text-shadow: 0 0 var(--t-fx-glow-lg) rgba(212, 160, 48, 0.22);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* Namespace card styling */
+.namespace-card-q {
+  transition: background-color var(--t-anim-transition-fast);
+}
+
+.namespace-card-q:hover {
+  background-color: var(--q-stone1);
+}
+
+.namespace-card-q--selected {
+  background-color: var(--q-stone2);
+  border-left: var(--t-border-width-depth) solid var(--q-torch);
+}
+
+.namespace-card-q--selected:hover {
+  background-color: var(--q-stone2);
+}
+
+/* Status count badges */
+.count-badge-q {
+  font-family: var(--font-display);
+  font-size: var(--t-type-size-badge);
+  letter-spacing: var(--t-type-tracking-tight);
+  padding: 2px 6px;
+  border-radius: var(--t-border-radius);
+}
+
+.count-badge-q--pending {
+  background: rgba(212, 160, 48, 0.2);
+  color: var(--q-torch);
+}
+
+.count-badge-q--active {
+  background: rgba(60, 116, 32, 0.2);
+  color: var(--q-slime1);
+}
+
+.count-badge-q--blocked {
+  background: rgba(196, 56, 24, 0.2);
+  color: var(--q-lava1);
+}
+
+.count-badge-q--complete {
+  background: rgba(44, 84, 24, 0.2);
+  color: var(--q-slime1);
+}
+
+/* Metric cards in namespace header */
+.metric-card-q {
+  background-color: var(--q-stone1);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-radius: var(--t-border-radius);
+  padding: var(--t-space-md);
+  text-align: center;
+  min-width: 80px;
+}
+
+.metric-card-q--pending {
+  border-color: rgba(212, 160, 48, 0.33);
+}
+
+.metric-card-q--active {
+  border-color: var(--q-slime1-44);
+}
+
+.metric-card-q--blocked {
+  border-color: var(--q-lava1-44);
+}
+
+.metric-card-q--complete {
+  border-color: var(--q-slime1-44);
+}
+
+.metric-card-q .metric-value {
+  font-family: var(--font-display);
+  font-size: var(--t-type-size-stat-medium);
+  line-height: var(--t-type-leading-tight);
+}
+
+.metric-card-q .metric-label {
+  font-family: var(--font-console);
+  font-size: var(--t-type-size-label-small);
+  color: var(--q-bone0);
+  text-transform: capitalize;
+}
+
+/* Collapse toggle button */
+.collapse-btn-q {
+  padding: var(--t-space-xs);
+  color: var(--q-bone0);
+  background: transparent;
+  border: none;
+  border-radius: var(--t-border-radius);
+  cursor: pointer;
+  transition: all var(--t-anim-transition-fast);
+}
+
+.collapse-btn-q:hover {
+  color: var(--q-copper3);
+  background: var(--q-stone2);
+}
+
+/* ============================================
+   WP-6: CHAT HEADER COMPONENT STYLES
+   Title editing, status badges, action buttons
+   ============================================ */
+
+/* ChatHeader edit button */
+.chat-header-edit-btn:hover {
+  color: var(--q-copper2);
+  background: var(--q-stone2);
+}
+
+/* ChatHeader save button (check icon) */
+.chat-header-save-btn:hover {
+  color: var(--q-slime1);
+  background: var(--q-stone2);
+}
+
+/* ChatHeader cancel button (X icon) */
+.chat-header-cancel-btn:hover {
+  color: var(--q-bone1);
+  background: var(--q-stone2);
+}
+
+/* ChatHeader details toggle button */
+.chat-header-details-btn:hover {
+  color: var(--q-bone1);
+  background: var(--q-stone2);
+}
+
+/* ChatHeader title input focus state */
+.chat-header input:focus {
+  border-color: var(--q-copper1);
+}
+
+/* ============================================
+   WP-8: CHAT PANEL COMPONENT STYLES
+   Threads pane toggle, new chat button hover states
+   ============================================ */
+
+/* ChatPanel collapse/expand button - Q palette hover */
+.chat-panel-collapse-btn:hover {
+  color: var(--q-bone3);
+  background: var(--q-stone2);
+}
+
+/* ChatPanel new chat button - Q palette copper hover */
+.chat-panel-new-btn:hover {
+  background-color: rgba(122, 78, 40, 0.25); /* copper1 at 25% */
+  color: var(--q-copper3);
+}
+
+/* ============================================
+   WP-7: JOB COMPONENTS - AgentHUD Card Styling
+   JobNode, JobChain connectors, HUD meters
+   ============================================ */
+
+/* JobNode HUD base - Riveted panel with 4 corner rivets */
+.job-node-hud {
+  background:
+    radial-gradient(circle at 8px 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at 8px calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    linear-gradient(180deg, var(--q-stone2), var(--q-stone1));
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-top-color: var(--q-iron1-33);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  border-radius: var(--t-border-radius);
+  padding: 0;
+  overflow: hidden;
+  transition: all var(--t-anim-transition-slow);
+  cursor: pointer;
+}
+
+.job-node-hud:hover {
+  border-color: var(--q-iron1);
+  transform: translateY(var(--t-anim-hover-lift));
+}
+
+/* Status glow bar at top of JobNode */
+.job-node-hud__glow-bar {
+  height: 3px;
+  background: linear-gradient(90deg,
+    transparent,
+    var(--job-glow-color, var(--q-copper1-44)),
+    transparent);
+}
+
+/* JobNode status modifiers */
+.job-node-hud--pending {
+  --job-glow-color: var(--q-iron1-44);
+  opacity: 0.7;
+}
+
+.job-node-hud--running {
+  --job-glow-color: var(--q-slime1-44);
+  box-shadow:
+    inset 0 0 30px var(--q-slime0-08),
+    0 0 20px var(--q-slime0-10);
+  animation: job-node-pulse 2.5s ease-in-out infinite;
+}
+
+.job-node-hud--complete {
+  --job-glow-color: var(--q-slime1-44);
+}
+
+.job-node-hud--failed,
+.job-node-hud--blocked {
+  --job-glow-color: var(--q-lava1-44);
+  box-shadow:
+    inset 0 0 30px var(--q-lava0-08),
+    0 0 20px var(--q-lava0-10);
+}
+
+/* JobNode selected state */
+.job-node-hud--selected {
+  box-shadow:
+    0 0 0 2px var(--q-copper3),
+    0 0 12px var(--q-copper1-44);
+}
+
+/* JobNode pulse animation for running state */
+@keyframes job-node-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 30px var(--q-slime0-08),
+      0 0 20px var(--q-slime0-10);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 40px var(--q-slime0-10),
+      0 0 30px var(--q-slime1-44);
+  }
+}
+
+/* HUD meter - health bar style for tool/token counts */
+.hud-meter {
+  height: var(--t-bar-height-health);
+  background: var(--q-void1);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-radius: var(--t-border-radius);
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-meter--mini {
+  height: 4px;
+}
+
+.hud-meter__fill {
+  height: 100%;
+  transition: width var(--t-anim-meter-duration) ease;
+  box-shadow: 0 0 var(--t-fx-glow-sm) currentColor;
+}
+
+.hud-meter--health .hud-meter__fill {
+  background: linear-gradient(90deg, var(--q-slime1-88), var(--q-slime1));
+  color: var(--q-slime1);
+}
+
+.hud-meter--tokens .hud-meter__fill {
+  background: linear-gradient(90deg, var(--q-copper1-88), var(--q-copper3));
+  color: var(--q-copper3);
+}
+
+.hud-meter--tools .hud-meter__fill {
+  background: linear-gradient(90deg, var(--q-teleport), var(--q-teleport-bright));
+  color: var(--q-teleport-bright);
+}
+
+/* Provider logo glow wrapper */
+.provider-logo-glow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.provider-logo-glow::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity var(--t-anim-transition-normal);
+}
+
+.provider-logo-glow--running::before {
+  opacity: 1;
+  background: radial-gradient(circle, var(--q-slime0-10), transparent 70%);
+  animation: provider-glow-pulse 2s ease-in-out infinite;
+}
+
+.provider-logo-glow--complete::before {
+  opacity: 0.6;
+  background: radial-gradient(circle, var(--q-slime0-08), transparent 70%);
+}
+
+.provider-logo-glow--failed::before {
+  opacity: 1;
+  background: radial-gradient(circle, var(--q-lava0-10), transparent 70%);
+}
+
+.provider-logo-glow--pending {
+  opacity: 0.5;
+  filter: grayscale(30%);
+}
+
+@keyframes provider-glow-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* JobChain container styling */
+.job-chain-container {
+  background-color: var(--q-stone1);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-radius: var(--t-border-radius);
+}
+
+/* Job node content area */
+.job-node-hud__content {
+  padding: var(--t-space-sm) var(--t-space-md);
+}
+
+/* Job type badge - Q palette colors */
+.job-type-badge {
+  font-family: var(--font-display);
+  font-size: var(--t-type-size-label);
+  letter-spacing: var(--t-type-tracking-normal);
+  text-transform: uppercase;
+}
+
+.job-type-badge--plan { color: var(--q-teleport-bright); }
+.job-type-badge--implement { color: var(--q-copper2); }
+.job-type-badge--review { color: var(--q-torch); }
+.job-type-badge--uat { color: var(--q-slime1); }
+.job-type-badge--document { color: var(--q-copper3); }
+.job-type-badge--pm { color: var(--q-torch-hot); }
+
+/* Harness badge - provider colors */
+.harness-badge {
+  font-family: var(--font-console);
+  font-size: var(--t-type-size-label-small);
+  letter-spacing: var(--t-type-tracking-tight);
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--t-border-radius);
+}
+
+.harness-badge--claude {
+  background-color: rgba(176, 120, 64, 0.12);
+  color: var(--q-copper3);
+  border: 1px solid rgba(176, 120, 64, 0.33);
+}
+
+.harness-badge--codex {
+  background-color: rgba(60, 116, 32, 0.12);
+  color: var(--q-slime1);
+  border: 1px solid rgba(60, 116, 32, 0.33);
+}
+
+.harness-badge--gemini {
+  background-color: rgba(124, 88, 160, 0.12);
+  color: var(--q-teleport-bright);
+  border: 1px solid rgba(124, 88, 160, 0.33);
+}
+
+.harness-badge--unknown {
+  background-color: rgba(80, 76, 64, 0.12);
+  color: var(--q-iron1);
+  border: 1px solid rgba(80, 76, 64, 0.33);
+}
+
+/* HUD stat display */
+.hud-stat {
+  font-family: var(--font-display);
+}
+
+.hud-stat__label {
+  font-size: var(--t-type-size-badge);
+  color: var(--q-bone0);
+  letter-spacing: var(--t-type-tracking-tight);
+  text-transform: uppercase;
+}
+
+.hud-stat__value {
+  font-size: var(--t-type-size-stat-small);
+  color: var(--q-bone2);
+}
+
+.hud-stat__value--highlight {
+  color: var(--q-torch);
+  text-shadow: 0 0 var(--t-fx-glow-sm) var(--q-torch-33);
+}
+
+/* Chain connectors - iron/stone colors */
+.chain-connector {
+  background-color: var(--q-iron1);
+}
+
+.chain-connector__arrow {
+  color: var(--q-iron1);
+}
+
+/* Job detail modal */
+.job-detail-modal {
+  background:
+    linear-gradient(180deg, rgba(40, 33, 26, 0.3), transparent 2px),
+    linear-gradient(135deg, var(--q-stone2) 0%, var(--q-stone1) 100%);
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-top-color: var(--q-iron1-44);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  border-radius: var(--t-border-radius);
+}
+
+.job-detail-modal__header {
+  border-bottom: var(--t-border-width-standard) solid var(--q-stone3);
+  background: linear-gradient(180deg, rgba(92, 58, 30, 0.1), transparent);
+}
+
+.job-detail-modal__footer {
+  background-color: var(--q-stone1);
+  border-top: var(--t-border-width-standard) solid var(--q-stone3);
+}
+
+/* Job card styles */
+.job-card-q {
+  background:
+    radial-gradient(circle at 8px 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at 8px calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    linear-gradient(180deg, var(--q-stone2), var(--q-stone1));
+  border: var(--t-border-width-standard) solid var(--q-stone3);
+  border-top-color: var(--q-iron1-33);
+  border-bottom: var(--t-border-width-depth) solid var(--q-void0);
+  border-radius: var(--t-border-radius);
+  transition: all var(--t-anim-transition-normal);
+}
+
+.job-card-q:hover {
+  background:
+    radial-gradient(circle at 8px 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) 8px, var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at 8px calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--q-iron0) 2px, transparent 2px),
+    linear-gradient(180deg, var(--q-stone3), var(--q-stone2));
+}
+
+.job-card-q--selected {
+  border-color: var(--q-torch);
+  box-shadow: 0 0 var(--t-fx-glow-md) var(--q-torch-33);
+}
+
+/* Running job pulse animation */
+@keyframes job-running-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 30px var(--q-slime0-08),
+      0 0 20px var(--q-slime0-10);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 40px var(--q-slime0-10),
+      0 0 30px var(--q-slime1-44);
+  }
+}
+
+/* Chain summary stats */
+.chain-stats {
+  font-family: var(--font-console);
+  font-size: var(--t-type-size-label);
+  color: var(--q-bone0);
+}
+
+.chain-stats__complete { color: var(--q-slime1); }
+.chain-stats__running { color: var(--q-teleport-bright); }
+.chain-stats__pending { color: var(--q-torch); }
+.chain-stats__failed { color: var(--q-lava1); }

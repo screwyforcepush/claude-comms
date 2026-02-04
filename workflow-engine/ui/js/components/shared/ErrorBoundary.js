@@ -1,8 +1,10 @@
 // ErrorBoundary - Error handling wrapper component
+// WP-4: Transformed to Q palette lava/danger colors
 import React from 'react';
 
 /**
  * ErrorBoundary component - catches render errors and displays fallback UI
+ * Uses Q palette lava colors for error styling
  * This is a class component because error boundaries require lifecycle methods
  * that aren't available in function components.
  */
@@ -40,18 +42,24 @@ export class ErrorBoundary extends React.Component {
         return this.props.fallback;
       }
 
-      // Default error UI
+      // Default error UI with Q palette lava/danger colors
       return React.createElement('div', {
-        className: `bg-gray-800 border border-red-500/30 rounded-lg p-6 ${this.props.className || ''}`
+        className: `error-boundary-q p-6 ${this.props.className || ''}`,
+        style: {
+          backgroundColor: 'var(--q-stone1)',
+          border: '1px solid var(--q-lava1-44)',
+          borderRadius: 'var(--t-border-radius)'
+        }
       },
-        // Error icon
+        // Error icon and title row
         React.createElement('div', { className: 'flex items-center gap-3 mb-4' },
           React.createElement('svg', {
-            className: 'w-8 h-8 text-red-500',
+            className: 'error-icon w-8 h-8',
             fill: 'none',
             stroke: 'currentColor',
             viewBox: '0 0 24 24',
-            strokeWidth: '1.5'
+            strokeWidth: '1.5',
+            style: { color: 'var(--q-lava1)' }
           },
             React.createElement('path', {
               strokeLinecap: 'round',
@@ -60,31 +68,48 @@ export class ErrorBoundary extends React.Component {
             })
           ),
           React.createElement('h3', {
-            className: 'text-lg font-semibold text-red-400'
+            className: 'error-title text-lg font-semibold',
+            style: {
+              color: 'var(--q-lava1)',
+              fontFamily: 'var(--font-display)',
+              letterSpacing: 'var(--t-type-tracking-normal)',
+              textTransform: 'uppercase'
+            }
           }, 'Something went wrong')
         ),
 
         // Error message
         React.createElement('p', {
-          className: 'text-gray-400 mb-4'
+          className: 'error-message mb-4',
+          style: {
+            color: 'var(--q-bone1)',
+            fontFamily: 'var(--font-body)'
+          }
         }, this.state.error?.message || 'An unexpected error occurred'),
 
         // Error details (collapsed by default for dev mode)
         this.state.errorInfo && React.createElement('details', {
-          className: 'mb-4'
+          className: 'error-details mb-4'
         },
           React.createElement('summary', {
-            className: 'text-sm text-gray-500 cursor-pointer hover:text-gray-400'
+            className: 'text-sm cursor-pointer',
+            style: { color: 'var(--q-bone0)' }
           }, 'Technical details'),
           React.createElement('pre', {
-            className: 'mt-2 p-3 bg-gray-900 rounded text-xs text-gray-400 overflow-auto max-h-40'
+            className: 'mt-2 p-3 rounded text-xs overflow-auto max-h-40',
+            style: {
+              backgroundColor: 'var(--q-void1)',
+              border: '1px solid var(--q-stone3)',
+              color: 'var(--q-bone0)',
+              fontFamily: 'var(--font-console)'
+            }
           }, this.state.errorInfo.componentStack)
         ),
 
-        // Retry button
+        // Retry button with Q palette lava styling
         React.createElement('button', {
           onClick: this.handleRetry,
-          className: 'btn btn-primary'
+          className: 'q-btn q-btn--lava q-btn--md'
         },
           React.createElement('svg', {
             className: 'w-4 h-4 mr-2',

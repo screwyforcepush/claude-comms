@@ -70,8 +70,10 @@ export interface ExecutionHandle {
 }
 
 export interface ExecutorConfig {
-  /** Timeout in milliseconds before killing the process */
+  /** Timeout in milliseconds before killing the process (max total duration) */
   timeoutMs: number;
+  /** Idle timeout in milliseconds - kills job if no events received for this duration */
+  idleTimeoutMs?: number;
   /** Working directory for spawned processes (defaults to process.cwd()) */
   cwd?: string;
   /** Polling interval for file watcher fallback (ms) */
@@ -374,6 +376,9 @@ export class HarnessExecutor {
       const eventType = (event.type as string) || "event";
       tracker.recordEvent(eventType);
 
+      // Reset idle timeout on each event
+      resetIdleTimeout();
+
       // Call optional user callback
       callbacks.onEvent?.(event);
     });
@@ -384,21 +389,44 @@ export class HarnessExecutor {
 
     tailer.start();
 
-    // 8. Set up timeout
+    // 8. Set up timeouts
     let timedOut = false;
+    let idleTimedOut = false;
     let spawnFailed = false;
+
+    // Max duration timeout
     const timeout = setTimeout(() => {
       timedOut = true;
-      console.log(`[${jobId}] Timeout after ${this.config.timeoutMs}ms`);
+      console.log(`[${jobId}] Timeout after ${this.config.timeoutMs}ms (max duration)`);
       tracker.timeout();
       child.kill("SIGTERM");
       setTimeout(() => child.kill("SIGKILL"), 5000);
     }, this.config.timeoutMs);
 
+    // Idle timeout (resets on each event)
+    let idleTimeout: NodeJS.Timeout | null = null;
+    const idleTimeoutMs = this.config.idleTimeoutMs;
+
+    const resetIdleTimeout = () => {
+      if (!idleTimeoutMs) return;
+      if (idleTimeout) clearTimeout(idleTimeout);
+      idleTimeout = setTimeout(() => {
+        idleTimedOut = true;
+        console.log(`[${jobId}] Idle timeout after ${idleTimeoutMs}ms (no events)`);
+        tracker.timeout();
+        child.kill("SIGTERM");
+        setTimeout(() => child.kill("SIGKILL"), 5000);
+      }, idleTimeoutMs);
+    };
+
+    // Start initial idle timeout
+    resetIdleTimeout();
+
     // 9. Handle spawn errors (command not found, permission denied, etc.)
     child.on("error", (err) => {
       spawnFailed = true;
       clearTimeout(timeout);
+      if (idleTimeout) clearTimeout(idleTimeout);
       tailer.stop();
       this.activeJobs.delete(jobId);
 
@@ -419,6 +447,7 @@ export class HarnessExecutor {
       if (spawnFailed) return;
 
       clearTimeout(timeout);
+      if (idleTimeout) clearTimeout(idleTimeout);
 
       // Final flush to capture any remaining events
       await tailer.flush();
@@ -429,7 +458,7 @@ export class HarnessExecutor {
       const result = handler.getResult();
       console.log(`[${jobId}] Exited with code ${code}`);
 
-      if (timedOut) {
+      if (timedOut || idleTimedOut) {
         callbacks.onTimeout(result || "(no output)");
       } else if (code === 0 && handler.isComplete()) {
         tracker.complete(result);

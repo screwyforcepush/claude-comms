@@ -8,27 +8,43 @@ import { NamespaceCard } from './NamespaceCard.js';
 
 /**
  * Connection status indicator for sidebar header
+ * Uses fullbright dot pattern with Q palette colors
  */
 function SidebarConnectionStatus() {
   const { connected, connecting, error } = useConvex();
 
   if (error) {
-    return React.createElement('div', { className: 'flex items-center gap-1.5 text-red-400' },
-      React.createElement('span', { className: 'status-dot bg-red-500' }),
+    return React.createElement('div', {
+      className: 'flex items-center gap-1.5',
+      style: { color: 'var(--q-lava1)' }
+    },
+      React.createElement('span', {
+        className: 'fullbright-dot fullbright-dot--sm',
+        style: { color: 'var(--q-lava1)' }
+      }),
       React.createElement('span', { className: 'text-xs' }, 'Offline')
     );
   }
 
   if (connecting) {
-    return React.createElement('div', { className: 'flex items-center gap-1.5 text-yellow-400' },
+    return React.createElement('div', {
+      className: 'flex items-center gap-1.5',
+      style: { color: 'var(--q-torch)' }
+    },
       React.createElement(LoadingSpinner, { size: 'sm' }),
       React.createElement('span', { className: 'text-xs' }, 'Connecting')
     );
   }
 
   if (connected) {
-    return React.createElement('div', { className: 'flex items-center gap-1.5 text-green-400' },
-      React.createElement('span', { className: 'status-dot bg-green-500 pulse-animation' }),
+    return React.createElement('div', {
+      className: 'flex items-center gap-1.5',
+      style: { color: 'var(--q-slime1)' }
+    },
+      React.createElement('span', {
+        className: 'fullbright-dot fullbright-dot--sm fullbright-pulse',
+        style: { color: 'var(--q-slime1)' }
+      }),
       React.createElement('span', { className: 'text-xs' }, 'Live')
     );
   }
@@ -38,10 +54,12 @@ function SidebarConnectionStatus() {
 
 /**
  * Search icon component
+ * Uses Q palette bone0 color
  */
 function SearchIcon() {
   return React.createElement('svg', {
-    className: 'w-4 h-4 text-gray-500',
+    className: 'w-4 h-4',
+    style: { color: 'var(--q-bone0)' },
     fill: 'none',
     stroke: 'currentColor',
     viewBox: '0 0 24 24',
@@ -57,16 +75,25 @@ function SearchIcon() {
 
 /**
  * Collapse toggle button - chevron icon that points left when expanded, right when collapsed
+ * Uses Q palette stone colors for hover, copper for chevron
  */
 function CollapseToggleButton({ isCollapsed, onToggle }) {
+  const [isHovered, setIsHovered] = React.useState(false);
+
   return React.createElement('button', {
     onClick: onToggle,
-    className: 'sidebar-collapse-btn p-1 rounded hover:bg-gray-700 transition-colors',
+    onMouseEnter: () => setIsHovered(true),
+    onMouseLeave: () => setIsHovered(false),
+    className: 'sidebar-collapse-btn p-1 rounded transition-colors',
+    style: {
+      backgroundColor: isHovered ? 'var(--q-stone2)' : 'transparent'
+    },
     title: isCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
     'aria-label': isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
   },
     React.createElement('svg', {
-      className: `w-4 h-4 text-gray-400 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`,
+      className: `w-4 h-4 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`,
+      style: { color: isHovered ? 'var(--q-torch)' : 'var(--q-copper2)' },
       fill: 'none',
       stroke: 'currentColor',
       viewBox: '0 0 24 24',
@@ -83,10 +110,12 @@ function CollapseToggleButton({ isCollapsed, onToggle }) {
 
 /**
  * Folder icon for collapsed state
+ * Uses Q palette copper3 color
  */
 function FolderIcon() {
   return React.createElement('svg', {
-    className: 'w-5 h-5 text-gray-400',
+    className: 'w-5 h-5',
+    style: { color: 'var(--q-copper3)' },
     fill: 'none',
     stroke: 'currentColor',
     viewBox: '0 0 24 24',
@@ -174,10 +203,17 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
   }
 
   // Collapsed view - show minimal icons
+  // Uses Q palette for backgrounds, borders and selected state with torch glow
   if (isCollapsed) {
     return React.createElement('div', { className: 'flex flex-col h-full' },
       // Collapsed header with expand button
-      React.createElement('div', { className: 'p-2 border-b border-gray-700 bg-gray-800/50 flex justify-center' },
+      React.createElement('div', {
+        className: 'p-2 border-b flex justify-center',
+        style: {
+          borderColor: 'var(--q-stone3)',
+          backgroundColor: 'rgba(30, 24, 19, 0.5)'  // --q-stone1 with 50% opacity
+        }
+      },
         React.createElement(CollapseToggleButton, {
           isCollapsed: true,
           onToggle: onToggleCollapse
@@ -185,27 +221,37 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
       ),
 
       // Connection status indicator (icon only)
-      React.createElement('div', { className: 'p-2 border-b border-gray-700 flex justify-center' },
+      React.createElement('div', {
+        className: 'p-2 border-b flex justify-center',
+        style: { borderColor: 'var(--q-stone3)' }
+      },
         React.createElement(SidebarConnectionStatus)
       ),
 
       // Collapsed namespace icons
       React.createElement('div', { className: 'flex-1 overflow-y-auto' },
-        sortedNamespaces.map(ns =>
-          React.createElement('button', {
+        sortedNamespaces.map(ns => {
+          const isSelected = selectedNamespace === ns.name;
+          const hasActive = (ns.counts?.active || 0) > 0;
+
+          return React.createElement('button', {
             key: ns.name,
             onClick: () => onSelect && onSelect(ns.name),
-            className: `w-full p-2 flex justify-center items-center hover:bg-gray-800 transition-colors ${
-              selectedNamespace === ns.name ? 'bg-blue-500/20 border-l-2 border-blue-500' : ''
-            }`,
+            className: 'w-full p-2 flex justify-center items-center transition-colors',
+            style: {
+              backgroundColor: isSelected ? 'rgba(212, 160, 48, 0.12)' : 'transparent',  // torch with alpha
+              borderLeft: isSelected ? '2px solid var(--q-torch)' : '2px solid transparent',
+              boxShadow: isSelected ? 'inset 0 0 20px rgba(212, 160, 48, 0.08)' : 'none'
+            },
             title: ns.name
           },
             React.createElement('div', {
-              className: `w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold ${
-                (ns.counts?.active || 0) > 0
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'bg-gray-700 text-gray-400'
-              }`
+              className: 'w-8 h-8 flex items-center justify-center text-xs font-semibold',
+              style: {
+                backgroundColor: hasActive ? 'rgba(60, 116, 32, 0.2)' : 'var(--q-stone2)',  // slime1/20% or stone2
+                color: hasActive ? 'var(--q-slime1)' : 'var(--q-bone0)',
+                borderRadius: '0'  // Quake aesthetic: no rounded corners
+              }
             },
               (() => {
                 const parts = ns.name.split(/[-_ ]+/);
@@ -215,18 +261,36 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
                 return ns.name.substring(0, 2).toUpperCase();
               })()
             )
-          )
-        )
+          );
+        })
       )
     );
   }
 
   // Expanded view - full content
+  // Uses Q palette for all visual styling with Silkscreen display font for branding
   return React.createElement('div', { className: 'flex flex-col h-full' },
     // Branding header with collapse toggle
-    React.createElement('div', { className: 'p-3 border-b border-gray-700 bg-gray-800/50' },
+    // Q palette: stone1 semi-transparent background, stone3 border, torch title with text shadow
+    React.createElement('div', {
+      className: 'p-3 border-b',
+      style: {
+        borderColor: 'var(--q-stone3)',
+        backgroundColor: 'rgba(30, 24, 19, 0.5)'  // --q-stone1 with 50% opacity
+      }
+    },
       React.createElement('div', { className: 'flex items-center justify-between' },
-        React.createElement('h1', { className: 'text-lg font-bold text-white' }, 'Workflow Engine'),
+        React.createElement('h1', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '16px',
+            color: 'var(--q-torch)',
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+            textShadow: '0 0 20px rgba(212, 160, 48, 0.22)',
+            margin: 0
+          }
+        }, 'Workflow Engine'),
         React.createElement('div', { className: 'flex items-center gap-2' },
           React.createElement(SidebarConnectionStatus),
           React.createElement(CollapseToggleButton, {
@@ -238,15 +302,28 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
     ),
 
     // Search section
-    React.createElement('div', { className: 'p-3 border-b border-gray-700' },
+    // Q palette: stone3 border, display font for heading, copper2 text
+    React.createElement('div', {
+      className: 'p-3 border-b',
+      style: { borderColor: 'var(--q-stone3)' }
+    },
       // Title row
       React.createElement('div', { className: 'flex items-center justify-between mb-3' },
-        React.createElement('h2', { className: 'text-sm font-semibold text-gray-400 uppercase tracking-wide' },
+        React.createElement('h2', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '10px',
+            color: 'var(--q-copper2)',
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+            margin: 0
+          }
+        },
           'Namespaces'
         )
       ),
 
-      // Search input
+      // Search input - uses rune-input class for Q palette styling
       React.createElement('div', { className: 'relative' },
         React.createElement('div', {
           className: 'absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'
@@ -258,17 +335,21 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
           value: searchTerm,
           onChange: handleSearchChange,
           placeholder: 'Filter namespaces...',
-          className: 'input pl-9 text-sm'
+          className: 'rune-input pl-9 text-sm'
         })
       ),
 
       // Count summary
-      effectiveNamespaces && React.createElement('div', { className: 'mt-2 text-xs text-gray-500' },
+      effectiveNamespaces && React.createElement('div', {
+        className: 'mt-2 text-xs',
+        style: { color: 'var(--q-bone0)' }
+      },
         `${sortedNamespaces.length} of ${effectiveNamespaces.length} namespaces`
       )
     ),
 
     // Namespace list
+    // Q palette: stone3 semi-transparent dividers
     React.createElement('div', { className: 'flex-1 overflow-y-auto' },
       sortedNamespaces.length === 0
         ? React.createElement(EmptyState, {
@@ -278,14 +359,25 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
               ? `No namespaces match "${searchTerm}"`
               : 'Create assignments to see namespaces here'
           })
-        : React.createElement('div', { className: 'divide-y divide-gray-700/50' },
-            sortedNamespaces.map(ns =>
-              React.createElement(NamespaceCard, {
+        : React.createElement('div', {
+            style: {
+              // Use CSS border-bottom on each child instead of divide utility
+              // This is handled in the NamespaceCard component
+            }
+          },
+            sortedNamespaces.map((ns, index) =>
+              React.createElement('div', {
                 key: ns.name,
-                namespace: ns,
-                isSelected: selectedNamespace === ns.name,
-                onClick: () => onSelect && onSelect(ns.name)
-              })
+                style: {
+                  borderBottom: index < sortedNamespaces.length - 1 ? '1px solid rgba(52, 42, 32, 0.5)' : 'none'  // --q-stone3 with 50% opacity
+                }
+              },
+                React.createElement(NamespaceCard, {
+                  namespace: ns,
+                  isSelected: selectedNamespace === ns.name,
+                  onClick: () => onSelect && onSelect(ns.name)
+                })
+              )
             )
           )
     )

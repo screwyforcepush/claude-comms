@@ -22,30 +22,34 @@ export function MessageList({ messages = [], loading = false, sending = false })
     }
   }, [messages, sending]);
 
-  // Loading state
+  // Loading state - Q palette bone text
   if (loading && messages.length === 0) {
     return React.createElement('div', {
       className: 'flex-1 flex items-center justify-center'
     },
       React.createElement('div', { className: 'text-center' },
         React.createElement(LoadingSpinner, { size: 'lg' }),
-        React.createElement('p', { className: 'text-gray-500 mt-3' }, 'Loading messages...')
+        React.createElement('p', {
+          className: 'mt-3',
+          style: { color: 'var(--q-bone0)' }
+        }, 'Loading messages...')
       )
     );
   }
 
-  // Empty state
+  // Empty state - Q palette bone text on void background
   if (messages.length === 0 && !sending) {
     return React.createElement('div', {
       className: 'flex-1 flex items-center justify-center p-8'
     },
       React.createElement('div', { className: 'text-center max-w-md' },
         React.createElement('svg', {
-          className: 'w-16 h-16 text-gray-600 mx-auto mb-4',
+          className: 'w-16 h-16 mx-auto mb-4',
           fill: 'none',
           stroke: 'currentColor',
           viewBox: '0 0 24 24',
-          strokeWidth: '1.5'
+          strokeWidth: '1.5',
+          style: { color: 'var(--q-bone0)' }
         },
           React.createElement('path', {
             strokeLinecap: 'round',
@@ -54,10 +58,12 @@ export function MessageList({ messages = [], loading = false, sending = false })
           })
         ),
         React.createElement('h3', {
-          className: 'text-lg font-medium text-gray-300 mb-2'
+          className: 'text-lg font-medium mb-2',
+          style: { color: 'var(--q-bone2)' }
         }, 'Start a conversation'),
         React.createElement('p', {
-          className: 'text-gray-500 text-sm'
+          className: 'text-sm',
+          style: { color: 'var(--q-bone0)' }
         }, 'Send a message to begin chatting with the Product Owner. They can help you spec out ideas and create assignments.')
       )
     );
@@ -77,16 +83,17 @@ export function MessageList({ messages = [], loading = false, sending = false })
         })
       ),
 
-      // Sending indicator
+      // Sending indicator - Q palette styling matching assistant messages
       sending && React.createElement('div', {
         className: 'flex justify-start'
       },
         React.createElement('div', {
           className: 'flex gap-3 max-w-[80%]'
         },
-          // Assistant avatar
+          // Assistant avatar - Q palette teleport (matches MessageBubble.js assistant avatar)
           React.createElement('div', {
-            className: 'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-purple-500'
+            className: 'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
+            style: { backgroundColor: 'var(--q-teleport)' }
           },
             React.createElement('svg', {
               className: 'w-5 h-5',
@@ -103,28 +110,33 @@ export function MessageList({ messages = [], loading = false, sending = false })
             )
           ),
 
-          // Typing indicator
+          // Typing indicator - Q palette stone/bone styling
           React.createElement('div', { className: 'flex flex-col items-start' },
             React.createElement('span', {
-              className: 'text-xs text-gray-500 mb-1 px-1'
+              className: 'text-xs mb-1 px-1',
+              style: { color: 'var(--q-bone0)' }
             }, 'Product Owner'),
             React.createElement('div', {
-              className: 'bg-gray-800 rounded-2xl rounded-tl-sm px-4 py-3'
+              className: 'px-4 py-3',
+              style: {
+                backgroundColor: 'var(--q-stone2)',
+                border: '1px solid var(--q-stone3)'
+              }
             },
               React.createElement('div', {
                 className: 'flex items-center gap-1'
               },
                 React.createElement('span', {
-                  className: 'w-2 h-2 bg-gray-500 rounded-full animate-bounce',
-                  style: { animationDelay: '0ms' }
+                  className: 'w-2 h-2 rounded-full animate-bounce',
+                  style: { backgroundColor: 'var(--q-copper1)', animationDelay: '0ms' }
                 }),
                 React.createElement('span', {
-                  className: 'w-2 h-2 bg-gray-500 rounded-full animate-bounce',
-                  style: { animationDelay: '150ms' }
+                  className: 'w-2 h-2 rounded-full animate-bounce',
+                  style: { backgroundColor: 'var(--q-copper1)', animationDelay: '150ms' }
                 }),
                 React.createElement('span', {
-                  className: 'w-2 h-2 bg-gray-500 rounded-full animate-bounce',
-                  style: { animationDelay: '300ms' }
+                  className: 'w-2 h-2 rounded-full animate-bounce',
+                  style: { backgroundColor: 'var(--q-copper1)', animationDelay: '300ms' }
                 })
               )
             )

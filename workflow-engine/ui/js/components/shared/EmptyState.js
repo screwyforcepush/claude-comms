@@ -1,8 +1,10 @@
 // EmptyState - Empty list placeholder component
+// WP-4: Transformed to Q palette bone colors
 import React from 'react';
 
 /**
  * Default icons for common empty states
+ * Icon colors will be inherited from parent via currentColor
  */
 const icons = {
   // Inbox/empty list icon
@@ -83,6 +85,7 @@ const icons = {
 
 /**
  * EmptyState component - displays a placeholder when a list is empty
+ * Uses Q palette bone colors for text hierarchy
  * @param {Object} props
  * @param {string} props.icon - Icon type: 'inbox' | 'search' | 'folder' | 'document' | 'error'
  * @param {string} props.title - Main heading text
@@ -100,27 +103,38 @@ export function EmptyState({
   const IconComponent = icons[icon] || icons.inbox;
 
   return React.createElement('div', {
-    className: `empty-state fade-in ${className}`
+    className: `empty-state empty-state-q fade-in ${className}`
   },
-    // Icon
+    // Icon - Q palette bone0 (muted)
     React.createElement('div', {
-      className: 'empty-state-icon text-gray-600 mb-4'
+      className: 'empty-state-icon mb-4',
+      style: { color: 'var(--q-bone0)' }
     }, React.createElement(IconComponent)),
 
-    // Title
+    // Title - Q palette bone3 (bright text)
     React.createElement('h3', {
-      className: 'text-lg font-medium text-gray-300 mb-2'
+      className: 'empty-state-title text-lg font-medium mb-2',
+      style: {
+        color: 'var(--q-bone3)',
+        fontFamily: 'var(--font-display)',
+        letterSpacing: 'var(--t-type-tracking-normal)',
+        textTransform: 'uppercase'
+      }
     }, title),
 
-    // Description
+    // Description - Q palette bone0 (muted text)
     description && React.createElement('p', {
-      className: 'text-gray-500 text-sm max-w-sm'
+      className: 'empty-state-description text-sm max-w-sm',
+      style: {
+        color: 'var(--q-bone0)',
+        fontFamily: 'var(--font-body)'
+      }
     }, description),
 
-    // Action button
+    // Action button - Q palette button
     action && React.createElement('button', {
       onClick: action.onClick,
-      className: 'mt-4 btn btn-primary'
+      className: 'mt-4 q-btn q-btn--primary q-btn--md'
     }, action.label)
   );
 }

@@ -80,6 +80,7 @@ export type PromptType = "full" | "mode_activation" | "minimal" | "guardian_eval
 // Resolve templates directory relative to this module
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, "..", "templates");
+const PM_MODULES_DIR = join(TEMPLATES_DIR, "pm-modules");
 
 /**
  * Load a template file by job type
@@ -92,6 +93,27 @@ export function loadTemplate(jobType: string): string {
     console.error(`Template not found: ${jobType}.md`);
     return "Execute the task as described.\n\n{{CONTEXT}}";
   }
+}
+
+function loadPmModule(moduleName: string): string {
+  const modulePath = join(PM_MODULES_DIR, `${moduleName}.md`);
+  try {
+    return readFileSync(modulePath, "utf-8");
+  } catch {
+    console.error(`PM module not found: ${moduleName}.md`);
+    return "";
+  }
+}
+
+function renderPmModule(
+  template: string,
+  replacements: Record<string, string>
+): string {
+  let output = template;
+  for (const [key, value] of Object.entries(replacements)) {
+    output = output.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+  }
+  return output;
 }
 
 // Accumulated job result for PM jobs
@@ -208,6 +230,7 @@ function buildPmModules(
   const latestHasReview = latestGroup.results.some((r) => isReviewJobType(r.jobType));
   const latestHasImplement = latestGroup.results.some((r) => r.jobType === "implement");
   const latestHasPlan = latestGroup.results.some((r) => r.jobType === "plan");
+  const latestHasDocument = latestGroup.results.some((r) => r.jobType === "document");
 
   if (latestHasReview) {
     let reviewGroupIndex = -1;
@@ -232,15 +255,23 @@ function buildPmModules(
         ? formatAccumulatedResults(priorGroup.results)
         : "(no prior group found)";
 
-    return `### Post-Review Decision\n\n#### R-1 Context (Group Before Review)\n${priorResults}\n\n#### Decision Logic (P-1 = ${p1JobType})\n1. **If fundamental decisions are required** (cannot be inferred from mental-model + north star with high confidence):\n   - Ask clarifying questions\n   - Block the assignment until resolved\n2. **If high-severity issues have a clear optimal solution and reviewers concur**:\n   - Append a new **${p1JobType}** job to address/refine\n   - Include the issues raised and rationale in your PM response\n3. **If only medium/low/no issues and reviewers (and UAT, if present) approve**:\n   - Filter issues for alignment with mental model and real product value\n   - If **P-1 = plan**: update the plan doc yourself, then append **implement** (or complete if planning-only)\n   - If **P-1 = implement**: append **implement** to address items, or append **document** if no further changes are warranted\n\nAlways include the issues raised and your decision rationale.\n`;
+    const template = loadPmModule("post-review");
+    return renderPmModule(template, {
+      R1_CONTEXT: priorResults,
+      P1_JOB_TYPE: p1JobType,
+    });
   }
 
   if (latestHasImplement) {
-    return `### Post-Implement Decision\n\n- Append a **review** job to assess the implementation quality and alignment.\n- If the implementation impacts UX, include **uat** in the same job group.\n- Provide clear context for reviewers/UAT (what changed, success criteria, files/flows).\n`;
+    return loadPmModule("post-implement");
   }
 
   if (latestHasPlan) {
-    return `### Post-Plan Decision\n\n- If the plan/spec represents **non-trivial change** (5+ files, backend + frontend, foundational schema, or core system building blocks), append a **review** job.\n- If the plan is **trivial** or already reviewed and approved, append **implement** to execute the full plan.\n - Note: the implement job is powerful and can candle multiple WP and sequence accordingly. Assign suffiecient work to the implement job so it can deliver a full vertical slice (ready for review).\n- Ensure the plan doc path is recorded in artifacts.\n`;
+    return loadPmModule("post-plan");
+  }
+
+  if (latestHasDocument) {
+    return loadPmModule("post-document");
   }
 
   return "No matching PM module found. Decide next steps based on the latest results and north star alignment.";

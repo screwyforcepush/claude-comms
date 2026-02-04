@@ -1,4 +1,5 @@
 // Timestamp - Relative time display component
+// WP-4: Transformed to Q palette bone colors
 import React, { useState, useEffect } from 'react';
 
 /**
@@ -57,6 +58,7 @@ function formatAbsoluteTime(date) {
 
 /**
  * Timestamp component - displays time in relative or absolute format
+ * Uses Q palette bone colors for text
  * @param {Object} props
  * @param {number|string} props.date - Unix timestamp (ms) or ISO string
  * @param {string} props.format - Display format: 'relative' | 'absolute' | 'both'
@@ -96,33 +98,61 @@ export function Timestamp({ date, format = 'relative', className = '' }) {
   }, [date]);
 
   if (!date) {
-    return React.createElement('span', { className: `text-gray-500 ${className}` }, '-');
+    return React.createElement('span', {
+      className: `timestamp-q timestamp-q--muted ${className}`,
+      style: { color: 'var(--q-bone0)' }
+    }, '-');
   }
 
   const absoluteTime = formatAbsoluteTime(date);
 
   if (format === 'absolute') {
     return React.createElement('span', {
-      className: `text-gray-400 ${className}`
+      className: `timestamp-q ${className}`,
+      style: {
+        color: 'var(--q-bone1)',
+        fontFamily: 'var(--font-console)',
+        fontSize: 'var(--t-type-size-console)'
+      }
     }, absoluteTime);
   }
 
   if (format === 'both') {
     return React.createElement('span', {
-      className: `text-gray-400 ${className}`,
-      title: absoluteTime
+      className: `timestamp-q ${className}`,
+      title: absoluteTime,
+      style: {
+        color: 'var(--q-bone1)',
+        fontFamily: 'var(--font-console)',
+        fontSize: 'var(--t-type-size-console)'
+      }
     },
       relativeTime,
-      React.createElement('span', { className: 'text-gray-600 ml-1' }, `(${absoluteTime})`)
+      React.createElement('span', {
+        className: 'timestamp-secondary ml-1',
+        style: { color: 'var(--q-bone0)' }
+      }, `(${absoluteTime})`)
     );
   }
 
-  // Default: relative with absolute tooltip
+  // Default: relative with absolute tooltip (Q palette styling)
   return React.createElement('span', {
-    className: `text-gray-400 cursor-default tooltip ${className}`
+    className: `timestamp-q cursor-default tooltip tooltip-q ${className}`,
+    style: {
+      color: 'var(--q-bone1)',
+      fontFamily: 'var(--font-console)',
+      fontSize: 'var(--t-type-size-console)'
+    }
   },
     relativeTime,
-    React.createElement('span', { className: 'tooltip-content' }, absoluteTime)
+    React.createElement('span', {
+      className: 'tooltip-content',
+      style: {
+        backgroundColor: 'var(--q-stone1)',
+        border: '1px solid var(--q-stone3)',
+        color: 'var(--q-bone2)'
+      }
+    }, absoluteTime)
   );
 }
 

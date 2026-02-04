@@ -62,6 +62,7 @@ interface Config {
   convexUrl: string;
   namespace: string;
   timeoutMs: number;
+  idleTimeoutMs?: number;
   harnessDefaults: {
     default: Harness;
     [jobType: string]: Harness;
@@ -90,6 +91,7 @@ let unsubscribeChatJobs: (() => void) | null = null;
 // Harness executor (handles process spawning, file-based event streaming, orphan recovery)
 const executor = new HarnessExecutor({
   timeoutMs: config.timeoutMs,
+  idleTimeoutMs: config.idleTimeoutMs,
   cwd: projectRoot,
 });
 
@@ -479,17 +481,23 @@ async function executeJob(
   };
 
   // Execute via HarnessExecutor (file-based streaming, crash-resilient)
+  const env: Record<string, string> = {
+    WORKFLOW_ASSIGNMENT_ID: assignment._id,
+    WORKFLOW_GROUP_ID: group._id,
+    WORKFLOW_JOB_ID: job._id,
+  };
+  if (job.jobType === "pm") {
+    env.WORKFLOW_ARTIFACTS = assignment.artifacts || "";
+    env.WORKFLOW_DECISIONS = assignment.decisions || "";
+  }
+
   executor.execute(
     {
       jobId,
       harness: job.harness as Harness,
       prompt,
       sessionId: isChat && chatContext?.claudeSessionId ? chatContext.claudeSessionId : undefined,
-      env: {
-        WORKFLOW_ASSIGNMENT_ID: assignment._id,
-        WORKFLOW_GROUP_ID: group._id,
-        WORKFLOW_JOB_ID: job._id,
-      },
+      env,
     },
     {
       onEvent: (event) => {
@@ -591,7 +599,6 @@ async function handleGroupCompletion(
   // Check job types in this group to determine behavior
   const jobs = currentGroup.jobs || [];
   const hasPMJob = jobs.some((j: Job) => j.jobType === "pm");
-  const hasDocumentJob = jobs.some((j: Job) => j.jobType === "document");
 
   // PM groups: always trigger guardian evaluation (even if PM inserted next job)
   if (hasPMJob) {
@@ -601,14 +608,6 @@ async function handleGroupCompletion(
     const pmResult = pmJob?.result || "";
     await triggerGuardianEvaluation(assignment, pmResult);
     // If PM didn't insert a next job, check if assignment is done
-    if (!currentGroup.nextGroupId) {
-      await checkAndCompleteAssignment(assignment._id, group._id);
-    }
-    return;
-  }
-
-  if (hasDocumentJob) {
-    // Document job auto-completes the assignment
     if (!currentGroup.nextGroupId) {
       await checkAndCompleteAssignment(assignment._id, group._id);
     }

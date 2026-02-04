@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/shared/ErrorBoundary.js';
 import { LoadingSpinner } from './components/shared/LoadingSkeleton.js';
 import { NamespaceList } from './components/namespace/NamespaceList.js';
 import { ChatPanel } from './components/chat/index.js';
+import { GrainOverlay, ScanlineSweep } from './components/effects/index.js';
 
 // ============================================
 // WP-5: Responsive breakpoint utilities
@@ -74,8 +75,8 @@ function ConnectionStatus() {
   const { connected, connecting, error } = useConvex();
 
   if (error) {
-    return React.createElement('div', { className: 'flex items-center gap-2 text-red-400' },
-      React.createElement('span', { className: 'status-dot bg-red-500' }),
+    return React.createElement('div', { className: 'flex items-center gap-2', style: { color: 'var(--q-lava1)' } },
+      React.createElement('span', { className: 'status-dot', style: { backgroundColor: 'var(--q-lava1)' } }),
       React.createElement('span', { className: 'text-sm' }, 'Disconnected')
     );
   }
@@ -88,8 +89,8 @@ function ConnectionStatus() {
   }
 
   if (connected) {
-    return React.createElement('div', { className: 'flex items-center gap-2 text-green-400' },
-      React.createElement('span', { className: 'status-dot bg-green-500 pulse-animation' }),
+    return React.createElement('div', { className: 'flex items-center gap-2', style: { color: 'var(--q-slime1)' } },
+      React.createElement('span', { className: 'status-dot pulse-animation', style: { backgroundColor: 'var(--q-slime1)' } }),
       React.createElement('span', { className: 'text-sm' }, 'Connected')
     );
   }
@@ -107,7 +108,8 @@ function WelcomeContent() {
   return React.createElement('div', { className: 'flex items-center justify-center h-full min-h-[400px]' },
     React.createElement('div', { className: 'text-center p-8' },
       React.createElement('svg', {
-        className: 'w-16 h-16 text-gray-600 mx-auto mb-4',
+        className: 'w-16 h-16 mx-auto mb-4',
+        style: { color: 'var(--q-bone0)' },
         fill: 'none',
         stroke: 'currentColor',
         viewBox: '0 0 24 24',
@@ -119,10 +121,16 @@ function WelcomeContent() {
           d: 'M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z'
         })
       ),
-      React.createElement('h2', { className: 'text-xl font-semibold text-gray-300 mb-2' },
+      React.createElement('h2', {
+        className: 'text-xl font-semibold mb-2',
+        style: { color: 'var(--q-bone3)' }
+      },
         'Select a Namespace'
       ),
-      React.createElement('p', { className: 'text-gray-500 max-w-md' },
+      React.createElement('p', {
+        className: 'max-w-md',
+        style: { color: 'var(--q-bone1)' }
+      },
         'Choose a namespace from the sidebar to view chat threads and assignments.'
       )
     )
@@ -329,7 +337,7 @@ function App() {
     return React.createElement('div', { className: 'flex items-center justify-center min-h-screen' },
       React.createElement('div', { className: 'text-center' },
         React.createElement(LoadingSpinner, { size: 'lg' }),
-        React.createElement('p', { className: 'text-gray-400 mt-4' }, 'Loading configuration...')
+        React.createElement('p', { className: 'mt-4', style: { color: 'var(--q-bone1)' } }, 'Loading configuration...')
       )
     );
   }
@@ -337,9 +345,16 @@ function App() {
   // Error state
   if (error) {
     return React.createElement('div', { className: 'flex items-center justify-center min-h-screen' },
-      React.createElement('div', { className: 'max-w-md mx-auto bg-gray-800 rounded-xl p-6 border border-red-500/30' },
+      React.createElement('div', {
+        className: 'max-w-md mx-auto p-6 border',
+        style: {
+          backgroundColor: 'var(--q-stone1)',
+          borderColor: 'rgba(196, 56, 24, 0.3)',
+          borderRadius: 0
+        }
+      },
         React.createElement('h2', { className: 'text-xl font-bold mb-4 text-red-400' }, 'Configuration Error'),
-        React.createElement('p', { className: 'text-gray-400 mb-4' }, error),
+        React.createElement('p', { className: 'mb-4', style: { color: 'var(--q-bone1)' } }, error),
         React.createElement('button', {
           onClick: () => window.location.reload(),
           className: 'btn btn-primary'
@@ -351,14 +366,31 @@ function App() {
   // Invalid config state
   if (!isConfigValid(config)) {
     return React.createElement('div', { className: 'flex items-center justify-center min-h-screen' },
-      React.createElement('div', { className: 'max-w-md mx-auto bg-gray-800 rounded-xl p-6 border border-gray-700' },
+      React.createElement('div', {
+        className: 'max-w-md mx-auto p-6 border',
+        style: {
+          backgroundColor: 'var(--q-stone1)',
+          borderColor: 'var(--q-stone3)',
+          borderRadius: 0
+        }
+      },
         React.createElement('h2', { className: 'text-xl font-bold mb-4 text-white' }, 'Configuration Required'),
-        React.createElement('p', { className: 'text-gray-400 mb-4' },
+        React.createElement('p', { className: 'mb-4', style: { color: 'var(--q-bone1)' } },
           'Please edit ',
-          React.createElement('code', { className: 'bg-gray-700 px-2 py-0.5 rounded' }, 'config.json'),
+          React.createElement('code', {
+            className: 'px-2 py-0.5',
+            style: { backgroundColor: 'var(--q-stone2)', borderRadius: 0 }
+          }, 'config.json'),
           ' and set your Convex deployment URL.'
         ),
-        React.createElement('pre', { className: 'bg-gray-900 p-3 rounded text-sm text-gray-300 overflow-x-auto' },
+        React.createElement('pre', {
+          className: 'p-3 text-sm overflow-x-auto',
+          style: {
+            backgroundColor: 'var(--q-void1)',
+            color: 'var(--q-bone3)',
+            borderRadius: 0
+          }
+        },
           JSON.stringify({ convexUrl: 'https://your-project.convex.cloud' }, null, 2)
         )
       )
@@ -368,7 +400,12 @@ function App() {
   // Main application with providers
   return React.createElement(ConvexProvider, { url: config.convexUrl },
     React.createElement(ErrorBoundary, null,
-      React.createElement('div', { className: 'h-screen bg-gray-900 flex flex-col' },
+      React.createElement('div', {
+        className: 'h-screen flex flex-col',
+        style: { backgroundColor: 'var(--q-void1)' }
+      },
+        React.createElement(GrainOverlay),      // WP-3: Grain overlay effect
+        React.createElement(ScanlineSweep),     // WP-3: Scanline sweep effect
         React.createElement(AppLayout)
       )
     )

@@ -16,17 +16,20 @@ import { EmptyState } from '../shared/EmptyState.js';
 export function ThreadList({ threads = [], assignments = {}, selectedThreadId, onSelectThread, loading = false }) {
   // Loading state
   if (loading && threads.length === 0) {
-    return React.createElement('div', { className: 'p-3' },
+    return React.createElement('div', {
+      className: 'p-3',
+      style: { backgroundColor: 'var(--q-void1)' }
+    },
       React.createElement('div', { className: 'space-y-2' },
         Array.from({ length: 5 }).map((_, i) =>
           React.createElement('div', {
             key: i,
             className: 'flex items-start gap-3 px-3 py-3'
           },
-            React.createElement('div', { className: 'skeleton w-8 h-8 rounded-lg' }),
+            React.createElement('div', { className: 'skeleton-q w-8 h-8' }),
             React.createElement('div', { className: 'flex-1' },
-              React.createElement('div', { className: 'skeleton h-4 w-3/4 rounded mb-2' }),
-              React.createElement('div', { className: 'skeleton h-3 w-1/2 rounded' })
+              React.createElement('div', { className: 'skeleton-q h-4 w-3/4 mb-2' }),
+              React.createElement('div', { className: 'skeleton-q h-3 w-1/2' })
             )
           )
         )
@@ -46,16 +49,21 @@ export function ThreadList({ threads = [], assignments = {}, selectedThreadId, o
   }
 
   return React.createElement('div', {
-    className: 'flex-1 overflow-y-auto divide-y divide-gray-800'
+    className: 'flex-1 overflow-y-auto',
+    style: { backgroundColor: 'var(--q-void1)' }
   },
-    threads.map(thread =>
-      React.createElement(ThreadItem, {
-        key: thread._id,
-        thread: thread,
-        assignment: thread.assignmentId ? assignments[thread.assignmentId] : null,
-        isSelected: selectedThreadId === thread._id,
-        onClick: () => onSelectThread && onSelectThread(thread)
-      })
+    threads.map((thread, index) =>
+      React.createElement(React.Fragment, { key: thread._id },
+        index > 0 && React.createElement('div', {
+          style: { height: '1px', backgroundColor: 'var(--q-stone2)' }
+        }),
+        React.createElement(ThreadItem, {
+          thread: thread,
+          assignment: thread.assignmentId ? assignments[thread.assignmentId] : null,
+          isSelected: selectedThreadId === thread._id,
+          onClick: () => onSelectThread && onSelectThread(thread)
+        })
+      )
     )
   );
 }

@@ -47,6 +47,7 @@ Artifacts and decisions are cumulative - append to existing, don't replace.
 
 ```bash
 npx tsx .agents/tools/workflow/cli.ts update-assignment \
+  --append \
   --artifacts "src/auth.ts:JWT login endpoint, src/session.ts:Session manager with 24hr expiry" \
   --decisions "D1: JWT over sessions (stateless scaling). D2: 24hr expiry (security/UX balance)."
 ```

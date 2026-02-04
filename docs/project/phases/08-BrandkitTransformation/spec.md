@@ -135,11 +135,11 @@ The brandkit.jsx is a reference implementation, not a component library. Each UI
 ## Dependency Map
 
 ```
-WP-1: Foundation (CSS tokens, fonts, base styles)
+WP-1: Foundation (CSS tokens, fonts, base styles) ✅ COMPLETE
   │
-  ├── WP-2: Surface Primitives (depends on WP-1)
+  ├── WP-2: Surface Primitives (depends on WP-1) ✅ COMPLETE
   │     │
-  │     ├── WP-3: Effects Layer (depends on WP-2)
+  │     ├── WP-3: Effects Layer (depends on WP-2) ✅ COMPLETE
   │     │
   │     └── WP-4: Shared Components (depends on WP-2)
   │           │
@@ -233,8 +233,9 @@ WP-1: Foundation (CSS tokens, fonts, base styles)
 
 ---
 
-### WP-3: Effects Layer - Grain Overlay & Scanline Sweep
+### WP-3: Effects Layer - Grain Overlay & Scanline Sweep ✅ COMPLETE
 **Scope:** `styles.css` (animations), `main.js` (grain canvas)
+**Status:** Complete (D13 approved)
 
 #### Deliverables
 1. Implement grain overlay canvas component (React, renders to fixed overlay)
@@ -358,12 +359,28 @@ function GrainOverlay() {
 ```
 
 #### Success Criteria
-- [ ] Grain overlay renders without performance degradation (<1ms/frame)
-- [ ] Scanline sweeps smoothly from top to bottom
-- [ ] Torch flicker applies to header "CLAUDE COMMS III" text
-- [ ] All animations respect `prefers-reduced-motion`
-- [ ] Effects don't block user interaction (pointer-events: none)
-- [ ] No accessibility issues (WCAG contrast ratios maintained)
+- [x] Grain overlay renders without performance degradation (<1ms/frame)
+- [x] Scanline sweeps smoothly from top to bottom
+- [x] Torch flicker applies to header "CLAUDE COMMS III" text
+- [x] All animations respect `prefers-reduced-motion`
+- [x] Effects don't block user interaction (pointer-events: none)
+- [x] No accessibility issues (WCAG contrast ratios maintained)
+
+#### Implementation Notes (WP-3 Complete)
+- **Canvas size**: 512x512 (intentional deviation from brandkit's 200x200 to prevent tiling on 4K displays)
+- **Scanline animation**: Uses `transform: translateY` for GPU acceleration (CSS-only, no requestAnimationFrame)
+- **Accessibility**: Both CSS media queries and JS checks for `prefers-reduced-motion`
+- **Z-index**: Grain at 9999, scanline at 9998 (above all content, below nothing)
+
+#### Deferred Issues (Non-blocking)
+| Issue | Severity | Description | Recommendation |
+|-------|----------|-------------|----------------|
+| Canvas null guard | Low | Missing guard for `canvas.getContext('2d')` returning null | Add null check before createImageData |
+| Mobile canvas generation | Low | Grain still generates on mobile (CSS hides it but canvas work runs) | Short-circuit in JS for mobile viewport |
+| Loading screen effects | Low | Effects only render in main app path, not loading/error/config screens | Lift effects wrapper if desired |
+| Redundant 91% keyframe | Info | torch-flicker 91% keyframe is redundant (90% already sets opacity:1) | Optional cleanup |
+
+**Note**: The `torch-flicker` animation behavior (brief stutter every 6s) is intentional per brandkit pattern - it creates organic flame-like variation rather than continuous flickering.
 
 ---
 

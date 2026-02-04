@@ -1,4 +1,5 @@
 // ChatPanel - Main container for chat feature
+// WP-8: Transformed to Q palette brandkit styling
 import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from '../../hooks/useConvex.js';
 import { api } from '../../api.js';
@@ -249,14 +250,18 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
     setThreadsMobileOpen(false);
   }, []);
 
-  // No namespace selected
+  // No namespace selected - Q palette empty state
   if (!namespaceId) {
     return React.createElement('div', {
-      className: 'flex-1 flex items-center justify-center bg-gray-900'
+      className: 'flex-1 flex items-center justify-center',
+      style: {
+        backgroundColor: 'var(--q-void1)'
+      }
     },
       React.createElement('div', { className: 'text-center p-8' },
         React.createElement('svg', {
-          className: 'w-16 h-16 text-gray-600 mx-auto mb-4',
+          className: 'w-16 h-16 mx-auto mb-4',
+          style: { color: 'var(--q-iron1)' },
           fill: 'none',
           stroke: 'currentColor',
           viewBox: '0 0 24 24',
@@ -269,22 +274,25 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
           })
         ),
         React.createElement('h2', {
-          className: 'text-xl font-semibold text-gray-300 mb-2'
+          className: 'text-xl mb-2',
+          style: {
+            fontFamily: 'var(--font-display)',
+            color: 'var(--q-bone2)',
+            letterSpacing: '2px'
+          }
         }, 'Select a Namespace'),
         React.createElement('p', {
-          className: 'text-gray-500'
+          style: { color: 'var(--q-bone0)' }
         }, 'Choose a namespace from the sidebar to access chat.')
       )
     );
   }
 
   // WP-5: Build threads pane classes based on responsive mode
+  // WP-8: Remove gray-* Tailwind classes, use Q palette via inline styles
   const threadsPaneClasses = [
     'threads-pane',
     'flex-shrink-0',
-    'border-r',
-    'border-gray-700',
-    'bg-gray-900',
     'overflow-hidden',
     'transition-all',
     'duration-300',
@@ -292,6 +300,12 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
     threadsPaneCollapsed ? 'threads-pane-collapsed' : 'threads-pane-expanded',
     responsive?.isMobile && threadsMobileOpen ? 'threads-mobile-open' : ''
   ].filter(Boolean).join(' ');
+
+  // WP-8: Threads pane inline styles using Q palette
+  const threadsPaneStyle = {
+    backgroundColor: 'var(--q-stone0)',
+    borderRight: '1px solid var(--q-stone3)'
+  };
 
   return React.createElement('div', {
     className: 'chat-panel flex flex-1 min-h-0'
@@ -303,32 +317,43 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
       'aria-hidden': 'true'
     }),
 
-    // WP-3: Collapsible thread sidebar container
+    // WP-3: Collapsible thread sidebar container with Q palette styling
     React.createElement('div', {
       className: threadsPaneClasses,
+      style: threadsPaneStyle,
       'aria-hidden': responsive?.isMobile && !threadsMobileOpen
     },
       // Collapsed state: icon-only strip with expand button
       threadsPaneCollapsed && React.createElement('div', {
         className: 'threads-pane-collapsed-content h-full flex flex-col items-center py-3 gap-3'
       },
-        // Expand button - uses threads-toggle class to survive CSS visibility rules
+        // Expand button - Q palette styling
         React.createElement('button', {
           type: 'button',
           onClick: handleToggleThreadsPane,
-          className: 'threads-toggle p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0',
+          className: 'threads-toggle p-2 transition-colors flex-shrink-0 chat-panel-collapse-btn',
+          style: {
+            color: 'var(--q-bone0)',
+            borderRadius: 0
+          },
           title: 'Expand conversations',
           'aria-label': 'Expand conversations'
         },
           React.createElement(CollapseChevron, { collapsed: true })
         ),
-        
-        // New Chat Button (Collapsed)
+
+        // New Chat Button (Collapsed) - Q palette copper instead of blue
         React.createElement('button', {
           type: 'button',
           onClick: handleCreateThread,
           disabled: creating,
-          className: `p-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors flex-shrink-0 ${creating ? 'opacity-50 cursor-wait' : ''}`,
+          className: `p-2 transition-colors flex-shrink-0 chat-panel-new-btn ${creating ? 'opacity-50 cursor-wait' : ''}`,
+          style: {
+            // Q palette: copper glow (replaces blue-500/10, blue-400)
+            backgroundColor: 'rgba(122, 78, 40, 0.15)', // copper1 at 15%
+            color: 'var(--q-copper2)',
+            borderRadius: 0
+          },
           title: 'New Chat'
         },
           React.createElement('svg', {
@@ -350,7 +375,7 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
         React.createElement('div', {
           className: 'flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-2 py-2 scrollbar-hide'
         },
-          threads && threads.map(thread => 
+          threads && threads.map(thread =>
             React.createElement(ThreadIcon, {
               key: thread._id,
               thread: thread,
@@ -366,17 +391,29 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
       !threadsPaneCollapsed && React.createElement('div', {
         className: 'threads-pane-expanded-content h-full flex flex-col'
       },
-        // Collapse button in header area
+        // Collapse button in header area - Q palette styling
         React.createElement('div', {
-          className: 'flex items-center justify-between px-3 py-2 border-b border-gray-700'
+          className: 'flex items-center justify-between px-3 py-2',
+          style: {
+            borderBottom: '1px solid var(--q-stone3)'
+          }
         },
           React.createElement('span', {
-            className: 'text-xs font-semibold text-gray-500 uppercase tracking-wide'
+            className: 'text-xs uppercase tracking-wide',
+            style: {
+              fontFamily: 'var(--font-display)',
+              color: 'var(--q-bone0)',
+              letterSpacing: '2px'
+            }
           }, 'Threads'),
           React.createElement('button', {
             type: 'button',
             onClick: handleToggleThreadsPane,
-            className: 'p-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded transition-colors',
+            className: 'p-1.5 transition-colors chat-panel-collapse-btn',
+            style: {
+              color: 'var(--q-bone0)',
+              borderRadius: 0
+            },
             title: 'Collapse conversations'
           },
             React.createElement(CollapseChevron, { collapsed: false })

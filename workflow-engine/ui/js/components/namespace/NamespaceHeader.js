@@ -1,36 +1,91 @@
 // NamespaceHeader - Header for selected namespace
+// WP-5: Transformed to Q palette brandkit styling with riveted panel aesthetic
 import React from 'react';
 import { StatusBadge } from '../shared/StatusBadge.js';
 
 /**
- * Metric card for status counts
+ * Status color mappings for MetricCard using Q palette CSS variables
+ * - pending: torch (warning/attention)
+ * - active: slime (success/running)
+ * - blocked: lava (danger/error)
+ * - complete: slime (success)
+ */
+const statusColors = {
+  pending: {
+    border: 'var(--q-torch-33)',
+    text: 'var(--q-torch)'
+  },
+  active: {
+    border: 'var(--q-slime1-44)',
+    text: 'var(--q-slime1)'
+  },
+  blocked: {
+    border: 'var(--q-lava1-44)',
+    text: 'var(--q-lava1)'
+  },
+  complete: {
+    border: 'var(--q-slime1-44)',
+    text: 'var(--q-slime1)'
+  }
+};
+
+/**
+ * Metric card for status counts - Q palette HUDStat pattern
+ * Uses riveted panel aesthetic with status-specific glow colors
  */
 function MetricCard({ label, count, status }) {
-  const colors = {
-    pending: 'border-yellow-500/30 text-yellow-400',
-    active: 'border-blue-500/30 text-blue-400',
-    blocked: 'border-red-500/30 text-red-400',
-    complete: 'border-green-500/30 text-green-400'
+  const colors = statusColors[status] || {
+    border: 'var(--q-stone3)',
+    text: 'var(--q-bone1)'
   };
 
   return React.createElement('div', {
-    className: `bg-gray-800 border ${colors[status]?.split(' ')[0] || 'border-gray-700'} rounded-lg p-3 text-center min-w-[80px]`
+    className: 'rounded-lg p-3 text-center min-w-[80px]',
+    style: {
+      background: 'var(--q-stone1)',
+      border: `1px solid ${colors.border}`,
+      borderRadius: 'var(--t-border-radius)'
+    }
   },
+    // Count number - display font, stat-medium size
     React.createElement('div', {
-      className: `text-2xl font-bold ${colors[status]?.split(' ')[1] || 'text-gray-300'}`
+      style: {
+        fontFamily: 'var(--font-display)',
+        fontSize: 'var(--t-type-size-stat-medium)',
+        color: colors.text,
+        lineHeight: 'var(--t-type-leading-tight)',
+        textShadow: `0 0 var(--t-fx-glow-sm) ${colors.text}33`
+      }
     }, count),
-    React.createElement('div', { className: 'text-xs text-gray-500 capitalize' }, label)
+    // Label - console font, label-small size
+    React.createElement('div', {
+      className: 'capitalize',
+      style: {
+        fontFamily: 'var(--font-console)',
+        fontSize: 'var(--t-type-size-label-small)',
+        color: 'var(--q-bone0)',
+        letterSpacing: 'var(--t-type-tracking-tight)'
+      }
+    }, label)
   );
 }
 
 /**
  * NamespaceHeader component - displays header for selected namespace
+ * WP-5: Q palette brandkit transformation with riveted panel aesthetic
  * @param {Object} props
  * @param {Object} props.namespace - Namespace data { name, counts }
  */
 export function NamespaceHeader({ namespace }) {
   if (!namespace) {
-    return React.createElement('div', { className: 'p-6 text-center text-gray-500' },
+    return React.createElement('div', {
+      className: 'p-6 text-center',
+      style: {
+        color: 'var(--q-bone0)',
+        fontFamily: 'var(--font-console)',
+        fontSize: 'var(--t-type-size-body)'
+      }
+    },
       'Select a namespace to view details'
     );
   }
@@ -44,11 +99,27 @@ export function NamespaceHeader({ namespace }) {
   else if (counts.active > 0) overallStatus = 'active';
   else if (counts.pending > 0) overallStatus = 'pending';
 
-  return React.createElement('div', { className: 'bg-gray-800 border-b border-gray-700 p-6' },
+  return React.createElement('div', {
+    className: 'p-6',
+    style: {
+      background: 'var(--q-stone1)',
+      borderBottom: '1px solid var(--q-stone3)'
+    }
+  },
     // Top row: namespace name, status, actions
     React.createElement('div', { className: 'flex items-center justify-between mb-4' },
       React.createElement('div', { className: 'flex items-center gap-3' },
-        React.createElement('h1', { className: 'text-2xl font-bold text-white' }, name),
+        // Namespace name - h1 with display font and bone4 color
+        React.createElement('h1', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-type-size-title)',
+            color: 'var(--q-bone4)',
+            letterSpacing: 'var(--t-type-tracking-wide)',
+            textShadow: '0 0 var(--t-fx-glow-sm) var(--q-torch-22)',
+            margin: 0
+          }
+        }, name),
         React.createElement(StatusBadge, { status: overallStatus, size: 'md' })
       )
     ),
@@ -75,12 +146,33 @@ export function NamespaceHeader({ namespace }) {
         count: counts.complete || 0,
         status: 'complete'
       }),
-      // Total assignments
+      // Total assignments - neutral Q palette styling
       React.createElement('div', {
-        className: 'bg-gray-800 border border-gray-700 rounded-lg p-3 text-center min-w-[80px]'
+        className: 'rounded-lg p-3 text-center min-w-[80px]',
+        style: {
+          background: 'var(--q-stone1)',
+          border: '1px solid var(--q-stone3)',
+          borderRadius: 'var(--t-border-radius)'
+        }
       },
-        React.createElement('div', { className: 'text-2xl font-bold text-gray-300' }, total),
-        React.createElement('div', { className: 'text-xs text-gray-500' }, 'Total')
+        // Total count - display font, bone3 color
+        React.createElement('div', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-type-size-stat-medium)',
+            color: 'var(--q-bone3)',
+            lineHeight: 'var(--t-type-leading-tight)'
+          }
+        }, total),
+        // Total label - console font, bone0 color
+        React.createElement('div', {
+          style: {
+            fontFamily: 'var(--font-console)',
+            fontSize: 'var(--t-type-size-label-small)',
+            color: 'var(--q-bone0)',
+            letterSpacing: 'var(--t-type-tracking-tight)'
+          }
+        }, 'Total')
       )
     )
   );

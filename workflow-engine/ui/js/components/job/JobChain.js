@@ -35,16 +35,24 @@ const providerConfig = {
  * ProviderLogo component - displays provider logo with status glow
  * D2: Status via glow (muted=pending, pulse=running, green=complete, red=failed)
  * D15: Provider logo glow uses CSS pseudo-element (::before) positioned behind the image
+ * WP-7: Added status-based glow wrapper with Q palette colors
  */
-function ProviderLogo({ harness }) {
+function ProviderLogo({ harness, status }) {
   const provider = providerConfig[harness] || providerConfig.claude;
 
-  return React.createElement('img', {
-    src: provider.logoSrc,
-    alt: `${provider.name} logo`,
-    className: 'w-6 h-6 object-contain',
-    draggable: false
-  });
+  // Status-based glow class
+  const glowClass = status ? `provider-logo-glow provider-logo-glow--${status}` : 'provider-logo-glow';
+
+  return React.createElement('div', {
+    className: glowClass
+  },
+    React.createElement('img', {
+      src: provider.logoSrc,
+      alt: `${provider.name} logo`,
+      className: 'w-6 h-6 object-contain',
+      draggable: false
+    })
+  );
 }
 
 function MiniProviderLogo({ harness }) {
@@ -136,32 +144,23 @@ function chunkArray(arr, size) {
  * Compact job node for chain visualization
  * D1: Provider logos replace StatusDot+shortId
  * D3: Preserve harness border colors
+ * WP-7: AgentHUD-style riveted card with status glow bar
  */
 function JobNode({ job, isSelected, isCurrent, onClick, now }) {
   const { _id, jobType, harness, status, toolCallCount, subagentCount, totalTokens, lastEventAt, startedAt } = job;
 
-  // Status-based border colors
-  const statusBorderColors = {
-    pending: 'border-yellow-500/50',
-    running: 'border-purple-500',
-    complete: 'border-green-500',
-    failed: 'border-red-500',
-    blocked: 'border-red-500'
-  };
-
+  // Q palette type colors for job type badge
   const typeColors = {
-    plan: 'text-purple-400',
-    implement: 'text-blue-400',
-    review: 'text-yellow-400',
-    uat: 'text-green-400',
-    document: 'text-teal-400'
+    plan: 'var(--q-teleport-bright)',
+    implement: 'var(--q-copper2)',
+    review: 'var(--q-torch)',
+    uat: 'var(--q-slime1)',
+    document: 'var(--q-copper3)'
   };
 
-  const selectedClass = isSelected
-    ? 'ring-2 ring-blue-500'
-    : '';
-
-  const pulseClass = status === 'running' ? 'running-border-pulse' : '';
+  // Build HUD class with status modifier
+  const hudStatusClass = `job-node-hud--${status || 'pending'}`;
+  const selectedClass = isSelected ? 'job-node-hud--selected' : '';
 
   const idleBase = lastEventAt || startedAt || null;
   const idleMs = idleBase ? Math.max(0, now - idleBase) : null;
@@ -169,53 +168,128 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
 
   const subagentTotal = typeof subagentCount === 'number' ? subagentCount : 0;
 
+  // AgentHUD riveted card pattern via inline styles + CSS class
+  const hudBaseStyle = {
+    background: 'radial-gradient(circle at 8px 8px, var(--q-iron0) 2px, transparent 2px), radial-gradient(circle at calc(100% - 8px) 8px, var(--q-iron0) 2px, transparent 2px), radial-gradient(circle at 8px calc(100% - 8px), var(--q-iron0) 2px, transparent 2px), radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--q-iron0) 2px, transparent 2px), linear-gradient(180deg, var(--q-stone2), var(--q-stone1))',
+    border: '1px solid var(--q-stone3)',
+    borderTopColor: 'var(--q-iron1-33)',
+    borderBottom: '2px solid var(--q-void0)',
+    borderRadius: 0,
+    padding: 0,
+    overflow: 'hidden'
+  };
+
+  // Status-based glow
+  const glowStyles = {
+    running: { boxShadow: 'inset 0 0 30px var(--q-slime0-08), 0 0 20px var(--q-slime0-10)' },
+    complete: {},
+    failed: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
+    blocked: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
+    pending: { opacity: 0.7 }
+  };
+
+  // Selected glow
+  const selectedStyle = isSelected ? {
+    boxShadow: '0 0 0 2px var(--q-copper3), 0 0 12px var(--q-copper1-44)'
+  } : {};
+
+  // Glow bar color based on status
+  const glowBarColors = {
+    running: 'var(--q-slime1-44)',
+    complete: 'var(--q-slime1-44)',
+    failed: 'var(--q-lava1-44)',
+    blocked: 'var(--q-lava1-44)',
+    pending: 'var(--q-iron1-44)'
+  };
+
   return React.createElement('button', {
     onClick: () => onClick && onClick(job),
-    className: `job-node flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-pointer hover:bg-gray-750 ${
-      statusBorderColors[status] || 'border-gray-600'
-    } ${selectedClass} ${pulseClass} bg-gray-800`
+    className: `job-node flex flex-col cursor-pointer transition-all ${hudStatusClass} ${selectedClass}`,
+    style: {
+      ...hudBaseStyle,
+      ...glowStyles[status] || glowStyles.pending,
+      ...selectedStyle
+    }
   },
-    // Provider logo (no status prop needed)
-    React.createElement(ProviderLogo, { harness }),
-    React.createElement('div', { className: 'flex flex-col items-start gap-1 min-w-0' },
-      React.createElement('span', {
-        className: `text-xs font-medium uppercase ${typeColors[jobType] || 'text-gray-400'}`
-      }, jobType || 'job'),
-      React.createElement('div', { className: 'flex items-center gap-2 text-[10px] text-gray-500' },
-        status === 'running' && React.createElement('span', {
-          className: 'flex items-center gap-1',
-          title: 'Idle time'
-        },
-          React.createElement(ClockIcon),
-          React.createElement('span', null, idleValue)
-        ),
+    // Status glow bar at top (3px)
+    React.createElement('div', {
+      className: 'job-node-hud__glow-bar',
+      style: {
+        height: '3px',
+        background: `linear-gradient(90deg, transparent, ${glowBarColors[status] || glowBarColors.pending}, transparent)`
+      }
+    }),
+    // Content area
+    React.createElement('div', {
+      className: 'flex items-center gap-2 px-3 py-2'
+    },
+      // Provider logo with status glow
+      React.createElement(ProviderLogo, { harness, status }),
+      React.createElement('div', { className: 'flex flex-col items-start gap-1 min-w-0' },
+        // Job type badge with Q palette color
         React.createElement('span', {
-          className: 'flex items-center gap-1',
-          title: 'Tool calls'
+          className: 'text-xs font-medium uppercase',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-type-size-label)',
+            letterSpacing: 'var(--t-type-tracking-normal)',
+            color: typeColors[jobType] || 'var(--q-bone1)'
+          }
+        }, jobType || 'job'),
+        // Stats display with Q palette bone colors
+        React.createElement('div', {
+          className: 'flex items-center gap-2',
+          style: {
+            fontSize: 'var(--t-type-size-label)',
+            color: 'var(--q-bone0)'
+          }
         },
-          React.createElement(ToolIcon),
-          React.createElement('span', null, formatCount(toolCallCount))
+          status === 'running' && React.createElement('span', {
+            className: 'flex items-center gap-1',
+            title: 'Idle time',
+            style: { color: 'var(--q-bone0)' }
+          },
+            React.createElement(ClockIcon),
+            React.createElement('span', { style: { color: 'var(--q-bone1)' } }, idleValue)
+          ),
+          React.createElement('span', {
+            className: 'flex items-center gap-1',
+            title: 'Tool calls',
+            style: { color: 'var(--q-bone0)' }
+          },
+            React.createElement(ToolIcon),
+            React.createElement('span', { style: { color: 'var(--q-bone1)' } }, formatCount(toolCallCount))
+          ),
+          React.createElement('span', {
+            className: 'flex items-center gap-1',
+            title: 'Total tokens',
+            style: { color: 'var(--q-bone0)' }
+          },
+            React.createElement(TokenIcon),
+            React.createElement('span', { style: { color: 'var(--q-bone1)' } }, formatCount(totalTokens))
+          )
         ),
-        React.createElement('span', {
+        // Subagent indicators
+        subagentTotal > 0 && React.createElement('div', {
           className: 'flex items-center gap-1',
-          title: 'Total tokens'
+          title: 'Subagents',
+          style: {
+            fontSize: 'var(--t-type-size-label)',
+            color: 'var(--q-bone0)'
+          }
         },
-          React.createElement(TokenIcon),
-          React.createElement('span', null, formatCount(totalTokens))
+          subagentTotal > 5
+            ? React.createElement(React.Fragment, null,
+                React.createElement(MiniProviderLogo, { harness }),
+                React.createElement('span', {
+                  className: 'ml-0.5',
+                  style: { color: 'var(--q-bone1)' }
+                }, `x ${subagentTotal}`)
+              )
+            : Array.from({ length: subagentTotal }).map((_, index) =>
+                React.createElement(MiniProviderLogo, { key: index, harness })
+              )
         )
-      ),
-      subagentTotal > 0 && React.createElement('div', {
-        className: 'flex items-center gap-1 text-[10px] text-gray-500',
-        title: 'Subagents'
-      },
-        subagentTotal > 5
-          ? React.createElement(React.Fragment, null,
-              React.createElement(MiniProviderLogo, { harness }),
-              React.createElement('span', { className: 'ml-0.5' }, `x ${subagentTotal}`)
-            )
-          : Array.from({ length: subagentTotal }).map((_, index) =>
-              React.createElement(MiniProviderLogo, { key: index, harness })
-            )
       )
     )
   );
@@ -223,18 +297,21 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
 
 /**
  * Vertical connector line between groups
+ * WP-7: Updated to Q palette iron colors
  */
 function VerticalConnector() {
   return React.createElement('div', {
     className: 'flex flex-col items-center py-1'
   },
     React.createElement('div', {
-      className: 'w-0.5 h-4 bg-gray-600'
+      className: 'w-0.5 h-4',
+      style: { backgroundColor: 'var(--q-iron1)' }
     }),
     React.createElement('svg', {
-      className: 'w-4 h-4 text-gray-600',
+      className: 'w-4 h-4',
       fill: 'currentColor',
-      viewBox: '0 0 24 24'
+      viewBox: '0 0 24 24',
+      style: { color: 'var(--q-iron1)' }
     },
       React.createElement('path', {
         d: 'M12 16l-6-6h12l-6 6z'
@@ -246,16 +323,20 @@ function VerticalConnector() {
 /**
  * Fan-out connector: single input to multiple outputs
  * Used when previous group has 1 job and current group has multiple
+ * WP-7: Updated to Q palette iron colors
  */
 function FanOutConnector({ outputCount }) {
   const maxVisible = Math.min(outputCount, 4);
+  const ironStyle = { backgroundColor: 'var(--q-iron1)' };
+  const ironSvgStyle = { color: 'var(--q-iron1)' };
 
   return React.createElement('div', {
     className: 'flex flex-col items-center py-2'
   },
     // Vertical stem from single source
     React.createElement('div', {
-      className: 'w-0.5 h-3 bg-gray-600'
+      className: 'w-0.5 h-3',
+      style: ironStyle
     }),
     // Horizontal line with branches
     React.createElement('div', {
@@ -263,8 +344,8 @@ function FanOutConnector({ outputCount }) {
     },
       // Horizontal bar
       React.createElement('div', {
-        className: 'h-0.5 bg-gray-600',
-        style: { width: `${Math.max(60, maxVisible * 30)}%` }
+        className: 'h-0.5',
+        style: { ...ironStyle, width: `${Math.max(60, maxVisible * 30)}%` }
       }),
       // Branch indicators
       React.createElement('div', {
@@ -277,12 +358,14 @@ function FanOutConnector({ outputCount }) {
             className: 'flex flex-col items-center'
           },
             React.createElement('div', {
-              className: 'w-0.5 h-3 bg-gray-600 mt-0.5'
+              className: 'w-0.5 h-3 mt-0.5',
+              style: ironStyle
             }),
             React.createElement('svg', {
-              className: 'w-3 h-3 text-gray-600',
+              className: 'w-3 h-3',
               fill: 'currentColor',
-              viewBox: '0 0 24 24'
+              viewBox: '0 0 24 24',
+              style: ironSvgStyle
             },
               React.createElement('path', {
                 d: 'M12 16l-5-5h10l-5 5z'
@@ -298,9 +381,12 @@ function FanOutConnector({ outputCount }) {
 /**
  * Fan-in connector: multiple inputs to single output
  * Used when previous group has multiple jobs and current group has 1
+ * WP-7: Updated to Q palette iron colors
  */
 function FanInConnector({ inputCount }) {
   const maxVisible = Math.min(inputCount, 4);
+  const ironStyle = { backgroundColor: 'var(--q-iron1)' };
+  const ironSvgStyle = { color: 'var(--q-iron1)' };
 
   return React.createElement('div', {
     className: 'flex flex-col items-center py-2'
@@ -317,24 +403,27 @@ function FanInConnector({ inputCount }) {
         Array.from({ length: maxVisible }).map((_, i) =>
           React.createElement('div', {
             key: i,
-            className: 'w-0.5 h-3 bg-gray-600'
+            className: 'w-0.5 h-3',
+            style: ironStyle
           })
         )
       )
     ),
     // Horizontal bar
     React.createElement('div', {
-      className: 'h-0.5 bg-gray-600',
-      style: { width: `${Math.max(60, maxVisible * 30)}%` }
+      className: 'h-0.5',
+      style: { ...ironStyle, width: `${Math.max(60, maxVisible * 30)}%` }
     }),
     // Vertical stem to single target
     React.createElement('div', {
-      className: 'w-0.5 h-3 bg-gray-600'
+      className: 'w-0.5 h-3',
+      style: ironStyle
     }),
     React.createElement('svg', {
-      className: 'w-4 h-4 text-gray-600',
+      className: 'w-4 h-4',
       fill: 'currentColor',
-      viewBox: '0 0 24 24'
+      viewBox: '0 0 24 24',
+      style: ironSvgStyle
     },
       React.createElement('path', {
         d: 'M12 16l-6-6h12l-6 6z'
@@ -346,9 +435,12 @@ function FanInConnector({ inputCount }) {
 /**
  * Parallel-to-parallel connector: multiple to multiple
  * Used when both groups have multiple jobs
+ * WP-7: Updated to Q palette iron colors
  */
 function ParallelConnector({ inputCount, outputCount }) {
   const maxVisible = Math.max(Math.min(inputCount, 4), Math.min(outputCount, 4));
+  const ironStyle = { backgroundColor: 'var(--q-iron1)' };
+  const ironSvgStyle = { color: 'var(--q-iron1)' };
 
   return React.createElement('div', {
     className: 'flex flex-col items-center py-2'
@@ -361,14 +453,15 @@ function ParallelConnector({ inputCount, outputCount }) {
       Array.from({ length: Math.min(inputCount, 4) }).map((_, i) =>
         React.createElement('div', {
           key: i,
-          className: 'w-0.5 h-2 bg-gray-600'
+          className: 'w-0.5 h-2',
+          style: ironStyle
         })
       )
     ),
     // Central horizontal bar
     React.createElement('div', {
-      className: 'h-0.5 bg-gray-600 my-1',
-      style: { width: `${Math.max(60, maxVisible * 30)}%` }
+      className: 'h-0.5 my-1',
+      style: { ...ironStyle, width: `${Math.max(60, maxVisible * 30)}%` }
     }),
     // Diverging branches to bottom
     React.createElement('div', {
@@ -381,12 +474,14 @@ function ParallelConnector({ inputCount, outputCount }) {
           className: 'flex flex-col items-center'
         },
           React.createElement('div', {
-            className: 'w-0.5 h-2 bg-gray-600'
+            className: 'w-0.5 h-2',
+            style: ironStyle
           }),
           React.createElement('svg', {
-            className: 'w-3 h-3 text-gray-600',
+            className: 'w-3 h-3',
             fill: 'currentColor',
-            viewBox: '0 0 24 24'
+            viewBox: '0 0 24 24',
+            style: ironSvgStyle
           },
             React.createElement('path', {
               d: 'M12 14l-4-4h8l-4 4z'
@@ -486,9 +581,10 @@ function GroupRow({ group, selectedJobId, onJobSelect, now }) {
           onJobSelect,
           now
         }),
-        // Add subtle row connector between wrapped rows
+        // Add subtle row connector between wrapped rows (Q palette iron)
         rowIndex < rows.length - 1 && React.createElement('div', {
-          className: 'w-px h-2 bg-gray-700'
+          className: 'w-px h-2',
+          style: { backgroundColor: 'var(--q-iron1)' }
         })
       )
     )
@@ -564,7 +660,8 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
 
   if (groups.length === 0 || allJobs.length === 0) {
     return React.createElement('div', {
-      className: 'text-center py-8 text-gray-500'
+      className: 'text-center py-8',
+      style: { color: 'var(--q-bone0)' }
     }, 'No jobs in this assignment');
   }
 
@@ -584,28 +681,34 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
   }, [stats.running]);
 
   return React.createElement('div', { className: 'space-y-4' },
-    // Chain summary
+    // Chain summary with Q palette colors
     React.createElement('div', {
-      className: 'flex items-center gap-4 text-xs text-gray-500 flex-wrap'
+      className: 'flex items-center gap-4 text-xs flex-wrap',
+      style: { color: 'var(--q-bone0)' }
     },
       React.createElement('span', null, `${stats.total} jobs in ${stats.groupCount} groups`),
-      stats.completed > 0 && React.createElement('span', { className: 'text-green-400' },
-        `${stats.completed} complete`
-      ),
-      stats.running > 0 && React.createElement('span', { className: 'text-purple-400' },
-        `${stats.running} running`
-      ),
-      stats.pending > 0 && React.createElement('span', { className: 'text-yellow-400' },
-        `${stats.pending} pending`
-      ),
-      stats.failed > 0 && React.createElement('span', { className: 'text-red-400' },
-        `${stats.failed} failed`
-      )
+      stats.completed > 0 && React.createElement('span', {
+        style: { color: 'var(--q-slime1)' }
+      }, `${stats.completed} complete`),
+      stats.running > 0 && React.createElement('span', {
+        style: { color: 'var(--q-slime1)' }
+      }, `${stats.running} running`),
+      stats.pending > 0 && React.createElement('span', {
+        style: { color: 'var(--q-torch)' }
+      }, `${stats.pending} pending`),
+      stats.failed > 0 && React.createElement('span', {
+        style: { color: 'var(--q-lava1)' }
+      }, `${stats.failed} failed`)
     ),
 
-    // Chain visualization
+    // Chain visualization container with Q palette stone colors
     React.createElement('div', {
-      className: 'p-4 bg-gray-850 rounded-lg border border-gray-700 overflow-x-auto'
+      className: 'p-4 overflow-x-auto job-chain-container',
+      style: {
+        backgroundColor: 'var(--q-stone1)',
+        border: '1px solid var(--q-stone3)',
+        borderRadius: 0
+      }
     },
       React.createElement(GroupChain, {
         groups,
@@ -615,9 +718,12 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
       })
     ),
 
-    // Inline job detail (D3: inline expansion)
+    // Inline job detail (D3: inline expansion) with Q palette torch accent
     selectedJob && expandedJobId === selectedJob._id && React.createElement('div', {
-      className: 'border-l-2 border-blue-500 pl-4'
+      className: 'pl-4',
+      style: {
+        borderLeft: '2px solid var(--q-torch)'
+      }
     },
       React.createElement(JobCard, {
         job: selectedJob,

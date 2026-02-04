@@ -10,6 +10,8 @@
  *   WORKFLOW_GROUP_ID        Current group (used as default --after for insert-job)
  *   WORKFLOW_JOB_ID          Current job
  *   WORKFLOW_THREAD_ID       Current chat thread (used for auto-linking assignments)
+ *   WORKFLOW_ARTIFACTS       Current artifacts (append base for PM updates)
+ *   WORKFLOW_DECISIONS       Current decisions (append base for PM updates)
  *
  * Usage:
  *   npx tsx cli.ts <command> [args]
@@ -375,10 +377,20 @@ async function updateAssignment(
     error(`Invalid alignment status. Must be one of: ${validAlignments.join(", ")}`);
   }
 
+  const appendField = (base: string | undefined, addition?: string): string | undefined => {
+    if (addition === undefined) return undefined;
+    if (!base) return addition;
+    if (!addition) return base;
+    return `${base}\n${addition}`;
+  };
+
+  const baseArtifacts = process.env.WORKFLOW_ARTIFACTS;
+  const baseDecisions = process.env.WORKFLOW_DECISIONS;
+
   await client.mutation(api.assignments.update, {
     id: id as Id<"assignments">,
-    artifacts,
-    decisions,
+    artifacts: appendField(baseArtifacts, artifacts),
+    decisions: appendField(baseDecisions, decisions),
     alignmentStatus: alignment as "aligned" | "uncertain" | "misaligned" | undefined,
   });
   output({ message: "Assignment updated" });

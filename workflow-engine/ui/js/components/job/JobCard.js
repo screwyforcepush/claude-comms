@@ -1,37 +1,97 @@
 // JobCard - Individual job card component
+// WP-7: Transformed to Q palette brandkit styling
 import React, { useState, useCallback, useMemo } from 'react';
 import { StatusBadge, StatusDot } from '../shared/StatusBadge.js';
 import { Timestamp } from '../shared/Timestamp.js';
 
 /**
- * Harness icon/badge component
+ * Harness icon/badge component - Q palette styling
+ * claude: copper palette (brand color)
+ * codex: slime palette (green)
+ * gemini: teleport palette (purple)
+ * default: iron palette (muted)
  */
 function HarnessBadge({ harness }) {
-  const colors = {
-    claude: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    codex: 'bg-green-500/20 text-green-400 border-green-500/30',
-    gemini: 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+  // Q palette color mappings for each harness provider
+  const getHarnessStyles = (h) => {
+    switch (h) {
+      case 'claude':
+        return {
+          backgroundColor: 'var(--q-copper1-08)',
+          color: 'var(--q-copper3)',
+          border: '1px solid var(--q-copper1-44)'
+        };
+      case 'codex':
+        return {
+          backgroundColor: 'var(--q-slime0-08)',
+          color: 'var(--q-slime1)',
+          border: '1px solid var(--q-slime1-44)'
+        };
+      case 'gemini':
+        return {
+          backgroundColor: 'rgba(92, 60, 124, 0.08)',
+          color: 'var(--q-teleport-bright)',
+          border: '1px solid rgba(124, 88, 160, 0.44)'
+        };
+      default:
+        return {
+          backgroundColor: 'rgba(80, 76, 64, 0.08)',
+          color: 'var(--q-iron2)',
+          border: '1px solid var(--q-iron1-44)'
+        };
+    }
   };
 
+  const styles = getHarnessStyles(harness);
+
   return React.createElement('span', {
-    className: `text-xs px-2 py-0.5 rounded-full border ${colors[harness] || 'bg-gray-700 text-gray-400 border-gray-600'}`
+    style: {
+      ...styles,
+      padding: '2px 8px',
+      fontSize: '12px',
+      fontFamily: 'var(--font-console)',
+      borderRadius: 0,
+      textTransform: 'uppercase',
+      letterSpacing: '1px'
+    }
   }, harness || 'unknown');
 }
 
 /**
- * Job type badge component
+ * Job type badge component - Q palette styling
+ * plan: teleport-bright (purple)
+ * implement: copper2 (orange)
+ * review: torch (gold)
+ * uat: slime1 (green)
+ * document: copper3 (light copper)
  */
 function JobTypeBadge({ jobType }) {
-  const colors = {
-    plan: 'text-purple-400',
-    implement: 'text-blue-400',
-    review: 'text-yellow-400',
-    uat: 'text-green-400',
-    document: 'text-teal-400'
+  const getJobTypeColor = (type) => {
+    switch (type) {
+      case 'plan':
+        return 'var(--q-teleport-bright)';
+      case 'implement':
+        return 'var(--q-copper2)';
+      case 'review':
+        return 'var(--q-torch)';
+      case 'uat':
+        return 'var(--q-slime1)';
+      case 'document':
+        return 'var(--q-copper3)';
+      default:
+        return 'var(--q-bone1)';
+    }
   };
 
   return React.createElement('span', {
-    className: `text-xs font-medium uppercase tracking-wider ${colors[jobType] || 'text-gray-400'}`
+    style: {
+      color: getJobTypeColor(jobType),
+      fontSize: '12px',
+      fontFamily: 'var(--font-display)',
+      letterSpacing: '2px',
+      textTransform: 'uppercase',
+      fontWeight: 500
+    }
   }, jobType || 'unknown');
 }
 
@@ -49,7 +109,12 @@ function truncateText(text, maxLength) {
  */
 function ExpandIcon({ expanded }) {
   return React.createElement('svg', {
-    className: `w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`,
+    style: {
+      width: '16px',
+      height: '16px',
+      transition: 'transform var(--t-anim-transition-normal)',
+      transform: expanded ? 'rotate(180deg)' : 'none'
+    },
     fill: 'none',
     stroke: 'currentColor',
     viewBox: '0 0 24 24',
@@ -65,6 +130,7 @@ function ExpandIcon({ expanded }) {
 
 /**
  * JobCard component - displays an individual job
+ * WP-7: Transformed to Q palette with riveted panel styling
  * @param {Object} props
  * @param {Object} props.job - Job data
  * @param {boolean} props.isSelected - Whether this job is selected
@@ -74,6 +140,7 @@ function ExpandIcon({ expanded }) {
  */
 export function JobCard({ job, isSelected = false, onClick, compact = false, onExpand }) {
   const [expanded, setExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const {
     _id,
@@ -117,15 +184,52 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
     if (onExpand) onExpand(job, !expanded);
   }, [onExpand, job, expanded]);
 
-  const selectedClass = isSelected
-    ? 'ring-2 ring-blue-500 bg-gray-750'
-    : 'hover:bg-gray-750';
+  // Q palette card styles
+  const getCardStyles = () => {
+    const baseStyles = {
+      backgroundColor: 'var(--q-stone1)',
+      border: '1px solid var(--q-stone3)',
+      borderTop: '1px solid var(--q-iron1-44)',
+      borderBottom: '2px solid var(--q-void0)',
+      borderRadius: 0,
+      transition: 'all var(--t-anim-transition-normal)'
+    };
+
+    if (isSelected) {
+      return {
+        ...baseStyles,
+        backgroundColor: 'var(--q-stone2)',
+        border: '2px solid var(--q-torch)',
+        borderTop: '2px solid var(--q-torch)',
+        borderBottom: '2px solid var(--q-torch)',
+        boxShadow: '0 0 var(--t-fx-glow-sm) var(--q-torch-33)'
+      };
+    }
+
+    if (isHovered) {
+      return {
+        ...baseStyles,
+        backgroundColor: 'var(--q-stone2)'
+      };
+    }
+
+    return baseStyles;
+  };
 
   // Compact view for chain visualization
   if (compact) {
     return React.createElement('div', {
       onClick: handleClick,
-      className: `flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${selectedClass} bg-gray-800 border border-gray-700`
+      onMouseEnter: () => setIsHovered(true),
+      onMouseLeave: () => setIsHovered(false),
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '8px',
+        cursor: 'pointer',
+        ...getCardStyles()
+      }
     },
       React.createElement(StatusDot, {
         status,
@@ -134,59 +238,137 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
       React.createElement(JobTypeBadge, { jobType }),
       React.createElement(HarnessBadge, { harness }),
       React.createElement('code', {
-        className: 'text-xs text-gray-500 font-mono ml-auto'
+        style: {
+          fontSize: '12px',
+          color: 'var(--q-bone0)',
+          fontFamily: 'var(--font-console)',
+          marginLeft: 'auto'
+        }
       }, shortId)
     );
   }
 
   // Full card view
   return React.createElement('div', {
-    className: `card p-4 transition-all ${selectedClass}`
+    onMouseEnter: () => setIsHovered(true),
+    onMouseLeave: () => setIsHovered(false),
+    style: {
+      padding: '16px',
+      ...getCardStyles()
+    }
   },
     // Header row
     React.createElement('div', {
       onClick: handleClick,
-      className: 'flex items-center justify-between mb-2 cursor-pointer'
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '8px',
+        cursor: 'pointer'
+      }
     },
-      React.createElement('div', { className: 'flex items-center gap-2' },
+      React.createElement('div', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }
+      },
         React.createElement(StatusDot, { status, pulse: status === 'running' }),
         React.createElement(JobTypeBadge, { jobType }),
         React.createElement(HarnessBadge, { harness }),
         React.createElement('code', {
-          className: 'text-xs text-gray-500 font-mono'
+          style: {
+            fontSize: '12px',
+            color: 'var(--q-bone0)',
+            fontFamily: 'var(--font-console)'
+          }
         }, shortId)
       ),
       React.createElement(StatusBadge, { status, size: 'sm' })
     ),
 
     // Context preview
-    context && React.createElement('div', { className: 'mb-3' },
+    context && React.createElement('div', {
+      style: { marginBottom: '12px' }
+    },
       React.createElement('p', {
-        className: 'text-xs text-gray-500 uppercase tracking-wide mb-1'
+        style: {
+          fontSize: '10px',
+          color: 'var(--q-bone0)',
+          textTransform: 'uppercase',
+          letterSpacing: '2px',
+          marginBottom: '4px',
+          fontFamily: 'var(--font-display)'
+        }
       }, 'Context/Instructions'),
       React.createElement('p', {
-        className: 'text-sm text-gray-300'
+        style: {
+          fontSize: '14px',
+          color: 'var(--q-bone2)',
+          fontFamily: 'var(--font-body)',
+          lineHeight: 'var(--t-type-leading-normal)'
+        }
       }, expanded ? context : contextPreview)
     ),
 
     // Result preview (only if completed)
-    (status === 'complete' || status === 'failed') && result && React.createElement('div', { className: 'mb-3' },
+    (status === 'complete' || status === 'failed') && result && React.createElement('div', {
+      style: { marginBottom: '12px' }
+    },
       React.createElement('p', {
-        className: `text-xs uppercase tracking-wide mb-1 ${status === 'failed' ? 'text-red-500' : 'text-gray-500'}`
+        style: {
+          fontSize: '10px',
+          color: status === 'failed' ? 'var(--q-lava1)' : 'var(--q-bone0)',
+          textTransform: 'uppercase',
+          letterSpacing: '2px',
+          marginBottom: '4px',
+          fontFamily: 'var(--font-display)'
+        }
       }, status === 'failed' ? 'Error' : 'Result'),
       React.createElement('div', {
-        className: `text-sm p-2 rounded border ${
-          status === 'failed'
-            ? 'bg-red-500/10 border-red-500/30 text-red-300'
-            : 'bg-gray-800 border-gray-700 text-gray-300'
-        }`
+        style: status === 'failed'
+          ? {
+              fontSize: '14px',
+              padding: '8px',
+              backgroundColor: 'var(--q-lava0-08)',
+              border: '1px solid var(--q-lava1-44)',
+              color: 'var(--q-bone3)',
+              fontFamily: 'var(--font-body)',
+              borderRadius: 0
+            }
+          : {
+              fontSize: '14px',
+              padding: '8px',
+              backgroundColor: 'var(--q-void1)',
+              border: '1px solid var(--q-stone3)',
+              color: 'var(--q-bone2)',
+              fontFamily: 'var(--font-body)',
+              borderRadius: 0
+            }
       }, expanded ? result : resultPreview)
     ),
 
     // Expand/collapse button for long content (D3: inline expansion)
     ((context && context.length > 100) || (result && result.length > 150)) && React.createElement('button', {
       onClick: handleExpand,
-      className: 'flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors mb-3'
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontSize: '12px',
+        color: 'var(--q-bone0)',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: 0,
+        marginBottom: '12px',
+        fontFamily: 'var(--font-console)',
+        transition: 'color var(--t-anim-transition-fast)'
+      },
+      onMouseEnter: (e) => { e.currentTarget.style.color = 'var(--q-bone2)'; },
+      onMouseLeave: (e) => { e.currentTarget.style.color = 'var(--q-bone0)'; }
     },
       React.createElement(ExpandIcon, { expanded }),
       expanded ? 'Show less' : 'Show more'
@@ -194,23 +376,49 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
 
     // Footer: Timestamps and duration
     React.createElement('div', {
-      className: 'flex items-center justify-between pt-3 border-t border-gray-700 text-xs text-gray-500'
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: '12px',
+        borderTop: '1px solid var(--q-stone3)',
+        fontSize: '12px',
+        color: 'var(--q-bone0)'
+      }
     },
-      React.createElement('div', { className: 'flex items-center gap-4' },
+      React.createElement('div', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px'
+        }
+      },
         createdAt && React.createElement('div', null,
-          React.createElement('span', { className: 'text-gray-600' }, 'Created: '),
+          React.createElement('span', {
+            style: { color: 'var(--q-iron1)' }
+          }, 'Created: '),
           React.createElement(Timestamp, { date: createdAt, format: 'relative' })
         ),
         startedAt && React.createElement('div', null,
-          React.createElement('span', { className: 'text-gray-600' }, 'Started: '),
+          React.createElement('span', {
+            style: { color: 'var(--q-iron1)' }
+          }, 'Started: '),
           React.createElement(Timestamp, { date: startedAt, format: 'relative' })
         )
       ),
       duration && React.createElement('div', {
-        className: 'flex items-center gap-1'
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px'
+        }
       },
-        React.createElement('span', { className: 'text-gray-600' }, 'Duration:'),
-        React.createElement('span', { className: 'text-gray-400' }, duration)
+        React.createElement('span', {
+          style: { color: 'var(--q-iron1)' }
+        }, 'Duration:'),
+        React.createElement('span', {
+          style: { color: 'var(--q-bone1)' }
+        }, duration)
       )
     )
   );
