@@ -340,17 +340,27 @@ export function determinePromptType(chatContext: ChatJobContext): PromptType {
 }
 
 /**
+ * Extract a named section from the template
+ */
+function extractSection(template: string, section: string): string {
+  const regex = new RegExp(
+    `\\{\\{#section ${section}\\}\\}([\\s\\S]*?)\\{\\{\\/section\\}\\}`,
+    "m"
+  );
+  const match = template.match(regex);
+  return match?.[1]?.trim() || "";
+}
+
+/**
  * Build prompt for chat jobs with differential prompting
- * - Full prompt for new sessions
- * - Mode activation snippet when mode changes
- * - Minimal prompt for same-mode resume
- * - Guardian eval injection for PM report evaluation
+ * All prompt types use section extraction from template - no hardcoded prompts
  */
 export function buildChatPrompt(chatContext: ChatJobContext, namespace: string): string {
   const promptType = determinePromptType(chatContext);
   const template = loadTemplate("product-owner");
+  const mode = chatContext.effectivePromptMode.toUpperCase() + "_MODE";
 
-  // Variable replacements used across all prompt types
+  // Variable replacements
   const replaceVars = (text: string): string => {
     return text
       .replace(/\{\{THREAD_ID\}\}/g, chatContext.threadId)
@@ -360,204 +370,37 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
       .replace(/\{\{ASSIGNMENT_ID\}\}/g, chatContext.assignmentId || "(no assignment linked)");
   };
 
+  const parts: string[] = [];
+
   switch (promptType) {
     case "full":
-      return buildFullPrompt(template, chatContext, replaceVars);
+      parts.push(extractSection(template, "INITIAL"));
+      parts.push(extractSection(template, mode));
+      break;
 
     case "mode_activation":
-      return buildModeActivationPrompt(chatContext, replaceVars);
-
-    case "minimal":
-      return buildMinimalPrompt(chatContext, replaceVars);
+      parts.push(extractSection(template, mode));
+      break;
 
     case "guardian_eval":
-      return buildGuardianEvalPrompt(template, chatContext, replaceVars);
-  }
-}
+      parts.push(extractSection(template, "GUARDIAN_MODE"));
+      break;
 
-/**
- * Build full prompt for new sessions
- */
-function buildFullPrompt(
-  template: string,
-  chatContext: ChatJobContext,
-  replaceVars: (text: string) => string
-): string {
-  let processed = template;
-
-  // Remove GUARDIAN_MODE blocks (not applicable for full prompt)
-  const guardianModeRegex = /\{\{#if GUARDIAN_MODE\}\}[\s\S]*?\{\{\/if\}\}/g;
-  processed = processed.replace(guardianModeRegex, "");
-
-  // Handle {{#if COOK_MODE}}...{{else}}...{{/if}}
-  const cookModeRegex = /\{\{#if COOK_MODE\}\}([\s\S]*?)\{\{else\}\}([\s\S]*?)\{\{\/if\}\}/g;
-  processed = processed.replace(cookModeRegex, (_match, cookContent, jamContent) => {
-    return chatContext.effectivePromptMode === "cook" ? cookContent : jamContent;
-  });
-
-  // Handle simple {{#if COOK_MODE}}...{{/if}} without else
-  const simpleCookModeRegex = /\{\{#if COOK_MODE\}\}([\s\S]*?)\{\{\/if\}\}/g;
-  processed = processed.replace(simpleCookModeRegex, (_match, content) => {
-    return chatContext.effectivePromptMode === "cook" ? content : "";
-  });
-
-  // Handle {{#if NEW_SESSION}}...{{/if}} - include for new sessions
-  const newSessionRegex = /\{\{#if NEW_SESSION\}\}([\s\S]*?)\{\{\/if\}\}/g;
-  processed = processed.replace(newSessionRegex, (_match, content) => content);
-
-  return replaceVars(processed);
-}
-
-/**
- * Build mode activation prompt when mode changes during session
- */
-function buildModeActivationPrompt(
-  chatContext: ChatJobContext,
-  replaceVars: (text: string) => string
-): string {
-  const mode = chatContext.effectivePromptMode.toUpperCase();
-
-  let modeContent: string;
-
-  if (chatContext.effectivePromptMode === "cook") {
-    modeContent = `## COOK MODE ACTIVATED
-
-You now have **FULL AUTONOMY** to take action. Adopt COOK mode behavior until explicitly changed.
-
-### Your Powers in Cook Mode
-
-- CREATE new assignments via CLI
-- INSERT jobs into the workflow queue
-- Make product decisions and execute them
-
-When the user wants work to be done:
-1. **Confirm** your understanding of requirements
-2. **Create** an assignment with a **verbose north star** (include user perspective + success criteria)
-3. **Insert** an initial job to begin work (usually \`plan\` type)
-4. **Immediately update** \`docs/project/spec/mental-model.md\` with new insights from the conversation
-5. **Inform** the user what you've initiated
-
-### CLI Commands Available
-
-\`\`\`bash
-# Create a new assignment (auto-linked to this thread)
-npx tsx .agents/tools/workflow/cli.ts create "<north-star-description>" --priority <N>
-
-# Insert job(s) - jobs in the same array run in parallel
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> \\
-  --jobs '[{"jobType":"plan","context":"<context>"}]'
-
-# Append to existing chain (use --append to link after current tail)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append \\
-  --jobs '[{"jobType":"implement","context":"Build auth"},{"jobType":"uat","context":"Test login"}]'
-
-# View assignments and queue
-npx tsx .agents/tools/workflow/cli.ts assignments
-npx tsx .agents/tools/workflow/cli.ts queue
-
-# Delete assignment
-npx tsx .agents/tools/workflow/cli.ts delete-assignment <assignmentId>
-\`\`\`
-
-### Job Types You Can Create
-
-| Type | Use When |
-|------|----------|
-| \`plan\` | Need a spec doc and work-package breakdown |
-| \`implement\` | Clear requirements ready for implementation |
-| \`review\` | Engineering quality review of plan/spec or implementation |
-| \`uat\` | Need user-perspective testing |
-| \`document\` | Update docs and finalize assignment |`;
-  } else {
-    modeContent = `## JAM MODE ACTIVATED
-
-You are now in **READ-ONLY** ideation mode. Adopt JAM mode behavior until explicitly changed.
-
-### Your Role in Jam Mode
-
-- You CANNOT create assignments or jobs
-- You CAN help spec out ideas
-- You CAN ask clarifying questions
-- You CAN suggest approaches and trade-offs
-- You CAN help refine requirements
-- You CAN explore the codebase and existing work
-
-Help the user think through their ideas:
-- Ask probing questions to clarify requirements
-- Identify potential challenges and edge cases
-- Suggest technical approaches
-- Help prioritize features
-- Draft acceptance criteria
-- Explore trade-offs between options
-
-### When to Suggest Cook Mode
-
-If the user says things like "Let's do it", "Make it happen", "Start working on this" - suggest they switch to **Cook mode** to take action.`;
+    case "minimal":
+      // No template content - just user message
+      break;
   }
 
-  const prompt = `${modeContent}
+  let prompt = replaceVars(parts.join("\n\n---\n\n"));
 
----
-
-## Current Message
-
-**User says:**
-${chatContext.latestUserMessage}`;
-
-  return replaceVars(prompt);
-}
-
-/**
- * Build minimal prompt for same-mode resume
- */
-function buildMinimalPrompt(
-  chatContext: ChatJobContext,
-  replaceVars: (text: string) => string
-): string {
-  const prompt = `## Current Message
-
-**User says:**
-${chatContext.latestUserMessage}`;
-
-  return replaceVars(prompt);
-}
-
-/**
- * Build guardian evaluation prompt for PM report evaluation
- */
-function buildGuardianEvalPrompt(
-  template: string,
-  chatContext: ChatJobContext,
-  replaceVars: (text: string) => string
-): string {
-  // Extract the GUARDIAN_MODE block from template
-  const guardianModeRegex = /\{\{#if GUARDIAN_MODE\}\}([\s\S]*?)\{\{\/if\}\}/;
-  const match = template.match(guardianModeRegex);
-
-  if (match && match[1]) {
-    return replaceVars(match[1].trim());
+  // Append user message (not for guardian - PM report is already in LATEST_MESSAGE)
+  if (promptType !== "guardian_eval") {
+    prompt += `\n\n---\n\n**User says:**\n${chatContext.latestUserMessage}`;
   }
 
-  // Fallback if template doesn't have guardian block
-  return replaceVars(`## GUARDIAN MODE - ALIGNMENT EVALUATION
-
-You are monitoring assignment alignment. A PM has reported on work progress.
-
-**Assignment ID:** ${chatContext.assignmentId || "(unknown)"}
-
-### PM Progress Report
-${chatContext.latestUserMessage}
-
-### Alignment Response
-
-Respond with **ONE** of:
-
-**🟢** - Trajectory aligned with intent. Just the emoji, nothing else.
-
-**🟠** - Uncertain. Include 2-3 sentence rationale explaining the concern.
-
-**🔴** - Misaligned. Include rationale and block the assignment.`);
+  return prompt;
 }
+
 
 /**
  * Parse chat context from job context JSON field

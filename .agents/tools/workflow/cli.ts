@@ -53,10 +53,19 @@
  */
 
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "./workflow-engine/convex/_generated/api.js";
+import { anyApi } from "convex/server";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+
+// Try generated types for type safety, fall back to anyApi for portability
+let api: typeof anyApi;
+try {
+  const generated = await import("./workflow-engine/convex/_generated/api.js");
+  api = generated.api;
+} catch {
+  api = anyApi;
+}
 
 type Id<T extends string> = string & { __tableName: T };
 

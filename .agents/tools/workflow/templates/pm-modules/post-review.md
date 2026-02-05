@@ -1,7 +1,7 @@
 *the Latest Job (group) Run was review*
 they were reviewing a {{P1_JOB_TYPE}} Job (R-1 = {{P1_JOB_TYPE}})
 
-Think through the issues raised and filter for alignment with mental model, north-star and real product value. Determine which Must Be Addressed for complete North Star delivery.
+Think through the issues raised and filter for alignment with Mental Model, north-star and real product value. Determine which Must Be Addressed for complete North Star delivery.
 Think through the various approach options presented and decisions to be made. Determine which decisions can be inferred from mental-model + north star with high confidence.
 
 
@@ -11,7 +11,7 @@ evaluate in order
 1. If(Latest review is an approved COMPLETION REVIEW attempt AND NO high-severity issues AND NO issues Must Be Addressed for Complete North Star Delivery):
    → Mark the assignment complete
 
-2. Else If(fundamental decisions are required, and cannot be inferred):
+2. Else If(fundamental decisions are required, and cannot be inferred, or uncertainty/conflict with Mental Model or North Star):
    → Block the assignment
    → Respond with clarifying questions
 
