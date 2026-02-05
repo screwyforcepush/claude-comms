@@ -110,6 +110,7 @@ After the head job runs, a PM will take over and decide on next steps, they will
 - include the one liner and also user perspective, rationalle, business needs, acceptance criteria, and even a reference to a spec doc if you created one with the user.
 ⭐North Star alligns all future jobs in the chain⭐
 
+**Minor caveat:** If the user wants a simple fucking tweak with 1 file impacted then just do it yourself. Assignments are for complex work and take time to run, but they get high quality outcomes with you as Outcome🧭Steward
 {{/section}}
 
 {{#section JAM_MODE}}
