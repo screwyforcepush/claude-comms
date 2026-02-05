@@ -24,8 +24,16 @@ The brandkit (`docs/project/guides/styleguide/brandkit.jsx`) defines aesthetic D
 - **Q palette** — colors with semantic roles (void=background, copper=primary, torch=highlight, etc.)
 - **T tokens** — spacing, typography, animation timing
 - **FONT stack** — three typefaces for different content types
+- **QIcon system** — stroke-based 24x24 icons with angular/miter joins (no rounded corners)
 
 Components in the brandkit are **examples of the flavor applied**, not a library to port. Every UI surface should be infused with this DNA, adapted to its specific purpose.
+
+### Iconography Philosophy
+The brandkit includes a complete icon system (QIcon) that should be used consistently:
+- Icons are stroke-based, angular, sharp — no rounded corners
+- All icons share a 24x24 viewBox
+- Icons have semantic meaning tied to Quake lore (slipgate, rune, axe, armor, etc.)
+- **Exception**: Harness/provider logos (Anthropic, OpenAI, Google) remain as brand logos, not replaced by QIcons
 
 ### Functionality as the Line in the Sand
 Visual transformation is unlimited. Functional behavior is immutable:
@@ -76,6 +84,16 @@ What users need to see, in order:
 - AgentHUD-style job cards (riveted panels, stats layout)
 - Three-font typography system
 - Zero rounded corners (this is Quake)
+- Consistent QIcon usage throughout (except harness logos)
+
+### Job Card Mental Model (AgentHUD Pattern)
+Job cards in the chain visualization should feel like Quake HUD status bars:
+- **HP (Health)** = Duration — how long the job has been running. Bar counts DOWN from 1 hour max. Shows actual time, bar is visual countdown.
+- **ARM (Armor)** = Idle time — how long since last activity. Bar counts DOWN from 10 min max. When complete, armor is "full" (job is protected/done).
+- **FRAGS** = Tool calls — kill count analogy. How many tools the agent has used.
+- **Tokens** = Can be DMG, AMMO, or similar — design judgment for fitting the theme.
+- **Status Rune** = Job state mapped to brandkit StatusRune patterns.
+- **Subagents** = Mini provider icons in the subhead area.
 
 ## Non-Goals / Out of Scope
 

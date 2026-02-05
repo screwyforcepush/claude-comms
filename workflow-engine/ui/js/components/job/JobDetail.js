@@ -141,10 +141,51 @@ function JobTypeBadge({ jobType }) {
 }
 
 /**
+ * Copy icon (clipboard)
+ */
+function CopyIcon() {
+  return React.createElement('svg', {
+    style: { width: '14px', height: '14px' },
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'
+    })
+  );
+}
+
+/**
+ * Check icon (for copy success feedback)
+ */
+function CheckIcon() {
+  return React.createElement('svg', {
+    style: { width: '14px', height: '14px' },
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+    strokeWidth: '2'
+  },
+    React.createElement('path', {
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      d: 'M5 13l4 4L19 7'
+    })
+  );
+}
+
+/**
  * Try to parse content as JSON for better display
  * Q palette styling for content boxes
  */
 function ContentViewer({ content, label, isError = false }) {
+  const [copied, setCopied] = React.useState(false);
+  const [copyHovered, setCopyHovered] = React.useState(false);
+
   if (!content) return null;
 
   // Try to parse as JSON
@@ -155,20 +196,65 @@ function ContentViewer({ content, label, isError = false }) {
     // Not JSON, display as text
   }
 
+  const handleCopy = useCallback(() => {
+    // For JSON, stringify with formatting; for text, use as-is
+    const textToCopy = parsed ? JSON.stringify(parsed, null, 2) : content;
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [content, parsed]);
+
   return React.createElement('div', {
     style: { marginBottom: '16px' }
   },
-    React.createElement('h4', {
+    // Header with label and copy button
+    React.createElement('div', {
       style: {
-        fontSize: '10px',
-        fontFamily: 'var(--font-display)',
-        letterSpacing: '2px',
-        textTransform: 'uppercase',
-        marginBottom: '8px',
-        color: isError ? 'var(--q-lava1)' : 'var(--q-bone0)',
-        fontWeight: 600
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '8px'
       }
-    }, label),
+    },
+      React.createElement('h4', {
+        style: {
+          fontSize: '10px',
+          fontFamily: 'var(--font-display)',
+          letterSpacing: '2px',
+          textTransform: 'uppercase',
+          color: isError ? 'var(--q-lava1)' : 'var(--q-bone0)',
+          fontWeight: 600,
+          margin: 0
+        }
+      }, label),
+      // Copy button
+      React.createElement('button', {
+        onClick: handleCopy,
+        onMouseEnter: () => setCopyHovered(true),
+        onMouseLeave: () => setCopyHovered(false),
+        title: copied ? 'Copied!' : 'Copy to clipboard',
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '4px 8px',
+          fontSize: '10px',
+          fontFamily: 'var(--font-display)',
+          letterSpacing: '1px',
+          textTransform: 'uppercase',
+          color: copied ? 'var(--q-slime1)' : (copyHovered ? 'var(--q-copper2)' : 'var(--q-bone0)'),
+          backgroundColor: copyHovered ? 'var(--q-stone2)' : 'transparent',
+          border: '1px solid ' + (copied ? 'var(--q-slime1-44)' : (copyHovered ? 'var(--q-stone3)' : 'transparent')),
+          borderRadius: 0,
+          cursor: 'pointer',
+          transition: 'all var(--t-anim-transition-fast)'
+        }
+      },
+        copied ? React.createElement(CheckIcon) : React.createElement(CopyIcon),
+        copied ? 'Copied' : 'Copy'
+      )
+    ),
     parsed
       ? React.createElement(JsonViewer, {
           data: parsed,

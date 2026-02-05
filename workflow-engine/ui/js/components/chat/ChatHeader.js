@@ -1,7 +1,79 @@
 // ChatHeader - Thread title and mode toggle
 // WP-6: Transformed to Q palette brandkit styling
+// WP-PHASE2: StatusRune integration for assignment status indicators
 import React, { useState, useCallback } from 'react';
 import { ModeToggle } from './ModeToggle.js';
+
+/**
+ * Fullbright indicator - radial gradient dot with glow effect
+ * Follows brandkit.jsx pattern (lines 442-450)
+ * @param {Object} props
+ * @param {string} props.color - CSS color value
+ * @param {boolean} props.pulse - Enable pulse animation
+ * @param {number} props.size - Dot size in pixels
+ */
+function Fullbright({ color, pulse = false, size = 5 }) {
+  return React.createElement('span', {
+    style: {
+      display: 'inline-block',
+      width: size,
+      height: size,
+      background: `radial-gradient(circle, ${color}, ${color}88)`,
+      borderRadius: '50%',
+      boxShadow: `0 0 ${size}px ${color}88, 0 0 ${size * 2}px ${color}44`,
+      animation: pulse ? 'fullbright-pulse 2.5s ease-in-out infinite' : 'none'
+    }
+  });
+}
+
+/**
+ * StatusRune component - Brandkit-aligned status indicator
+ * Fullbright dot with radial gradient and glow, label in display font
+ * Follows brandkit.jsx pattern (lines 615-637)
+ * @param {Object} props
+ * @param {string} props.status - Status type: 'running' | 'complete' | 'blocked' | 'failed' | 'idle' | 'aligned' | 'misaligned' | 'uncertain'
+ * @param {string} props.label - Optional custom label text
+ */
+function StatusRune({ status, label }) {
+  // Status configuration mapped to Q palette
+  // running/active = teleport (purple), complete = slime (green), blocked/failed = lava (red)
+  const statusConfig = {
+    running: { color: 'var(--q-teleport-bright)', label: label || 'RUNNING', pulse: true },
+    active: { color: 'var(--q-teleport-bright)', label: label || 'ACTIVE', pulse: true },
+    complete: { color: 'var(--q-slime1)', label: label || 'COMPLETE', pulse: false },
+    completed: { color: 'var(--q-slime1)', label: label || 'COMPLETE', pulse: false },
+    blocked: { color: 'var(--q-lava1)', label: label || 'BLOCKED', pulse: false },
+    failed: { color: 'var(--q-lava1)', label: label || 'FAILED', pulse: false },
+    idle: { color: 'var(--q-iron1)', label: label || 'IDLE', pulse: false },
+    pending: { color: 'var(--q-copper1)', label: label || 'PENDING', pulse: false },
+    // Alignment statuses (Guardian mode)
+    aligned: { color: 'var(--q-slime1)', label: label || 'ALIGNED', pulse: false },
+    misaligned: { color: 'var(--q-lava1)', label: label || 'MISALIGNED', pulse: true },
+    uncertain: { color: 'var(--q-torch)', label: label || 'UNCERTAIN', pulse: false }
+  };
+
+  const config = statusConfig[status] || statusConfig.idle;
+
+  return React.createElement('span', {
+    style: {
+      fontFamily: 'var(--font-display)',
+      fontSize: 'var(--t-type-size-badge)',
+      letterSpacing: 'var(--t-type-tracking-normal)',
+      color: config.color,
+      background: `color-mix(in srgb, ${config.color} 12%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${config.color} 33%, transparent)`,
+      padding: '3px 8px',
+      textTransform: 'uppercase',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px',
+      borderRadius: 0
+    }
+  },
+    React.createElement(Fullbright, { color: config.color, pulse: config.pulse, size: 5 }),
+    config.label
+  );
+}
 
 /**
  * Edit icon
@@ -218,33 +290,20 @@ export function ChatHeader({ thread, assignment, onUpdateTitle, onUpdateMode, on
     assignment && React.createElement('div', {
       className: 'flex items-center gap-2 mr-4'
     },
-      // Alignment emoji (Guardian mode only)
-      thread.mode === 'guardian' && React.createElement('span', {
-        className: 'text-lg',
-        title: `Alignment: ${assignment.alignmentStatus || 'aligned'}`
-      }, assignment.alignmentStatus === 'misaligned' ? '🔴' :
-         assignment.alignmentStatus === 'uncertain' ? '🟠' : '🟢'),
-      // Status badge (ALL modes) - Q palette
-      React.createElement('span', {
-        className: 'text-xs px-1.5 py-0.5',
-        style: assignment.status === 'blocked'
-          ? {
-              backgroundColor: 'rgba(196, 56, 24, 0.2)',
-              color: 'var(--q-lava1)',
-              borderRadius: 0
-            }
-          : assignment.status === 'active'
-            ? {
-                backgroundColor: 'rgba(60, 116, 32, 0.2)',
-                color: 'var(--q-slime1)',
-                borderRadius: 0
-              }
-            : {
-                backgroundColor: 'rgba(80, 76, 64, 0.2)',
-                color: 'var(--q-iron1)',
-                borderRadius: 0
-              }
-      }, assignment.status),
+      // Alignment StatusRune (Guardian mode only) - replaces emoji indicator
+      thread.mode === 'guardian' && React.createElement(StatusRune, {
+        status: assignment.alignmentStatus || 'aligned',
+        label: (assignment.alignmentStatus || 'aligned').toUpperCase()
+      }),
+      // Status StatusRune (ALL modes) - replaces plain text badge
+      // Maps assignment status to StatusRune: active->running (teleport), blocked->blocked (lava), completed->complete (slime)
+      React.createElement(StatusRune, {
+        status: assignment.status === 'active' ? 'running' :
+                assignment.status === 'blocked' ? 'blocked' :
+                assignment.status === 'completed' ? 'complete' :
+                assignment.status === 'failed' ? 'failed' :
+                assignment.status || 'idle'
+      }),
       // WP-3: Details toggle button (visible when assignment exists) - Q palette
       onTogglePane && React.createElement('button', {
         type: 'button',

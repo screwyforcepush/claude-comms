@@ -1,24 +1,34 @@
 // ThreadItem - Single thread preview in sidebar
 // WP-6: Transformed to Q palette brandkit styling
+// WP-7: Fullbright notification dot pattern for status and alignment indicators
 import React from 'react';
+import { QIcon } from '../shared/index.js';
 
 /**
- * Chat bubble icon
+ * Fullbright indicator component - glowing status dot
+ * Follows brandkit pattern with radial gradient and layered box-shadow glow
+ * @param {Object} props
+ * @param {string} props.color - CSS color value (use Q palette CSS variables)
+ * @param {boolean} props.pulse - Enable pulse animation for active states
+ * @param {number} props.size - Dot size in pixels (default: 7)
+ * @param {string} props.title - Tooltip text
+ * @param {string} props.className - Additional CSS classes for positioning
  */
-function ChatIcon() {
-  return React.createElement('svg', {
-    className: 'w-4 h-4',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
-    })
-  );
+function Fullbright({ color, pulse = false, size = 7, title, className = '' }) {
+  return React.createElement('span', {
+    className: className,
+    title: title,
+    style: {
+      display: 'inline-block',
+      width: size,
+      height: size,
+      background: `radial-gradient(circle, ${color}, ${color}88)`,
+      borderRadius: '50%',
+      boxShadow: `0 0 ${size}px ${color}88, 0 0 ${size * 2}px ${color}44`,
+      animation: pulse ? 'fbPulse 2.5s ease-in-out infinite' : 'none',
+      flexShrink: 0
+    }
+  });
 }
 
 /**
@@ -50,57 +60,58 @@ function formatRelativeTime(timestamp) {
   return 'Just now';
 }
 
-/**
- * Shield icon for guardian mode
- */
-function ShieldIcon() {
-  return React.createElement('svg', {
-    className: 'w-4 h-4',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
-    })
-  );
-}
 
 /**
- * Get Q palette status color for status dot
- * Maps status to Q palette CSS variables
+ * Get Fullbright status configuration
+ * Maps status to Q palette colors and pulse state
+ * @returns {Object} { color: string, pulse: boolean }
  */
-function getQPaletteStatusColor(status) {
+function getFullbrightStatusConfig(status) {
   switch (status) {
     case 'blocked':
     case 'failed':
-      return 'var(--q-lava1)';
+      return { color: 'var(--q-lava1)', pulse: false };
     case 'active':
     case 'running':
-      return 'var(--q-slime1)';
+      return { color: 'var(--q-teleport-bright)', pulse: true };
     case 'pending':
-      return 'var(--q-torch)';
+      return { color: 'var(--q-torch)', pulse: false };
     case 'complete':
-      return 'var(--q-slime1)';
+      return { color: 'var(--q-slime1)', pulse: false };
     default:
-      return 'var(--q-iron1)';
+      return { color: 'var(--q-iron1)', pulse: false };
+  }
+}
+
+/**
+ * Get Fullbright alignment configuration
+ * Maps alignment status to Q palette colors
+ * @returns {Object|null} { color: string } or null if no alignment
+ */
+function getFullbrightAlignmentConfig(alignmentStatus) {
+  switch (alignmentStatus) {
+    case 'aligned':
+      return { color: 'var(--q-slime1)' };
+    case 'uncertain':
+      return { color: 'var(--q-torch)' };
+    case 'misaligned':
+      return { color: 'var(--q-lava1)' };
+    default:
+      return null;
   }
 }
 
 /**
  * Get mode configuration for styling with Q palette
- * Jam: teleport palette
- * Cook: torch palette
- * Guardian: slime palette
+ * Jam: teleport palette + eye icon
+ * Cook: torch palette + axe icon
+ * Guardian: slime palette + armor icon
  */
 function getModeConfig(mode) {
   switch (mode) {
     case 'cook':
       return {
-        icon: ChatIcon,
+        iconName: 'axe',
         label: 'Cook',
         // Q palette: torch (orange/copper)
         bgStyle: {
@@ -115,7 +126,7 @@ function getModeConfig(mode) {
       };
     case 'guardian':
       return {
-        icon: ShieldIcon,
+        iconName: 'armor',
         label: 'Guardian',
         // Q palette: slime (green)
         bgStyle: {
@@ -131,7 +142,7 @@ function getModeConfig(mode) {
     case 'jam':
     default:
       return {
-        icon: ChatIcon,
+        iconName: 'eye',
         label: 'Jam',
         // Q palette: teleport (purple)
         bgStyle: {
@@ -147,17 +158,7 @@ function getModeConfig(mode) {
   }
 }
 
-/**
- * Get alignment status emoji
- */
-function getAlignmentEmoji(status) {
-  switch (status) {
-    case 'aligned': return '\uD83D\uDFE2';
-    case 'uncertain': return '\uD83D\uDFE0';
-    case 'misaligned': return '\uD83D\uDD34';
-    default: return null;
-  }
-}
+// NOTE: getAlignmentEmoji removed - replaced with Fullbright dots via getFullbrightAlignmentConfig
 
 /**
  * Get Q palette assignment status badge style
@@ -174,8 +175,8 @@ function getAssignmentStatusStyle(status) {
     case 'active':
     case 'running':
       return {
-        backgroundColor: 'rgba(60, 116, 32, 0.2)',
-        color: 'var(--q-slime1)',
+        backgroundColor: 'rgba(92, 60, 124, 0.2)',
+        color: 'var(--q-teleport-bright)',
         fontFamily: 'var(--font-display)'
       };
     default:
@@ -189,6 +190,7 @@ function getAssignmentStatusStyle(status) {
 
 /**
  * ThreadIcon component - Visual icon for thread (used in collapsed view and list)
+ * WP-7: Uses Fullbright dots for status and alignment indicators
  * @param {Object} props
  * @param {Object} props.thread - Thread object
  * @param {Object} props.assignment - Linked assignment
@@ -197,21 +199,16 @@ function getAssignmentStatusStyle(status) {
  */
 export function ThreadIcon({ thread, assignment, isSelected, onClick }) {
   const modeConfig = getModeConfig(thread.mode);
-  const Icon = modeConfig.icon;
 
-  // Alignment emoji (Guardian mode)
-  const alignmentEmoji = thread.mode === 'guardian' && assignment
-    ? getAlignmentEmoji(assignment.alignmentStatus)
+  // Alignment Fullbright config (Guardian mode only)
+  const alignmentConfig = thread.mode === 'guardian' && assignment
+    ? getFullbrightAlignmentConfig(assignment.alignmentStatus)
     : null;
 
-  // Status dot color using Q palette
-  let statusDotStyle = null;
-  if (assignment?.status) {
-    statusDotStyle = {
-      backgroundColor: getQPaletteStatusColor(assignment.status),
-      borderColor: 'var(--q-void0)'
-    };
-  }
+  // Status Fullbright config
+  const statusConfig = assignment?.status
+    ? getFullbrightStatusConfig(assignment.status)
+    : null;
 
   return React.createElement('button', {
     type: 'button',
@@ -229,20 +226,29 @@ export function ThreadIcon({ thread, assignment, isSelected, onClick }) {
       className: 'w-8 h-8 flex items-center justify-center',
       style: modeConfig.bgStyle
     },
-      React.createElement(Icon)
+      React.createElement(QIcon, {
+        name: modeConfig.iconName,
+        size: 16,
+        color: 'currentColor'
+      })
     ),
 
-    // Alignment status indicator (guardian mode only) - Top Right
-    alignmentEmoji && React.createElement('span', {
-      className: 'absolute -top-1 -right-1 text-xs',
-      title: `Alignment: ${assignment.alignmentStatus}`
-    }, alignmentEmoji),
+    // Alignment status indicator (guardian mode only) - Top Right - Fullbright dot
+    alignmentConfig && React.createElement(Fullbright, {
+      color: alignmentConfig.color,
+      size: 6,
+      pulse: false,
+      title: `Alignment: ${assignment.alignmentStatus}`,
+      className: 'absolute -top-0.5 -right-0.5'
+    }),
 
-    // Assignment status dot - Bottom Right with Q palette color
-    statusDotStyle && React.createElement('span', {
-      className: 'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2',
-      style: statusDotStyle,
-      title: `Status: ${assignment.status}`
+    // Assignment status dot - Bottom Right - Fullbright with pulse for active states
+    statusConfig && React.createElement(Fullbright, {
+      color: statusConfig.color,
+      size: 7,
+      pulse: statusConfig.pulse,
+      title: `Status: ${assignment.status}`,
+      className: 'absolute -bottom-0.5 -right-0.5'
     })
   );
 }
@@ -264,9 +270,7 @@ export function ThreadIcon({ thread, assignment, isSelected, onClick }) {
  */
 export function ThreadItem({ thread, assignment, isSelected, onClick }) {
   const modeConfig = getModeConfig(thread.mode);
-  const alignmentEmoji = thread.mode === 'guardian' && assignment
-    ? getAlignmentEmoji(assignment.alignmentStatus)
-    : null;
+  // Note: Alignment is displayed via Fullbright dot in ThreadIcon (top-right position)
 
   // Base styles for the button
   const baseStyle = {

@@ -269,14 +269,25 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
 
   // Expanded view - full content
   // Uses Q palette for all visual styling with Silkscreen display font for branding
-  return React.createElement('div', { className: 'flex flex-col h-full' },
+  // CopperTexture pattern applied to entire sidebar per brandkit.jsx
+  return React.createElement('div', {
+    className: 'flex flex-col h-full',
+    style: {
+      background: `
+        repeating-linear-gradient(90deg, transparent 0px, transparent 63px, var(--q-stone0-40) 63px, var(--q-stone0-40) 64px),
+        repeating-linear-gradient(0deg, transparent 0px, transparent 63px, var(--q-stone0-30) 63px, var(--q-stone0-30) 64px),
+        linear-gradient(180deg, var(--q-copper0-30), transparent 2px),
+        linear-gradient(135deg, var(--q-stone1) 0%, var(--q-void1) 100%)
+      `
+    }
+  },
     // Branding header with collapse toggle
     // Q palette: stone1 semi-transparent background, stone3 border, torch title with text shadow
     React.createElement('div', {
       className: 'p-3 border-b',
       style: {
         borderColor: 'var(--q-stone3)',
-        backgroundColor: 'rgba(30, 24, 19, 0.5)'  // --q-stone1 with 50% opacity
+        backgroundColor: 'transparent'  // transparent to show CopperTexture from parent
       }
     },
       React.createElement('div', { className: 'flex items-center justify-between' },
@@ -287,10 +298,11 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
             color: 'var(--q-torch)',
             letterSpacing: '2px',
             textTransform: 'uppercase',
-            textShadow: '0 0 20px rgba(212, 160, 48, 0.22)',
-            margin: 0
+            textShadow: '0 0 30px rgba(212, 160, 48, 0.22), 0 2px 4px var(--q-void0)',
+            margin: 0,
+            animation: 'torchFlicker 6s infinite'
           }
-        }, 'Workflow Engine'),
+        }, 'CLAUDE COMMS III'),
         React.createElement('div', { className: 'flex items-center gap-2' },
           React.createElement(SidebarConnectionStatus),
           React.createElement(CollapseToggleButton, {
