@@ -352,7 +352,15 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     implement: 'var(--q-copper2)',
     review: 'var(--q-torch)',
     uat: 'var(--q-slime1)',
-    document: 'var(--q-copper3)'
+    document: 'var(--q-copper3)',
+    pm: 'var(--q-copper2)'
+  };
+
+  // Map internal job types to on-brand display names
+  const typeDisplayNames = {
+    document: 'SCRIBE',
+    implement: 'BUILD',
+    pm: 'DISPATCH'
   };
 
   // Build HUD class with status modifier
@@ -478,7 +486,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
               color: typeColors[jobType] || 'var(--q-bone1)',
               textTransform: 'uppercase'
             }
-          }, jobType || 'JOB'),
+          }, typeDisplayNames[jobType] || (jobType ? jobType.toUpperCase() : 'JOB')),
           // Subhead: subagent mini icons
           subagentTotal > 0 && React.createElement('div', {
             style: {
@@ -1073,7 +1081,6 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
       className: 'flex items-center gap-4 text-xs flex-wrap',
       style: { color: 'var(--q-bone0)' }
     },
-      React.createElement('span', null, `${stats.total} jobs in ${stats.groupCount} groups`),
       React.createElement(RollupBadge, {
         count: stats.completed,
         label: 'DONE',

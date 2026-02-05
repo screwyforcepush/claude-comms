@@ -64,7 +64,7 @@ export function MessageList({ messages = [], loading = false, sending = false })
         React.createElement('p', {
           className: 'text-sm',
           style: { color: 'var(--q-bone0)' }
-        }, 'Send a message to begin chatting with the Product Owner. They can help you spec out ideas and create assignments.')
+        }, 'Send a message to begin chatting with the Quartermaster. They can help you spec out ideas and create assignments.')
       )
     );
   }
@@ -102,11 +102,10 @@ export function MessageList({ messages = [], loading = false, sending = false })
               viewBox: '0 0 24 24',
               strokeWidth: '2'
             },
-              React.createElement('path', {
-                strokeLinecap: 'round',
-                strokeLinejoin: 'round',
-                d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'
-              })
+              React.createElement('rect', { x: 5, y: 3, width: 14, height: 18, stroke: 'currentColor', strokeWidth: 2, fill: 'none' }),
+              React.createElement('path', { d: 'M9 7 L12 10 L15 7', stroke: 'currentColor', strokeWidth: 1.6, fill: 'none' }),
+              React.createElement('line', { x1: 12, y1: 10, x2: 12, y2: 17, stroke: 'currentColor', strokeWidth: 1.6 }),
+              React.createElement('line', { x1: 9, y1: 14, x2: 15, y2: 14, stroke: 'currentColor', strokeWidth: 1.6 })
             )
           ),
 
@@ -115,7 +114,7 @@ export function MessageList({ messages = [], loading = false, sending = false })
             React.createElement('span', {
               className: 'text-xs mb-1 px-1',
               style: { color: 'var(--q-bone0)' }
-            }, 'Product Owner'),
+            }, 'Quartermaster'),
             React.createElement('div', {
               className: 'px-4 py-3',
               style: {

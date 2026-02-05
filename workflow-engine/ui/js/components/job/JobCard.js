@@ -60,10 +60,11 @@ function HarnessBadge({ harness }) {
 /**
  * Job type badge component - Q palette styling
  * plan: teleport-bright (purple)
- * implement: copper2 (orange)
+ * implement (build): copper2 (orange)
  * review: torch (gold)
  * uat: slime1 (green)
- * document: copper3 (light copper)
+ * document (scribe): copper3 (light copper)
+ * pm (dispatcher): torch (gold)
  */
 function JobTypeBadge({ jobType }) {
   const getJobTypeColor = (type) => {
@@ -78,8 +79,24 @@ function JobTypeBadge({ jobType }) {
         return 'var(--q-slime1)';
       case 'document':
         return 'var(--q-copper3)';
+      case 'pm':
+        return 'var(--q-copper2)';
       default:
         return 'var(--q-bone1)';
+    }
+  };
+
+  // Map internal job types to on-brand display names
+  const getDisplayName = (type) => {
+    switch (type) {
+      case 'document':
+        return 'scribe';
+      case 'implement':
+        return 'build';
+      case 'pm':
+        return 'dispatch';
+      default:
+        return type || 'unknown';
     }
   };
 
@@ -92,7 +109,7 @@ function JobTypeBadge({ jobType }) {
       textTransform: 'uppercase',
       fontWeight: 500
     }
-  }, jobType || 'unknown');
+  }, getDisplayName(jobType));
 }
 
 /**

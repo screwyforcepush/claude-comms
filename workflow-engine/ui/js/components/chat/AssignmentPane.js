@@ -584,36 +584,11 @@ export function AssignmentPane({
 
         // Job Chain
         groups.length > 0 &&
-          React.createElement(
-            "div",
-            {
-              style: {
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-              },
-            },
-            React.createElement(
-              "h3",
-              {
-                style: {
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  color: "var(--q-bone0)",
-                  textTransform: "uppercase",
-                  letterSpacing: "2px",
-                  fontFamily: "var(--font-display)",
-                  margin: 0,
-                },
-              },
-              `Job Chain (${totalJobCount})`,
-            ),
-            React.createElement(JobChain, {
-              groups,
-              onJobSelect,
-              layout: "vertical",
-            }),
-          ),
+          React.createElement(JobChain, {
+            groups,
+            onJobSelect,
+            layout: "vertical",
+          }),
 
         // Artifacts (collapsible)
         artifactList.length > 0 &&

@@ -37,8 +37,8 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
   }, [message, disabled, onSend]);
 
   const handleKeyDown = useCallback((e) => {
-    // Submit on Enter (without Shift)
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Submit on Enter (without Shift or Option/Alt)
+    if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       handleSubmit();
     }
@@ -129,7 +129,7 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
       style: {
         color: 'var(--q-bone0)'
       }
-    }, 'Press Enter to send, Shift+Enter for new line')
+    }, 'Press Enter to send, Shift/Option+Enter for new line')
   );
 }
 

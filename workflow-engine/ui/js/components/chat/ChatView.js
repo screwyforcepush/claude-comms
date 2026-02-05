@@ -60,11 +60,12 @@ export function ChatView({
   // Ref to toggle button for focus management
   const toggleButtonRef = useRef(null);
 
-  // D2: Close pane when switching threads (fresh context)
-  // Note: We still reset on thread change but don't persist this reset
+  // D2: Open pane by default when thread has linked assignment, close otherwise
+  // Note: Only triggers on thread ID change, not on assignment data updates
   useEffect(() => {
-    setPaneOpen(false);
+    setPaneOpen(!!assignment);
     setSelectedJob(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?._id]);
 
   // Toggle pane callback for header - with localStorage persistence
@@ -157,11 +158,11 @@ export function ChatView({
         React.createElement('h2', {
           className: 'text-xl font-semibold mb-2',
           style: { color: 'var(--q-bone2)' }
-        }, 'Product Owner Chat'),
+        }, 'Quartermaster'),
         React.createElement('p', {
           className: 'mb-6',
           style: { color: 'var(--q-bone0)' }
-        }, 'Select a conversation from the sidebar or create a new one to start chatting with the Product Owner.'),
+        }, 'Select a conversation from the sidebar or create a new one to start chatting with the Quartermaster.'),
         React.createElement('div', {
           className: 'flex flex-col gap-3 text-sm',
           style: { color: 'var(--q-bone0)' }
@@ -182,7 +183,7 @@ export function ChatView({
             React.createElement('span', {
               style: modeBadgeStyles.guardian
             }, 'Guardian'),
-            React.createElement('span', null, 'PO monitors assignment alignment')
+            React.createElement('span', null, 'QM monitors assignment alignment')
           )
         )
       )
@@ -222,10 +223,10 @@ export function ChatView({
         onSend: onSendMessage,
         disabled: sending,
         placeholder: thread.mode === 'guardian'
-          ? 'Discuss alignment with the Product Owner...'
+          ? 'Discuss alignment with the Quartermaster...'
           : thread.mode === 'cook'
-            ? 'Tell the Product Owner what to build...'
-            : 'Discuss ideas with the Product Owner...'
+            ? 'Tell the Quartermaster what to build...'
+            : 'Discuss ideas with the Quartermaster...'
       })
     ),
 

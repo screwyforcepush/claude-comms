@@ -21,9 +21,9 @@ function UserIcon() {
 }
 
 /**
- * Assistant icon for assistant messages
+ * Quartermaster icon for assistant messages (rune icon from brandkit)
  */
-function AssistantIcon() {
+function QuartermasterIcon() {
   return React.createElement('svg', {
     className: 'w-5 h-5',
     fill: 'none',
@@ -31,30 +31,25 @@ function AssistantIcon() {
     viewBox: '0 0 24 24',
     strokeWidth: '2'
   },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'
-    })
+    React.createElement('rect', { x: 5, y: 3, width: 14, height: 18, stroke: 'currentColor', strokeWidth: 2, fill: 'none' }),
+    React.createElement('path', { d: 'M9 7 L12 10 L15 7', stroke: 'currentColor', strokeWidth: 1.6, fill: 'none' }),
+    React.createElement('line', { x1: 12, y1: 10, x2: 12, y2: 17, stroke: 'currentColor', strokeWidth: 1.6 }),
+    React.createElement('line', { x1: 9, y1: 14, x2: 15, y2: 14, stroke: 'currentColor', strokeWidth: 1.6 })
   );
 }
 
 /**
- * PM icon for PM report messages
+ * Dispatch icon for PM/dispatch report messages (dispatch icon from brandkit)
+ * Uses dark stroke on light torch background
  */
-function PMIcon() {
+function DispatchIcon() {
   return React.createElement('svg', {
     className: 'w-5 h-5',
     fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
+    viewBox: '0 0 24 24'
   },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'
-    })
+    React.createElement('path', { d: 'M4 12h12', stroke: 'var(--q-void0)', strokeWidth: 2 }),
+    React.createElement('path', { d: 'M14 7l6 5-6 5', stroke: 'var(--q-void0)', strokeWidth: 2, fill: 'none', strokeLinejoin: 'miter' })
   );
 }
 
@@ -121,7 +116,7 @@ function renderContent(content) {
 
 /**
  * Get role configuration for styling - Q palette brandkit
- * User: copper gradient, Assistant: stone palette, PM: torch/copper accent
+ * User: copper gradient, Assistant: stone palette, Dispatcher: torch/copper accent
  */
 function getRoleConfig(role) {
   switch (role) {
@@ -140,13 +135,13 @@ function getRoleConfig(role) {
       };
     case 'pm':
       return {
-        icon: PMIcon,
-        label: 'PM Report',
+        icon: DispatchIcon,
+        label: 'Dispatch',
         avatarStyle: { backgroundColor: 'var(--q-torch)' },
         bubbleStyle: {
           backgroundColor: 'var(--q-stone1)',
           color: 'var(--q-bone3)',
-          border: '1px solid var(--q-copper1-44)'
+          border: '1px solid var(--q-torch-33)'
         },
         bubbleClass: '',
         isRight: false,
@@ -154,8 +149,8 @@ function getRoleConfig(role) {
     case 'assistant':
     default:
       return {
-        icon: AssistantIcon,
-        label: 'Product Owner',
+        icon: QuartermasterIcon,
+        label: 'Quartermaster',
         avatarStyle: { backgroundColor: 'var(--q-teleport)' },
         bubbleStyle: {
           backgroundColor: 'var(--q-stone2)',
@@ -170,7 +165,7 @@ function getRoleConfig(role) {
 
 /**
  * MessageBubble component - Individual message with role styling
- * Uses Q palette brandkit: copper for user, stone for assistant, torch/copper for PM
+ * Uses Q palette brandkit: copper for user, stone for assistant, torch/copper for dispatcher
  * @param {Object} props
  * @param {Object} props.message - Message object with role, content, createdAt
  * @param {boolean} props.isLast - Whether this is the last message (for styling)
@@ -197,7 +192,7 @@ export function MessageBubble({ message, isLast = false }) {
       React.createElement('div', {
         className: `flex flex-col ${config.isRight ? 'items-end' : 'items-start'}`
       },
-        // Role label - Q palette bone0, PM uses torch
+        // Role label - Q palette bone0, dispatcher uses torch
         React.createElement('span', {
           className: 'text-xs mb-1 px-1',
           style: { color: message.role === 'pm' ? 'var(--q-torch)' : 'var(--q-bone0)' }
