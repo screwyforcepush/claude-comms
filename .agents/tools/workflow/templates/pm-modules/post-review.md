@@ -5,7 +5,8 @@ Think through the issues raised and filter for alignment with mental model, nort
 Think through the various approach options presented and decisions to be made. Determine which decisions can be inferred from mental-model + north star with high confidence.
 
 
-### Decision Logic (evaluate in order)
+[DecisionLogic]
+evaluate in order
 
 1. If(Latest review is an approved COMPLETION REVIEW attempt AND NO high-severity issues AND NO issues Must Be Addressed for Complete North Star Delivery):
    → Mark the assignment complete
@@ -29,14 +30,15 @@ Think through the various approach options presented and decisions to be made. D
    → If(you beleive full North Star scope is already achieved): append a COMPLETION REVIEW attempt job group of **review**, **document**, and (if frontend impact) **uat**. include in context "COMPLETION REVIEW" and instruct to assess the entire Assignment delivery against the full North Star scope.
    → Else: append **implement** to execute the next vertical slice (or the remainder of the Assignment North Star spec in preperation for COMPLETION REVIEW) 
 }
-
+[/DecisionLogic]
 
 Remember: 
 - **implement** is powerful and can handle multiple WP, tasks, and even a full Assignment North Star spec. **implement** crew will appropriatly sequence implementation based on dependency mapping. Assign suffiecient work to the implement job so it can deliver a full vertical slice of functional product value. 
 - Always include in your final response message: issues raised, approaches considered, and your decision rationalle.
 
 
-*R-1 Job Run for context (Group Before Latest Review)*
+## R-1 Job Run
+*Group Before Latest Review for reference*
 ```
 {{R1_CONTEXT}}
 ```
