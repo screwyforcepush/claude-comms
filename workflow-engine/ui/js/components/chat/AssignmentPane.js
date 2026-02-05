@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { StatusBadge } from "../shared/StatusBadge.js";
 import { JobChain } from "../job/JobChain.js";
 import { JsonViewer } from "../shared/JsonViewer.js";
+import { QIcon } from "../shared/index.js";
 
 /**
  * Close icon (X)
@@ -29,31 +30,6 @@ function CloseIcon() {
   );
 }
 
-/**
- * Chevron icon for collapsible sections
- */
-function ChevronIcon({ rotated }) {
-  return React.createElement(
-    "svg",
-    {
-      style: {
-        width: "16px",
-        height: "16px",
-        transition: "transform var(--t-anim-transition-normal)",
-        transform: rotated ? "rotate(180deg)" : "none",
-      },
-      fill: "none",
-      stroke: "currentColor",
-      viewBox: "0 0 24 24",
-      strokeWidth: "2",
-    },
-    React.createElement("path", {
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      d: "M19 9l-7 7-7-7",
-    }),
-  );
-}
 
 /**
  * Collapsible section header - Q palette styling
@@ -122,7 +98,22 @@ function SectionHeader({ title, count, isOpen, onToggle }) {
           count,
         ),
     ),
-    React.createElement(ChevronIcon, { rotated: isOpen }),
+    React.createElement(
+      "span",
+      {
+        style: {
+          display: "inline-flex",
+          color: "var(--q-bone1)",
+          transition: "transform var(--t-anim-transition-normal)",
+          transform: isOpen ? "rotate(180deg)" : "none",
+        },
+      },
+      React.createElement(QIcon, {
+        name: "chevronDown",
+        size: 16,
+        color: "currentColor",
+      }),
+    ),
   );
 }
 
@@ -354,6 +345,7 @@ export function AssignmentPane({
 }) {
   const [artifactsOpen, setArtifactsOpen] = useState(false);
   const [decisionsOpen, setDecisionsOpen] = useState(false);
+  const [northStarOpen, setNorthStarOpen] = useState(false);
   const [closeHovered, setCloseHovered] = useState(false);
 
   // Parse artifacts and decisions from JSON strings
@@ -522,45 +514,31 @@ export function AssignmentPane({
             ),
         ),
 
-        // North Star
+        // North Star (collapsible - collapsed by default)
         React.createElement(
           "div",
-          {
-            style: {
-              display: "flex",
-              flexDirection: "column",
-              gap: "4px",
-            },
-          },
-          React.createElement(
-            "h3",
-            {
-              style: {
-                fontSize: "10px",
-                fontWeight: 600,
-                color: "var(--q-bone0)",
-                textTransform: "uppercase",
-                letterSpacing: "2px",
-                fontFamily: "var(--font-display)",
-                margin: 0,
+          null,
+          React.createElement(SectionHeader, {
+            title: "North Star",
+            isOpen: northStarOpen,
+            onToggle: () => setNorthStarOpen(!northStarOpen),
+          }),
+          northStarOpen &&
+            React.createElement(
+              "p",
+              {
+                style: {
+                  fontSize: "14px",
+                  color: "var(--q-bone2)",
+                  whiteSpace: "pre-wrap",
+                  lineHeight: "var(--t-type-leading-relaxed)",
+                  fontFamily: "var(--font-body)",
+                  margin: 0,
+                  marginTop: "8px",
+                },
               },
-            },
-            "North Star",
-          ),
-          React.createElement(
-            "p",
-            {
-              style: {
-                fontSize: "14px",
-                color: "var(--q-bone2)",
-                whiteSpace: "pre-wrap",
-                lineHeight: "var(--t-type-leading-relaxed)",
-                fontFamily: "var(--font-body)",
-                margin: 0,
-              },
-            },
-            northStar || "No description provided",
-          ),
+              northStar || "No description provided",
+            ),
         ),
 
         // Blocked reason - Q lava palette for danger state

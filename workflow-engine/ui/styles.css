@@ -67,6 +67,13 @@
   --q-copper3-12: #b078401f;    /* 12% - copper light bg */
   --q-copper3-33: #b0784054;    /* 33% - copper border */
 
+  /* Teleport alpha variants - for running/warp states */
+  --q-teleport-08: #5c3c7c14;       /* 8% - teleport glow inset */
+  --q-teleport-10: #5c3c7c1a;       /* 10% - teleport glow outer */
+  --q-teleport-44: #5c3c7c70;       /* 44% - teleport glow bar */
+  --q-teleport-bright-44: #7c58a070; /* 44% - teleport bright glow */
+  --q-teleport-bright-88: #7c58a0e0; /* 88% - teleport bright gradient */
+
   /* T Tokens - Border tokens */
   --t-border-radius: 0;
   --t-border-width-standard: 1px;
@@ -1027,21 +1034,23 @@ p, h1, h2, h3, h4, h5, h6 {
   max-width: 400px;
 }
 
-/* Assignment Pane - responsive width */
+/* Assignment Pane - responsive width (50% of chat area on desktop) */
 .assignment-pane {
-  width: clamp(16rem, 25vw, 22rem);
-  min-width: 0;
-  max-width: 22rem;
+  flex: 1 1 clamp(20rem, 40vw, 32rem);
+  min-width: 20rem;
+  max-width: 40rem;
 }
 
 .assignment-pane.collapsed {
+  flex: 0 0 0;
   width: 0;
+  min-width: 0;
 }
 
 .assignment-pane-inner {
-  width: clamp(16rem, 25vw, 22rem);
-  min-width: 16rem;
-  max-width: 22rem;
+  width: clamp(20rem, 40vw, 32rem);
+  min-width: 20rem;
+  max-width: 40rem;
 }
 
 /* Thread sidebar in ChatPanel - responsive width */
@@ -1065,13 +1074,15 @@ p, h1, h2, h3, h4, h5, h6 {
   }
 
   .assignment-pane {
-    width: clamp(14rem, 22vw, 18rem);
-    max-width: 18rem;
+    flex: 1 1 clamp(16rem, 35vw, 28rem);
+    min-width: 16rem;
+    max-width: 28rem;
   }
 
   .assignment-pane-inner {
-    width: clamp(14rem, 22vw, 18rem);
-    max-width: 18rem;
+    width: clamp(16rem, 35vw, 28rem);
+    min-width: 16rem;
+    max-width: 28rem;
   }
 
   .threads-pane-expanded {
@@ -1093,13 +1104,15 @@ p, h1, h2, h3, h4, h5, h6 {
   }
 
   .assignment-pane {
-    width: clamp(12rem, 20vw, 16rem);
-    max-width: 16rem;
+    flex: 1 1 clamp(14rem, 30vw, 24rem);
+    min-width: 14rem;
+    max-width: 24rem;
   }
 
   .assignment-pane-inner {
-    width: clamp(12rem, 20vw, 16rem);
-    max-width: 16rem;
+    width: clamp(14rem, 30vw, 24rem);
+    min-width: 14rem;
+    max-width: 24rem;
   }
 
   .thread-sidebar {
@@ -1126,13 +1139,15 @@ p, h1, h2, h3, h4, h5, h6 {
   }
 
   .assignment-pane {
-    width: clamp(10rem, 18vw, 14rem);
-    max-width: 14rem;
+    flex: 1 1 clamp(12rem, 28vw, 20rem);
+    min-width: 12rem;
+    max-width: 20rem;
   }
 
   .assignment-pane-inner {
-    width: clamp(10rem, 18vw, 14rem);
-    max-width: 14rem;
+    width: clamp(12rem, 28vw, 20rem);
+    min-width: 12rem;
+    max-width: 20rem;
   }
 
   .thread-sidebar {
@@ -1310,9 +1325,9 @@ p, h1, h2, h3, h4, h5, h6 {
   --threads-width-laptop: clamp(14rem, 20vw, 18rem);
   --threads-width-tablet: clamp(10rem, 16vw, 14rem);
 
-  --assignment-width-desktop: clamp(18rem, 22vw, 24rem);
-  --assignment-width-laptop: clamp(16rem, 25vw, 22rem);
-  --assignment-width-tablet: clamp(14rem, 20vw, 18rem);
+  --assignment-width-desktop: clamp(24rem, 45vw, 40rem);
+  --assignment-width-laptop: clamp(20rem, 40vw, 32rem);
+  --assignment-width-tablet: clamp(16rem, 35vw, 24rem);
 }
 
 /* ============================================
@@ -1344,14 +1359,15 @@ p, h1, h2, h3, h4, h5, h6 {
   }
 
   .assignment-pane {
-    width: var(--assignment-width-desktop);
-    max-width: 24rem;
+    flex: 1 1 var(--assignment-width-desktop);
+    min-width: 24rem;
+    max-width: 40rem;
   }
 
   .assignment-pane-inner {
     width: var(--assignment-width-desktop);
-    min-width: 18rem;
-    max-width: 24rem;
+    min-width: 24rem;
+    max-width: 40rem;
   }
 
   .thread-sidebar {
@@ -1402,16 +1418,17 @@ p, h1, h2, h3, h4, h5, h6 {
     max-width: 14rem;
   }
 
-  /* Assignment pane - narrower */
+  /* Assignment pane - flexible width for 50% chat area */
   .assignment-pane {
-    width: var(--assignment-width-tablet);
-    max-width: 18rem;
+    flex: 1 1 var(--assignment-width-tablet);
+    min-width: 16rem;
+    max-width: 24rem;
   }
 
   .assignment-pane-inner {
     width: var(--assignment-width-tablet);
-    min-width: 14rem;
-    max-width: 18rem;
+    min-width: 16rem;
+    max-width: 24rem;
   }
 
   .thread-sidebar {
@@ -1813,6 +1830,16 @@ p, h1, h2, h3, h4, h5, h6 {
   97% {
     opacity: 1;
   }
+}
+
+/* Torch flicker (camelCase variant for JS inline styles - per brandkit.jsx) */
+@keyframes torchFlicker {
+  0%, 100% { opacity: 1; }
+  91% { opacity: 1; }
+  92% { opacity: 0.85; }
+  93% { opacity: 1; }
+  96% { opacity: 0.92; }
+  97% { opacity: 1; }
 }
 
 /* Fullbright pulse - status indicator glow cycling */
@@ -2776,3 +2803,178 @@ p, h1, h2, h3, h4, h5, h6 {
 .chain-stats__running { color: var(--q-teleport-bright); }
 .chain-stats__pending { color: var(--q-torch); }
 .chain-stats__failed { color: var(--q-lava1); }
+
+/* ============================================
+   WP-2: FULLBRIGHT & STATUS RUNE PATTERNS
+   From brandkit.jsx - glowing indicators and status badges
+   ============================================ */
+
+/* --- KEYFRAME ANIMATIONS --- */
+
+/* Fullbright pulse animation - fbPulse */
+@keyframes fbPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Torch flicker animation - torchFlicker (6s duration) */
+@keyframes torchFlicker {
+  0%, 100% { opacity: 1; }
+  91% { opacity: 1; }
+  92% { opacity: 0.85; }
+  93% { opacity: 1; }
+  96% { opacity: 0.92; }
+  97% { opacity: 1; }
+}
+
+/* --- FULLBRIGHT DOT --- */
+/* Glowing indicator dot with radial gradient and box-shadow glow layers */
+
+.fullbright-dot {
+  display: inline-block;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Size variants - sm (5px), md (7px), lg (10px) */
+.fullbright-dot--sm {
+  width: 5px;
+  height: 5px;
+}
+
+.fullbright-dot--md {
+  width: 7px;
+  height: 7px;
+}
+
+.fullbright-dot--lg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Color variants with radial gradient and glow layers */
+/* fbMultiplier: [1, 2] - first glow at 1x size, second at 2x size */
+
+/* Slime/Success fullbright */
+.fullbright-dot--slime {
+  background: radial-gradient(circle, var(--q-slime1), var(--q-slime1-88));
+  box-shadow:
+    0 0 5px var(--q-slime1-88),
+    0 0 10px var(--q-slime1-44);
+}
+.fullbright-dot--sm.fullbright-dot--slime {
+  box-shadow: 0 0 5px var(--q-slime1-88), 0 0 10px var(--q-slime1-44);
+}
+.fullbright-dot--lg.fullbright-dot--slime {
+  box-shadow: 0 0 10px var(--q-slime1-88), 0 0 20px var(--q-slime1-44);
+}
+
+/* Torch/Warning fullbright */
+.fullbright-dot--torch {
+  background: radial-gradient(circle, var(--q-torch), var(--q-torch-hot-33));
+  box-shadow:
+    0 0 7px var(--q-torch-hot-33),
+    0 0 14px var(--q-torch-22);
+}
+.fullbright-dot--sm.fullbright-dot--torch {
+  box-shadow: 0 0 5px var(--q-torch-hot-33), 0 0 10px var(--q-torch-22);
+}
+.fullbright-dot--lg.fullbright-dot--torch {
+  box-shadow: 0 0 10px var(--q-torch-hot-33), 0 0 20px var(--q-torch-22);
+}
+
+/* Lava/Danger fullbright */
+.fullbright-dot--lava {
+  background: radial-gradient(circle, var(--q-lava1), var(--q-lava1-44));
+  box-shadow:
+    0 0 7px var(--q-lava1-44),
+    0 0 14px var(--q-lava0-10);
+}
+.fullbright-dot--sm.fullbright-dot--lava {
+  box-shadow: 0 0 5px var(--q-lava1-44), 0 0 10px var(--q-lava0-10);
+}
+.fullbright-dot--lg.fullbright-dot--lava {
+  box-shadow: 0 0 10px var(--q-lava1-44), 0 0 20px var(--q-lava0-10);
+}
+
+/* Iron/Offline fullbright (muted, no glow) */
+.fullbright-dot--iron {
+  background: radial-gradient(circle, var(--q-iron1), var(--q-iron0));
+  box-shadow: none;
+}
+
+/* Teleport/Special fullbright */
+.fullbright-dot--teleport {
+  background: radial-gradient(circle, var(--q-teleport-bright), var(--q-teleport));
+  box-shadow:
+    0 0 7px rgba(124, 88, 160, 0.53),
+    0 0 14px rgba(92, 60, 124, 0.27);
+}
+.fullbright-dot--sm.fullbright-dot--teleport {
+  box-shadow: 0 0 5px rgba(124, 88, 160, 0.53), 0 0 10px rgba(92, 60, 124, 0.27);
+}
+.fullbright-dot--lg.fullbright-dot--teleport {
+  box-shadow: 0 0 10px rgba(124, 88, 160, 0.53), 0 0 20px rgba(92, 60, 124, 0.27);
+}
+
+/* Pulse animation modifier */
+.fullbright-dot--pulse {
+  animation: fbPulse var(--t-anim-pulse-duration) ease-in-out infinite;
+}
+
+/* --- STATUS RUNE --- */
+/* Badge-style status indicator with Fullbright dot and label */
+
+.status-rune {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-display);
+  font-size: var(--t-type-size-badge);
+  letter-spacing: var(--t-type-tracking-normal);
+  text-transform: uppercase;
+  padding: 3px var(--t-space-sm);
+  border-width: var(--t-border-width-standard);
+  border-style: solid;
+  border-radius: var(--t-border-radius);
+}
+
+/* Status variants - active (success/slime) */
+.status-rune--active {
+  color: var(--q-slime1);
+  background-color: rgba(60, 116, 32, 0.07);
+  border-color: rgba(60, 116, 32, 0.2);
+}
+
+/* Status variants - idle (warning/torch) */
+.status-rune--idle {
+  color: var(--q-torch);
+  background-color: rgba(212, 160, 48, 0.07);
+  border-color: rgba(212, 160, 48, 0.2);
+}
+
+/* Status variants - error (danger/lava) */
+.status-rune--error {
+  color: var(--q-lava1);
+  background-color: rgba(196, 56, 24, 0.07);
+  border-color: rgba(196, 56, 24, 0.2);
+}
+
+/* Status variants - offline (iron) */
+.status-rune--offline {
+  color: var(--q-iron1);
+  background-color: rgba(80, 76, 64, 0.07);
+  border-color: rgba(80, 76, 64, 0.2);
+}
+
+/* Status variants - warp/special (teleport) */
+.status-rune--warp {
+  color: var(--q-teleport-bright);
+  background-color: rgba(124, 88, 160, 0.07);
+  border-color: rgba(124, 88, 160, 0.2);
+}
+
+/* Torch flicker utility class for header text */
+.torch-flicker {
+  animation: torchFlicker 6s ease-in-out infinite;
+}

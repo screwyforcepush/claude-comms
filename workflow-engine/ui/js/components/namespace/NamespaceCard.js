@@ -1,14 +1,56 @@
 // NamespaceCard - Individual namespace card in the sidebar list
 // WP-5: Transformed to Q palette brandkit styling with riveted panel aesthetic
+// WP-6: Uses inline Fullbright component for status indicator
 import React from 'react';
-import { StatusDot } from '../shared/StatusBadge.js';
 import { Timestamp } from '../shared/Timestamp.js';
+
+/**
+ * Fullbright - Inline glowing dot indicator using brandkit pattern
+ * Uses radial gradient + box-shadow glow effect
+ * @param {Object} props
+ * @param {string} props.color - CSS color value (use Q palette CSS variables)
+ * @param {boolean} props.pulse - Whether to animate with fbPulse
+ * @param {number} props.size - Dot size in pixels
+ */
+function Fullbright({ color, pulse = false, size = 7 }) {
+  return React.createElement('span', {
+    style: {
+      display: 'inline-block',
+      width: size,
+      height: size,
+      background: `radial-gradient(circle, ${color}, ${color}88)`,
+      borderRadius: '50%',
+      boxShadow: `0 0 ${size}px ${color}88, 0 0 ${size * 2}px ${color}44`,
+      animation: pulse ? 'fbPulse 2.5s ease-in-out infinite' : 'none'
+    }
+  });
+}
+
+/**
+ * Map status to Q palette colors for Fullbright indicator
+ * @param {string} status - Status value
+ * @returns {Object} { color: string, pulse: boolean, size: number }
+ */
+function getStatusIndicatorProps(status) {
+  switch (status) {
+    case 'active':
+      return { color: 'var(--q-teleport-bright)', pulse: true, size: 7 };
+    case 'blocked':
+      return { color: 'var(--q-lava1)', pulse: false, size: 7 };
+    case 'pending':
+      return { color: 'var(--q-torch)', pulse: false, size: 7 };
+    case 'complete':
+      return { color: 'var(--q-slime1)', pulse: false, size: 5 }; // muted, smaller
+    default:
+      return { color: 'var(--q-iron1)', pulse: false, size: 7 };
+  }
+}
 
 /**
  * Count badge for status counts
  * WP-5: Uses Q palette colors with CSS variables
  * - pending: torch (warning/yellow)
- * - active: slime1 (success/green)
+ * - active: teleport-bright (running/purple)
  * - blocked: lava1 (danger/red)
  * - complete: slime0 bg alpha, slime1 text (success muted)
  */
@@ -22,8 +64,8 @@ function CountBadge({ count, status }) {
       color: 'var(--q-torch)',
     },
     active: {
-      backgroundColor: 'rgba(60, 116, 32, 0.15)', // --q-slime1 with alpha
-      color: 'var(--q-slime1)',
+      backgroundColor: 'rgba(92, 60, 124, 0.15)', // --q-teleport-bright with alpha
+      color: 'var(--q-teleport-bright)',
     },
     blocked: {
       backgroundColor: 'rgba(196, 56, 24, 0.15)', // --q-lava1 with alpha
@@ -127,10 +169,7 @@ export function NamespaceCard({ namespace, isSelected = false, onClick }) {
           color: isSelected ? 'var(--q-bone3)' : 'var(--q-bone2)',
         }
       }, name),
-      activeCount > 0 && React.createElement(StatusDot, {
-        status: primaryStatus,
-        pulse: primaryStatus === 'active'
-      })
+      activeCount > 0 && React.createElement(Fullbright, getStatusIndicatorProps(primaryStatus))
     ),
 
     // Status counts row

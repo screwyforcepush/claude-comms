@@ -1,24 +1,6 @@
 // ChatInput - Message input with send button
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-
-/**
- * Send icon component
- */
-function SendIcon() {
-  return React.createElement('svg', {
-    className: 'w-5 h-5',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8'
-    })
-  );
-}
+import { QIcon } from '../shared/index.js';
 
 /**
  * ChatInput component - Text input with send button
@@ -133,7 +115,11 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
         },
         title: canSend ? 'Send message' : disabled ? 'Sending...' : 'Type a message to send'
       },
-        React.createElement(SendIcon)
+        React.createElement(QIcon, {
+          name: 'dispatch',
+          size: 20,
+          color: 'currentColor'
+        })
       )
     ),
 

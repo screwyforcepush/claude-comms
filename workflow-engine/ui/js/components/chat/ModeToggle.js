@@ -1,5 +1,6 @@
 // ModeToggle - Runic dimension tabs for Jam/Cook/Guardian modes
 import React from 'react';
+import { QIcon } from '../shared/index.js';
 
 /**
  * ModeToggle component - Runic tab selector for switching between Jam, Cook, and Guardian modes
@@ -90,12 +91,6 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
     borderBottom: '2px solid var(--q-stone3)'
   };
 
-  // Icon style - inherits color from parent
-  const iconStyle = {
-    width: '16px',
-    height: '16px'
-  };
-
   // Content wrapper style
   const contentStyle = {
     display: 'flex',
@@ -109,7 +104,7 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
   const isGuardianDisabled = disabled || !hasAssignment;
 
   return React.createElement('div', { style: containerStyle },
-    // Jam button
+    // Jam button - eye icon (watching/observing)
     React.createElement('button', {
       type: 'button',
       onClick: () => handleModeChange('jam'),
@@ -120,24 +115,16 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
       title: 'Jam mode: Read-only ideation - helps spec out ideas'
     },
       React.createElement('span', { style: contentStyle },
-        React.createElement('svg', {
-          style: iconStyle,
-          fill: 'none',
-          stroke: 'currentColor',
-          viewBox: '0 0 24 24',
-          strokeWidth: '2'
-        },
-          React.createElement('path', {
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z'
-          })
-        ),
+        React.createElement(QIcon, {
+          name: 'eye',
+          size: 16,
+          color: 'currentColor'
+        }),
         'Jam'
       )
     ),
 
-    // Cook button
+    // Cook button - axe icon (action/building)
     React.createElement('button', {
       type: 'button',
       onClick: () => handleModeChange('cook'),
@@ -148,29 +135,16 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
       title: 'Cook mode: Full autonomy - can create assignments and insert jobs'
     },
       React.createElement('span', { style: contentStyle },
-        React.createElement('svg', {
-          style: iconStyle,
-          fill: 'none',
-          stroke: 'currentColor',
-          viewBox: '0 0 24 24',
-          strokeWidth: '2'
-        },
-          React.createElement('path', {
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z'
-          }),
-          React.createElement('path', {
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z'
-          })
-        ),
+        React.createElement(QIcon, {
+          name: 'axe',
+          size: 16,
+          color: 'currentColor'
+        }),
         'Cook'
       )
     ),
 
-    // Guardian button (only enabled when assignment is linked)
+    // Guardian button - armor icon (protection)
     React.createElement('button', {
       type: 'button',
       onClick: () => handleModeChange('guardian'),
@@ -183,19 +157,11 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
         : 'Guardian mode requires a linked assignment'
     },
       React.createElement('span', { style: contentStyle },
-        React.createElement('svg', {
-          style: iconStyle,
-          fill: 'none',
-          stroke: 'currentColor',
-          viewBox: '0 0 24 24',
-          strokeWidth: '2'
-        },
-          React.createElement('path', {
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
-          })
-        ),
+        React.createElement(QIcon, {
+          name: 'armor',
+          size: 16,
+          color: 'currentColor'
+        }),
         'Guardian'
       )
     )

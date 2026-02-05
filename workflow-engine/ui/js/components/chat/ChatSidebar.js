@@ -1,45 +1,7 @@
 // ChatSidebar - Thread list sidebar with new chat button
 import React, { useCallback, useState } from 'react';
 import { ThreadList } from './ThreadList.js';
-import { LoadingSpinner } from '../shared/LoadingSkeleton.js';
-
-/**
- * Plus icon for new chat button
- */
-function PlusIcon() {
-  return React.createElement('svg', {
-    className: 'w-5 h-5',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M12 4v16m8-8H4'
-    })
-  );
-}
-
-/**
- * Delete icon
- */
-function TrashIcon() {
-  return React.createElement('svg', {
-    className: 'w-4 h-4',
-    fill: 'none',
-    stroke: 'currentColor',
-    viewBox: '0 0 24 24',
-    strokeWidth: '2'
-  },
-    React.createElement('path', {
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      d: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
-    })
-  );
-}
+import { LoadingSpinner, QIcon } from '../shared/index.js';
 
 /**
  * New Chat button with copper gradient styling per QButton pattern
@@ -84,7 +46,11 @@ function NewChatButton({ onClick, creating }) {
   },
     creating
       ? React.createElement(LoadingSpinner, { size: 'sm' })
-      : React.createElement(PlusIcon),
+      : React.createElement(QIcon, {
+          name: 'spawn',
+          size: 20,
+          color: 'currentColor'
+        }),
     React.createElement('span', null,
       creating ? 'Creating...' : 'New Chat'
     )
@@ -114,7 +80,11 @@ function DeleteChatButton({ onClick }) {
       transition: 'all 0.15s'
     }
   },
-    React.createElement(TrashIcon),
+    React.createElement(QIcon, {
+      name: 'skull',
+      size: 16,
+      color: 'currentColor'
+    }),
     React.createElement('span', null, 'Delete Chat')
   );
 }
