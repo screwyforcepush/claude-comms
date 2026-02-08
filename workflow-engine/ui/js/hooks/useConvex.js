@@ -1,6 +1,7 @@
 // Convex client context and hook
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ConvexClient } from 'convex/browser';
+import { usePassword } from '../components/auth/PasswordContext.js';
 
 // Context for Convex client
 const ConvexContext = createContext(null);
@@ -73,19 +74,24 @@ export function useConvex() {
 
 /**
  * Hook to subscribe to a Convex query
+ * Auto-injects password from PasswordContext into args.
  * @param {string} queryName - The query function reference (e.g., "scheduler:getQueueStatus")
  * @param {object} args - Query arguments
  * @returns {{ data: any, loading: boolean, error: string | null }}
  */
 export function useQuery(queryName, args = {}) {
   const { client, connected } = useConvex();
+  const password = usePassword();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const unsubscribeRef = useRef(null);
 
+  // Inject password into args
+  const argsWithPassword = password ? { ...args, password } : args;
+
   // Serialize args for dependency comparison
-  const argsKey = JSON.stringify(args);
+  const argsKey = JSON.stringify(argsWithPassword);
 
   useEffect(() => {
     if (!client || !connected) {
@@ -99,7 +105,7 @@ export function useQuery(queryName, args = {}) {
     try {
       unsubscribeRef.current = client.onUpdate(
         queryName,
-        args,
+        argsWithPassword,
         (result) => {
           setData(result);
           setLoading(false);
@@ -128,18 +134,21 @@ export function useQuery(queryName, args = {}) {
 
 /**
  * Hook to call a Convex mutation
+ * Auto-injects password from PasswordContext into args.
  * @param {string} mutationName - The mutation function reference
  * @returns {Function} - Function to call the mutation with args
  */
 export function useMutation(mutationName) {
   const { client } = useConvex();
+  const password = usePassword();
 
   const mutate = useCallback(async (args = {}) => {
     if (!client) {
       throw new Error('Convex client not available');
     }
-    return await client.mutation(mutationName, args);
-  }, [client, mutationName]);
+    const argsWithPassword = password ? { ...args, password } : args;
+    return await client.mutation(mutationName, argsWithPassword);
+  }, [client, mutationName, password]);
 
   return mutate;
 }

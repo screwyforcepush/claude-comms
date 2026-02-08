@@ -58,14 +58,8 @@ import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
-// Try generated types for type safety, fall back to anyApi for portability
-let api: typeof anyApi;
-try {
-  const generated = await import("./workflow-engine/convex/_generated/api.js");
-  api = generated.api;
-} catch {
-  api = anyApi;
-}
+// Use anyApi for portability (same as runner.ts)
+const api = anyApi;
 
 type Id<T extends string> = string & { __tableName: T };
 
@@ -75,6 +69,7 @@ type Harness = "claude" | "codex" | "gemini";
 interface Config {
   convexUrl: string;
   namespace: string;
+  password: string;
   timeoutMs: number;
   harnessDefaults: {
     default: Harness;
@@ -111,6 +106,7 @@ async function getNamespaceId(): Promise<Id<"namespaces">> {
   if (namespaceId) return namespaceId;
 
   const namespace = await client.query(api.namespaces.getByName, {
+    password: config.password,
     name: config.namespace,
   });
 
@@ -161,6 +157,7 @@ async function listAssignments(status?: string) {
 
   const nsId = await getNamespaceId();
   const result = await client.query(api.assignments.list, {
+    password: config.password,
     namespaceId: nsId,
     status: status as any,
   });
@@ -169,6 +166,7 @@ async function listAssignments(status?: string) {
 
 async function getAssignment(id: string) {
   const result = await client.query(api.assignments.getWithGroups, {
+    password: config.password,
     id: id as Id<"assignments">,
   });
   if (!result) error("Assignment not found");
@@ -182,6 +180,7 @@ async function listGroups(status?: string, assignmentId?: string) {
   }
 
   const result = await client.query(api.jobs.listGroups, {
+    password: config.password,
     status: status as any,
     assignmentId: assignmentId as Id<"assignments"> | undefined,
   });
@@ -190,6 +189,7 @@ async function listGroups(status?: string, assignmentId?: string) {
 
 async function getGroup(id: string) {
   const result = await client.query(api.jobs.getGroupWithJobs, {
+    password: config.password,
     id: id as Id<"jobGroups">,
   });
   if (!result) error("Group not found");
@@ -203,6 +203,7 @@ async function listJobs(status?: string, groupId?: string) {
   }
 
   const result = await client.query(api.jobs.list, {
+    password: config.password,
     status: status as any,
     groupId: groupId as Id<"jobGroups"> | undefined,
   });
@@ -211,6 +212,7 @@ async function listJobs(status?: string, groupId?: string) {
 
 async function getJob(id: string) {
   const result = await client.query(api.jobs.getWithGroup, {
+    password: config.password,
     id: id as Id<"jobs">,
   });
   if (!result) error("Job not found");
@@ -220,6 +222,7 @@ async function getJob(id: string) {
 async function getQueueStatus() {
   const nsId = await getNamespaceId();
   const result = await client.query(api.scheduler.getQueueStatus, {
+    password: config.password,
     namespaceId: nsId,
   });
   output(result);
@@ -233,6 +236,7 @@ async function createAssignment(
 ) {
   const nsId = await getNamespaceId();
   const id = await client.mutation(api.assignments.create, {
+    password: config.password,
     namespaceId: nsId,
     northStar,
     priority,
@@ -243,6 +247,7 @@ async function createAssignment(
   const effectiveThreadId = threadId || process.env.WORKFLOW_THREAD_ID;
   if (effectiveThreadId) {
     await client.mutation(api.chatThreads.linkAssignment, {
+      password: config.password,
       id: effectiveThreadId as Id<"chatThreads">,
       assignmentId: id as Id<"assignments">,
     });
@@ -256,6 +261,7 @@ async function createAssignment(
 // Find the tail group of an assignment (for --append)
 async function findTailGroup(assignmentId: string): Promise<string | null> {
   const assignment = await client.query(api.assignments.get, {
+    password: config.password,
     id: assignmentId as Id<"assignments">,
   });
   if (!assignment || !assignment.headGroupId) return null;
@@ -266,6 +272,7 @@ async function findTailGroup(assignmentId: string): Promise<string | null> {
 
   while (currentGroupId) {
     const group = await client.query(api.jobs.getGroup, {
+      password: config.password,
       id: currentGroupId as Id<"jobGroups">,
     });
     if (!group) break;
@@ -355,12 +362,14 @@ async function insertJobs(
 
   if (effectiveAfterGroupId) {
     result = await client.mutation(api.jobs.insertGroupAfter, {
+      password: config.password,
       afterGroupId: effectiveAfterGroupId as Id<"jobGroups">,
       jobs: expandedJobs as any,
     });
     linkInfo = `linked after group ${effectiveAfterGroupId.slice(-8)}`;
   } else {
     result = await client.mutation(api.jobs.createGroup, {
+      password: config.password,
       assignmentId: assignmentId as Id<"assignments">,
       jobs: expandedJobs as any,
     });
@@ -397,6 +406,7 @@ async function updateAssignment(
   const baseDecisions = process.env.WORKFLOW_DECISIONS;
 
   await client.mutation(api.assignments.update, {
+    password: config.password,
     id: id as Id<"assignments">,
     artifacts: appendField(baseArtifacts, artifacts),
     decisions: appendField(baseDecisions, decisions),
@@ -407,6 +417,7 @@ async function updateAssignment(
 
 async function completeAssignment(id: string) {
   await client.mutation(api.assignments.complete, {
+    password: config.password,
     id: id as Id<"assignments">,
   });
   output({ message: "Assignment completed" });
@@ -414,6 +425,7 @@ async function completeAssignment(id: string) {
 
 async function blockAssignment(id: string, reason: string) {
   await client.mutation(api.assignments.block, {
+    password: config.password,
     id: id as Id<"assignments">,
     reason,
   });
@@ -422,6 +434,7 @@ async function blockAssignment(id: string, reason: string) {
 
 async function unblockAssignment(id: string) {
   await client.mutation(api.assignments.unblock, {
+    password: config.password,
     id: id as Id<"assignments">,
   });
   output({ message: "Assignment unblocked" });
@@ -429,6 +442,7 @@ async function unblockAssignment(id: string) {
 
 async function deleteAssignment(id: string) {
   const result = await client.mutation(api.assignments.remove, {
+    password: config.password,
     id: id as Id<"assignments">,
   });
   output({ message: `Assignment deleted (${result.groupsDeleted} groups, ${result.jobsDeleted} jobs removed)` });
@@ -436,6 +450,7 @@ async function deleteAssignment(id: string) {
 
 async function startJob(id: string) {
   await client.mutation(api.jobs.start, {
+    password: config.password,
     id: id as Id<"jobs">,
   });
   output({ message: "Job started" });
@@ -443,6 +458,7 @@ async function startJob(id: string) {
 
 async function completeJob(id: string, result: string) {
   await client.mutation(api.jobs.complete, {
+    password: config.password,
     id: id as Id<"jobs">,
     result,
   });
@@ -451,6 +467,7 @@ async function completeJob(id: string, result: string) {
 
 async function failJob(id: string, result?: string) {
   await client.mutation(api.jobs.fail, {
+    password: config.password,
     id: id as Id<"jobs">,
     result,
   });
@@ -462,6 +479,7 @@ async function failJob(id: string, result?: string) {
 async function listChatThreads() {
   const nsId = await getNamespaceId();
   const result = await client.query(api.chatThreads.list, {
+    password: config.password,
     namespaceId: nsId,
   });
   output(result);
@@ -469,11 +487,13 @@ async function listChatThreads() {
 
 async function getChatThread(threadId: string) {
   const thread = await client.query(api.chatThreads.get, {
+    password: config.password,
     id: threadId as Id<"chatThreads">,
   });
   if (!thread) error("Thread not found");
 
   const messages = await client.query(api.chatMessages.list, {
+    password: config.password,
     threadId: threadId as Id<"chatThreads">,
   });
 
@@ -483,6 +503,7 @@ async function getChatThread(threadId: string) {
 async function createChatThread(title?: string) {
   const nsId = await getNamespaceId();
   const threadId = await client.mutation(api.chatThreads.create, {
+    password: config.password,
     namespaceId: nsId,
     title,
     mode: "jam", // Default to safe mode
@@ -502,6 +523,7 @@ async function changeChatMode(threadId: string, mode: string, assignmentId?: str
     }
     // Use atomic mutation to link, set alignment, and change mode
     await client.mutation(api.chatThreads.enableGuardianMode, {
+      password: config.password,
       threadId: threadId as Id<"chatThreads">,
       assignmentId: assignmentId as Id<"assignments">,
     });
@@ -510,6 +532,7 @@ async function changeChatMode(threadId: string, mode: string, assignmentId?: str
   }
 
   await client.mutation(api.chatThreads.updateMode, {
+    password: config.password,
     id: threadId as Id<"chatThreads">,
     mode: mode as "jam" | "cook",
   });
@@ -518,6 +541,7 @@ async function changeChatMode(threadId: string, mode: string, assignmentId?: str
 
 async function updateChatTitle(threadId: string, title: string) {
   await client.mutation(api.chatThreads.updateTitle, {
+    password: config.password,
     id: threadId as Id<"chatThreads">,
     title,
   });
@@ -527,12 +551,14 @@ async function updateChatTitle(threadId: string, title: string) {
 async function sendChatMessage(threadId: string, message: string, harness?: string) {
   // Get thread to check it exists
   const thread = await client.query(api.chatThreads.get, {
+    password: config.password,
     id: threadId as Id<"chatThreads">,
   });
   if (!thread) error("Thread not found");
 
   // Add user message to thread
   await client.mutation(api.chatMessages.add, {
+    password: config.password,
     threadId: threadId as Id<"chatThreads">,
     role: "user",
     content: message,
@@ -541,6 +567,7 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
   // Trigger chat job (uses chatJobs table, not assignments/jobs)
   // The trigger mutation builds context internally
   const result = await client.mutation(api.chatJobs.trigger, {
+    password: config.password,
     threadId: threadId as Id<"chatThreads">,
     harness: (harness || getHarnessForJobType("chat")) as Harness,
   });

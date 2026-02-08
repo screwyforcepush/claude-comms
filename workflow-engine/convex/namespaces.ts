@@ -1,11 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requirePassword } from "./auth";
 
 // Queries
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { password: v.string() },
+  handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db
       .query("namespaces")
       .order("asc")
@@ -14,15 +16,17 @@ export const list = query({
 });
 
 export const get = query({
-  args: { id: v.id("namespaces") },
+  args: { password: v.string(), id: v.id("namespaces") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db.get(args.id);
   },
 });
 
 export const getByName = query({
-  args: { name: v.string() },
+  args: { password: v.string(), name: v.string() },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db
       .query("namespaces")
       .withIndex("by_name", (q) => q.eq("name", args.name))
@@ -34,10 +38,12 @@ export const getByName = query({
 
 export const create = mutation({
   args: {
+    password: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     // Check if namespace already exists
     const existing = await ctx.db
       .query("namespaces")
@@ -60,12 +66,14 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    password: v.string(),
     id: v.id("namespaces"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    requirePassword(args);
+    const { id, password, ...updates } = args;
     const filteredUpdates = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)
     );
@@ -77,8 +85,9 @@ export const update = mutation({
 });
 
 export const remove = mutation({
-  args: { id: v.id("namespaces") },
+  args: { password: v.string(), id: v.id("namespaces") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     // Note: This doesn't cascade delete - caller should handle that
     await ctx.db.delete(args.id);
   },

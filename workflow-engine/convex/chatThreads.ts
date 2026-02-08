@@ -1,20 +1,23 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { requirePassword } from "./auth";
 
 // Queries
 
 // Debug: list all without index
 export const listAll = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { password: v.string() },
+  handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db.query("chatThreads").collect();
   },
 });
 
 export const list = query({
-  args: { namespaceId: v.id("namespaces") },
+  args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db
       .query("chatThreads")
       .withIndex("by_namespace_updated", (q) => q.eq("namespaceId", args.namespaceId))
@@ -24,8 +27,9 @@ export const list = query({
 });
 
 export const get = query({
-  args: { id: v.id("chatThreads") },
+  args: { password: v.string(), id: v.id("chatThreads") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db.get(args.id);
   },
 });
@@ -34,11 +38,13 @@ export const get = query({
 
 export const create = mutation({
   args: {
+    password: v.string(),
     namespaceId: v.id("namespaces"),
     title: v.optional(v.string()),
     mode: v.optional(v.union(v.literal("jam"), v.literal("cook"))),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const now = Date.now();
     return await ctx.db.insert("chatThreads", {
       namespaceId: args.namespaceId,
@@ -52,10 +58,12 @@ export const create = mutation({
 
 export const updateMode = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatThreads"),
     mode: v.union(v.literal("jam"), v.literal("cook"), v.literal("guardian")),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       mode: args.mode,
       updatedAt: Date.now(),
@@ -65,10 +73,12 @@ export const updateMode = mutation({
 
 export const linkAssignment = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatThreads"),
     assignmentId: v.id("assignments"),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       assignmentId: args.assignmentId,
       updatedAt: Date.now(),
@@ -78,8 +88,9 @@ export const linkAssignment = mutation({
 
 // Query thread linked to an assignment in guardian mode
 export const getGuardianThread = query({
-  args: { assignmentId: v.id("assignments") },
+  args: { password: v.string(), assignmentId: v.id("assignments") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     // Use index to efficiently find thread by assignmentId
     const thread = await ctx.db
       .query("chatThreads")
@@ -94,10 +105,12 @@ export const getGuardianThread = query({
 // Atomically enable guardian mode (link + align + mode change)
 export const enableGuardianMode = mutation({
   args: {
+    password: v.string(),
     threadId: v.id("chatThreads"),
     assignmentId: v.id("assignments"),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const now = Date.now();
 
     // 1. Link assignment to thread
@@ -119,10 +132,12 @@ export const enableGuardianMode = mutation({
 
 export const updateTitle = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatThreads"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       title: args.title,
       updatedAt: Date.now(),
@@ -132,10 +147,12 @@ export const updateTitle = mutation({
 
 export const updateSessionId = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatThreads"),
     sessionId: v.string(),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       claudeSessionId: args.sessionId,
       updatedAt: Date.now(),
@@ -146,10 +163,12 @@ export const updateSessionId = mutation({
 // Update the last prompt mode sent (for differential prompting)
 export const updateLastPromptMode = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatThreads"),
     lastPromptMode: v.union(v.literal("jam"), v.literal("cook")),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       lastPromptMode: args.lastPromptMode,
       updatedAt: Date.now(),
@@ -160,10 +179,12 @@ export const updateLastPromptMode = mutation({
 // Bypass ID validation - for manual DB fixes
 export const linkAssignmentRaw = mutation({
   args: {
+    password: v.string(),
     threadId: v.string(),
     assignmentId: v.string(),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.threadId as any, {
       assignmentId: args.assignmentId as any,
       updatedAt: Date.now(),
@@ -172,8 +193,9 @@ export const linkAssignmentRaw = mutation({
 });
 
 export const remove = mutation({
-  args: { id: v.id("chatThreads") },
+  args: { password: v.string(), id: v.id("chatThreads") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     // Delete all messages in the thread first
     const messages = await ctx.db
       .query("chatMessages")

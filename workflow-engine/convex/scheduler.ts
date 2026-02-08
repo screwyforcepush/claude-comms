@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { requirePassword } from "./auth";
 
 // Ready job info returned to runner
 interface ReadyJob {
@@ -159,8 +160,9 @@ async function findReadyJobs(
 
 // Get all jobs that are ready to run for a namespace
 export const getReadyJobs = query({
-  args: { namespaceId: v.id("namespaces") },
+  args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args): Promise<ReadyJob[]> => {
+    requirePassword(args);
     // Get all non-complete, non-blocked assignments for this namespace
     const assignments = await ctx.db
       .query("assignments")
@@ -211,8 +213,9 @@ export const getReadyJobs = query({
 
 // Get the queue status for a namespace
 export const getQueueStatus = query({
-  args: { namespaceId: v.id("namespaces") },
+  args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const assignments = await ctx.db
       .query("assignments")
       .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
@@ -252,8 +255,9 @@ export const getQueueStatus = query({
 
 // Get all namespaces with aggregated stats
 export const getAllNamespaces = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { password: v.string() },
+  handler: async (ctx, args) => {
+    requirePassword(args);
     const namespaces = await ctx.db.query("namespaces").collect();
 
     const result = [];
@@ -291,8 +295,9 @@ export const getAllNamespaces = query({
 
 // Subscription-friendly: get all active/pending assignments with their group chains
 export const watchQueue = query({
-  args: { namespaceId: v.id("namespaces") },
+  args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const assignments = await ctx.db
       .query("assignments")
       .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
@@ -339,8 +344,9 @@ export const watchQueue = query({
 
 // Get ALL assignments for a namespace (including complete) with their group chains
 export const getAllAssignments = query({
-  args: { namespaceId: v.id("namespaces") },
+  args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const assignments = await ctx.db
       .query("assignments")
       .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
@@ -385,8 +391,9 @@ export const getAllAssignments = query({
 
 // Get all pending chat jobs for a namespace (separate from assignment jobs)
 export const getReadyChatJobs = query({
-  args: { namespaceId: v.id("namespaces") },
+  args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args): Promise<ReadyChatJob[]> => {
+    requirePassword(args);
     const pendingChatJobs = await ctx.db
       .query("chatJobs")
       .withIndex("by_namespace_status", (q) =>

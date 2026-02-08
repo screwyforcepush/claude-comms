@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requirePassword } from "./auth";
 
 /**
  * Chat Jobs - Separate from assignment-based jobs
@@ -13,6 +14,7 @@ import { mutation, query } from "./_generated/server";
  */
 export const trigger = mutation({
   args: {
+    password: v.string(),
     threadId: v.id("chatThreads"),
     harness: v.optional(
       v.union(v.literal("claude"), v.literal("codex"), v.literal("gemini"))
@@ -21,6 +23,7 @@ export const trigger = mutation({
     isGuardianEvaluation: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const harness = args.harness ?? "claude";
     const now = Date.now();
 
@@ -103,10 +106,12 @@ export const trigger = mutation({
  */
 export const start = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatJobs"),
     prompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       status: "running",
       startedAt: Date.now(),
@@ -120,6 +125,7 @@ export const start = mutation({
  */
 export const complete = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatJobs"),
     result: v.string(),
     toolCallCount: v.optional(v.number()),
@@ -128,6 +134,7 @@ export const complete = mutation({
     lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const update: Record<string, any> = {
       status: "complete",
       result: args.result,
@@ -146,6 +153,7 @@ export const complete = mutation({
  */
 export const fail = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatJobs"),
     result: v.optional(v.string()),
     toolCallCount: v.optional(v.number()),
@@ -154,6 +162,7 @@ export const fail = mutation({
     lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const update: Record<string, any> = {
       status: "failed",
       result: args.result,
@@ -169,6 +178,7 @@ export const fail = mutation({
 
 export const updateMetrics = mutation({
   args: {
+    password: v.string(),
     id: v.id("chatJobs"),
     toolCallCount: v.optional(v.number()),
     subagentCount: v.optional(v.number()),
@@ -176,6 +186,7 @@ export const updateMetrics = mutation({
     lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const update: Record<string, any> = {};
     if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
     if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
@@ -190,8 +201,9 @@ export const updateMetrics = mutation({
  * Get pending chat jobs for a namespace
  */
 export const getPending = query({
-  args: { namespaceId: v.id("namespaces") },
+  args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db
       .query("chatJobs")
       .withIndex("by_namespace_status", (q) =>
@@ -205,8 +217,9 @@ export const getPending = query({
  * Get a chat job by ID
  */
 export const get = query({
-  args: { id: v.id("chatJobs") },
+  args: { password: v.string(), id: v.id("chatJobs") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db.get(args.id);
   },
 });
@@ -216,8 +229,9 @@ export const get = query({
  * Used for showing typing indicator while job is processing
  */
 export const getActiveForThread = query({
-  args: { threadId: v.id("chatThreads") },
+  args: { password: v.string(), threadId: v.id("chatThreads") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     // Get all chatJobs for this thread
     const jobs = await ctx.db
       .query("chatJobs")

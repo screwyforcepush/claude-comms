@@ -61,6 +61,7 @@ interface ChatJob {
 interface Config {
   convexUrl: string;
   namespace: string;
+  password: string;
   timeoutMs: number;
   idleTimeoutMs?: number;
   harnessDefaults: {
@@ -95,7 +96,7 @@ const executor = new HarnessExecutor({
   cwd: projectRoot,
 });
 
-const METRICS_HEARTBEAT_MS = 10_000;
+const METRICS_HEARTBEAT_MS = 60_000;
 const CODEX_TOOL_ITEM_TYPES = new Set([
   "command_execution",
   "tool_call",
@@ -288,6 +289,7 @@ function recordMetricsEvent(
 async function saveChatResponse(threadId: string, content: string): Promise<void> {
   try {
     await client!.mutation(api.chatMessages.add, {
+      password: config.password,
       threadId: threadId as any,
       role: "assistant",
       content,
@@ -302,6 +304,7 @@ async function saveChatResponse(threadId: string, content: string): Promise<void
 async function saveSessionId(threadId: string, sessionId: string): Promise<void> {
   try {
     await client!.mutation(api.chatThreads.updateSessionId, {
+      password: config.password,
       id: threadId as any,
       sessionId,
     });
@@ -318,6 +321,7 @@ async function saveLastPromptMode(
 ): Promise<void> {
   try {
     await client!.mutation(api.chatThreads.updateLastPromptMode, {
+      password: config.password,
       id: threadId as any,
       lastPromptMode: mode,
     });
@@ -343,7 +347,7 @@ async function triggerGuardianEvaluation(
   try {
     const guardianThread: ChatThread | null = await client!.query(
       api.chatThreads.getGuardianThread,
-      { assignmentId: assignment._id as any }
+      { password: config.password, assignmentId: assignment._id as any }
     );
 
     if (!guardianThread) {
@@ -355,6 +359,7 @@ async function triggerGuardianEvaluation(
 
     try {
       await client!.mutation(api.chatMessages.add, {
+        password: config.password,
         threadId: guardianThread._id as any,
         role: "pm",
         content: pmResult,
@@ -367,6 +372,7 @@ async function triggerGuardianEvaluation(
 
     try {
       await client!.mutation(api.chatJobs.trigger, {
+        password: config.password,
         threadId: guardianThread._id as any,
         harness: getHarnessForJobType("chat"),
         isGuardianEvaluation: true,
@@ -404,6 +410,7 @@ async function executeJob(
     if (!chatContext) {
       console.error(`[${jobId}] Invalid chat context, failing job`);
       await client!.mutation(api.jobs.fail, {
+        password: config.password,
         id: jobId,
         result: "Invalid chat context provided",
       });
@@ -426,18 +433,19 @@ async function executeJob(
   }
 
   // Mark job as running with prompt for visibility
-  await client!.mutation(api.jobs.start, { id: jobId, prompt });
+  await client!.mutation(api.jobs.start, { password: config.password, id: jobId, prompt });
 
   const metrics = createMetricsState();
 
   const flushMetrics = async (): Promise<void> => {
     if (!client) return;
     const update: {
+      password: string;
       id: string;
       toolCallCount?: number;
       subagentCount?: number;
       lastEventAt?: number;
-    } = { id: jobId };
+    } = { password: config.password, id: jobId };
     let changed = false;
 
     if (metrics.toolCallCount !== metrics.lastFlushedToolCallCount) {
@@ -508,6 +516,7 @@ async function executeJob(
         stopHeartbeat();
         try {
           await client!.mutation(api.jobs.complete, {
+            password: config.password,
             id: jobId,
             result,
             toolCallCount: metrics.toolCallCount,
@@ -531,6 +540,7 @@ async function executeJob(
         stopHeartbeat();
         try {
           await client!.mutation(api.jobs.fail, {
+            password: config.password,
             id: jobId,
             result: partialResult || reason,
             toolCallCount: metrics.toolCallCount,
@@ -553,6 +563,7 @@ async function executeJob(
         stopHeartbeat();
         try {
           await client!.mutation(api.jobs.fail, {
+            password: config.password,
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
             toolCallCount: metrics.toolCallCount,
@@ -582,7 +593,7 @@ async function handleGroupCompletion(
   anyFailed: boolean
 ): Promise<void> {
   // Re-fetch group with jobs to get current status
-  const currentGroup = await client!.query(api.jobs.getGroupWithJobs, { id: group._id });
+  const currentGroup = await client!.query(api.jobs.getGroupWithJobs, { password: config.password, id: group._id });
   if (!currentGroup) {
     console.error(`[${group._id}] Group not found`);
     return;
@@ -627,7 +638,7 @@ async function handleGroupCompletion(
 
 // Check if all groups in assignment are done, if so mark complete
 async function checkAndCompleteAssignment(assignmentId: string, completedGroupId: string): Promise<void> {
-  const groups = await client!.query(api.jobs.listGroups, { assignmentId: assignmentId as any });
+  const groups = await client!.query(api.jobs.listGroups, { password: config.password, assignmentId: assignmentId as any });
 
   const hasIncompleteGroups = groups.some(
     (g: JobGroup) => g.status === "pending" || g.status === "running"
@@ -640,6 +651,7 @@ async function checkAndCompleteAssignment(assignmentId: string, completedGroupId
 
   console.log(`[${completedGroupId}] All groups done, marking assignment ${assignmentId} as complete`);
   await client!.mutation(api.assignments.complete, {
+    password: config.password,
     id: assignmentId,
   });
 }
@@ -658,6 +670,7 @@ async function triggerPMGroup(
   console.log(`[${completedGroup._id}] Triggering ${jobType} group`);
 
   await client!.mutation(api.jobs.insertGroupAfter, {
+    password: config.password,
     afterGroupId: completedGroup._id,
     jobs: [{
       jobType,
@@ -701,6 +714,7 @@ async function processQueue(readyJobs: ReadyJob[]): Promise<void> {
   } of newJobs) {
     // Double-check assignment status before executing
     const currentAssignment = await client!.query(api.assignments.get, {
+      password: config.password,
       id: assignment._id,
     });
     if (currentAssignment?.status === "blocked") {
@@ -730,6 +744,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
   if (!chatContext) {
     console.error(`[${jobId}] Invalid chat context, failing job`);
     await client!.mutation(api.chatJobs.fail, {
+      password: config.password,
       id: jobId,
       result: "Invalid chat context provided",
     });
@@ -743,18 +758,19 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
     : " (new session)";
   console.log(`[${jobId}] Chat mode: ${chatContext.mode}, prompt: ${promptType}, thread: ${chatContext.threadId}${resumeInfo}`);
 
-  await client!.mutation(api.chatJobs.start, { id: jobId, prompt });
+  await client!.mutation(api.chatJobs.start, { password: config.password, id: jobId, prompt });
 
   const metrics = createMetricsState();
 
   const flushMetrics = async (): Promise<void> => {
     if (!client) return;
     const update: {
+      password: string;
       id: string;
       toolCallCount?: number;
       subagentCount?: number;
       lastEventAt?: number;
-    } = { id: jobId };
+    } = { password: config.password, id: jobId };
     let changed = false;
 
     if (metrics.toolCallCount !== metrics.lastFlushedToolCallCount) {
@@ -818,6 +834,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
         stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.complete, {
+            password: config.password,
             id: jobId,
             result,
             toolCallCount: metrics.toolCallCount,
@@ -847,6 +864,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
         stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.fail, {
+            password: config.password,
             id: jobId,
             result: partialResult || reason,
             toolCallCount: metrics.toolCallCount,
@@ -865,6 +883,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
         stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.fail, {
+            password: config.password,
             id: jobId,
             result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
             toolCallCount: metrics.toolCallCount,
@@ -905,6 +924,7 @@ async function startRunner() {
   client = new ConvexClient(config.convexUrl);
 
   const namespace = await client.query(api.namespaces.getByName, {
+    password: config.password,
     name: config.namespace,
   });
 
@@ -928,7 +948,7 @@ async function startRunner() {
   // Subscribe to assignment-based jobs
   unsubscribeJobs = client.onUpdate(
     api.scheduler.getReadyJobs,
-    { namespaceId },
+    { password: config.password, namespaceId },
     (readyJobs: ReadyJob[]) => {
       console.log(`Queue update: ${readyJobs.length} ready jobs`);
       processQueue(readyJobs).catch((e) => {
@@ -945,7 +965,7 @@ async function startRunner() {
   // Subscribe to chat jobs (separate from assignments)
   unsubscribeChatJobs = client.onUpdate(
     api.scheduler.getReadyChatJobs,
-    { namespaceId },
+    { password: config.password, namespaceId },
     (readyChatJobs: ReadyChatJob[]) => {
       if (readyChatJobs.length > 0) {
         console.log(`Chat queue update: ${readyChatJobs.length} ready chat jobs`);

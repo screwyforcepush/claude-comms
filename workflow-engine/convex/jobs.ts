@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { requirePassword } from "./auth";
 
 // ============================================================================
 // Queries
@@ -8,6 +9,7 @@ import { Id } from "./_generated/dataModel";
 
 export const list = query({
   args: {
+    password: v.string(),
     groupId: v.optional(v.id("jobGroups")),
     status: v.optional(
       v.union(
@@ -19,6 +21,7 @@ export const list = query({
     ),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     if (args.groupId && args.status) {
       return await ctx.db
         .query("jobs")
@@ -44,15 +47,17 @@ export const list = query({
 });
 
 export const get = query({
-  args: { id: v.id("jobs") },
+  args: { password: v.string(), id: v.id("jobs") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db.get(args.id);
   },
 });
 
 export const getWithGroup = query({
-  args: { id: v.id("jobs") },
+  args: { password: v.string(), id: v.id("jobs") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const job = await ctx.db.get(args.id);
     if (!job) return null;
 
@@ -69,15 +74,17 @@ export const getWithGroup = query({
 // ============================================================================
 
 export const getGroup = query({
-  args: { id: v.id("jobGroups") },
+  args: { password: v.string(), id: v.id("jobGroups") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db.get(args.id);
   },
 });
 
 export const getGroupWithJobs = query({
-  args: { id: v.id("jobGroups") },
+  args: { password: v.string(), id: v.id("jobGroups") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const group = await ctx.db.get(args.id);
     if (!group) return null;
 
@@ -93,6 +100,7 @@ export const getGroupWithJobs = query({
 
 export const listGroups = query({
   args: {
+    password: v.string(),
     assignmentId: v.optional(v.id("assignments")),
     status: v.optional(
       v.union(
@@ -104,6 +112,7 @@ export const listGroups = query({
     ),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     if (args.assignmentId) {
       const groups = await ctx.db
         .query("jobGroups")
@@ -141,13 +150,15 @@ const jobDefValidator = v.object({
 
 // Create a new group with jobs
 // Accepts array of job definitions - all jobs run in parallel within the group
-// Auto-expansion (e.g., review → 3 harnesses) should be handled by CLI before calling
+// Auto-expansion (e.g., review -> 3 harnesses) should be handled by CLI before calling
 export const createGroup = mutation({
   args: {
+    password: v.string(),
     assignmentId: v.id("assignments"),
     jobs: v.array(jobDefValidator),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     if (args.jobs.length === 0) {
       throw new Error("At least one job required");
     }
@@ -194,10 +205,12 @@ export const createGroup = mutation({
 // Auto-expansion should be handled by CLI before calling
 export const insertGroupAfter = mutation({
   args: {
+    password: v.string(),
     afterGroupId: v.id("jobGroups"),
     jobs: v.array(jobDefValidator),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     if (args.jobs.length === 0) {
       throw new Error("At least one job required");
     }
@@ -245,10 +258,12 @@ export const insertGroupAfter = mutation({
 
 export const start = mutation({
   args: {
+    password: v.string(),
     id: v.id("jobs"),
     prompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const now = Date.now();
     await ctx.db.patch(args.id, {
       status: "running",
@@ -277,6 +292,7 @@ export const start = mutation({
 
 export const complete = mutation({
   args: {
+    password: v.string(),
     id: v.id("jobs"),
     result: v.string(),
     toolCallCount: v.optional(v.number()),
@@ -285,6 +301,7 @@ export const complete = mutation({
     lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const now = Date.now();
     const update: Record<string, any> = {
       status: "complete",
@@ -307,6 +324,7 @@ export const complete = mutation({
 
 export const fail = mutation({
   args: {
+    password: v.string(),
     id: v.id("jobs"),
     result: v.optional(v.string()),
     toolCallCount: v.optional(v.number()),
@@ -315,6 +333,7 @@ export const fail = mutation({
     lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const now = Date.now();
     const update: Record<string, any> = {
       status: "failed",
@@ -337,6 +356,7 @@ export const fail = mutation({
 
 export const updateMetrics = mutation({
   args: {
+    password: v.string(),
     id: v.id("jobs"),
     toolCallCount: v.optional(v.number()),
     subagentCount: v.optional(v.number()),
@@ -344,6 +364,7 @@ export const updateMetrics = mutation({
     lastEventAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const update: Record<string, any> = {};
     if (args.toolCallCount !== undefined) update.toolCallCount = args.toolCallCount;
     if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
@@ -427,8 +448,9 @@ async function updateGroupStatus(
 
 // Get job with its group and assignment (for runner)
 export const getWithAssignment = query({
-  args: { id: v.id("jobs") },
+  args: { password: v.string(), id: v.id("jobs") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const job = await ctx.db.get(args.id);
     if (!job) return null;
 

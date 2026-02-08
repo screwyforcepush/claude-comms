@@ -95,9 +95,37 @@ Job cards in the chain visualization should feel like Quake HUD status bars:
 - **Status Rune** = Job state mapped to brandkit StatusRune patterns.
 - **Subagents** = Mini provider icons in the subhead area.
 
+## Security Model
+
+### Single-User Philosophy
+This system is built for a single user (the Product Owner). Security needs are simple:
+- **Stop bots and crawlers** from accessing data or triggering jobs
+- **Stop casual snoops** from viewing the deployed UI
+- **No complex auth** — OAuth, sessions, JWTs are overkill for single-user
+
+### Trust Boundaries
+The system has four entry points with different trust levels:
+
+| Entry Point | Location | Trust Level | Protection |
+|-------------|----------|-------------|------------|
+| **UI** | Vercel (public URL) | Untrusted | Password wall |
+| **Convex Backend** | Cloud | Untrusted | Password on all functions |
+| **Runner** | Local machine | Trusted | Reads password from config |
+| **CLI** | Local machine | Trusted | Reads password from config |
+
+The Runner and CLI run on the user's machine — they're inside the perimeter. The password is just to authenticate them to Convex, not to protect them from the user.
+
+### Why This Matters
+The Runner executes jobs using the user's API tokens (Anthropic, OpenAI, Google). An unprotected Convex backend means anyone with the URL could:
+- Read chat history and job results
+- Trigger jobs that consume API credits
+- Potentially exfiltrate sensitive context from prompts
+
+A simple password wall stops this without adding complexity.
+
 ## Non-Goals / Out of Scope
 
-- Backend changes (Convex, data schemas, APIs)
+- OAuth, BetterAuth, or complex authentication (single-user system)
 - Business logic modifications
 - New features or capabilities
 - Changes to data contracts or information architecture
@@ -105,4 +133,4 @@ Job cards in the chain visualization should feel like Quake HUD status bars:
 
 ## Open Questions
 
-*None currently — the transformation scope is well-defined.*
+*None currently.*

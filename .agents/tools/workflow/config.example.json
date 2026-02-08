@@ -1,6 +1,7 @@
 {
   "convexUrl": "https://your-project.convex.cloud",
   "namespace": "my-project",
+  "password": "your-admin-password-here",
   "timeoutMs": 3600000,
   "idleTimeoutMs": 600000,
   "harnessDefaults": {

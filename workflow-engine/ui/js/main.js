@@ -9,6 +9,7 @@ import { LoadingSpinner } from './components/shared/LoadingSkeleton.js';
 import { NamespaceList } from './components/namespace/NamespaceList.js';
 import { ChatPanel } from './components/chat/index.js';
 import { GrainOverlay, ScanlineSweep } from './components/effects/index.js';
+import { LoginGate, logout } from './components/auth/index.js';
 
 // ============================================
 // WP-5: Responsive breakpoint utilities
@@ -398,15 +399,18 @@ function App() {
   }
 
   // Main application with providers
-  return React.createElement(ConvexProvider, { url: config.convexUrl },
-    React.createElement(ErrorBoundary, null,
-      React.createElement('div', {
-        className: 'h-screen flex flex-col',
-        style: { backgroundColor: 'var(--q-void1)' }
-      },
-        React.createElement(GrainOverlay),      // WP-3: Grain overlay effect
-        React.createElement(ScanlineSweep),     // WP-3: Scanline sweep effect
-        React.createElement(AppLayout)
+  // LoginGate wraps everything - shows login form if no password in sessionStorage
+  return React.createElement(LoginGate, { convexUrl: config.convexUrl },
+    React.createElement(ConvexProvider, { url: config.convexUrl },
+      React.createElement(ErrorBoundary, null,
+        React.createElement('div', {
+          className: 'h-screen flex flex-col',
+          style: { backgroundColor: 'var(--q-void1)' }
+        },
+          React.createElement(GrainOverlay),      // WP-3: Grain overlay effect
+          React.createElement(ScanlineSweep),     // WP-3: Scanline sweep effect
+          React.createElement(AppLayout)
+        )
       )
     )
   );

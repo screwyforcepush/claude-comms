@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requirePassword } from "./auth";
 
 // Queries
 
 export const list = query({
   args: {
+    password: v.string(),
     namespaceId: v.id("namespaces"),
     status: v.optional(
       v.union(
@@ -16,6 +18,7 @@ export const list = query({
     ),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     if (args.status) {
       return await ctx.db
         .query("assignments")
@@ -32,16 +35,18 @@ export const list = query({
 });
 
 export const get = query({
-  args: { id: v.id("assignments") },
+  args: { password: v.string(), id: v.id("assignments") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     return await ctx.db.get(args.id);
   },
 });
 
 // Get assignment with its group chain and jobs
 export const getWithGroups = query({
-  args: { id: v.id("assignments") },
+  args: { password: v.string(), id: v.id("assignments") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const assignment = await ctx.db.get(args.id);
     if (!assignment) return null;
 
@@ -70,12 +75,14 @@ export const getWithGroups = query({
 
 export const create = mutation({
   args: {
+    password: v.string(),
     namespaceId: v.id("namespaces"),
     northStar: v.string(),
     independent: v.optional(v.boolean()),
     priority: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     const now = Date.now();
     return await ctx.db.insert("assignments", {
       namespaceId: args.namespaceId,
@@ -93,6 +100,7 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    password: v.string(),
     id: v.id("assignments"),
     artifacts: v.optional(v.string()),
     decisions: v.optional(v.string()),
@@ -115,7 +123,8 @@ export const update = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    requirePassword(args);
+    const { id, password, ...updates } = args;
     const filteredUpdates = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)
     );
@@ -127,8 +136,9 @@ export const update = mutation({
 });
 
 export const complete = mutation({
-  args: { id: v.id("assignments") },
+  args: { password: v.string(), id: v.id("assignments") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       status: "complete",
       updatedAt: Date.now(),
@@ -138,10 +148,12 @@ export const complete = mutation({
 
 export const block = mutation({
   args: {
+    password: v.string(),
     id: v.id("assignments"),
     reason: v.string(),
   },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       status: "blocked",
       blockedReason: args.reason,
@@ -151,8 +163,9 @@ export const block = mutation({
 });
 
 export const unblock = mutation({
-  args: { id: v.id("assignments") },
+  args: { password: v.string(), id: v.id("assignments") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     await ctx.db.patch(args.id, {
       status: "active",
       blockedReason: undefined,
@@ -162,8 +175,9 @@ export const unblock = mutation({
 });
 
 export const remove = mutation({
-  args: { id: v.id("assignments") },
+  args: { password: v.string(), id: v.id("assignments") },
   handler: async (ctx, args) => {
+    requirePassword(args);
     // Delete all groups and their jobs for this assignment
     const groups = await ctx.db
       .query("jobGroups")
