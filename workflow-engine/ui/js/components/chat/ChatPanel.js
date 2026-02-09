@@ -5,7 +5,7 @@ import { useQuery, useMutation } from '../../hooks/useConvex.js';
 import { api } from '../../api.js';
 import { ChatSidebar } from './ChatSidebar.js';
 import { ChatView } from './ChatView.js';
-import { ThreadIcon } from './ThreadItem.js';
+import { ThreadIconWithAssignment } from './ThreadItem.js';
 
 // localStorage key for threads pane collapse state
 const THREADS_PANE_COLLAPSED_KEY = 'workflow-engine:threads-pane-collapsed';
@@ -84,29 +84,20 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
     { namespaceId }
   );
 
-  // Fetch assignments with jobs for assignment visibility (WP-5: unified data flow)
-  const { data: allAssignmentsData } = useQuery(
-    api.scheduler.getAllAssignments,
-    { namespaceId }
-  );
-
   // Get selected thread object (must be defined before useMemos that reference it)
   const selectedThread = threads?.find(t => t._id === selectedThreadId) || null;
 
-  // Build assignments map for quick lookup (assignment data only)
-  const assignments = React.useMemo(() => {
-    if (!allAssignmentsData) return {};
-    return allAssignmentsData.reduce((acc, item) => {
-      acc[item.assignment._id] = item.assignment;
-      return acc;
-    }, {});
-  }, [allAssignmentsData]);
+  // Per-assignment subscription for the selected thread's assignment
+  const { data: selectedAssignment } = useQuery(
+    selectedThread?.assignmentId ? api.assignments.get : null,
+    selectedThread?.assignmentId ? { id: selectedThread.assignmentId } : {}
+  );
 
-  // Get assignment + jobs for selected thread (WP-5: data flow for job chain)
-  const selectedAssignmentWithJobs = React.useMemo(() => {
-    if (!selectedThread?.assignmentId || !allAssignmentsData) return null;
-    return allAssignmentsData.find(item => item.assignment._id === selectedThread.assignmentId);
-  }, [selectedThread?.assignmentId, allAssignmentsData]);
+  // Get group chain for selected assignment (no job data - lightweight)
+  const { data: selectedChainData } = useQuery(
+    selectedThread?.assignmentId ? api.assignments.getGroupChain : null,
+    selectedThread?.assignmentId ? { id: selectedThread.assignmentId } : {}
+  );
 
   // Fetch messages for selected thread
   const { data: messages, loading: loadingMessages } = useQuery(
@@ -376,10 +367,9 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
           className: 'flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-2 py-2 scrollbar-hide'
         },
           threads && threads.map(thread =>
-            React.createElement(ThreadIcon, {
+            React.createElement(ThreadIconWithAssignment, {
               key: thread._id,
               thread: thread,
-              assignment: thread.assignmentId ? assignments[thread.assignmentId] : null,
               isSelected: selectedThreadId === thread._id,
               onClick: () => handleSelectThread(thread)
             })
@@ -422,7 +412,6 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
         // ChatSidebar content (without its own header)
         React.createElement(ChatSidebar, {
           threads: threads || [],
-          assignments: assignments,
           selectedThreadId: selectedThreadId,
           onSelectThread: handleSelectThread,
           onCreateThread: handleCreateThread,
@@ -433,11 +422,11 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
       )
     ),
 
-    // Main chat view (WP-5: pass groups data for assignment pane + responsive mode)
+    // Main chat view (pass chain data for assignment pane + responsive mode)
     React.createElement(ChatView, {
       thread: selectedThread,
-      assignment: selectedAssignmentWithJobs?.assignment || null,
-      groups: selectedAssignmentWithJobs?.groups || [],
+      assignment: selectedAssignment || null,
+      chainData: selectedChainData || null,
       messages: messages || [],
       onSendMessage: handleSendMessage,
       onUpdateTitle: handleUpdateTitle,

@@ -221,9 +221,8 @@ function AppLayout() {
   // WP-5: Mobile drawer state (separate from collapse)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  // Subscribe to live namespace data at the top level so both sidebar and main content
-  // receive realtime updates via the same subscription
-  const { data: namespaces } = useQuery(api.scheduler.getAllNamespaces);
+  // Subscribe to live namespace data - reads only namespace documents (no assignments)
+  const { data: namespaces } = useQuery(api.namespaces.list);
 
   // Look up the selected namespace from live subscription data
   const selectedNamespace = namespaces?.find(ns => ns.name === selectedNamespaceName) || null;

@@ -77,6 +77,7 @@ Check if `.agents/tools/workflow/config.json` exists. If not, create it from the
 {
   "convexUrl": "<ask the user for their Convex URL - same one used in server setup>",
   "namespace": "<suggest the repo/directory name, ask user to confirm or change>",
+  "password": "<the ADMIN_PASSWORD set in the Convex server - ask the user>",
   "timeoutMs": 3600000,
   "idleTimeoutMs": 600000,
   "harnessDefaults": {
@@ -95,6 +96,7 @@ Check if `.agents/tools/workflow/config.json` exists. If not, create it from the
 **Fields to ask the user about:**
 - `convexUrl`: The Convex deployment URL (cloud: `https://your-deployment.convex.cloud`, local: whatever `npx convex dev` outputs)
 - `namespace`: Identifies this project in the workflow engine. Suggest the current directory name. Must match what they'll use in the Workflow Engine UI.
+- `password`: The `ADMIN_PASSWORD` set on the Convex server. All Convex calls require this. Must match exactly.
 
 update `.claude/settings.json` with the same namespace replace "claude-comms" in the sections `--source-app claude-comms`
 

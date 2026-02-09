@@ -278,9 +278,20 @@ export const start = mutation({
         status: "running",
       });
 
-      // Also mark assignment as active
+      // Also mark assignment as active + update namespace counts
       const group = await ctx.db.get(job.groupId);
       if (group) {
+        const assignment = await ctx.db.get(group.assignmentId);
+        if (assignment && assignment.status !== "active") {
+          // Update namespace counts: decrement old status, increment active
+          const ns = await ctx.db.get(assignment.namespaceId);
+          if (ns) {
+            const counts = ns.assignmentCounts || { pending: 0, active: 0, blocked: 0, complete: 0 };
+            counts[assignment.status as keyof typeof counts] = Math.max(0, (counts[assignment.status as keyof typeof counts] || 0) - 1);
+            counts.active = (counts.active || 0) + 1;
+            await ctx.db.patch(assignment.namespaceId, { assignmentCounts: counts });
+          }
+        }
         await ctx.db.patch(group.assignmentId, {
           status: "active",
           updatedAt: now,

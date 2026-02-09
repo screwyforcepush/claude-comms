@@ -1,19 +1,37 @@
 // ThreadList - Scrollable list of chat threads
 import React from 'react';
+import { useQuery } from '../../hooks/useConvex.js';
+import { api } from '../../api.js';
 import { ThreadItem } from './ThreadItem.js';
 import { LoadingSkeleton } from '../shared/LoadingSkeleton.js';
 import { EmptyState } from '../shared/EmptyState.js';
 
 /**
+ * Wrapper that subscribes to a single assignment for a thread
+ * Each thread with an assignmentId gets its own lightweight subscription
+ */
+function ThreadItemWithAssignment({ thread, isSelected, onClick }) {
+  const { data: assignment } = useQuery(
+    thread.assignmentId ? api.assignments.get : null,
+    thread.assignmentId ? { id: thread.assignmentId } : {}
+  );
+  return React.createElement(ThreadItem, {
+    thread,
+    assignment: assignment || null,
+    isSelected,
+    onClick
+  });
+}
+
+/**
  * ThreadList component - List of chat threads
  * @param {Object} props
  * @param {Array} props.threads - Array of thread objects
- * @param {Object} props.assignments - Map of assignmentId -> assignment for guardian mode
  * @param {string} props.selectedThreadId - Currently selected thread ID
  * @param {Function} props.onSelectThread - Callback when thread is selected
  * @param {boolean} props.loading - Whether threads are loading
  */
-export function ThreadList({ threads = [], assignments = {}, selectedThreadId, onSelectThread, loading = false }) {
+export function ThreadList({ threads = [], selectedThreadId, onSelectThread, loading = false }) {
   // Loading state
   if (loading && threads.length === 0) {
     return React.createElement('div', {
@@ -57,9 +75,8 @@ export function ThreadList({ threads = [], assignments = {}, selectedThreadId, o
         index > 0 && React.createElement('div', {
           style: { height: '1px', backgroundColor: 'var(--q-stone2)' }
         }),
-        React.createElement(ThreadItem, {
+        React.createElement(ThreadItemWithAssignment, {
           thread: thread,
-          assignment: thread.assignmentId ? assignments[thread.assignmentId] : null,
           isSelected: selectedThreadId === thread._id,
           onClick: () => onSelectThread && onSelectThread(thread)
         })

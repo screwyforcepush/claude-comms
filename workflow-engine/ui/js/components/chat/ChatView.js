@@ -28,7 +28,7 @@ function getInitialPaneOpen() {
  * @param {Object} props
  * @param {Object} props.thread - Selected thread object
  * @param {Object} props.assignment - Linked assignment (for guardian mode)
- * @param {Array} props.groups - Job groups for this assignment (each group contains jobs array)
+ * @param {Object} props.chainData - Chain data from getGroupChain (assignment + groups without jobs)
  * @param {Array} props.messages - Array of message objects
  * @param {Function} props.onSendMessage - Callback when message is sent
  * @param {Function} props.onUpdateTitle - Callback to update thread title
@@ -41,7 +41,7 @@ function getInitialPaneOpen() {
 export function ChatView({
   thread,
   assignment = null,
-  groups = [],
+  chainData = null,
   messages = [],
   onSendMessage,
   onUpdateTitle,
@@ -240,7 +240,7 @@ export function ChatView({
     // WP-3: Assignment pane (collapsible right sidebar, drawer on mobile)
     assignment && React.createElement(AssignmentPane, {
       assignment: assignment,
-      groups: groups,
+      chainGroups: chainData?.groups || [],
       isOpen: paneOpen,
       onClose: handleClosePane,
       onJobSelect: handleJobSelect,

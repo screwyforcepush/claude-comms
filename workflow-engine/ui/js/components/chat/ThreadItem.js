@@ -2,6 +2,8 @@
 // WP-6: Transformed to Q palette brandkit styling
 // WP-7: Fullbright notification dot pattern for status and alignment indicators
 import React from 'react';
+import { useQuery } from '../../hooks/useConvex.js';
+import { api } from '../../api.js';
 import { QIcon } from '../shared/index.js';
 
 /**
@@ -351,6 +353,23 @@ export function ThreadItem({ thread, assignment, isSelected, onClick }) {
       )
     )
   );
+}
+
+/**
+ * Self-subscribing ThreadIcon wrapper for collapsed sidebar view
+ * Subscribes to assignments.get for threads that have an assignmentId
+ */
+export function ThreadIconWithAssignment({ thread, isSelected, onClick }) {
+  const { data: assignment } = useQuery(
+    thread.assignmentId ? api.assignments.get : null,
+    thread.assignmentId ? { id: thread.assignmentId } : {}
+  );
+  return React.createElement(ThreadIcon, {
+    thread,
+    assignment: assignment || null,
+    isSelected,
+    onClick
+  });
 }
 
 export default ThreadItem;

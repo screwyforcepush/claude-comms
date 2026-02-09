@@ -221,11 +221,20 @@ async function getJob(id: string) {
 
 async function getQueueStatus() {
   const nsId = await getNamespaceId();
-  const result = await client.query(api.scheduler.getQueueStatus, {
+  // Use namespace's denormalized counts instead of removed scheduler.getQueueStatus
+  const ns = await client.query(api.namespaces.get, {
     password: config.password,
-    namespaceId: nsId,
+    id: nsId,
   });
-  output(result);
+  if (!ns) error("Namespace not found");
+  const counts = ns.assignmentCounts || { pending: 0, active: 0, blocked: 0, complete: 0 };
+  output({
+    totalAssignments: counts.pending + counts.active + counts.blocked + counts.complete,
+    pendingAssignments: counts.pending,
+    activeAssignments: counts.active,
+    blockedAssignments: counts.blocked,
+    completeAssignments: counts.complete,
+  });
 }
 
 async function createAssignment(

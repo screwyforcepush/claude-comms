@@ -1053,14 +1053,7 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
     setShowModal(false);
   }, []);
 
-  if (groups.length === 0 || allJobs.length === 0) {
-    return React.createElement('div', {
-      className: 'text-center py-8',
-      style: { color: 'var(--q-bone0)' }
-    }, 'No jobs in this assignment');
-  }
-
-  // Calculate chain statistics
+  // Calculate chain statistics (must be before early return to preserve hook order)
   const stats = useMemo(() => {
     const completed = allJobs.filter(j => j.status === 'complete').length;
     const running = allJobs.filter(j => j.status === 'running').length;
@@ -1074,6 +1067,13 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [stats.running]);
+
+  if (groups.length === 0 || allJobs.length === 0) {
+    return React.createElement('div', {
+      className: 'text-center py-8',
+      style: { color: 'var(--q-bone0)' }
+    }, 'No jobs in this assignment');
+  }
 
   return React.createElement('div', { className: 'space-y-4' },
     // Chain summary with StatusRune-style RollupBadge components

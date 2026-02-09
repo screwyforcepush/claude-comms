@@ -142,8 +142,9 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fallback: If namespaces not provided from parent, fetch directly
-  // This maintains backwards compatibility and handles initial loading state
-  const { data: localNamespaces, loading, error } = useQuery(api.scheduler.getAllNamespaces);
+  const { data: localNamespaces, loading, error } = useQuery(
+    namespaces ? null : api.namespaces.list
+  );
 
   // Use parent-provided namespaces if available, otherwise use local query
   const effectiveNamespaces = namespaces || localNamespaces;
@@ -159,16 +160,18 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
     );
   }, [effectiveNamespaces, searchTerm]);
 
-  // Sort namespaces: active first, then by lastActivity
+  // Sort namespaces: active first, then by updatedAt
   const sortedNamespaces = useMemo(() => {
     return [...filteredNamespaces].sort((a, b) => {
       // Active namespaces first
-      const aActive = (a.counts?.active || 0) + (a.counts?.pending || 0);
-      const bActive = (b.counts?.active || 0) + (b.counts?.pending || 0);
+      const aC = a.assignmentCounts || {};
+      const bC = b.assignmentCounts || {};
+      const aActive = (aC.active || 0) + (aC.pending || 0);
+      const bActive = (bC.active || 0) + (bC.pending || 0);
       if (aActive !== bActive) return bActive - aActive;
 
       // Then by last activity
-      return (b.lastActivity || 0) - (a.lastActivity || 0);
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
     });
   }, [filteredNamespaces]);
 
@@ -232,7 +235,7 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
       React.createElement('div', { className: 'flex-1 overflow-y-auto' },
         sortedNamespaces.map(ns => {
           const isSelected = selectedNamespace === ns.name;
-          const hasActive = (ns.counts?.active || 0) > 0;
+          const hasActive = (ns.assignmentCounts?.active || 0) > 0;
 
           return React.createElement('button', {
             key: ns.name,

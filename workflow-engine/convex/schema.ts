@@ -5,6 +5,12 @@ export default defineSchema({
   namespaces: defineTable({
     name: v.string(),
     description: v.optional(v.string()),
+    assignmentCounts: v.optional(v.object({
+      pending: v.number(),
+      active: v.number(),
+      blocked: v.number(),
+      complete: v.number(),
+    })),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -147,5 +153,6 @@ export default defineSchema({
     .index("by_namespace", ["namespaceId"])
     .index("by_status", ["status"])
     .index("by_namespace_status", ["namespaceId", "status"])
-    .index("by_thread", ["threadId"]),
+    .index("by_thread", ["threadId"])
+    .index("by_thread_status", ["threadId", "status"]),
 });

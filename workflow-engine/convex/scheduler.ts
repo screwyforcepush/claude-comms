@@ -50,6 +50,15 @@ async function findReadyJobs(
 ): Promise<ReadyJob[]> {
   if (!assignment.headGroupId) return [];
 
+  // 6b: Short-circuit on running groups - check group statuses WITHOUT reading jobs
+  const runningGroup = await ctx.db
+    .query("jobGroups")
+    .withIndex("by_assignment", (q: any) => q.eq("assignmentId", assignment._id))
+    .filter((q: any) => q.eq(q.field("status"), "running"))
+    .first();
+
+  if (runningGroup) return []; // A group is running, nothing to dispatch
+
   let currentGroupId: Id<"jobGroups"> | undefined = assignment.headGroupId;
 
   // Track accumulated results from completed groups (for PM context)
@@ -163,15 +172,18 @@ export const getReadyJobs = query({
   args: { password: v.string(), namespaceId: v.id("namespaces") },
   handler: async (ctx, args): Promise<ReadyJob[]> => {
     requirePassword(args);
-    // Get all non-complete, non-blocked assignments for this namespace
-    const assignments = await ctx.db
+    // 6a: Use compound index to fetch only active and pending assignments
+    const active = await ctx.db
       .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
+      .withIndex("by_namespace_status", (q) =>
+        q.eq("namespaceId", args.namespaceId).eq("status", "active"))
       .collect();
-
-    const workableAssignments = assignments.filter(
-      (a) => a.status !== "complete" && a.status !== "blocked"
-    );
+    const pending = await ctx.db
+      .query("assignments")
+      .withIndex("by_namespace_status", (q) =>
+        q.eq("namespaceId", args.namespaceId).eq("status", "pending"))
+      .collect();
+    const workableAssignments = [...active, ...pending];
 
     // Separate independent vs non-independent (sequential) assignments
     const independentAssignments = workableAssignments.filter((a) => a.independent);
@@ -208,184 +220,6 @@ export const getReadyJobs = query({
     }
 
     return readyJobs;
-  },
-});
-
-// Get the queue status for a namespace
-export const getQueueStatus = query({
-  args: { password: v.string(), namespaceId: v.id("namespaces") },
-  handler: async (ctx, args) => {
-    requirePassword(args);
-    const assignments = await ctx.db
-      .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
-      .collect();
-
-    const runningJobs = await ctx.db
-      .query("jobs")
-      .withIndex("by_status", (q) => q.eq("status", "running"))
-      .collect();
-
-    // Filter running jobs to this namespace (via group -> assignment)
-    const namespaceRunningJobs = [];
-    for (const job of runningJobs) {
-      const group = await ctx.db.get(job.groupId);
-      if (!group) continue;
-      const assignment = await ctx.db.get(group.assignmentId);
-      if (assignment?.namespaceId === args.namespaceId) {
-        namespaceRunningJobs.push({ job, group, assignment });
-      }
-    }
-
-    const hasActiveNonIndependent = assignments.some(
-      (a) => a.status === "active" && !a.independent
-    );
-
-    return {
-      totalAssignments: assignments.length,
-      pendingAssignments: assignments.filter((a) => a.status === "pending").length,
-      activeAssignments: assignments.filter((a) => a.status === "active").length,
-      blockedAssignments: assignments.filter((a) => a.status === "blocked").length,
-      completeAssignments: assignments.filter((a) => a.status === "complete").length,
-      runningJobs: namespaceRunningJobs.length,
-      hasActiveNonIndependent,
-    };
-  },
-});
-
-// Get all namespaces with aggregated stats
-export const getAllNamespaces = query({
-  args: { password: v.string() },
-  handler: async (ctx, args) => {
-    requirePassword(args);
-    const namespaces = await ctx.db.query("namespaces").collect();
-
-    const result = [];
-
-    for (const ns of namespaces) {
-      const assignments = await ctx.db
-        .query("assignments")
-        .withIndex("by_namespace", (q) => q.eq("namespaceId", ns._id))
-        .collect();
-
-      const counts = {
-        pending: assignments.filter((a) => a.status === "pending").length,
-        active: assignments.filter((a) => a.status === "active").length,
-        blocked: assignments.filter((a) => a.status === "blocked").length,
-        complete: assignments.filter((a) => a.status === "complete").length,
-      };
-
-      const lastActivity =
-        assignments.length > 0
-          ? Math.max(...assignments.map((a) => a.updatedAt))
-          : ns.updatedAt;
-
-      result.push({
-        _id: ns._id,
-        name: ns.name,
-        description: ns.description,
-        counts,
-        lastActivity,
-      });
-    }
-
-    return result;
-  },
-});
-
-// Subscription-friendly: get all active/pending assignments with their group chains
-export const watchQueue = query({
-  args: { password: v.string(), namespaceId: v.id("namespaces") },
-  handler: async (ctx, args) => {
-    requirePassword(args);
-    const assignments = await ctx.db
-      .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
-      .collect();
-
-    const result = [];
-
-    for (const assignment of assignments) {
-      if (assignment.status === "complete") continue;
-
-      // Walk the group chain
-      const groups: Array<Doc<"jobGroups"> & { jobs: Doc<"jobs">[] }> = [];
-      let currentGroupId = assignment.headGroupId;
-
-      while (currentGroupId) {
-        const group = await ctx.db.get(currentGroupId);
-        if (!group) break;
-
-        const jobs = await ctx.db
-          .query("jobs")
-          .withIndex("by_group", (q) => q.eq("groupId", currentGroupId as Id<"jobGroups">))
-          .collect();
-
-        groups.push({ ...group, jobs });
-        currentGroupId = group.nextGroupId;
-      }
-
-      const hasRunningJob = groups.some((g) =>
-        g.jobs.some((j) => j.status === "running")
-      );
-      const nextPendingGroup = groups.find((g) => g.status === "pending") ?? null;
-
-      result.push({
-        assignment,
-        groups,
-        hasRunningJob,
-        nextPendingGroup,
-      });
-    }
-
-    return result;
-  },
-});
-
-// Get ALL assignments for a namespace (including complete) with their group chains
-export const getAllAssignments = query({
-  args: { password: v.string(), namespaceId: v.id("namespaces") },
-  handler: async (ctx, args) => {
-    requirePassword(args);
-    const assignments = await ctx.db
-      .query("assignments")
-      .withIndex("by_namespace", (q) => q.eq("namespaceId", args.namespaceId))
-      .collect();
-
-    const result = [];
-
-    for (const assignment of assignments) {
-      // Walk the group chain
-      const groups: Array<Doc<"jobGroups"> & { jobs: Doc<"jobs">[] }> = [];
-      let currentGroupId = assignment.headGroupId;
-
-      while (currentGroupId) {
-        const group = await ctx.db.get(currentGroupId as Id<"jobGroups">);
-        if (!group) break;
-
-        const jobs = await ctx.db
-          .query("jobs")
-          .withIndex("by_group", (q) => q.eq("groupId", currentGroupId as Id<"jobGroups">))
-          .collect();
-
-        groups.push({ ...group, jobs });
-        currentGroupId = group.nextGroupId;
-      }
-
-      const hasRunningJob = groups.some((g) =>
-        g.jobs.some((j) => j.status === "running")
-      );
-      const nextPendingGroup = groups.find((g) => g.status === "pending") ?? null;
-
-      result.push({
-        assignment,
-        groups,
-        hasRunningJob,
-        nextPendingGroup,
-      });
-    }
-
-    return result;
   },
 });
 

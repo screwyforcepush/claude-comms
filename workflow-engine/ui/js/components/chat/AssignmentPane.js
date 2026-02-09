@@ -1,10 +1,51 @@
 // AssignmentPane - Collapsible right sidebar showing assignment details + job chain
 // WP-8: Transformed to Q palette brandkit styling
 import React, { useState, useMemo } from "react";
+import { useQuery } from "../../hooks/useConvex.js";
+import { api } from "../../api.js";
 import { StatusBadge } from "../shared/StatusBadge.js";
 import { JobChain } from "../job/JobChain.js";
 import { JsonViewer } from "../shared/JsonViewer.js";
 import { QIcon } from "../shared/index.js";
+
+/**
+ * Hook to subscribe to jobs for each group in the chain
+ * Each group gets its own jobs.list subscription
+ */
+function useGroupJobs(chainGroups) {
+  // Subscribe to jobs for up to 20 groups (practical limit)
+  // We use individual useQuery calls - React hooks must be called unconditionally
+  const g0 = chainGroups[0];
+  const g1 = chainGroups[1];
+  const g2 = chainGroups[2];
+  const g3 = chainGroups[3];
+  const g4 = chainGroups[4];
+  const g5 = chainGroups[5];
+  const g6 = chainGroups[6];
+  const g7 = chainGroups[7];
+  const g8 = chainGroups[8];
+  const g9 = chainGroups[9];
+
+  const r0 = useQuery(g0 ? api.jobs.list : null, g0 ? { groupId: g0._id } : {});
+  const r1 = useQuery(g1 ? api.jobs.list : null, g1 ? { groupId: g1._id } : {});
+  const r2 = useQuery(g2 ? api.jobs.list : null, g2 ? { groupId: g2._id } : {});
+  const r3 = useQuery(g3 ? api.jobs.list : null, g3 ? { groupId: g3._id } : {});
+  const r4 = useQuery(g4 ? api.jobs.list : null, g4 ? { groupId: g4._id } : {});
+  const r5 = useQuery(g5 ? api.jobs.list : null, g5 ? { groupId: g5._id } : {});
+  const r6 = useQuery(g6 ? api.jobs.list : null, g6 ? { groupId: g6._id } : {});
+  const r7 = useQuery(g7 ? api.jobs.list : null, g7 ? { groupId: g7._id } : {});
+  const r8 = useQuery(g8 ? api.jobs.list : null, g8 ? { groupId: g8._id } : {});
+  const r9 = useQuery(g9 ? api.jobs.list : null, g9 ? { groupId: g9._id } : {});
+
+  const results = [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9];
+
+  return useMemo(() => {
+    return chainGroups.map((group, i) => {
+      if (i >= 10) return { ...group, jobs: [] };
+      return { ...group, jobs: results[i]?.data || [] };
+    });
+  }, [chainGroups, ...results.map(r => r.data)]);
+}
 
 /**
  * Close icon (X)
@@ -329,7 +370,7 @@ function DecisionItem({ decision, index }) {
  * WP-8: Transformed to Q palette with copper texture styling
  * @param {Object} props
  * @param {Object} props.assignment - Assignment data
- * @param {Array} props.groups - Job groups (each group contains jobs array)
+ * @param {Array} props.chainGroups - Group chain (groups without jobs, from getGroupChain)
  * @param {boolean} props.isOpen - Whether the pane is open
  * @param {Function} props.onClose - Callback to close the pane
  * @param {Function} props.onJobSelect - Callback when a job is selected
@@ -337,12 +378,14 @@ function DecisionItem({ decision, index }) {
  */
 export function AssignmentPane({
   assignment,
-  groups = [],
+  chainGroups = [],
   isOpen,
   onClose,
   onJobSelect,
   responsive,
 }) {
+  // Subscribe to jobs per group individually
+  const groups = useGroupJobs(chainGroups);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
   const [decisionsOpen, setDecisionsOpen] = useState(false);
   const [northStarOpen, setNorthStarOpen] = useState(false);

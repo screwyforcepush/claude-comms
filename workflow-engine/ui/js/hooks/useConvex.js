@@ -94,6 +94,13 @@ export function useQuery(queryName, args = {}) {
   const argsKey = JSON.stringify(argsWithPassword);
 
   useEffect(() => {
+    if (!queryName) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     if (!client || !connected) {
       setLoading(true);
       return;

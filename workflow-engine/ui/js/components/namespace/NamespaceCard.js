@@ -108,7 +108,8 @@ function CountBadge({ count, status }) {
  * @param {Function} props.onClick - Click handler
  */
 export function NamespaceCard({ namespace, isSelected = false, onClick }) {
-  const { name, counts = {}, lastActivity } = namespace;
+  const { name, assignmentCounts, lastActivity, updatedAt } = namespace;
+  const counts = assignmentCounts || { pending: 0, active: 0, blocked: 0, complete: 0 };
 
   // Calculate total active items (pending + active + blocked)
   const activeCount = (counts.pending || 0) + (counts.active || 0) + (counts.blocked || 0);
@@ -181,8 +182,8 @@ export function NamespaceCard({ namespace, isSelected = false, onClick }) {
     ),
 
     // Last activity timestamp
-    lastActivity && React.createElement('div', { className: 'text-xs' },
-      React.createElement(Timestamp, { date: lastActivity, format: 'relative' })
+    (lastActivity || updatedAt) && React.createElement('div', { className: 'text-xs' },
+      React.createElement(Timestamp, { date: lastActivity || updatedAt, format: 'relative' })
     )
   );
 }

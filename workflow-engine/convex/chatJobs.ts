@@ -232,17 +232,19 @@ export const getActiveForThread = query({
   args: { password: v.string(), threadId: v.id("chatThreads") },
   handler: async (ctx, args) => {
     requirePassword(args);
-    // Get all chatJobs for this thread
-    const jobs = await ctx.db
+    // Check pending first, then running. At most 2 indexed lookups.
+    const pending = await ctx.db
       .query("chatJobs")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .collect();
+      .withIndex("by_thread_status", (q) =>
+        q.eq("threadId", args.threadId).eq("status", "pending"))
+      .first();
+    if (pending) return pending;
 
-    // Find any that are pending or running (most recent first)
-    const activeJob = jobs
-      .filter((job) => job.status === "pending" || job.status === "running")
-      .sort((a, b) => b.createdAt - a.createdAt)[0];
-
-    return activeJob ?? null;
+    const running = await ctx.db
+      .query("chatJobs")
+      .withIndex("by_thread_status", (q) =>
+        q.eq("threadId", args.threadId).eq("status", "running"))
+      .first();
+    return running ?? null;
   },
 });

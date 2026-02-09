@@ -93,7 +93,16 @@ Check if `workflow-engine/ui/config.json` exists. Create it if not:
 For local dev this is typically something like `https://localhost:3210` (whatever `npx convex dev` outputs).
 For cloud it's the deployment URL like `https://your-deployment-name.convex.cloud`.
 
-### 2c. Start the Workflow Engine UI
+### 2c. Set the admin password
+
+All Convex functions are protected by a password wall. Set `ADMIN_PASSWORD` as an environment variable in the Convex dashboard:
+
+- **Convex Cloud:** Go to https://dashboard.convex.dev → your deployment → Settings → Environment Variables → Add `ADMIN_PASSWORD`
+- **Convex Local:** Add `ADMIN_PASSWORD=<your-password>` to `workflow-engine/.env.local`
+
+This same password must also be set in each client's `config.json` (see `/cc3-client`).
+
+### 2d. Start the Workflow Engine UI
 
 ```bash
 cd workflow-engine/ui && nohup npm start > /tmp/ui-server.log 2>&1 &

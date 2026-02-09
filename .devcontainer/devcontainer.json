@@ -46,7 +46,7 @@
   },
   
   // Port forwarding for frontend, storybook
-  "forwardPorts": [3000, 600, 3500, 3501],
+  "forwardPorts": [3000, 3500, 3501],
 
   // Post-create command to set up the repository and authenticate tools
   "postCreateCommand": "bash .devcontainer/post-create.sh",

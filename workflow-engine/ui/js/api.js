@@ -7,28 +7,26 @@
  */
 export const api = {
   scheduler: {
-    // Get queue status for a namespace (metrics)
-    getQueueStatus: "scheduler:getQueueStatus",
-
-    // Watch queue - get non-complete assignments with job chains
-    watchQueue: "scheduler:watchQueue",
-
-    // Get ALL assignments with job chains (D2: includes complete)
-    getAllAssignments: "scheduler:getAllAssignments",
-
-    // Get all namespaces with stats
-    getAllNamespaces: "scheduler:getAllNamespaces",
-
     // Get ready jobs (for runners)
     getReadyJobs: "scheduler:getReadyJobs"
   },
 
-  // Assignments API (for guardian mode)
+  // Namespaces API
+  namespaces: {
+    list: "namespaces:list",
+  },
+
+  // Assignments API
   assignments: {
-    // List assignments for a namespace
     list: "assignments:list",
-    // Get assignment by ID
     get: "assignments:get",
+    getGroupChain: "assignments:getGroupChain",
+    backfillNamespaceCounts: "assignments:backfillNamespaceCounts",
+  },
+
+  // Jobs API
+  jobs: {
+    list: "jobs:list",
   },
 
   // Chat threads API
