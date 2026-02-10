@@ -75,10 +75,9 @@ async function main() {
     
     // Show next steps
     console.log(chalk.cyan('Next steps:'));
-    console.log(chalk.white('1. Review .claude/settings.local.json for configuration'));
-    console.log(chalk.white('2. Ensure Python and uv are installed for hooks'));
-    console.log(chalk.white('3. Start the observability server (optional)'));
-    console.log(chalk.white('4. Open your project in Claude Code'));
+    console.log(chalk.white('1. Ensure Python and uv are installed for hooks'));
+    console.log(chalk.white('2. Start the observability server (optional)'));
+    console.log(chalk.white('3. Open your project in Claude Code'));
     console.log(chalk.cyan('\nHappy coding with Claude! 🤖\n'));
     
   } catch (error) {

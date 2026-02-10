@@ -339,6 +339,7 @@ class Installer extends EventEmitter {
 
       // Files that should not be overwritten if they exist (user customizations)
       const preserveIfExists = [
+        { path: '.claude/settings.local.json', fullPath: path.join(this.options.targetDir, '.claude', 'settings.local.json') },
         { path: '.agents/repo.md', fullPath: path.join(this.options.targetDir, '.agents', 'repo.md') },
         { path: '.agents/tools/chrome-devtools/config.json', fullPath: path.join(this.options.targetDir, '.agents', 'tools', 'chrome-devtools', 'config.json') }
       ];
@@ -397,67 +398,9 @@ class Installer extends EventEmitter {
     this.state = InstallationState.CONFIGURING;
     this._emitProgress('Configuring installation...', 80);
 
-    if (this.options.dryRun) {
-      this.logger.info('DRY RUN: Would configure local settings');
-      return;
-    }
-
-    try {
-      // Generate settings.local.json with comprehensive defaults
-      const settingsPath = path.join(this.options.targetDir, '.claude', 'settings.local.json');
-      const defaultSettings = {
-        observability: {
-          server_url: 'http://localhost:3001',
-          enabled: true,
-          auto_start: false
-        },
-        hooks: {
-          enabled: true,
-          python_path: 'python3',
-          uv_path: 'uv',
-          timeout: 30
-        },
-        agents: {
-          max_concurrent: 10,
-          timeout: 300,
-          retry_attempts: 3
-        },
-        communication: {
-          message_retention_hours: 24,
-          broadcast_enabled: true
-        },
-        development: {
-          verbose_logging: false,
-          debug_mode: false
-        },
-        installation: {
-          date: new Date().toISOString(),
-          version: this.options.version,
-          installer_version: '1.0.0',
-          installed_via: 'npx-installer'
-        }
-      };
-
-      // Only create settings.local.json if it doesn't exist
-      const settingsExists = await this.validator.pathExists(settingsPath);
-      if (!settingsExists) {
-        await this.writer.writeFile(settingsPath, JSON.stringify(defaultSettings, null, 2), {
-          overwrite: false
-        });
-        this.installedFiles.push(settingsPath);
-        this.logger.info('Created settings.local.json with default configuration');
-      } else {
-        this.logger.info('settings.local.json already exists, skipping creation');
-      }
-
-      this.logger.info('Post-installation configuration completed');
-
-    } catch (error) {
-      throw new InstallerError(
-        `Post-installation configuration failed: ${error.message}`,
-        ErrorCode.CONFIGURATION_FAILED
-      );
-    }
+    // settings.local.json is user-owned and never generated or overwritten.
+    // All needed files come from the GitHub fetch in Phase 2.
+    this.logger.info('Post-installation configuration completed');
   }
 
   /**
@@ -475,8 +418,7 @@ class Installer extends EventEmitter {
     const requiredPaths = [
       path.join(this.options.targetDir, '.claude'),
       path.join(this.options.targetDir, '.agents'),
-      path.join(this.options.targetDir, 'CLAUDE.md'),
-      path.join(this.options.targetDir, '.claude', 'settings.local.json')
+      path.join(this.options.targetDir, 'CLAUDE.md')
     ];
 
     const missingPaths = [];
