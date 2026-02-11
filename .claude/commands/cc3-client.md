@@ -46,9 +46,23 @@ Each job gets environment variables: `WORKFLOW_ASSIGNMENT_ID`, `WORKFLOW_GROUP_I
 
 # Setup Steps
 
-## Step 1: Verify harness CLIs are available
+## Step 1: Prerequisite check
 
-Before configuring, check which agent CLIs are installed and authed. Claude is required, Codex and Gemini are optional but enable multi-model orchestration (different models reviewing each other's work).
+## Python and UV
+Ensure python and UV are installed in the system and install if not.
+```bash
+uv --version
+```
+
+### Convex
+Check if convex is installed in the project.
+```bash
+ls node_modules/convex 
+```
+install as dev dep if not yet installed: `npm install -D convex`
+
+
+Check which agent CLIs are installed and authed.
 
 ### Claude (required)
 If you are reading this then claude is installed and authed!
@@ -106,15 +120,8 @@ Check if `.agents/tools/workflow/config.json` exists. If not, create it from the
 
 update `.claude/settings.json` with the same namespace replace "claude-comms" in the sections `--source-app claude-comms`
 
-## Step 3: Initialise the namespace
 
-This creates the namespace in the Convex database if it doesn't already exist:
-
-```bash
-cd .agents/tools/workflow && npx tsx init.ts
-```
-
-## Step 4: Start the runner
+## Step 3: Start the runner
 
 Check if a runner is already running first (we do NOT want duplicates):
 
@@ -131,6 +138,13 @@ cd .agents/tools/workflow && nohup npx tsx runner.ts > /tmp/runner.log 2>&1 &
 ```
 
 Verify it started: `tail -20 /tmp/runner.log`
+
+**If namespace not found in database:**
+Initialise the namespace
+This creates the namespace in the Convex database if it doesn't already exist:
+```bash
+cd .agents/tools/workflow && npx tsx init.ts
+```
 
 ## Step 5: Tell the user they're ready
 

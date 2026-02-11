@@ -22,6 +22,7 @@ const __dirname = dirname(__filename);
 interface Config {
   convexUrl: string;
   namespace: string;
+  password: string;
   timeoutMs?: number;
   harnessDefaults?: {
     default: "claude" | "codex" | "gemini";
@@ -50,6 +51,7 @@ async function main() {
     // Check if namespace already exists
     const existing = await client.query(api.namespaces.getByName, {
       name: config.namespace,
+      password: config.password,
     });
 
     if (existing) {
@@ -59,6 +61,7 @@ async function main() {
       // Create the namespace
       const namespaceId = await client.mutation(api.namespaces.create, {
         name: config.namespace,
+        password: config.password,
         description: `Namespace for ${config.namespace} repo`,
       });
       console.log(`Created namespace "${config.namespace}" with ID: ${namespaceId}`);
