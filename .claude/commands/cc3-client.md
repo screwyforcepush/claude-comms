@@ -51,23 +51,24 @@ Each job gets environment variables: `WORKFLOW_ASSIGNMENT_ID`, `WORKFLOW_GROUP_I
 Before configuring, check which agent CLIs are installed. Claude is required, Codex and Gemini are optional but enable multi-model orchestration (different models reviewing each other's work).
 
 ### Claude (required)
-```bash
-claude --version
-```
+If you are reading this then claude is installed and authed!
+
 
 ### Codex (optional - OpenAI)
 ```bash
 codex --version
+codex e "is codex authed test: respond 'hello world'"
 ```
 If not installed, `npm install -g @openai/codex` and ask the user to codex -> auth in terminal
 
 ### Gemini (optional - Google)
 ```bash
 gemini --version
+gemini -p "is gemini authed test: respond 'hello world'"
 ```
 If not installed, `npm install -g @google/gemini-cli@latest` and ask the user to gemini -> auth in terminal
 
-Tell the user which harnesses are available. If user only wants claude and none/one of the others this system will still work, just not as good quality outcomes.
+Tell the user which harnesses are available and authed. If user only wants claude and none/one of the others this system will still work, just not as good quality outcomes.
 
 ## Step 2: Configure the client
 
@@ -93,7 +94,12 @@ Check if `.agents/tools/workflow/config.json` exists. If not, create it from the
 }
 ```
 
-**Fields to ask the user about:**
+**User has provided:** $ARGUMENTS
+
+
+
+
+**Fields to ask the user about (if not provided):**
 - `convexUrl`: The Convex deployment URL (cloud: `https://your-deployment.convex.cloud`, local: whatever `npx convex dev` outputs)
 - `namespace`: Identifies this project in the workflow engine. Suggest the current directory name. Must match what they'll use in the Workflow Engine UI.
 - `password`: The `ADMIN_PASSWORD` set on the Convex server. All Convex calls require this. Must match exactly.

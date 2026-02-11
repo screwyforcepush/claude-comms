@@ -242,9 +242,10 @@ export function buildCommand(
         args: [
           "--yolo",
           "-m",
-          "gemini-2.5-pro",
+          "auto-gemini-3",
           "--output-format",
           "stream-json",
+          "-p",
           prompt,
         ],
       };
