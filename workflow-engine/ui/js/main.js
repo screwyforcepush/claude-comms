@@ -276,7 +276,7 @@ function AppLayout() {
         'aria-label': 'Open navigation menu'
       }, React.createElement(MenuIcon)),
       React.createElement('span', { className: 'mobile-header-title' },
-        selectedNamespace ? selectedNamespace.name : 'Workflow Engine'
+        selectedNamespace ? selectedNamespace.name : 'Claude Comms III'
       ),
       // Placeholder for right side button (could be assignment pane toggle)
       React.createElement('div', { style: { width: '2.5rem' } })

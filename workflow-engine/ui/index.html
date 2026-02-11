@@ -3,7 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Workflow Engine - Queue Visualization</title>
+  <meta name="theme-color" content="#0a0c10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Claude Comms III</title>
+
+  <!-- Favicon + PWA icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="public/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="public/favicon-16.png">
+  <link rel="apple-touch-icon" href="public/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
 
   <!-- Google Fonts - Preconnect for performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,5 +60,10 @@
   </script>
 
   <script type="module" src="./js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
 </body>
 </html>

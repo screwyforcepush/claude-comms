@@ -45,7 +45,7 @@ function SidebarConnectionStatus() {
         className: 'fullbright-dot fullbright-dot--sm fullbright-pulse',
         style: { color: 'var(--q-slime1)' }
       }),
-      React.createElement('span', { className: 'text-xs' }, 'Live')
+      React.createElement('span', { className: 'text-xs sr-only' }, 'Live')
     );
   }
 
@@ -294,18 +294,26 @@ export function NamespaceList({ namespaces, selectedNamespace, onSelect, isColla
       }
     },
       React.createElement('div', { className: 'flex items-center justify-between' },
-        React.createElement('h1', {
-          style: {
-            fontFamily: 'var(--font-display)',
-            fontSize: '16px',
-            color: 'var(--q-torch)',
-            letterSpacing: '2px',
-            textTransform: 'uppercase',
-            textShadow: '0 0 30px rgba(212, 160, 48, 0.22), 0 2px 4px var(--q-void0)',
-            margin: 0,
-            animation: 'torchFlicker 6s infinite'
-          }
-        }, 'CLAUDE COMMS III'),
+        React.createElement('div', { className: 'flex items-center gap-2', style: { minWidth: 0 } },
+          React.createElement('img', {
+            src: 'public/cc3icon.png',
+            alt: 'CC3',
+            style: { width: '20px', height: '20px', borderRadius: '3px', flexShrink: 0 }
+          }),
+          React.createElement('h1', {
+            style: {
+              fontFamily: 'var(--font-display)',
+              fontSize: '18px',
+              color: 'var(--q-torch)',
+              letterSpacing: '2px',
+              textTransform: 'uppercase',
+              textShadow: '0 0 30px rgba(212, 160, 48, 0.22), 0 2px 4px var(--q-void0)',
+              margin: 0,
+              animation: 'torchFlicker 6s infinite',
+              whiteSpace: 'nowrap'
+            }
+          }, 'CLAUDE COMMS III')
+        ),
         React.createElement('div', { className: 'flex items-center gap-2' },
           React.createElement(SidebarConnectionStatus),
           React.createElement(CollapseToggleButton, {

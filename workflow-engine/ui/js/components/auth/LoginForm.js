@@ -59,15 +59,23 @@ export function LoginForm({ onSuccess, initialConvexUrl }) {
         maxWidth: '360px',
       }
     },
-      React.createElement('h1', {
-        style: {
-          fontFamily: 'var(--font-display)',
-          color: 'var(--q-bone3)',
-          fontSize: '1.5rem',
-          marginBottom: '1.5rem',
-          textAlign: 'center',
-        }
-      }, 'Workflow Engine'),
+      React.createElement('div', {
+        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', gap: '0.75rem' }
+      },
+        React.createElement('img', {
+          src: 'public/cc3icon.png',
+          alt: 'CC3',
+          style: { width: '48px', height: '48px', borderRadius: '8px' }
+        }),
+        React.createElement('h1', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            color: 'var(--q-bone3)',
+            fontSize: '1.5rem',
+            textAlign: 'center',
+          }
+        }, 'Claude Comms III')
+      ),
 
       React.createElement('input', {
         type: 'url',
