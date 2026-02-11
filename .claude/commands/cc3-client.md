@@ -48,7 +48,7 @@ Each job gets environment variables: `WORKFLOW_ASSIGNMENT_ID`, `WORKFLOW_GROUP_I
 
 ## Step 1: Verify harness CLIs are available
 
-Before configuring, check which agent CLIs are installed. Claude is required, Codex and Gemini are optional but enable multi-model orchestration (different models reviewing each other's work).
+Before configuring, check which agent CLIs are installed and authed. Claude is required, Codex and Gemini are optional but enable multi-model orchestration (different models reviewing each other's work).
 
 ### Claude (required)
 If you are reading this then claude is installed and authed!
