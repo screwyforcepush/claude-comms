@@ -254,7 +254,8 @@ function AppLayout() {
     return React.createElement(ChatPanel, {
       namespaceId: selectedNamespace._id,
       namespaceName: selectedNamespace.name,
-      responsive: responsive
+      responsive: responsive,
+      onOpenNamespaceDrawer: handleToggleMobileDrawer
     });
   };
 
@@ -267,8 +268,8 @@ function AppLayout() {
   ].filter(Boolean).join(' ');
 
   return React.createElement('div', { className: 'app-layout' },
-    // WP-5: Mobile header with menu toggle
-    responsive.isMobile && React.createElement('header', { className: 'mobile-header show-mobile' },
+    // WP-5: Mobile header with menu toggle (only when no namespace selected; ChatPanel renders its own header otherwise)
+    responsive.isMobile && !selectedNamespace && React.createElement('header', { className: 'mobile-header show-mobile' },
       React.createElement('button', {
         type: 'button',
         onClick: handleToggleMobileDrawer,

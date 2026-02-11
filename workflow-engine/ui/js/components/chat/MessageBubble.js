@@ -1,5 +1,7 @@
 // MessageBubble - Individual message display
-import React from 'react';
+import React, { useMemo } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 /**
  * User icon for user messages
@@ -62,56 +64,21 @@ function formatTime(timestamp) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+// Configure marked for GFM with breaks
+marked.setOptions({
+  gfm: true,
+  breaks: true
+});
+
 /**
- * Simple markdown-like rendering (basic support for code blocks and line breaks)
- * Code blocks use Q palette void background with bone text
+ * Render markdown content to sanitized HTML
+ * Uses marked for parsing and DOMPurify for XSS prevention
  */
-function renderContent(content) {
-  if (!content) return null;
-
-  // Split by code blocks
-  const parts = content.split(/(```[\s\S]*?```)/g);
-
-  return parts.map((part, index) => {
-    if (part.startsWith('```') && part.endsWith('```')) {
-      // Code block - Q palette void background
-      const code = part.slice(3, -3);
-      const lines = code.split('\n');
-      const language = lines[0]?.match(/^\w+$/) ? lines.shift() : '';
-      const codeContent = lines.join('\n').trim();
-
-      return React.createElement('pre', {
-        key: index,
-        className: 'p-3 my-2 overflow-x-auto text-sm',
-        style: {
-          backgroundColor: 'var(--q-void1)',
-          fontFamily: 'var(--font-console)'
-        }
-      },
-        language && React.createElement('div', {
-          className: 'text-xs mb-2',
-          style: { color: 'var(--q-bone0)' }
-        }, language),
-        React.createElement('code', {
-          style: {
-            color: 'var(--q-bone1)',
-            fontFamily: 'var(--font-console)'
-          }
-        }, codeContent)
-      );
-    } else {
-      // Regular text with line breaks
-      const lines = part.split('\n');
-      return React.createElement('span', { key: index },
-        lines.map((line, lineIndex) =>
-          React.createElement(React.Fragment, { key: lineIndex },
-            line,
-            lineIndex < lines.length - 1 && React.createElement('br')
-          )
-        )
-      );
-    }
-  });
+function renderMarkdown(content) {
+  if (!content) return { __html: '' };
+  const rawHtml = marked.parse(content);
+  const cleanHtml = DOMPurify.sanitize(rawHtml);
+  return { __html: cleanHtml };
 }
 
 /**
@@ -174,15 +141,18 @@ export function MessageBubble({ message, isLast = false }) {
   const config = getRoleConfig(message.role);
   const Icon = config.icon;
 
+  // Memoize markdown parsing per message content
+  const markdownHtml = useMemo(() => renderMarkdown(message.content), [message.content]);
+
   return React.createElement('div', {
     className: `flex ${config.isRight ? 'justify-end' : 'justify-start'} ${isLast ? '' : 'mb-4'} ${message.role === 'pm' ? 'pm-message' : ''}`
   },
     React.createElement('div', {
-      className: `flex gap-3 max-w-[80%] ${config.isRight ? 'flex-row-reverse' : 'flex-row'}`
+      className: `message-content-wrapper flex gap-3 max-w-[80%] ${config.isRight ? 'flex-row-reverse' : 'flex-row'}`
     },
       // Avatar - Q palette colors via inline style
       React.createElement('div', {
-        className: 'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
+        className: 'message-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
         style: config.avatarStyle
       },
         React.createElement(Icon)
@@ -190,7 +160,7 @@ export function MessageBubble({ message, isLast = false }) {
 
       // Message content
       React.createElement('div', {
-        className: `flex flex-col ${config.isRight ? 'items-end' : 'items-start'}`
+        className: `message-column flex flex-col ${config.isRight ? 'items-end' : 'items-start'}`
       },
         // Role label - Q palette bone0, dispatcher uses torch
         React.createElement('span', {
@@ -200,13 +170,14 @@ export function MessageBubble({ message, isLast = false }) {
 
         // Message bubble - Q palette styling via inline style
         React.createElement('div', {
-          className: `px-4 py-2.5 ${config.bubbleClass}`,
+          className: `message-bubble px-4 py-2.5 ${config.bubbleClass}`,
           style: config.bubbleStyle
         },
           React.createElement('div', {
-            className: 'text-sm leading-relaxed whitespace-pre-wrap break-words',
-            style: { fontFamily: 'var(--font-body)' }
-          }, renderContent(message.content))
+            className: `markdown-content ${config.isRight ? 'markdown-user' : ''} text-sm leading-relaxed break-words`,
+            style: { fontFamily: 'var(--font-body)' },
+            dangerouslySetInnerHTML: markdownHtml
+          })
         ),
 
         // Timestamp - Q palette bone0

@@ -6,23 +6,6 @@ import { ChatInput } from './ChatInput.js';
 import { AssignmentPane } from './AssignmentPane.js';
 import { JobDetail } from '../job/JobDetail.js';
 
-// localStorage key for assignment pane collapse state (D8: namespaced key)
-const ASSIGNMENT_PANE_COLLAPSED_KEY = 'workflow-engine:assignment-pane-collapsed';
-
-/**
- * Get initial collapsed state from localStorage
- * Note: We store "collapsed" state, but the component uses "open" state (inverted)
- */
-function getInitialPaneOpen() {
-  try {
-    const stored = localStorage.getItem(ASSIGNMENT_PANE_COLLAPSED_KEY);
-    // If stored as 'true' (collapsed), paneOpen should be false
-    return stored !== 'true';
-  } catch {
-    return false; // Default to closed (collapsed = true)
-  }
-}
-
 /**
  * ChatView component - Main chat area with header, messages, and input
  * @param {Object} props
@@ -49,52 +32,29 @@ export function ChatView({
   loadingMessages = false,
   sending = false,
   responsive,
-  onToggleThreadsPane
+  onToggleThreadsPane,
+  paneOpen = false,
+  onTogglePane,
+  onClosePane
 }) {
-  // WP-3: State for assignment pane visibility with localStorage persistence
-  const [paneOpen, setPaneOpen] = useState(getInitialPaneOpen);
-
   // WP-4: State for selected job modal
   const [selectedJob, setSelectedJob] = useState(null);
 
   // Ref to toggle button for focus management
   const toggleButtonRef = useRef(null);
 
-  // D2: Open pane by default when thread has linked assignment, close otherwise
-  // Note: Only triggers on thread ID change, not on assignment data updates
+  // Reset job selection on thread change
   useEffect(() => {
-    setPaneOpen(!!assignment);
     setSelectedJob(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?._id]);
 
-  // Toggle pane callback for header - with localStorage persistence
-  const handleTogglePane = useCallback(() => {
-    setPaneOpen(prev => {
-      const newValue = !prev;
-      try {
-        // Store collapsed state (inverted from open state)
-        localStorage.setItem(ASSIGNMENT_PANE_COLLAPSED_KEY, String(!newValue));
-      } catch {
-        // Ignore localStorage errors
-      }
-      return newValue;
-    });
-  }, []);
-
-  // Close pane callback - with focus management and localStorage persistence
+  // Close pane with focus management (wraps parent callback)
   const handleClosePane = useCallback(() => {
-    setPaneOpen(false);
-    try {
-      localStorage.setItem(ASSIGNMENT_PANE_COLLAPSED_KEY, 'true');
-    } catch {
-      // Ignore localStorage errors
-    }
-    // Return focus to toggle button when pane closes
+    if (onClosePane) onClosePane();
     if (toggleButtonRef.current) {
       toggleButtonRef.current.focus();
     }
-  }, []);
+  }, [onClosePane]);
 
   // WP-4: Job selection callback for modal
   const handleJobSelect = useCallback((job) => {
@@ -205,7 +165,7 @@ export function ChatView({
         assignment: assignment,
         onUpdateTitle: onUpdateTitle,
         onUpdateMode: onUpdateMode,
-        onTogglePane: handleTogglePane,
+        onTogglePane: onTogglePane,
         paneOpen: paneOpen,
         toggleButtonRef: toggleButtonRef,
         disabled: sending

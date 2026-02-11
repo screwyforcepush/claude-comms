@@ -88,11 +88,11 @@ export function MessageList({ messages = [], loading = false, sending = false })
         className: 'flex justify-start'
       },
         React.createElement('div', {
-          className: 'flex gap-3 max-w-[80%]'
+          className: 'message-content-wrapper flex gap-3 max-w-[80%]'
         },
           // Assistant avatar - Q palette teleport (matches MessageBubble.js assistant avatar)
           React.createElement('div', {
-            className: 'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
+            className: 'message-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
             style: { backgroundColor: 'var(--q-teleport)' }
           },
             React.createElement('svg', {

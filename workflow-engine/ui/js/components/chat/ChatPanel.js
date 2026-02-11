@@ -6,9 +6,12 @@ import { api } from '../../api.js';
 import { ChatSidebar } from './ChatSidebar.js';
 import { ChatView } from './ChatView.js';
 import { ThreadIconWithAssignment } from './ThreadItem.js';
+import { ModeToggle } from './ModeToggle.js';
+import { QIcon } from '../shared/index.js';
 
-// localStorage key for threads pane collapse state
+// localStorage keys for collapse states
 const THREADS_PANE_COLLAPSED_KEY = 'workflow-engine:threads-pane-collapsed';
+const ASSIGNMENT_PANE_COLLAPSED_KEY = 'workflow-engine:assignment-pane-collapsed';
 
 /**
  * Get initial collapsed state from localStorage
@@ -17,6 +20,18 @@ function getInitialCollapsedState() {
   try {
     const stored = localStorage.getItem(THREADS_PANE_COLLAPSED_KEY);
     return stored === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get initial assignment pane open state from localStorage
+ */
+function getInitialPaneOpen() {
+  try {
+    const stored = localStorage.getItem(ASSIGNMENT_PANE_COLLAPSED_KEY);
+    return stored !== 'true';
   } catch {
     return false;
   }
@@ -61,13 +76,183 @@ function ChatIcon() {
 }
 
 /**
+ * Get status color from assignment status string
+ */
+function getStatusColor(status) {
+  switch (status) {
+    case 'active': return 'var(--q-teleport-bright)';
+    case 'complete': return 'var(--q-slime1)';
+    case 'completed': return 'var(--q-slime1)';
+    case 'blocked': return 'var(--q-lava1)';
+    case 'failed': return 'var(--q-lava1)';
+    case 'pending': return 'var(--q-copper1)';
+    default: return 'var(--q-iron1)';
+  }
+}
+
+/**
+ * Get alignment color from alignment status string
+ */
+function getAlignmentColor(alignmentStatus) {
+  switch (alignmentStatus) {
+    case 'aligned': return 'var(--q-slime1)';
+    case 'misaligned': return 'var(--q-lava1)';
+    case 'uncertain': return 'var(--q-torch)';
+    default: return 'var(--q-slime1)';
+  }
+}
+
+/**
+ * MobileChatHeader - Compact header for mobile chat view
+ * Replaces both the AppLayout mobile-header and ChatHeader on mobile
+ */
+function MobileChatHeader({
+  thread,
+  assignment,
+  namespaceName,
+  onOpenNamespaceDrawer,
+  onToggleThreadsPane,
+  onToggleAssignmentPane,
+  paneOpen,
+  onUpdateMode,
+  sending
+}) {
+  return React.createElement('header', {
+    className: 'mobile-chat-header'
+  },
+    // Left group: hamburger + threads button
+    React.createElement('div', {
+      className: 'flex items-center gap-1 flex-shrink-0'
+    },
+      // Hamburger - open namespace sidebar
+      React.createElement('button', {
+        type: 'button',
+        onClick: onOpenNamespaceDrawer,
+        className: 'mobile-header-btn',
+        'aria-label': 'Open namespaces'
+      },
+        React.createElement(QIcon, { name: 'menu', size: 20, color: 'currentColor' })
+      ),
+      // Threads - open threads drawer
+      React.createElement('button', {
+        type: 'button',
+        onClick: onToggleThreadsPane,
+        className: 'mobile-header-btn',
+        'aria-label': 'Open threads',
+        title: 'Threads'
+      },
+        React.createElement('svg', {
+          width: 18,
+          height: 18,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 2
+        },
+          React.createElement('path', {
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+            d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
+          })
+        )
+      )
+    ),
+
+    // Center: thread title + namespace subtext (or just namespace if no thread)
+    React.createElement('div', {
+      className: 'flex-1 min-w-0 px-2'
+    },
+      React.createElement('div', {
+        className: 'truncate',
+        style: {
+          fontFamily: 'var(--font-display)',
+          fontSize: '13px',
+          letterSpacing: '1.5px',
+          color: 'var(--q-bone3)',
+          lineHeight: '1.2'
+        }
+      }, thread ? (thread.title || 'New Chat') : namespaceName),
+      thread && React.createElement('div', {
+        className: 'truncate',
+        style: {
+          fontFamily: 'var(--font-console)',
+          fontSize: '9px',
+          color: 'var(--q-bone0)',
+          letterSpacing: '1px',
+          lineHeight: '1.2',
+          marginTop: '2px'
+        }
+      }, namespaceName)
+    ),
+
+    // Right group: status runes + compact mode toggle
+    React.createElement('div', {
+      className: 'flex items-center gap-1 flex-shrink-0'
+    },
+      // Status runes (only when assignment exists)
+      assignment && React.createElement('div', {
+        className: 'flex items-center gap-1 mr-1'
+      },
+        // Alignment rune (guardian mode only)
+        thread?.mode === 'guardian' && React.createElement('span', {
+          title: `Alignment: ${(assignment.alignmentStatus || 'aligned').toUpperCase()}`,
+          style: { display: 'flex', alignItems: 'center' }
+        },
+          React.createElement(QIcon, {
+            name: 'armor',
+            size: 14,
+            color: getAlignmentColor(assignment.alignmentStatus || 'aligned')
+          })
+        ),
+        // Assignment status rune
+        React.createElement('span', {
+          title: `Status: ${(assignment.status || 'idle').toUpperCase()}`,
+          style: { display: 'flex', alignItems: 'center' }
+        },
+          React.createElement(QIcon, {
+            name: 'health',
+            size: 14,
+            color: getStatusColor(assignment.status)
+          })
+        )
+      ),
+      // Assignment pane toggle (only when assignment exists)
+      assignment && React.createElement('button', {
+        type: 'button',
+        onClick: onToggleAssignmentPane,
+        className: 'mobile-header-btn',
+        'aria-label': paneOpen ? 'Hide assignment details' : 'Show assignment details',
+        'aria-expanded': paneOpen,
+        title: paneOpen ? 'Hide details' : 'Show details',
+        style: paneOpen ? { color: 'var(--q-copper2)' } : undefined
+      },
+        React.createElement(QIcon, {
+          name: 'route',
+          size: 16,
+          color: paneOpen ? 'var(--q-copper2)' : 'currentColor'
+        })
+      ),
+      // Compact mode toggle
+      React.createElement(ModeToggle, {
+        mode: thread?.mode || 'jam',
+        onChange: onUpdateMode,
+        disabled: sending,
+        hasAssignment: !!thread?.assignmentId || !!assignment,
+        compact: true
+      })
+    )
+  );
+}
+
+/**
  * ChatPanel component - Main container managing chat state
  * @param {Object} props
  * @param {string} props.namespaceId - Current namespace ID for thread scoping
  * @param {string} props.namespaceName - Current namespace name (for display)
  * @param {Object} props.responsive - Responsive mode info (optional, for WP-5)
+ * @param {Function} props.onOpenNamespaceDrawer - Callback to open namespace sidebar drawer (mobile)
  */
-export function ChatPanel({ namespaceId, namespaceName, responsive }) {
+export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamespaceDrawer }) {
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -77,6 +262,9 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
 
   // WP-5: Mobile drawer state for threads pane
   const [threadsMobileOpen, setThreadsMobileOpen] = useState(false);
+
+  // Assignment pane state (lifted from ChatView for mobile header access)
+  const [paneOpen, setPaneOpen] = useState(getInitialPaneOpen);
 
   // Fetch threads for this namespace
   const { data: threads, loading: loadingThreads } = useQuery(
@@ -241,6 +429,33 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
     setThreadsMobileOpen(false);
   }, []);
 
+  // Assignment pane toggle (lifted from ChatView for mobile header access)
+  const handleTogglePane = useCallback(() => {
+    setPaneOpen(prev => {
+      const newValue = !prev;
+      try {
+        localStorage.setItem(ASSIGNMENT_PANE_COLLAPSED_KEY, String(!newValue));
+      } catch {
+        // Ignore localStorage errors
+      }
+      return newValue;
+    });
+  }, []);
+
+  const handleClosePane = useCallback(() => {
+    setPaneOpen(false);
+    try {
+      localStorage.setItem(ASSIGNMENT_PANE_COLLAPSED_KEY, 'true');
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  // Auto-open pane when thread changes and has assignment
+  useEffect(() => {
+    setPaneOpen(!!selectedAssignment);
+  }, [selectedThread?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // No namespace selected - Q palette empty state
   if (!namespaceId) {
     return React.createElement('div', {
@@ -301,6 +516,19 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
   return React.createElement('div', {
     className: 'chat-panel flex flex-1 min-h-0'
   },
+    // Mobile chat header (replaces both AppLayout mobile-header and ChatHeader on mobile)
+    responsive?.isMobile && React.createElement(MobileChatHeader, {
+      thread: selectedThread,
+      assignment: selectedAssignment || null,
+      namespaceName: namespaceName,
+      onOpenNamespaceDrawer: onOpenNamespaceDrawer,
+      onToggleThreadsPane: handleToggleThreadsPane,
+      onToggleAssignmentPane: handleTogglePane,
+      paneOpen: paneOpen,
+      onUpdateMode: handleUpdateMode,
+      sending: sending || isProcessing
+    }),
+
     // WP-5: Mobile threads overlay
     responsive?.isMobile && React.createElement('div', {
       className: `threads-overlay ${threadsMobileOpen ? 'visible' : ''}`,
@@ -434,7 +662,10 @@ export function ChatPanel({ namespaceId, namespaceName, responsive }) {
       loadingMessages: loadingMessages,
       sending: sending || isProcessing,
       responsive: responsive,
-      onToggleThreadsPane: handleToggleThreadsPane
+      onToggleThreadsPane: handleToggleThreadsPane,
+      paneOpen: paneOpen,
+      onTogglePane: handleTogglePane,
+      onClosePane: handleClosePane
     })
   );
 }

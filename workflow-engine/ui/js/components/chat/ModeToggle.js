@@ -11,7 +11,7 @@ import { QIcon } from '../shared/index.js';
  * @param {boolean} props.disabled - Whether the toggle is disabled
  * @param {boolean} props.hasAssignment - Whether thread has linked assignment (enables guardian)
  */
-export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = false }) {
+export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = false, compact = false }) {
   const handleModeChange = (newMode) => {
     if (!disabled && newMode !== mode && onChange) {
       onChange(newMode);
@@ -32,7 +32,7 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
       fontSize: '10px',
       letterSpacing: '2px',
       textTransform: 'uppercase',
-      padding: '9px 18px',
+      padding: compact ? '7px 10px' : '9px 18px',
       border: 'none',
       borderRadius: '0',
       borderBottom: '2px solid transparent',
@@ -95,7 +95,7 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
   const contentStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px'
+    gap: compact ? '0' : '6px'
   };
 
   const isJamActive = mode === 'jam';
@@ -117,10 +117,10 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
       React.createElement('span', { style: contentStyle },
         React.createElement(QIcon, {
           name: 'eye',
-          size: 16,
+          size: compact ? 14 : 16,
           color: 'currentColor'
         }),
-        'Jam'
+        !compact && 'Jam'
       )
     ),
 
@@ -137,10 +137,10 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
       React.createElement('span', { style: contentStyle },
         React.createElement(QIcon, {
           name: 'axe',
-          size: 16,
+          size: compact ? 14 : 16,
           color: 'currentColor'
         }),
-        'Cook'
+        !compact && 'Cook'
       )
     ),
 
@@ -159,10 +159,10 @@ export function ModeToggle({ mode, onChange, disabled = false, hasAssignment = f
       React.createElement('span', { style: contentStyle },
         React.createElement(QIcon, {
           name: 'armor',
-          size: 16,
+          size: compact ? 14 : 16,
           color: 'currentColor'
         }),
-        'Guardian'
+        !compact && 'Guardian'
       )
     )
   );
