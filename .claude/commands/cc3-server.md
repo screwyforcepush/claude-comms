@@ -40,7 +40,7 @@ The multi-agent system has two layers that work together:
 
 - CC2 server + dashboard: `scripts/start-system.sh` (launches `apps/server` on :4000 and `apps/client` on :5173)
 - CC3 Convex schema: `workflow-engine/convex/schema.ts`
-- CC3 UI config: `workflow-engine/ui/config.json`
+- CC3 UI: `workflow-engine/ui/` (static site, no build step — Convex URL entered at login)
 - CC3 Convex env: `workflow-engine/.env` (for cloud deploy)
 - Client runner: `.agents/tools/workflow/runner.ts`
 - Client config: `.agents/tools/workflow/config.json`
@@ -80,20 +80,7 @@ Ask the user which approach they want:
 - Client and UI must be on the same machine (or use port forwarding)
 - Good for trying things out
 
-### 2b. Configure the UI
-
-Check if `workflow-engine/ui/config.json` exists. Create it if not:
-
-```json
-{
-  "convexUrl": "<the convex deployment URL from step 2a>"
-}
-```
-
-For local dev this is typically something like `https://localhost:3210` (whatever `npx convex dev` outputs).
-For cloud it's the deployment URL like `https://your-deployment-name.convex.cloud`.
-
-### 2c. Set the admin password
+### 2b. Set the admin password
 
 All Convex functions are protected by a password wall. Set `ADMIN_PASSWORD` as an environment variable in the Convex dashboard:
 
@@ -102,13 +89,18 @@ All Convex functions are protected by a password wall. Set `ADMIN_PASSWORD` as a
 
 This same password must also be set in each client's `config.json` (see `/cc3-client`).
 
-### 2d. Start the Workflow Engine UI
+### 2c. Start the Workflow Engine UI
 
+The UI is a static site — no config file needed. The Convex URL and admin password are entered on the login screen and persisted in browser storage (URL in localStorage, password in sessionStorage).
+
+**Local dev:**
 ```bash
 cd workflow-engine/ui && nohup npm start > /tmp/ui-server.log 2>&1 &
 ```
-
 The UI will be available at http://localhost:3500
+
+**Vercel (hosted):**
+Deploy `workflow-engine/ui` as a static site — no build command, no env vars. Users enter the Convex URL and password on first visit.
 
 ## Step 3: Guide the user on next steps
 

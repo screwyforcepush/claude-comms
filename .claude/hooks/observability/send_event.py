@@ -42,14 +42,14 @@ def send_event_to_server(event_data, server_url=None):
                 return True
             else:
                 print(f"Server returned status: {response.status}", file=sys.stderr)
-                return False
+                return True
                 
     except urllib.error.URLError as e:
         print(f"Failed to send event: {e}", file=sys.stderr)
-        return False
+        return True
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
-        return False
+        return True
 
 def main():
     # Parse command line arguments

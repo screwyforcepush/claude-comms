@@ -1,12 +1,17 @@
 import React, { useState, useCallback } from 'react';
 
-export function LoginForm({ onSuccess }) {
+export function LoginForm({ onSuccess, initialConvexUrl }) {
+  const [convexUrl, setConvexUrl] = useState(initialConvexUrl || '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+    if (!convexUrl.trim()) {
+      setError('Convex URL is required');
+      return;
+    }
     if (!password.trim()) {
       setError('Password is required');
       return;
@@ -16,12 +21,24 @@ export function LoginForm({ onSuccess }) {
     setError(null);
 
     try {
-      await onSuccess(password.trim());
+      await onSuccess(convexUrl.trim(), password.trim());
     } catch (err) {
-      setError('Unauthorized');
+      setError(err.message === 'Unauthorized' ? 'Unauthorized' : 'Connection failed — check URL');
       setLoading(false);
     }
-  }, [password, onSuccess]);
+  }, [convexUrl, password, onSuccess]);
+
+  const inputStyle = {
+    width: '100%',
+    padding: '0.625rem 0.75rem',
+    backgroundColor: 'var(--q-stone0)',
+    color: 'var(--q-bone2)',
+    border: '1px solid var(--q-stone3)',
+    outline: 'none',
+    fontSize: '0.875rem',
+    boxSizing: 'border-box',
+    marginBottom: '1rem',
+  };
 
   return React.createElement('div', {
     style: {
@@ -53,23 +70,23 @@ export function LoginForm({ onSuccess }) {
       }, 'Workflow Engine'),
 
       React.createElement('input', {
+        type: 'url',
+        value: convexUrl,
+        onChange: (e) => setConvexUrl(e.target.value),
+        placeholder: 'https://your-project.convex.cloud',
+        autoFocus: !initialConvexUrl,
+        disabled: loading,
+        style: inputStyle
+      }),
+
+      React.createElement('input', {
         type: 'password',
         value: password,
         onChange: (e) => setPassword(e.target.value),
         placeholder: 'Admin password',
-        autoFocus: true,
+        autoFocus: !!initialConvexUrl,
         disabled: loading,
-        style: {
-          width: '100%',
-          padding: '0.625rem 0.75rem',
-          backgroundColor: 'var(--q-stone0)',
-          color: 'var(--q-bone2)',
-          border: '1px solid var(--q-stone3)',
-          outline: 'none',
-          fontSize: '0.875rem',
-          boxSizing: 'border-box',
-          marginBottom: '1rem',
-        }
+        style: inputStyle
       }),
 
       error && React.createElement('p', {

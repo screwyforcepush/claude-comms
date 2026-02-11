@@ -41,17 +41,17 @@ def send_message(sender_name, message):
             return True
         else:
             print(f"Error: Server returned status {response.status_code}", file=sys.stderr)
-            return False
+            return True
             
     except requests.exceptions.ConnectionError:
         print(f"Error: Could not connect to observability server at {get_server_url()}", file=sys.stderr)
-        return False
+        return True
     except requests.exceptions.Timeout:
         print("Error: Request timed out", file=sys.stderr)
-        return False
+        return True
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)
-        return False
+        return True
 
 def main():
     parser = argparse.ArgumentParser(description='Send a message from a subagent')

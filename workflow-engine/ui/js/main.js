@@ -1,8 +1,7 @@
 // Main entry point for Workflow Engine UI
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
-import { loadConfig, isConfigValid } from './config.js';
-import { ConvexProvider, useConvex, useQuery } from './hooks/useConvex.js';
+import { useConvex, useQuery } from './hooks/useConvex.js';
 import { api } from './api.js';
 import { ErrorBoundary } from './components/shared/ErrorBoundary.js';
 import { LoadingSpinner } from './components/shared/LoadingSkeleton.js';
@@ -314,103 +313,20 @@ function AppLayout() {
 }
 
 /**
- * Root App component with config loading and providers
+ * Root App component
+ * LoginGate handles both Convex URL + password collection, then wraps children
+ * with ConvexProvider and PasswordProvider internally.
  */
 function App() {
-  const [config, setConfig] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
-
-  React.useEffect(() => {
-    loadConfig()
-      .then(cfg => {
-        setConfig(cfg);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
-
-  // Loading state
-  if (loading) {
-    return React.createElement('div', { className: 'flex items-center justify-center min-h-screen' },
-      React.createElement('div', { className: 'text-center' },
-        React.createElement(LoadingSpinner, { size: 'lg' }),
-        React.createElement('p', { className: 'mt-4', style: { color: 'var(--q-bone1)' } }, 'Loading configuration...')
-      )
-    );
-  }
-
-  // Error state
-  if (error) {
-    return React.createElement('div', { className: 'flex items-center justify-center min-h-screen' },
+  return React.createElement(LoginGate, null,
+    React.createElement(ErrorBoundary, null,
       React.createElement('div', {
-        className: 'max-w-md mx-auto p-6 border',
-        style: {
-          backgroundColor: 'var(--q-stone1)',
-          borderColor: 'rgba(196, 56, 24, 0.3)',
-          borderRadius: 0
-        }
+        className: 'h-screen flex flex-col',
+        style: { backgroundColor: 'var(--q-void1)' }
       },
-        React.createElement('h2', { className: 'text-xl font-bold mb-4 text-red-400' }, 'Configuration Error'),
-        React.createElement('p', { className: 'mb-4', style: { color: 'var(--q-bone1)' } }, error),
-        React.createElement('button', {
-          onClick: () => window.location.reload(),
-          className: 'btn btn-primary'
-        }, 'Retry')
-      )
-    );
-  }
-
-  // Invalid config state
-  if (!isConfigValid(config)) {
-    return React.createElement('div', { className: 'flex items-center justify-center min-h-screen' },
-      React.createElement('div', {
-        className: 'max-w-md mx-auto p-6 border',
-        style: {
-          backgroundColor: 'var(--q-stone1)',
-          borderColor: 'var(--q-stone3)',
-          borderRadius: 0
-        }
-      },
-        React.createElement('h2', { className: 'text-xl font-bold mb-4 text-white' }, 'Configuration Required'),
-        React.createElement('p', { className: 'mb-4', style: { color: 'var(--q-bone1)' } },
-          'Please edit ',
-          React.createElement('code', {
-            className: 'px-2 py-0.5',
-            style: { backgroundColor: 'var(--q-stone2)', borderRadius: 0 }
-          }, 'config.json'),
-          ' and set your Convex deployment URL.'
-        ),
-        React.createElement('pre', {
-          className: 'p-3 text-sm overflow-x-auto',
-          style: {
-            backgroundColor: 'var(--q-void1)',
-            color: 'var(--q-bone3)',
-            borderRadius: 0
-          }
-        },
-          JSON.stringify({ convexUrl: 'https://your-project.convex.cloud' }, null, 2)
-        )
-      )
-    );
-  }
-
-  // Main application with providers
-  // LoginGate wraps everything - shows login form if no password in sessionStorage
-  return React.createElement(LoginGate, { convexUrl: config.convexUrl },
-    React.createElement(ConvexProvider, { url: config.convexUrl },
-      React.createElement(ErrorBoundary, null,
-        React.createElement('div', {
-          className: 'h-screen flex flex-col',
-          style: { backgroundColor: 'var(--q-void1)' }
-        },
-          React.createElement(GrainOverlay),      // WP-3: Grain overlay effect
-          React.createElement(ScanlineSweep),     // WP-3: Scanline sweep effect
-          React.createElement(AppLayout)
-        )
+        React.createElement(GrainOverlay),
+        React.createElement(ScanlineSweep),
+        React.createElement(AppLayout)
       )
     )
   );

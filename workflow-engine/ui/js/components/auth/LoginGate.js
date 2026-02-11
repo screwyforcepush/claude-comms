@@ -2,46 +2,69 @@ import React, { useState, useCallback } from 'react';
 import { ConvexHttpClient } from 'convex/browser';
 import { LoginForm } from './LoginForm.js';
 import { PasswordProvider } from './PasswordContext.js';
+import { ConvexProvider } from '../../hooks/useConvex.js';
 
-const SESSION_KEY = 'adminPassword';
+const PASSWORD_KEY = 'adminPassword';
+const CONVEX_URL_KEY = 'convexUrl';
 
-export function LoginGate({ convexUrl, children }) {
+export function LoginGate({ children }) {
   const [password, setPassword] = useState(() => {
     try {
-      return sessionStorage.getItem(SESSION_KEY);
+      return sessionStorage.getItem(PASSWORD_KEY);
     } catch {
       return null;
     }
   });
 
-  const handleLogin = useCallback(async (pwd) => {
-    // Validate password by calling a lightweight query
-    const httpClient = new ConvexHttpClient(convexUrl);
+  const [convexUrl, setConvexUrl] = useState(() => {
+    try {
+      return localStorage.getItem(CONVEX_URL_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogin = useCallback(async (url, pwd) => {
+    // Validate password by calling a lightweight query against the provided URL
+    const httpClient = new ConvexHttpClient(url);
     try {
       await httpClient.query("namespaces:list", { password: pwd });
     } catch (err) {
       throw new Error('Unauthorized');
     }
 
-    // Password is valid - store and proceed
+    // Credentials valid — persist
     try {
-      sessionStorage.setItem(SESSION_KEY, pwd);
+      localStorage.setItem(CONVEX_URL_KEY, url);
+      sessionStorage.setItem(PASSWORD_KEY, pwd);
     } catch {
       // Ignore storage errors
     }
+    setConvexUrl(url);
     setPassword(pwd);
-  }, [convexUrl]);
+  }, []);
 
-  if (!password) {
-    return React.createElement(LoginForm, { onSuccess: handleLogin });
+  // Pre-fill URL from localStorage for returning users
+  const storedUrl = (() => {
+    try { return localStorage.getItem(CONVEX_URL_KEY) || ''; } catch { return ''; }
+  })();
+
+  if (!password || !convexUrl) {
+    return React.createElement(LoginForm, {
+      onSuccess: handleLogin,
+      initialConvexUrl: storedUrl
+    });
   }
 
-  return React.createElement(PasswordProvider, { password }, children);
+  // Wrap children with both providers
+  return React.createElement(PasswordProvider, { password },
+    React.createElement(ConvexProvider, { url: convexUrl }, children)
+  );
 }
 
 export function logout() {
   try {
-    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(PASSWORD_KEY);
   } catch {
     // Ignore
   }
