@@ -2,6 +2,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { JobCard } from './JobCard.js';
 import { JobDetail } from './JobDetail.js';
+import { StatusBadge } from '../shared/StatusBadge.js';
+import { QIcon } from '../shared/index.js';
 
 /**
  * Provider logo mapping: harness -> provider info
@@ -195,6 +197,7 @@ function Fullbright({ color, pulse = false, size = 5 }) {
 function StatusRune({ status }) {
   const config = statusRuneConfig[status] || statusRuneConfig.pending;
   return React.createElement('span', {
+    className: 'job-status-rune',
     style: {
       fontFamily: 'var(--font-display)',
       fontSize: 'var(--t-type-size-badge)',
@@ -466,6 +469,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     }),
     // Header: Provider Logo + JOB_TYPE + StatusRune
     React.createElement('div', {
+      className: 'job-node__header',
       style: {
         padding: '8px 12px 6px',
         display: 'flex',
@@ -479,6 +483,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
         React.createElement('div', null,
           // Job type badge
           React.createElement('div', {
+            className: 'job-node__type',
             style: {
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--t-type-size-subheading)',
@@ -519,6 +524,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     ),
     // Stat Bars Section: HP (+ ARM when running)
     React.createElement('div', {
+      className: 'job-node__stats',
       style: {
         padding: '4px 12px 8px',
         display: 'flex',
@@ -543,6 +549,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     ),
     // FRAGS + DMG Section (Tool calls + Tokens)
     React.createElement('div', {
+      className: 'job-node__footer',
       style: {
         padding: '6px 12px',
         borderTop: '1px solid var(--q-stone3)',
@@ -564,6 +571,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
           }
         }, 'FRAGS'),
         React.createElement('span', {
+          className: 'job-node__stat-value',
           style: {
             fontFamily: 'var(--font-display)',
             fontSize: 'var(--t-type-size-stat-medium)',
@@ -586,6 +594,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
           }
         }, 'DMG'),
         React.createElement('span', {
+          className: 'job-node__stat-value',
           style: {
             fontFamily: 'var(--font-display)',
             fontSize: 'var(--t-type-size-stat-medium)',
@@ -1024,7 +1033,7 @@ function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
  * @param {Function} props.onJobSelect - Callback when job is selected
  * @param {string} props.layout - Layout mode: 'vertical' | 'horizontal' | 'auto' (reserved for future)
  */
-export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 'vertical' }) {
+export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 'vertical', assignmentStatus, independent }) {
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -1062,6 +1071,32 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
     return { completed, running, pending, failed, total: allJobs.length, groupCount: groups.length };
   }, [allJobs, groups.length]);
 
+  // Assignment-level rollup metrics (computed client-side from job data)
+  // Runtime: sum of max-per-group (accounts for parallel execution within groups)
+  // Tokens/ToolCalls/Subagents: sum across all jobs
+  const rollup = useMemo(() => {
+    let totalTokens = 0;
+    let totalToolCalls = 0;
+    let totalSubagents = 0;
+    let totalRuntime = 0;
+
+    for (const group of groups) {
+      let maxGroupRuntime = 0;
+      for (const job of (group.jobs || [])) {
+        totalTokens += (typeof job.totalTokens === 'number' ? job.totalTokens : 0);
+        totalToolCalls += (typeof job.toolCallCount === 'number' ? job.toolCallCount : 0);
+        totalSubagents += (typeof job.subagentCount === 'number' ? job.subagentCount : 0);
+        if (job.startedAt) {
+          const runtime = (job.completedAt || now) - job.startedAt;
+          if (runtime > maxGroupRuntime) maxGroupRuntime = runtime;
+        }
+      }
+      totalRuntime += maxGroupRuntime;
+    }
+
+    return { totalRuntime, totalTokens, totalToolCalls, totalSubagents };
+  }, [groups, now]);
+
   React.useEffect(() => {
     if (stats.running === 0) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -1081,6 +1116,22 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
       className: 'flex items-center gap-4 text-xs flex-wrap',
       style: { color: 'var(--q-bone0)' }
     },
+      // Assignment status badge (first in row)
+      assignmentStatus && React.createElement(StatusBadge, { status: assignmentStatus, size: 'sm' }),
+      independent && React.createElement(
+        'span',
+        {
+          style: {
+            fontSize: '12px',
+            backgroundColor: 'rgba(92, 60, 124, 0.15)',
+            color: 'var(--q-teleport-bright)',
+            border: '1px solid rgba(124, 88, 160, 0.44)',
+            padding: '2px 8px',
+            borderRadius: '9999px',
+          },
+        },
+        'Independent'
+      ),
       React.createElement(RollupBadge, {
         count: stats.completed,
         label: 'DONE',
@@ -1105,6 +1156,113 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
         color: 'var(--q-lava1)',
         pulse: false
       })
+    ),
+
+    // Assignment rollup stats (aggregated from all jobs)
+    React.createElement('div', {
+      className: 'assignment-rollup flex items-center justify-evenly flex-wrap',
+      style: {
+        padding: '6px 10px',
+        backgroundColor: 'var(--q-stone1)',
+        border: '1px solid var(--q-stone3)'
+      }
+    },
+      // TIME (total runtime - sum of max-per-group for parallel awareness)
+      React.createElement('div', {
+        className: 'rollup-stat',
+        style: { display: 'flex', alignItems: 'center', gap: '4px' }
+      },
+        React.createElement('span', {
+          className: 'rollup-stat__label',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-type-size-badge)',
+            color: 'var(--q-bone0)',
+            letterSpacing: 'var(--t-type-tracking-tight)'
+          }
+        }, 'TIME'),
+        React.createElement('span', {
+          className: 'rollup-stat__value',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '14px',
+            color: 'var(--q-slime1)',
+            textShadow: '0 0 8px var(--q-slime1-44)'
+          }
+        }, formatDuration(rollup.totalRuntime))
+      ),
+      // FRAGS (total tool calls)
+      React.createElement('div', {
+        className: 'rollup-stat',
+        style: { display: 'flex', alignItems: 'center', gap: '4px' }
+      },
+        React.createElement('span', {
+          className: 'rollup-stat__label',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-type-size-badge)',
+            color: 'var(--q-bone0)',
+            letterSpacing: 'var(--t-type-tracking-tight)'
+          }
+        }, 'FRAGS'),
+        React.createElement('span', {
+          className: 'rollup-stat__value',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '14px',
+            color: 'var(--q-torch-hot)',
+            textShadow: '0 0 8px var(--q-torch-33)'
+          }
+        }, formatCount(rollup.totalToolCalls))
+      ),
+      // DMG (total tokens)
+      React.createElement('div', {
+        className: 'rollup-stat',
+        style: { display: 'flex', alignItems: 'center', gap: '4px' }
+      },
+        React.createElement('span', {
+          className: 'rollup-stat__label',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-type-size-badge)',
+            color: 'var(--q-bone0)',
+            letterSpacing: 'var(--t-type-tracking-tight)'
+          }
+        }, 'DMG'),
+        React.createElement('span', {
+          className: 'rollup-stat__value',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '14px',
+            color: 'var(--q-lava1)',
+            textShadow: '0 0 8px var(--q-lava1-44)'
+          }
+        }, formatCount(rollup.totalTokens))
+      ),
+      // FIENDS (total subagents) - only shown when > 0
+      rollup.totalSubagents > 0 && React.createElement('div', {
+        className: 'rollup-stat',
+        style: { display: 'flex', alignItems: 'center', gap: '4px' }
+      },
+        React.createElement('span', {
+          className: 'rollup-stat__label',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-type-size-badge)',
+            color: 'var(--q-bone0)',
+            letterSpacing: 'var(--t-type-tracking-tight)'
+          }
+        }, 'FIENDS'),
+        React.createElement('span', {
+          className: 'rollup-stat__value',
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '14px',
+            color: 'var(--q-teleport-bright)',
+            textShadow: '0 0 8px var(--q-teleport-08)'
+          }
+        }, rollup.totalSubagents)
+      )
     ),
 
     // Chain visualization container with Q palette stone colors

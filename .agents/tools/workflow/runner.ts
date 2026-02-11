@@ -218,16 +218,24 @@ function extractTotalTokens(
 ): number | null {
   const type = event.type as string | undefined;
   if (harness === "claude" && type === "result") {
-    const usage = event.usage as { input_tokens?: number; output_tokens?: number } | undefined;
-    if (typeof usage?.input_tokens === "number" && typeof usage?.output_tokens === "number") {
-      return usage.input_tokens + usage.output_tokens;
+    const modelUsage = event.modelUsage as Record<string, {
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheCreationInputTokens?: number;
+    }> | undefined;
+    if (modelUsage) {
+      let total = 0;
+      for (const model of Object.values(modelUsage)) {
+        total += (model.inputTokens ?? 0) + (model.outputTokens ?? 0) + (model.cacheCreationInputTokens ?? 0);
+      }
+      return total;
     }
   }
 
   if (harness === "codex" && type === "turn.completed") {
-    const usage = event.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+    const usage = event.usage as { input_tokens?: number; output_tokens?: number; cached_input_tokens?: number } | undefined;
     if (typeof usage?.input_tokens === "number" && typeof usage?.output_tokens === "number") {
-      return usage.input_tokens + usage.output_tokens;
+      return usage.input_tokens + usage.output_tokens - (usage.cached_input_tokens ?? 0);
     }
   }
 

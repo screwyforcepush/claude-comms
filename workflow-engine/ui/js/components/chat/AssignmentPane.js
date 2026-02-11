@@ -528,35 +528,6 @@ export function AssignmentPane({
             gap: "16px",
           },
         },
-        // Status badges
-        React.createElement(
-          "div",
-          {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              flexWrap: "wrap",
-            },
-          },
-          React.createElement(StatusBadge, { status, size: "sm" }),
-          independent &&
-            React.createElement(
-              "span",
-              {
-                style: {
-                  fontSize: "12px",
-                  backgroundColor: "rgba(92, 60, 124, 0.15)",
-                  color: "var(--q-teleport-bright)",
-                  border: "1px solid rgba(124, 88, 160, 0.44)",
-                  padding: "2px 8px",
-                  borderRadius: "9999px",
-                },
-              },
-              "Independent",
-            ),
-        ),
-
         // North Star (collapsible - collapsed by default)
         React.createElement(
           "div",
@@ -631,6 +602,8 @@ export function AssignmentPane({
             groups,
             onJobSelect,
             layout: "vertical",
+            assignmentStatus: status,
+            independent,
           }),
 
         // Artifacts (collapsible)
