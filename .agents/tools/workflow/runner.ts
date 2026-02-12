@@ -566,7 +566,7 @@ async function executeJob(
             const forceKillLine = exitForced
               ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
               : undefined;
-            const hint = [pressureLine, forceKillLine].filter(Boolean).join("\n") || undefined;
+            const hint = [pressureLine, forceKillLine].filter(Boolean).join(" ") || undefined;
             await saveChatResponse(chatContext.threadId, result, hint);
             if (sessionId) {
               await saveSessionId(chatContext.threadId, sessionId);
@@ -896,7 +896,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           const forceKillLine = exitForced
             ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
             : undefined;
-          const hint = [pressureLine, forceKillLine].filter(Boolean).join("\n") || undefined;
+          const hint = [pressureLine, forceKillLine].filter(Boolean).join(" ") || undefined;
           await saveChatResponse(chatContext.threadId, result, hint);
           if (sessionId) {
             await saveSessionId(chatContext.threadId, sessionId);

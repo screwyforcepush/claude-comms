@@ -56,6 +56,38 @@ function DispatchIcon() {
 }
 
 /**
+ * Parse hint string into individual hint segments with style info.
+ * Extracts "Context Pressure: Nk" and color-codes by threshold.
+ * Remaining text becomes a default-styled hint.
+ */
+const PRESSURE_RE = /Context Pressure: (\d+)k/;
+
+function parseHints(hintString) {
+  if (!hintString) return [];
+  const hints = [];
+  const match = hintString.match(PRESSURE_RE);
+  if (match) {
+    const k = parseInt(match[1], 10);
+    let colorStyle;
+    if (k < 80) {
+      colorStyle = { color: '#4ade80', backgroundColor: 'rgba(74, 222, 128, 0.08)', borderLeft: '2px solid #4ade80' };
+    } else if (k <= 120) {
+      colorStyle = { color: 'var(--q-torch)', backgroundColor: 'rgba(212, 160, 48, 0.08)', borderLeft: '2px solid var(--q-torch)' };
+    } else {
+      colorStyle = { color: '#f87171', backgroundColor: 'rgba(248, 113, 113, 0.08)', borderLeft: '2px solid #f87171' };
+    }
+    hints.push({ text: match[0], style: colorStyle });
+    const remainder = hintString.replace(PRESSURE_RE, '').trim();
+    if (remainder) {
+      hints.push({ text: remainder, style: { color: 'var(--q-torch)', backgroundColor: 'rgba(212, 160, 48, 0.08)', borderLeft: '2px solid var(--q-torch)' } });
+    }
+  } else {
+    hints.push({ text: hintString, style: { color: 'var(--q-torch)', backgroundColor: 'rgba(212, 160, 48, 0.08)', borderLeft: '2px solid var(--q-torch)' } });
+  }
+  return hints;
+}
+
+/**
  * Format timestamp to readable time
  */
 function formatTime(timestamp) {
@@ -180,21 +212,21 @@ export function MessageBubble({ message, isLast = false }) {
           })
         ),
 
-        // Hint bar — system annotation beneath bubble
-        message.hint && React.createElement('div', {
-          className: 'message-hint flex items-center gap-1.5 mt-1 px-2 py-1',
-          style: {
-            fontSize: '11px',
-            fontFamily: 'var(--font-console)',
-            color: 'var(--q-torch)',
-            backgroundColor: 'rgba(212, 160, 48, 0.08)',
-            borderLeft: '2px solid var(--q-torch)',
-            letterSpacing: '0.3px',
-            lineHeight: '1.4',
-            whiteSpace: 'pre-line',
-          }
-        },
-          React.createElement('span', null, message.hint)
+        // Hint bars — system annotations beneath bubble, color-coded
+        message.hint && parseHints(message.hint).map((hint, i) =>
+          React.createElement('div', {
+            key: `hint-${i}`,
+            className: 'message-hint flex items-center gap-1.5 mt-1 px-2 py-1',
+            style: {
+              fontSize: '11px',
+              fontFamily: 'var(--font-console)',
+              letterSpacing: '0.3px',
+              lineHeight: '1.4',
+              ...hint.style,
+            }
+          },
+            React.createElement('span', null, hint.text)
+          )
         ),
 
         // Timestamp - Q palette bone0
