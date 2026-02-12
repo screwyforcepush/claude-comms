@@ -191,6 +191,7 @@ export function MessageBubble({ message, isLast = false }) {
             borderLeft: '2px solid var(--q-torch)',
             letterSpacing: '0.3px',
             lineHeight: '1.4',
+            whiteSpace: 'pre-line',
           }
         },
           React.createElement('span', null, message.hint)

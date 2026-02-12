@@ -108,6 +108,7 @@ interface MetricsState {
   toolCallCount: number;
   subagentCount: number;
   totalTokens: number | null;
+  contextPressure: number | null;
   lastEventAt: number | null;
   lastFlushedToolCallCount: number;
   lastFlushedSubagentCount: number;
@@ -122,6 +123,7 @@ function createMetricsState(): MetricsState {
     toolCallCount: 0,
     subagentCount: 0,
     totalTokens: null,
+    contextPressure: null,
     lastEventAt: null,
     lastFlushedToolCallCount: 0,
     lastFlushedSubagentCount: 0,
@@ -254,6 +256,23 @@ function extractTotalTokens(
   return null;
 }
 
+function extractContextPressure(
+  harness: Harness,
+  event: Record<string, unknown>
+): number | null {
+  if (harness !== "claude" || (event.type as string) !== "result") return null;
+  const modelUsage = event.modelUsage as Record<string, {
+    cacheCreationInputTokens?: number;
+  }> | undefined;
+  if (!modelUsage) return null;
+  const firstModel = Object.values(modelUsage)[0];
+  return firstModel?.cacheCreationInputTokens ?? null;
+}
+
+function formatContextPressure(tokens: number): string {
+  return `Context Pressure: ${Math.round(tokens / 1000)}k`;
+}
+
 function recordMetricsEvent(
   harness: Harness,
   event: Record<string, unknown>,
@@ -290,6 +309,11 @@ function recordMetricsEvent(
   const totalTokens = extractTotalTokens(harness, event);
   if (totalTokens !== null) {
     metrics.totalTokens = totalTokens;
+  }
+
+  const contextPressure = extractContextPressure(harness, event);
+  if (contextPressure !== null) {
+    metrics.contextPressure = contextPressure;
   }
 }
 
@@ -536,9 +560,13 @@ async function executeJob(
             exitForced: exitForced || undefined,
           });
           if (isChat && chatContext) {
-            const hint = exitForced
+            const pressureLine = metrics.contextPressure != null
+              ? formatContextPressure(metrics.contextPressure)
+              : undefined;
+            const forceKillLine = exitForced
               ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
               : undefined;
+            const hint = [pressureLine, forceKillLine].filter(Boolean).join("\n") || undefined;
             await saveChatResponse(chatContext.threadId, result, hint);
             if (sessionId) {
               await saveSessionId(chatContext.threadId, sessionId);
@@ -862,9 +890,13 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
             lastEventAt: metrics.lastEventAt ?? undefined,
             exitForced: exitForced || undefined,
           });
-          const hint = exitForced
+          const pressureLine = metrics.contextPressure != null
+            ? formatContextPressure(metrics.contextPressure)
+            : undefined;
+          const forceKillLine = exitForced
             ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
             : undefined;
+          const hint = [pressureLine, forceKillLine].filter(Boolean).join("\n") || undefined;
           await saveChatResponse(chatContext.threadId, result, hint);
           if (sessionId) {
             await saveSessionId(chatContext.threadId, sessionId);
