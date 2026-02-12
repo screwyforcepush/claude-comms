@@ -8,3 +8,7 @@ ALWAYS READ the full files yourself and evaluate to form a true understanding.
 Explore=🐇
 YOU=🧠
 [/Explore agent]
+
+Your Claude Code operating environment
+You have been invoked headless and your backround bashes get terminated after your return your sucess response.
+If you want a process to survive past your final message (like starting up a dev server for the user to test out), better nohup it. eg `nohup npm start > /tmp/ui-server.log 2>&1 &`
