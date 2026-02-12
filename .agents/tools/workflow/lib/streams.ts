@@ -14,6 +14,8 @@ export interface StreamHandler {
   onEvent(event: Record<string, unknown>): void;
   /** Get accumulated result text */
   getResult(): string;
+  /** Check if a terminal result event was observed (success or error) */
+  isTerminal(): boolean;
   /** Check if the stream indicates successful completion */
   isComplete(): boolean;
   /** Get session ID for resume functionality (Claude only) */
@@ -86,6 +88,10 @@ export class ClaudeStreamHandler implements StreamHandler {
     return this.finalResult || this.textChunks.join("\n\n");
   }
 
+  isTerminal(): boolean {
+    return this.complete;
+  }
+
   isComplete(): boolean {
     return this.complete && this.success;
   }
@@ -124,6 +130,10 @@ export class CodexStreamHandler implements StreamHandler {
 
   getResult(): string {
     return this.messages.join("\n\n");
+  }
+
+  isTerminal(): boolean {
+    return this.complete;
   }
 
   isComplete(): boolean {
@@ -167,6 +177,10 @@ export class GeminiStreamHandler implements StreamHandler {
 
   getResult(): string {
     return this.buffer;
+  }
+
+  isTerminal(): boolean {
+    return this.complete;
   }
 
   isComplete(): boolean {

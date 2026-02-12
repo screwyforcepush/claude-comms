@@ -93,6 +93,7 @@ export default defineSchema({
     subagentCount: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    exitForced: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_group", ["groupId"])
@@ -119,6 +120,7 @@ export default defineSchema({
     threadId: v.id("chatThreads"),
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("pm")),
     content: v.string(),
+    hint: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_thread", ["threadId"])
@@ -148,6 +150,7 @@ export default defineSchema({
     subagentCount: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    exitForced: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_namespace", ["namespaceId"])

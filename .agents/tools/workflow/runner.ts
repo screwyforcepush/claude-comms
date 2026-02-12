@@ -294,14 +294,16 @@ function recordMetricsEvent(
 }
 
 // Save assistant response to chat thread
-async function saveChatResponse(threadId: string, content: string): Promise<void> {
+async function saveChatResponse(threadId: string, content: string, hint?: string): Promise<void> {
   try {
-    await client!.mutation(api.chatMessages.add, {
+    const msg: Record<string, any> = {
       password: config.password,
       threadId: threadId as any,
       role: "assistant",
       content,
-    });
+    };
+    if (hint) msg.hint = hint;
+    await client!.mutation(api.chatMessages.add, msg);
     console.log(`[Chat] Saved assistant response to thread ${threadId}`);
   } catch (e) {
     console.error(`[Chat] Failed to save response:`, e);
@@ -520,7 +522,7 @@ async function executeJob(
         recordMetricsEvent(job.harness as Harness, event, metrics);
         ensureHeartbeat();
       },
-      onComplete: async (result, sessionId) => {
+      onComplete: async (result, sessionId, exitForced) => {
         stopHeartbeat();
         try {
           await client!.mutation(api.jobs.complete, {
@@ -531,9 +533,13 @@ async function executeJob(
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
+            exitForced: exitForced || undefined,
           });
           if (isChat && chatContext) {
-            await saveChatResponse(chatContext.threadId, result);
+            const hint = exitForced
+              ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
+              : undefined;
+            await saveChatResponse(chatContext.threadId, result, hint);
             if (sessionId) {
               await saveSessionId(chatContext.threadId, sessionId);
             }
@@ -544,7 +550,7 @@ async function executeJob(
           console.error(`[${jobId}] Error in onComplete:`, e);
         }
       },
-      onFail: async (reason, partialResult) => {
+      onFail: async (reason, partialResult, exitForced) => {
         stopHeartbeat();
         try {
           await client!.mutation(api.jobs.fail, {
@@ -555,10 +561,13 @@ async function executeJob(
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
+            exitForced: exitForced || undefined,
           });
           if (isChat && chatContext) {
-            await saveChatResponse(chatContext.threadId,
-              `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${partialResult || reason}`
+            await saveChatResponse(
+              chatContext.threadId,
+              partialResult || "",
+              `Agent failed (${reason}). Partial response shown above.`
             );
           } else {
             await handleGroupCompletion(group, assignment, true);
@@ -580,8 +589,10 @@ async function executeJob(
             lastEventAt: metrics.lastEventAt ?? undefined,
           });
           if (isChat && chatContext) {
-            await saveChatResponse(chatContext.threadId,
-              `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${partialResult || "(no output)"}`
+            await saveChatResponse(
+              chatContext.threadId,
+              partialResult || "",
+              `Agent timed out after ${Math.round(config.timeoutMs / 1000)}s. Partial response shown above.`
             );
           } else {
             await handleGroupCompletion(group, assignment, true);
@@ -838,7 +849,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
         recordMetricsEvent(chatJob.harness as Harness, event, metrics);
         ensureHeartbeat();
       },
-      onComplete: async (result, sessionId) => {
+      onComplete: async (result, sessionId, exitForced) => {
         stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.complete, {
@@ -849,8 +860,12 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
+            exitForced: exitForced || undefined,
           });
-          await saveChatResponse(chatContext.threadId, result);
+          const hint = exitForced
+            ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
+            : undefined;
+          await saveChatResponse(chatContext.threadId, result, hint);
           if (sessionId) {
             await saveSessionId(chatContext.threadId, sessionId);
           }
@@ -868,7 +883,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           }
         }
       },
-      onFail: async (reason, partialResult) => {
+      onFail: async (reason, partialResult, exitForced) => {
         stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.fail, {
@@ -879,9 +894,12 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
+            exitForced: exitForced || undefined,
           });
-          await saveChatResponse(chatContext.threadId,
-            `I encountered an issue while processing your request. Please try again or rephrase your question.\n\nError details: ${partialResult || reason}`
+          await saveChatResponse(
+            chatContext.threadId,
+            partialResult || "",
+            `Agent failed (${reason}). Partial response shown above.`
           );
         } catch (e) {
           console.error(`[${jobId}] Error in onFail:`, e);
@@ -899,8 +917,10 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
           });
-          await saveChatResponse(chatContext.threadId,
-            `I apologize, but I ran into a timeout. Here's what I was able to process:\n\n${partialResult || "(no output)"}`
+          await saveChatResponse(
+            chatContext.threadId,
+            partialResult || "",
+            `Agent timed out after ${Math.round(config.timeoutMs / 1000)}s. Partial response shown above.`
           );
         } catch (e) {
           console.error(`[${jobId}] Error in onTimeout:`, e);

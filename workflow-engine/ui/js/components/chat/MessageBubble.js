@@ -180,6 +180,22 @@ export function MessageBubble({ message, isLast = false }) {
           })
         ),
 
+        // Hint bar — system annotation beneath bubble
+        message.hint && React.createElement('div', {
+          className: 'message-hint flex items-center gap-1.5 mt-1 px-2 py-1',
+          style: {
+            fontSize: '11px',
+            fontFamily: 'var(--font-console)',
+            color: 'var(--q-torch)',
+            backgroundColor: 'rgba(212, 160, 48, 0.08)',
+            borderLeft: '2px solid var(--q-torch)',
+            letterSpacing: '0.3px',
+            lineHeight: '1.4',
+          }
+        },
+          React.createElement('span', null, message.hint)
+        ),
+
         // Timestamp - Q palette bone0
         message.createdAt && React.createElement('span', {
           className: 'text-xs mt-1 px-1',

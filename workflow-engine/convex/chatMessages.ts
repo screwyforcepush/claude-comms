@@ -24,6 +24,7 @@ export const add = mutation({
     threadId: v.id("chatThreads"),
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("pm")),
     content: v.string(),
+    hint: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -37,6 +38,7 @@ export const add = mutation({
       role: args.role,
       content: args.content,
       createdAt: now,
+      ...(args.hint ? { hint: args.hint } : {}),
     });
   },
 });

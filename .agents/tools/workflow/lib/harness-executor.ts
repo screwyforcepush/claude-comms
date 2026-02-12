@@ -51,10 +51,10 @@ export type Harness = "claude" | "codex" | "gemini";
 
 export interface ExecutionCallbacks {
   /** Called when job completes successfully */
-  onComplete: (result: string, sessionId?: string) => void;
+  onComplete: (result: string, sessionId?: string, exitForced?: boolean) => void;
   /** Called when job fails */
-  onFail: (reason: string, partialResult?: string) => void;
-  /** Called when job times out */
+  onFail: (reason: string, partialResult?: string, exitForced?: boolean) => void;
+  /** Called when job times out (max duration or idle timeout before terminal event) */
   onTimeout: (partialResult: string) => void;
   /** Optional: called for each event (for custom handling) */
   onEvent?: (event: Record<string, unknown>) => void;
@@ -370,6 +370,15 @@ export class HarnessExecutor {
       debounceMs: this.config.debounceMs,
     });
 
+    // 8. Set up state flags
+    let timedOut = false;
+    let idleTimedOut = false;
+    let spawnFailed = false;
+    let jobCompleted = false; // Set when terminal result event triggers completion
+
+    // Grace period before force-killing after terminal event (ms)
+    const TERMINAL_GRACE_MS = 2000;
+
     // Wire up event handling
     tailer.on("event", (event: Record<string, unknown>, _rawLine: string) => {
       handler.onEvent(event);
@@ -381,6 +390,46 @@ export class HarnessExecutor {
 
       // Call optional user callback
       callbacks.onEvent?.(event);
+
+      // Check for terminal result event — decouple completion from process exit
+      if (handler.isTerminal() && !jobCompleted) {
+        jobCompleted = true;
+
+        // Clear all timeouts — we're handling completion now
+        clearTimeout(timeout);
+        if (idleTimeout) clearTimeout(idleTimeout);
+
+        // Stop tailing — no further events needed
+        tailer.stop();
+
+        console.log(`[${jobId}] Terminal event received, waiting ${TERMINAL_GRACE_MS}ms for process exit`);
+
+        // Grace period: let the process exit naturally, then determine exitForced
+        setTimeout(() => {
+          const exitForced = child.exitCode === null;
+
+          if (exitForced) {
+            console.log(`[${jobId}] Process still alive after grace period, force killing`);
+            child.kill("SIGTERM");
+            setTimeout(() => {
+              if (child.exitCode === null) child.kill("SIGKILL");
+            }, 5000);
+          }
+
+          this.activeJobs.delete(jobId);
+
+          const result = handler.getResult();
+          if (handler.isComplete()) {
+            tracker.complete(result);
+            callbacks.onComplete(result, handler.getSessionId() || undefined, exitForced);
+          } else {
+            const failureReason = handler.getFailureReason();
+            const reason = failureReason || "terminal_error";
+            tracker.fail(reason);
+            callbacks.onFail(reason, result, exitForced);
+          }
+        }, TERMINAL_GRACE_MS);
+      }
     });
 
     tailer.on("position", (pos: number) => {
@@ -388,11 +437,6 @@ export class HarnessExecutor {
     });
 
     tailer.start();
-
-    // 8. Set up timeouts
-    let timedOut = false;
-    let idleTimedOut = false;
-    let spawnFailed = false;
 
     // Max duration timeout
     const timeout = setTimeout(() => {
@@ -441,17 +485,23 @@ export class HarnessExecutor {
       console.error(`[${jobId}] stderr: ${data.toString()}`);
     });
 
-    // 12. Handle process exit
+    // 11. Handle process exit
+    // When jobCompleted is set, the terminal event handler already handled
+    // completion — this becomes a no-op for callback purposes.
     child.on("close", async (code) => {
-      // If spawn failed, error handler already cleaned up
-      if (spawnFailed) return;
+      if (spawnFailed || jobCompleted) return;
 
       clearTimeout(timeout);
       if (idleTimeout) clearTimeout(idleTimeout);
 
       // Final flush to capture any remaining events
+      // NOTE: flush may process a terminal event, triggering the event handler
+      // which sets jobCompleted and starts its own grace period timer.
+      // Re-check jobCompleted after flush to avoid double-firing callbacks.
       await tailer.flush();
       tailer.stop();
+
+      if (jobCompleted) return;
 
       this.activeJobs.delete(jobId);
 
@@ -462,14 +512,14 @@ export class HarnessExecutor {
         callbacks.onTimeout(result || "(no output)");
       } else if (code === 0 && handler.isComplete()) {
         tracker.complete(result);
-        callbacks.onComplete(result, handler.getSessionId() || undefined);
+        callbacks.onComplete(result, handler.getSessionId() || undefined, false);
       } else {
         const failureReason = handler.getFailureReason();
         const reason = failureReason
           ? `process_exit_${code} (${failureReason})`
           : `process_exit_${code}`;
         tracker.fail(reason);
-        callbacks.onFail(reason, result);
+        callbacks.onFail(reason, result, false);
       }
     });
 

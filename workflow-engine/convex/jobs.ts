@@ -310,6 +310,7 @@ export const complete = mutation({
     subagentCount: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    exitForced: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -323,6 +324,7 @@ export const complete = mutation({
     if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
     if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
     if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    if (args.exitForced !== undefined) update.exitForced = args.exitForced;
     await ctx.db.patch(args.id, update);
 
     // Check if group is done and update status
@@ -342,6 +344,7 @@ export const fail = mutation({
     subagentCount: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    exitForced: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -355,6 +358,7 @@ export const fail = mutation({
     if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
     if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
     if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    if (args.exitForced !== undefined) update.exitForced = args.exitForced;
     await ctx.db.patch(args.id, update);
 
     // Check if group is done and update status
