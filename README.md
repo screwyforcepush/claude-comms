@@ -24,41 +24,21 @@ Context-engineered for extended battles without bankruptcy:
 
 
 ## 🚀 Quick Start
-
-```bash
-# 1. Clone this repo and start the system
-./scripts/start-system.sh
-# If this fails you probably need to bun install or whatever. Just ask claude code to sort it out.
-
-
-# 2. Use it in your project
-npx claude-comms # in your project root.
-# or copy CLAUDE.md and .claude directory to your projects
-
-# 3. Launch claude code in your project. --dangerously-skip-permissions if you like.
-
-# 4. prompt claude to get cookin: /cook <what you want to build, requirements spec, etc>
-/cook make a dashboard that for the real time event stream but style it like the matrix and populate the matrix characters with the event stream data
-
-# If you get stuck on anything, errors/issues just ask for help (this repo)
-/learn
-```
+Clone this repo and prompt claude command: `/cc3-server`
+Claude will sort you and and tell you what to do next.
 
 ### Level Up
-1. Observe `http://localhost:5173/`
-./scripts/restart-system.sh restarts everything and can clear the db
+1. **Model Diversity**: Install [Codex CLI](https://github.com/openai/codex) and [Gemini CLI](https://github.com/google-gemini/gemini-cli) for multi-model orchestration. The system can spawn Codex and Gemini consultants alongside Claude agents—different models checking each other's work, diverse perspectives on research tasks. See [Consultant Paradigm Guide](docs/project/guides/consultant-paradigm-guide.md).
 
-2. **Model Diversity**: Install [Codex CLI](https://github.com/openai/codex) and [Gemini CLI](https://github.com/google-gemini/gemini-cli) for multi-model orchestration. The system can spawn Codex and Gemini consultants alongside Claude agents—different models checking each other's work, diverse perspectives on research tasks. See [Consultant Paradigm Guide](docs/project/guides/consultant-paradigm-guide.md).
-
-3. Visual Feedback Loop - Add the feedback widget to your app for human-in-the-loop UI refinement:
+2. Visual Feedback Loop - Add the feedback widget to your app for human-in-the-loop UI refinement:
 - `/install-feedback-widget` - Installs annotated feedback widget in your project
 - `/feedback` - Review and action UI feedback (requires widget installation first)
 
-4. MCPs. Only one is worth the context fee - Web Research to make your claude code cap last 20% longer:
+3. MCPs. Only one is worth the context fee - Web Research to make your claude code cap last 20% longer:
 `claude mcp add perplexity-ask -- env PERPLEXITY_API_KEY=pplx-xxxx npx -y server-perplexity-ask` I've used $5 in a month and I'm a HEAVY user.
 Note: Browser automation is built-in via browsertools wrapper - you get Chrome DevTools benefits without the context bloat (progressive disclosure principle)!
 
-5. In this project prompt claude with `/learn`
+4. In this project prompt claude with `/learn`
 My man Deckard Cain will teach you everything I know.
 
 

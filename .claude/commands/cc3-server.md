@@ -125,4 +125,3 @@ For each project repo where the user wants to do work:
 
 - **Workflow UI** (http://localhost:3500): Create namespaces, chat threads, send messages to the PO agent, switch between jam/cook/guardian modes
 - **Observability Dashboard** (http://localhost:5173): Watch real-time agent activity, tool use, inter-agent messages
-- **CLI commands** in Claude Code: `/cook <objective>` to kick off work, `/learn` for guidance

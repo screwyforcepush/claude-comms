@@ -152,7 +152,6 @@ The client is now running and listening for jobs in the `<namespace>` namespace.
 
 **How to use it:**
 - Open the **Workflow Engine UI** (where the servers are running) to create threads, chat with the PO, and kick off work
-- Use `/cook <objective>` in Claude Code to start orchestrated work
 - Monitor agent execution with the TUI: `uv run .agents/tools/agent-job/agent_monitor.py`
 - Watch real-time observability at the **CC2 Dashboard** (http://localhost:5173)
 - Check runner logs: `tail -f /tmp/runner.log`
