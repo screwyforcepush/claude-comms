@@ -63,12 +63,12 @@ Types: `plan`, `implement`, `review`, `uat`, `document`.
 
 ## Complete (ONLY when north star is fully achieved)
 ```bash
-npx tsx .agents/tools/workflow/cli.ts complete
+npx tsx .agents/tools/workflow/cli.ts update-assignment --status complete
 ```
 
 ## Block (when human decision needed)
 ```bash
-npx tsx .agents/tools/workflow/cli.ts block --reason "Specific decision needed from human: [question]"
+npx tsx .agents/tools/workflow/cli.ts update-assignment --status blocked --reason "Specific decision needed from human: [question]"
 ```
 
 ---

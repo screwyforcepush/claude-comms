@@ -50,10 +50,10 @@ Respond with **ONE** of:
 npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --alignment <aligned|uncertain|misaligned>
 
 # Block assignment (required for misaligned)
-npx tsx .agents/tools/workflow/cli.ts block {{ASSIGNMENT_ID}} --reason "..."
+npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --status blocked --reason "..."
 
 # Unblock assignment (after user confirms resolution)
-npx tsx .agents/tools/workflow/cli.ts unblock {{ASSIGNMENT_ID}}
+npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --status active
 ```
 
 ### Conversation

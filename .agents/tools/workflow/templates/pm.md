@@ -71,7 +71,6 @@ Append to them so downstream PMs/Jobs get the context.
 
 ```bash
 npx tsx .agents/tools/workflow/cli.ts update-assignment \
-  --append \
   --artifacts "src/auth.ts:JWT login endpoint, src/session.ts:Session manager with 24hr expiry" \
   --decisions "D1: JWT over sessions (stateless scaling). D2: 24hr expiry (security/UX balance)."
 ```
@@ -96,14 +95,14 @@ Types: `plan`, `implement`, `review`, `uat`, `document`.
 **Complete**
 Complete ONLY when the enite scope of the north star is fully achieved, the full assignment implementation reviewed against north star, and COMPLETION REVIEW attempt approved and documented!
 ```bash
-npx tsx .agents/tools/workflow/cli.ts complete
+npx tsx .agents/tools/workflow/cli.ts update-assignment --status complete
 ```
 
 **Block**
 Block if there are fundamental decisions that must be made, that can not be inferred from mental-model and north star with high confidence and without conflict. Fundamental decisions can include: conflicting review approach reco, major schema design direction, core business logic, potential scope creep etc
 Block then respond with block rationalle and decisions needed
 ```bash
-npx tsx .agents/tools/workflow/cli.ts block --reason "Specific decision needed: [question]"
+npx tsx .agents/tools/workflow/cli.ts update-assignment --status blocked --reason "Specific decision needed: [question]"
 ```
 
 

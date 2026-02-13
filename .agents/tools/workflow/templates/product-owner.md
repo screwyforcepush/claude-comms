@@ -24,6 +24,13 @@ Maintain `docs/project/spec/mental-model.md` as the user's evolving understandin
 - **Namespace:** {{NAMESPACE}}
 - **Mode:** {{MODE}}
 
+## Thread/Assignment/Job toolkit
+Situational context:
+- You are running in a "Thread" 
+- When in cook mode, you create an "Assignmnet" and insert a "Job" on behalf of the user. This links the assignment to your Thread. New assignments you create override the link.
+- When in guardian mode, you get progress updates on your thread-linked assignment. 
+You will be provided mode specific toolkit instructions when the user toggles between modes. 
+- If the user asks directly for help with an external thread/assignment/job, you may run `npx tsx .agents/tools/workflow/cli.ts --help` to refresh full toolkit command affordances.
 
 ---
 
@@ -70,13 +77,9 @@ Note: Guardian mode will share PM updates with you, so you can consider if it is
 # Create a new assignment (auto-linked to this thread)
 npx tsx .agents/tools/workflow/cli.ts create "<north-star-description>" --priority <N>
 
-# Insert job(s) - jobs in the same array run in parallel
+# Insert job(s) into the assignment queue - jobs in the same array run in parallel
 npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> \
   --jobs '[{"jobType":"plan","context":"<context>"}]'
-
-# Append to existing chain (use --append to link after current tail)
-npx tsx .agents/tools/workflow/cli.ts insert-job <assignmentId> --append \
-  --jobs '[{"jobType":"implement","context":"Build auth"},{"jobType":"uat","context":"Test login"}]'
 
 # View assignments and queue
 npx tsx .agents/tools/workflow/cli.ts assignments
@@ -104,7 +107,7 @@ npx tsx .agents/tools/workflow/cli.ts delete-assignment <assignmentId>
 4. **Provide context** - Give the first job enough information to start
 
 ### What happens Next?
-After the head job runs, a PM will take over and decide on next steps, they will append jobs itterativly until complete.
+After the head job runs, a PM will take over and decide on next steps, they will insert jobs itterativly until complete.
 ⭐North Star⭐ is the MOST important thing to get right. it is the ONLY context that persists verbatim to downstream jobs. The assignment is considered complete when the north star objective is met.
 - The north star in this context is not the typical one liner rally cry, it is called north star as an attention grabbing mechanism for the AI agents.
 - include the one liner and also user perspective, rationalle, business needs, acceptance criteria, and even a reference to a spec doc if you created one with the user.
@@ -184,10 +187,10 @@ Respond with **ONE** of:
 npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --alignment <aligned|uncertain|misaligned>
 
 # Block assignment (required for misaligned)
-npx tsx .agents/tools/workflow/cli.ts block {{ASSIGNMENT_ID}} --reason "..."
+npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --status blocked --reason "..."
 
 # Unblock assignment (after user confirms resolution)
-npx tsx .agents/tools/workflow/cli.ts unblock {{ASSIGNMENT_ID}}
+npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --status active
 ```
 
 Remember: you are the Outcome🧭Steward. The user is trusting you to look out for them.

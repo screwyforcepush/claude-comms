@@ -17,26 +17,25 @@
  *   npx tsx cli.ts <command> [args]
  *
  * Commands:
+ *   help                                Show this usage information
  *   assignments [--status <status>]     List assignments
  *   assignment <id>                     Get assignment details with groups
  *   groups [--status <status>]          List job groups
  *   group <id>                          Get group details with jobs
- *   jobs [--status <status>]            List jobs
+ *   jobs [--status <status>] [--group <groupId>] [--assignment <assignmentId>]   List jobs
  *   job <id>                            Get job details
  *   queue                               Show queue status
  *
  *   create <northStar> [--priority N] [--independent] [--thread <threadId>]   Create assignment
- *   insert-job [assignmentId] [--type <type>] [--jobs <json>] [--harness <harness>] [--context <ctx>] [--after <groupId>] [--append]
+ *   insert-job [assignmentId] [--type <type>] [--jobs <json>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
  *              assignmentId defaults to WORKFLOW_ASSIGNMENT_ID
  *              --jobs: JSON array of job definitions: [{"jobType":"review"},{"jobType":"implement","harness":"codex"}]
  *                      Jobs in the same group run in parallel and share a groupId
  *              --type: single job type (shorthand for --jobs with one entry)
- *              --after defaults to WORKFLOW_GROUP_ID (auto-links in job context)
- *              --append finds tail group and links there (for PO adding to existing chain)
- *   update-assignment [id] [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
- *   complete [assignmentId]             Mark assignment complete
- *   block [assignmentId] --reason <str> Block assignment
- *   unblock [assignmentId]              Unblock assignment
+ *              --after defaults to WORKFLOW_GROUP_ID, then auto-finds tail group of assignment
+ *   update-assignment [id] [--status <pending|active|blocked|complete>] [--reason <str>]
+ *                          [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
+ *              --reason required when setting status to blocked
  *   delete-assignment <id>              Delete assignment and all its groups/jobs
  *
  *   start-job <jobId>                   Mark job as running
@@ -148,6 +147,44 @@ function error(message: string): never {
   process.exit(1);
 }
 
+// Accepted flags per command (for validation — unknown flags are rejected)
+const COMMAND_FLAGS: Record<string, string[]> = {
+  help: [],
+  assignments: ["status"],
+  assignment: [],
+  groups: ["status", "assignment"],
+  group: [],
+  jobs: ["status", "group", "assignment"],
+  job: [],
+  queue: [],
+  create: ["priority", "independent", "thread"],
+  "insert-job": ["type", "jobs", "harness", "context", "after"],
+  "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason"],
+  "delete-assignment": [],
+  "start-job": [],
+  "complete-job": ["result"],
+  "fail-job": ["result"],
+  "chat-threads": [],
+  "chat-thread": [],
+  "chat-create": ["title"],
+  "chat-send": ["harness"],
+  "chat-mode": ["assignment"],
+  "chat-title": [],
+};
+
+function validateFlags(command: string, flags: Record<string, string>) {
+  const accepted = COMMAND_FLAGS[command];
+  if (!accepted) return; // unknown command handled elsewhere
+
+  const unknown = Object.keys(flags).filter((f) => !accepted.includes(f));
+  if (unknown.length > 0) {
+    const accepted_str = accepted.length > 0
+      ? `Accepted flags: --${accepted.join(", --")}`
+      : "This command accepts no flags.";
+    error(`Unknown flag${unknown.length > 1 ? "s" : ""} "${unknown.map(f => `--${f}`).join(", ")}" for command "${command}". ${accepted_str}`);
+  }
+}
+
 // Commands
 async function listAssignments(status?: string) {
   const validStatuses = ["pending", "active", "blocked", "complete"];
@@ -196,10 +233,29 @@ async function getGroup(id: string) {
   output(result);
 }
 
-async function listJobs(status?: string, groupId?: string) {
+async function listJobs(status?: string, groupId?: string, assignmentId?: string) {
   const validStatuses = ["pending", "running", "complete", "failed"];
   if (status && !validStatuses.includes(status)) {
     error(`Invalid status. Must be one of: ${validStatuses.join(", ")}`);
+  }
+
+  // Assignment-scoped: get groups for assignment, then jobs for each group
+  if (assignmentId) {
+    const groups = await client.query(api.jobs.listGroups, {
+      password: config.password,
+      assignmentId: assignmentId as Id<"assignments">,
+    });
+    let allJobs: any[] = [];
+    for (const group of groups) {
+      const jobs = await client.query(api.jobs.list, {
+        password: config.password,
+        groupId: group._id as Id<"jobGroups">,
+        status: status as any,
+      });
+      allJobs.push(...jobs);
+    }
+    output(allJobs);
+    return;
   }
 
   const result = await client.query(api.jobs.list, {
@@ -267,7 +323,7 @@ async function createAssignment(
   }
 }
 
-// Find the tail group of an assignment (for --append)
+// Find the tail group of an assignment (last in chain, no nextGroupId)
 async function findTailGroup(assignmentId: string): Promise<string | null> {
   const assignment = await client.query(api.assignments.get, {
     password: config.password,
@@ -342,7 +398,6 @@ async function insertJobs(
   assignmentId: string,
   jobs: JobDefInput[],
   afterGroupId?: string,
-  append?: boolean
 ) {
   if (jobs.length === 0) {
     error("At least one job required");
@@ -358,11 +413,23 @@ async function insertJobs(
     }
   }
 
-  // Determine effective afterGroupId
+  // Check assignment status and warn if not active/pending
+  const assignment = await client.query(api.assignments.get, {
+    password: config.password,
+    id: assignmentId as Id<"assignments">,
+  });
+  let warning: string | undefined;
+  if (assignment && assignment.status !== "active" && assignment.status !== "pending") {
+    warning = `Warning: Assignment ${assignmentId.slice(-8)} has status "${assignment.status}". Jobs will not run until assignment status is set to active.`;
+  }
+
+  // Determine effective afterGroupId:
+  // 1. Explicit --after flag
+  // 2. WORKFLOW_GROUP_ID env var (set in runner context)
+  // 3. Auto-find tail group of assignment
   let effectiveAfterGroupId = afterGroupId;
 
-  if (append && !effectiveAfterGroupId) {
-    // --append: find tail group and insert after it
+  if (!effectiveAfterGroupId) {
     effectiveAfterGroupId = await findTailGroup(assignmentId) || undefined;
   }
 
@@ -385,23 +452,36 @@ async function insertJobs(
     linkInfo = "created as head group";
   }
 
-  output({
+  const out: any = {
     groupId: result.groupId,
     jobIds: result.jobIds,
     jobs: expandedJobs.map(j => ({ jobType: j.jobType, harness: j.harness })),
     message: `Group ${linkInfo} with ${result.jobIds.length} job(s)`,
-  });
+  };
+  if (warning) out.warning = warning;
+  output(out);
 }
 
 async function updateAssignment(
   id: string,
   artifacts?: string,
   decisions?: string,
-  alignment?: string
+  alignment?: string,
+  status?: string,
+  reason?: string
 ) {
   const validAlignments = ["aligned", "uncertain", "misaligned"];
   if (alignment && !validAlignments.includes(alignment)) {
-    error(`Invalid alignment status. Must be one of: ${validAlignments.join(", ")}`);
+    error(`Invalid alignment. Must be one of: ${validAlignments.join(", ")}`);
+  }
+
+  const validStatuses = ["pending", "active", "blocked", "complete"];
+  if (status && !validStatuses.includes(status)) {
+    error(`Invalid status. Must be one of: ${validStatuses.join(", ")}`);
+  }
+
+  if (status === "blocked" && !reason) {
+    error("--reason required when setting status to blocked");
   }
 
   const appendField = (base: string | undefined, addition?: string): string | undefined => {
@@ -420,33 +500,10 @@ async function updateAssignment(
     artifacts: appendField(baseArtifacts, artifacts),
     decisions: appendField(baseDecisions, decisions),
     alignmentStatus: alignment as "aligned" | "uncertain" | "misaligned" | undefined,
+    status: status as "pending" | "active" | "blocked" | "complete" | undefined,
+    blockedReason: status === "blocked" ? reason : undefined,
   });
   output({ message: "Assignment updated" });
-}
-
-async function completeAssignment(id: string) {
-  await client.mutation(api.assignments.complete, {
-    password: config.password,
-    id: id as Id<"assignments">,
-  });
-  output({ message: "Assignment completed" });
-}
-
-async function blockAssignment(id: string, reason: string) {
-  await client.mutation(api.assignments.block, {
-    password: config.password,
-    id: id as Id<"assignments">,
-    reason,
-  });
-  output({ message: "Assignment blocked" });
-}
-
-async function unblockAssignment(id: string) {
-  await client.mutation(api.assignments.unblock, {
-    password: config.password,
-    id: id as Id<"assignments">,
-  });
-  output({ message: "Assignment unblocked" });
 }
 
 async function deleteAssignment(id: string) {
@@ -589,15 +646,72 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
   });
 }
 
+// Help text
+const USAGE = `Workflow Engine CLI
+
+Commands:
+  help                                Show this usage information
+  assignments [--status <status>]     List assignments
+  assignment <id>                     Get assignment details with groups
+  groups [--status <status>]          List job groups
+  group <id>                          Get group details with jobs
+  jobs [--status <status>] [--group <groupId>] [--assignment <assignmentId>]
+                                      List jobs (filterable by status, group, or assignment)
+  job <id>                            Get job details
+  queue                               Show queue status
+
+  create <northStar> [--priority N] [--independent] [--thread <threadId>]
+                                      Create assignment
+  insert-job [assignmentId] [--type <type>] [--jobs <json>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
+              assignmentId defaults to WORKFLOW_ASSIGNMENT_ID
+              --jobs: JSON array [{\"jobType\":\"review\"},{\"jobType\":\"implement\",\"harness\":\"codex\"}]
+              --type: single job type (shorthand for --jobs with one entry)
+              --after defaults to WORKFLOW_GROUP_ID, then auto-finds tail group
+  update-assignment [id] [--status <pending|active|blocked|complete>] [--reason <str>]
+                         [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
+              --reason required when setting status to blocked
+  delete-assignment <id>              Delete assignment and all its groups/jobs
+
+  start-job <jobId>                   Mark job as running
+  complete-job <jobId> --result <str> Mark job as complete
+  fail-job <jobId> [--result <str>]   Mark job as failed
+
+Chat Commands:
+  chat-threads                        List chat threads
+  chat-thread <threadId>              Get thread with messages
+  chat-create [--title <title>]       Create a new chat thread
+  chat-send <threadId> <message>      Send message and create chat job
+  chat-mode <threadId> <jam|cook|guardian> [--assignment <id>]  Change thread mode
+  chat-title <threadId> <title>       Update thread title
+
+Environment Variables (auto-set by runner):
+  WORKFLOW_ASSIGNMENT_ID   Default assignment for commands
+  WORKFLOW_GROUP_ID        Default --after for insert-job
+  WORKFLOW_JOB_ID          Current job
+  WORKFLOW_THREAD_ID       Auto-link thread for create
+  WORKFLOW_ARTIFACTS       Append base for update-assignment --artifacts
+  WORKFLOW_DECISIONS       Append base for update-assignment --decisions`;
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    error("No command provided. Use --help for usage.");
+    console.log(USAGE);
+    process.exit(0);
   }
 
   const command = args[0];
+
+  // Handle --help anywhere
+  if (command === "--help" || command === "help") {
+    console.log(USAGE);
+    process.exit(0);
+  }
+
   const { flags, positional } = parseArgs(args.slice(1));
+
+  // Validate flags before executing command
+  validateFlags(command, flags);
 
   try {
     switch (command) {
@@ -620,7 +734,7 @@ async function main() {
         break;
 
       case "jobs":
-        await listJobs(flags.status, flags.group);
+        await listJobs(flags.status, flags.group, flags.assignment);
         break;
 
       case "job":
@@ -647,15 +761,13 @@ async function main() {
         const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
         if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
 
-        // After group ID: --after flag > env var (auto-link in job context)
+        // After group ID: --after flag > env var > auto-find tail
         const afterGroupId = flags.after || process.env.WORKFLOW_GROUP_ID;
 
         // Build jobs array - either from --jobs JSON or from --type (single job)
-        // Keep harness undefined to allow expandJobs() to handle auto-expansion
         let jobs: JobDefInput[];
 
         if (flags.jobs) {
-          // Parse JSON array of jobs: [{"jobType":"review","harness":"claude"},...]
           try {
             const parsed = JSON.parse(flags.jobs);
             if (!Array.isArray(parsed)) {
@@ -663,14 +775,13 @@ async function main() {
             }
             jobs = parsed.map((j: any) => ({
               jobType: j.jobType,
-              harness: j.harness, // Don't apply default - let expandJobs handle it
+              harness: j.harness,
               context: j.context,
             }));
           } catch (e) {
             error(`Invalid --jobs JSON: ${e instanceof Error ? e.message : String(e)}`);
           }
         } else if (flags.type) {
-          // Single job via --type (backward compatible)
           jobs = [{
             jobType: flags.type,
             harness: flags.harness as "claude" | "codex" | "gemini" | undefined,
@@ -680,41 +791,21 @@ async function main() {
           error("Either --jobs (JSON array) or --type required");
         }
 
-        await insertJobs(
-          assignmentId,
-          jobs,
-          afterGroupId,
-          flags.append === "true"
-        );
+        await insertJobs(assignmentId, jobs, afterGroupId);
         break;
       }
 
       case "update-assignment": {
         const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
         if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
-        await updateAssignment(assignmentId, flags.artifacts, flags.decisions, flags.alignment);
-        break;
-      }
-
-      case "complete": {
-        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
-        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
-        await completeAssignment(assignmentId);
-        break;
-      }
-
-      case "block": {
-        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
-        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
-        if (!flags.reason) error("--reason required");
-        await blockAssignment(assignmentId, flags.reason);
-        break;
-      }
-
-      case "unblock": {
-        const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
-        if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
-        await unblockAssignment(assignmentId);
+        await updateAssignment(
+          assignmentId,
+          flags.artifacts,
+          flags.decisions,
+          flags.alignment,
+          flags.status,
+          flags.reason
+        );
         break;
       }
 
@@ -773,7 +864,7 @@ async function main() {
         break;
 
       default:
-        error(`Unknown command: ${command}`);
+        error(`Unknown command: ${command}. Run "help" for usage.`);
     }
   } catch (e) {
     error(e instanceof Error ? e.message : String(e));

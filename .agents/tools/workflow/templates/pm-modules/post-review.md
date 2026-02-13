@@ -17,18 +17,18 @@ evaluate in order
 
 3. Else If(high-severity issues have a clear optimal solution and reviewers concur):
    → high-severity issues must be handled explicitly.
-   → Append a new **{{P1_JOB_TYPE}}** job to address/refine
+   → insert a new **{{P1_JOB_TYPE}}** job to address/refine
 
 4. Else If(issues that Must Be Addressed are medium/low/minor):{
-   → If(R-1 == plan): update the plan doc yourself, then append **implement**
-   → Else: append **implement** to address items, and (if there is more to be done to achive full North Star Scope) also instruct implementation of the next vertical slice .
+   → If(R-1 == plan): update the plan doc yourself, then insert **implement**
+   → Else: insert **implement** to address items, and (if there is more to be done to achive full North Star Scope) also instruct implementation of the next vertical slice .
 }
 
 5. Else If(NO issues that Must Be Addressed AND reviewers (and UAT, if present) approve):{
    → Determine what the next step is to progress towart North Star. 
    → Think through what is the next vertical slice that must be implemented.
-   → If(you beleive full North Star scope is already achieved): append a COMPLETION REVIEW attempt job group of **review**, **document**, and (if frontend impact) **uat**. include in context "COMPLETION REVIEW" and instruct to assess the entire Assignment delivery against the full North Star scope.
-   → Else: append **implement** to execute the next vertical slice (or the remainder of the Assignment North Star spec in preperation for COMPLETION REVIEW) 
+   → If(you beleive full North Star scope is already achieved): insert a COMPLETION REVIEW attempt job group of **review**, **document**, and (if frontend impact) **uat**. include in context "COMPLETION REVIEW" and instruct to assess the entire Assignment delivery against the full North Star scope.
+   → Else: insert **implement** to execute the next vertical slice (or the remainder of the Assignment North Star spec in preperation for COMPLETION REVIEW) 
 }
 [/DecisionLogic]
 

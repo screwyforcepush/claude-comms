@@ -107,9 +107,9 @@ cli.ts job <id>                       # Job details
 # Mutations
 cli.ts create "<north_star>"          # New assignment
 cli.ts insert-job <aid> --type X --harness Y --context "Z"
-cli.ts complete <aid>                 # Mark done
-cli.ts block <aid> --reason "..."     # Escalate to human
-cli.ts unblock <aid>                  # Resume
+cli.ts update-assignment <aid> --status complete         # Mark done
+cli.ts update-assignment <aid> --status blocked --reason "..."  # Escalate to human
+cli.ts update-assignment <aid> --status active           # Resume
 ```
 
 ## Config

@@ -109,13 +109,13 @@ cli.ts update-assignment <id> \
   [--decisions "decision text"]
 
 # Complete assignment
-cli.ts complete <assignment_id>
+cli.ts update-assignment <assignment_id> --status complete
 
 # Block assignment
-cli.ts block <assignment_id> --reason "why"
+cli.ts update-assignment <assignment_id> --status blocked --reason "why"
 
-# Unblock assignment
-cli.ts unblock <assignment_id>
+# Reopen / unblock assignment
+cli.ts update-assignment <assignment_id> --status active
 
 # Job status updates (typically used by runner)
 cli.ts start-job <job_id>
