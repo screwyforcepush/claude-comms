@@ -24,7 +24,9 @@ Context-engineered for extended battles without bankruptcy:
 
 
 ## 🚀 Quick Start
-Clone this repo and prompt claude command: `/cc3-server`
+------------------------------------------------------------------
+---- Clone this repo and prompt claude command: `/cc3-server` ----
+------------------------------------------------------------------
 Claude will sort you and and tell you what to do next.
 
 ### Level Up
