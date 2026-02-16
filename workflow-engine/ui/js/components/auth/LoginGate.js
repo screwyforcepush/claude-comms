@@ -10,7 +10,7 @@ const CONVEX_URL_KEY = 'convexUrl';
 export function LoginGate({ children }) {
   const [password, setPassword] = useState(() => {
     try {
-      return sessionStorage.getItem(PASSWORD_KEY);
+      return localStorage.getItem(PASSWORD_KEY);
     } catch {
       return null;
     }
@@ -36,7 +36,7 @@ export function LoginGate({ children }) {
     // Credentials valid — persist
     try {
       localStorage.setItem(CONVEX_URL_KEY, url);
-      sessionStorage.setItem(PASSWORD_KEY, pwd);
+      localStorage.setItem(PASSWORD_KEY, pwd);
     } catch {
       // Ignore storage errors
     }
@@ -64,7 +64,7 @@ export function LoginGate({ children }) {
 
 export function logout() {
   try {
-    sessionStorage.removeItem(PASSWORD_KEY);
+    localStorage.removeItem(PASSWORD_KEY);
   } catch {
     // Ignore
   }

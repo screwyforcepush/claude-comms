@@ -244,6 +244,24 @@ function AppLayout() {
     setMobileDrawerOpen(false);
   }, []);
 
+  // Mobile back button: close all drawers/panes instead of leaving app
+  const [mobileBackTrigger, setMobileBackTrigger] = useState(0);
+
+  useEffect(() => {
+    if (!responsive.isMobile) return;
+
+    history.pushState(null, '');
+
+    const handlePopState = () => {
+      setMobileDrawerOpen(false);
+      setMobileBackTrigger(c => c + 1);
+      history.pushState(null, '');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [responsive.isMobile]);
+
   // Render main content - ChatPanel when namespace selected, WelcomeContent otherwise
   const renderMainContent = () => {
     if (!selectedNamespace) {
@@ -254,7 +272,8 @@ function AppLayout() {
       namespaceId: selectedNamespace._id,
       namespaceName: selectedNamespace.name,
       responsive: responsive,
-      onOpenNamespaceDrawer: handleToggleMobileDrawer
+      onOpenNamespaceDrawer: handleToggleMobileDrawer,
+      mobileBackTrigger: mobileBackTrigger
     });
   };
 

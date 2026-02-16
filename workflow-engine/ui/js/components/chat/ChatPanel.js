@@ -252,7 +252,7 @@ function MobileChatHeader({
  * @param {Object} props.responsive - Responsive mode info (optional, for WP-5)
  * @param {Function} props.onOpenNamespaceDrawer - Callback to open namespace sidebar drawer (mobile)
  */
-export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamespaceDrawer }) {
+export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamespaceDrawer, mobileBackTrigger }) {
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -265,6 +265,14 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
 
   // Assignment pane state (lifted from ChatView for mobile header access)
   const [paneOpen, setPaneOpen] = useState(getInitialPaneOpen);
+
+  // Mobile back button: close all panes when triggered from AppLayout
+  useEffect(() => {
+    if (mobileBackTrigger > 0) {
+      setThreadsMobileOpen(false);
+      setPaneOpen(false);
+    }
+  }, [mobileBackTrigger]);
 
   // Fetch threads for this namespace
   const { data: threads, loading: loadingThreads } = useQuery(
