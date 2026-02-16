@@ -111,6 +111,7 @@ export class ClaudeStreamHandler implements StreamHandler {
 
 export class CodexStreamHandler implements StreamHandler {
   private messages: string[] = [];
+  private lastMessage: string | null = null;
   private complete = false;
 
   onEvent(event: Record<string, unknown>): void {
@@ -120,6 +121,7 @@ export class CodexStreamHandler implements StreamHandler {
       const item = event.item as { type?: string; text?: string } | undefined;
       if (item?.type === "agent_message" && item.text) {
         this.messages.push(item.text);
+        this.lastMessage = item.text;
       }
     }
 
@@ -129,7 +131,8 @@ export class CodexStreamHandler implements StreamHandler {
   }
 
   getResult(): string {
-    return this.messages.join("\n\n");
+    // Prefer the final agent_message, fall back to all accumulated messages
+    return this.lastMessage || this.messages.join("\n\n");
   }
 
   isTerminal(): boolean {
@@ -155,6 +158,7 @@ export class CodexStreamHandler implements StreamHandler {
 
 export class GeminiStreamHandler implements StreamHandler {
   private buffer = "";
+  private currentTurnBuffer = "";
   private complete = false;
   private failureReason: string | null = null;
 
@@ -163,7 +167,15 @@ export class GeminiStreamHandler implements StreamHandler {
 
     if (type === "message" && event.role === "assistant") {
       const content = event.content as string | undefined;
-      if (content) this.buffer += content;
+      if (content) {
+        this.buffer += content;
+        this.currentTurnBuffer += content;
+      }
+    }
+
+    // tool_use marks a turn boundary — next assistant messages are a new turn
+    if (type === "tool_use") {
+      this.currentTurnBuffer = "";
     }
 
     if (type === "result") {
@@ -176,7 +188,8 @@ export class GeminiStreamHandler implements StreamHandler {
   }
 
   getResult(): string {
-    return this.buffer;
+    // Prefer the last assistant turn, fall back to full accumulated buffer
+    return this.currentTurnBuffer || this.buffer;
   }
 
   isTerminal(): boolean {
