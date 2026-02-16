@@ -25,6 +25,16 @@ function useGroupJobs(chainGroups) {
   const g7 = chainGroups[7];
   const g8 = chainGroups[8];
   const g9 = chainGroups[9];
+  const g10 = chainGroups[10];
+  const g11 = chainGroups[11];
+  const g12 = chainGroups[12];
+  const g13 = chainGroups[13];
+  const g14 = chainGroups[14];
+  const g15 = chainGroups[15];
+  const g16 = chainGroups[16];
+  const g17 = chainGroups[17];
+  const g18 = chainGroups[18];
+  const g19 = chainGroups[19];
 
   const r0 = useQuery(g0 ? api.jobs.list : null, g0 ? { groupId: g0._id } : {});
   const r1 = useQuery(g1 ? api.jobs.list : null, g1 ? { groupId: g1._id } : {});
@@ -36,12 +46,22 @@ function useGroupJobs(chainGroups) {
   const r7 = useQuery(g7 ? api.jobs.list : null, g7 ? { groupId: g7._id } : {});
   const r8 = useQuery(g8 ? api.jobs.list : null, g8 ? { groupId: g8._id } : {});
   const r9 = useQuery(g9 ? api.jobs.list : null, g9 ? { groupId: g9._id } : {});
+  const r10 = useQuery(g10 ? api.jobs.list : null, g10 ? { groupId: g10._id } : {});
+  const r11 = useQuery(g11 ? api.jobs.list : null, g11 ? { groupId: g11._id } : {});
+  const r12 = useQuery(g12 ? api.jobs.list : null, g12 ? { groupId: g12._id } : {});
+  const r13 = useQuery(g13 ? api.jobs.list : null, g13 ? { groupId: g13._id } : {});
+  const r14 = useQuery(g14 ? api.jobs.list : null, g14 ? { groupId: g14._id } : {});
+  const r15 = useQuery(g15 ? api.jobs.list : null, g15 ? { groupId: g15._id } : {});
+  const r16 = useQuery(g16 ? api.jobs.list : null, g16 ? { groupId: g16._id } : {});
+  const r17 = useQuery(g17 ? api.jobs.list : null, g17 ? { groupId: g17._id } : {});
+  const r18 = useQuery(g18 ? api.jobs.list : null, g18 ? { groupId: g18._id } : {});
+  const r19 = useQuery(g19 ? api.jobs.list : null, g19 ? { groupId: g19._id } : {});
 
-  const results = [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9];
+  const results = [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19];
 
   return useMemo(() => {
     return chainGroups.map((group, i) => {
-      if (i >= 10) return { ...group, jobs: [] };
+      if (i >= 20) return { ...group, jobs: [] };
       return { ...group, jobs: results[i]?.data || [] };
     });
   }, [chainGroups, ...results.map(r => r.data)]);

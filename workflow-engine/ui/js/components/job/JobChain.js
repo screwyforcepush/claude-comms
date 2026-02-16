@@ -999,11 +999,14 @@ function GroupRow({ group, selectedJobId, onJobSelect, now }) {
  * Main group chain - renders groups vertically with connectors between
  */
 function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
+  // Filter out groups with no jobs (e.g., beyond subscription limit)
+  const validGroups = groups.filter(g => g.jobs && g.jobs.length > 0);
+
   return React.createElement('div', {
     className: 'flex flex-col items-center'
   },
-    groups.map((group, index) => {
-      const prevGroup = groups[index - 1];
+    validGroups.map((group, index) => {
+      const prevGroup = validGroups[index - 1];
       const prevJobCount = prevGroup?.jobs?.length || 0;
       const currentJobCount = group.jobs?.length || 0;
 
