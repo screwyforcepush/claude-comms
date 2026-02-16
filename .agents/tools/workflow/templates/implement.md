@@ -35,6 +35,7 @@ You must **launch batches of concurrent engineer agents** to execute independent
 - Target one coherent work package per engineer.
 - Include explicit success criteria and required files to read first.
 - Coordinate to avoid conflicts and rework.
+- When tasking agents, never background them. have them run in the foreground! `run_in_background: false`
 
 Continue batching engineers until done!
 
