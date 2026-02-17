@@ -215,17 +215,15 @@ function extractTotalTokens(
 ): number | null {
   const type = event.type as string | undefined;
   if (harness === "claude" && type === "result") {
-    const modelUsage = event.modelUsage as Record<string, {
-      inputTokens?: number;
-      outputTokens?: number;
-      cacheCreationInputTokens?: number;
-    }> | undefined;
-    if (modelUsage) {
-      let total = 0;
-      for (const model of Object.values(modelUsage)) {
-        total += (model.inputTokens ?? 0) + (model.outputTokens ?? 0) + (model.cacheCreationInputTokens ?? 0);
-      }
-      return total;
+    const usage = event.usage as {
+      input_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    } | undefined;
+    if (usage) {
+      return (usage.input_tokens ?? 0)
+        + (usage.cache_creation_input_tokens ?? 0)
+        + (usage.cache_read_input_tokens ?? 0);
     }
   }
 

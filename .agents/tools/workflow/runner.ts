@@ -220,17 +220,15 @@ function extractTotalTokens(
 ): number | null {
   const type = event.type as string | undefined;
   if (harness === "claude" && type === "result") {
-    const modelUsage = event.modelUsage as Record<string, {
-      inputTokens?: number;
-      outputTokens?: number;
-      cacheCreationInputTokens?: number;
-    }> | undefined;
-    if (modelUsage) {
-      let total = 0;
-      for (const model of Object.values(modelUsage)) {
-        total += (model.inputTokens ?? 0) + (model.outputTokens ?? 0) + (model.cacheCreationInputTokens ?? 0);
-      }
-      return total;
+    const usage = event.usage as {
+      input_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    } | undefined;
+    if (usage) {
+      return (usage.input_tokens ?? 0)
+        + (usage.cache_creation_input_tokens ?? 0)
+        + (usage.cache_read_input_tokens ?? 0);
     }
   }
 
@@ -260,13 +258,8 @@ function extractContextPressure(
   harness: Harness,
   event: Record<string, unknown>
 ): number | null {
-  if (harness !== "claude" || (event.type as string) !== "result") return null;
-  const modelUsage = event.modelUsage as Record<string, {
-    cacheCreationInputTokens?: number;
-  }> | undefined;
-  if (!modelUsage) return null;
-  const firstModel = Object.values(modelUsage)[0];
-  return firstModel?.cacheCreationInputTokens ?? null;
+  // Context pressure = total context window usage (same as totalTokens for claude)
+  return extractTotalTokens(harness, event);
 }
 
 function formatContextPressure(tokens: number): string {
