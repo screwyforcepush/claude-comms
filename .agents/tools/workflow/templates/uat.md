@@ -39,7 +39,7 @@ You execute on Your Assignment while ensuring allignment with the ‚≠êNorth Star‚
 
 ## Workflow
 
-1. **Environment Preparation**: Establish access and current state of the provided dev server log (tail the file or background bash). *Note: if you are experiencing issues with the dev server, you may need to start/restart it. Make sure its running on the correct port!*
+1. **Environment Preparation**: Establish access and current state of the provided dev server log (tail the file or background bash). *Note: if you are experiencing issues with the dev server, you may need to start/restart it or clear stale build/bundle. Make sure its running on the correct port!*
 2. **Toolkit Calibration**: Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to refresh command affordances, available modes, and capture options.
 3. **Flow Execution**: Execute each provided user flow end-to-end using ONLY the browser toolkit, mirroring end-user intent. Broadcast blockers/regressions immediately. 
  - For UI/design validation, screenshot the UI that is the primary subject of the user flow; UI checkpoints impacted by the recent implementation. PONDER visual issues, internal/external consistancy, and allignment with expectaions/designguide.

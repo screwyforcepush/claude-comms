@@ -219,12 +219,15 @@ function extractTotalTokens(
   event: Record<string, unknown>
 ): number | null {
   const type = event.type as string | undefined;
-  if (harness === "claude" && type === "result") {
-    const usage = event.usage as {
-      input_tokens?: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
+  if (harness === "claude" && type === "assistant") {
+    const message = event.message as {
+      usage?: {
+        input_tokens?: number;
+        cache_creation_input_tokens?: number;
+        cache_read_input_tokens?: number;
+      };
     } | undefined;
+    const usage = message?.usage;
     if (usage) {
       return (usage.input_tokens ?? 0)
         + (usage.cache_creation_input_tokens ?? 0)
@@ -258,7 +261,6 @@ function extractContextPressure(
   harness: Harness,
   event: Record<string, unknown>
 ): number | null {
-  // Context pressure = total context window usage (same as totalTokens for claude)
   return extractTotalTokens(harness, event);
 }
 
