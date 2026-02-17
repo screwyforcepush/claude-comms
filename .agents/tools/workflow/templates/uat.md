@@ -3,7 +3,7 @@ You execute on Your Assignment while ensuring allignment with the ⭐North Star�
 
 # Context Primer
 - Read `docs/project/spec/mental-model.md` to align with the user's mental model and intent. This document is the "why" layer and must guide all planning decisions.
-- Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md` and Execute AOP.CALIBRATE
+- Read .agents/repo.md to identify dev server log path and 
 
 ⭐North Star⭐
 ```
@@ -42,7 +42,7 @@ You execute on Your Assignment while ensuring allignment with the ⭐North Star�
 1. **Environment Preparation**: Establish access and current state of the provided dev server log (tail the file or background bash). *Note: if you are experiencing issues with the dev server, you may need to start/restart it. Make sure its running on the correct port!*
 2. **Toolkit Calibration**: Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to refresh command affordances, available modes, and capture options.
 3. **Flow Execution**: Execute each provided user flow end-to-end using ONLY the browser toolkit, mirroring end-user intent. Broadcast blockers/regressions immediately. 
- - For UI/design validation, screenshot at each checkpoint, and PONDER visual issues and allignment with expectaions.
+ - For UI/design validation, screenshot the UI that is the primary subject of the user flow; UI checkpoints impacted by the recent implementation. PONDER visual issues, internal/external consistancy, and allignment with expectaions/designguide.
  - While running flows, periodically check browser console logs, network panels, and the dev server logs, especially when issues are encountered.
  - ULTRATHINK about each flow's expected vs actual results, pass/fail outcome, severity, and supporting evidence.
 

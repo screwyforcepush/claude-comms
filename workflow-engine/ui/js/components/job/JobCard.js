@@ -165,11 +165,15 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
     harness,
     context,
     status,
+    exitForced,
     result,
     startedAt,
     completedAt,
     createdAt
   } = job;
+
+  // Derive effective display status: exitForced jobs show as "chunked"
+  const effectiveStatus = (status === 'complete' && exitForced) ? 'chunked' : status;
 
   // Truncated previews
   const contextPreview = useMemo(() => truncateText(context, 100), [context]);
@@ -249,7 +253,7 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
       }
     },
       React.createElement(StatusDot, {
-        status,
+        status: effectiveStatus,
         pulse: status === 'running'
       }),
       React.createElement(JobTypeBadge, { jobType }),
@@ -292,7 +296,7 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
           gap: '8px'
         }
       },
-        React.createElement(StatusDot, { status, pulse: status === 'running' }),
+        React.createElement(StatusDot, { status: effectiveStatus, pulse: status === 'running' }),
         React.createElement(JobTypeBadge, { jobType }),
         React.createElement(HarnessBadge, { harness }),
         React.createElement('code', {
@@ -303,7 +307,7 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
           }
         }, shortId)
       ),
-      React.createElement(StatusBadge, { status, size: 'sm' })
+      React.createElement(StatusBadge, { status: effectiveStatus, size: 'sm' })
     ),
 
     // Context preview
@@ -330,22 +334,22 @@ export function JobCard({ job, isSelected = false, onClick, compact = false, onE
       }, expanded ? context : contextPreview)
     ),
 
-    // Result preview (only if completed)
+    // Result preview (only if completed/failed/chunked)
     (status === 'complete' || status === 'failed') && result && React.createElement('div', {
       style: { marginBottom: '12px' }
     },
       React.createElement('p', {
         style: {
           fontSize: '10px',
-          color: status === 'failed' ? 'var(--q-lava1)' : 'var(--q-bone0)',
+          color: effectiveStatus === 'failed' || effectiveStatus === 'chunked' ? 'var(--q-lava1)' : 'var(--q-bone0)',
           textTransform: 'uppercase',
           letterSpacing: '2px',
           marginBottom: '4px',
           fontFamily: 'var(--font-display)'
         }
-      }, status === 'failed' ? 'Error' : 'Result'),
+      }, effectiveStatus === 'failed' || effectiveStatus === 'chunked' ? 'Error' : 'Result'),
       React.createElement('div', {
-        style: status === 'failed'
+        style: effectiveStatus === 'failed' || effectiveStatus === 'chunked'
           ? {
               fontSize: '14px',
               padding: '8px',

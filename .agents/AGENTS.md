@@ -8,6 +8,7 @@ Baseline your understanding of the project current state, trajectory, guidelines
    - Read project guides `docs/project/guides/`, and source-of-truth (SoT) requirement specs `docs/project/spec/`, relevant to your Assignment/Task. IMPORTANT: You will need to read multiple documents, some of which may link to other relevant documents you must read. You must allign your approach with this documentation. Read the relevant documents in full!
    - Read relevant phase documentation from `docs/project/phases/<phase-id>/` if working at phase/WP level
 *Explore codebase*
+   - Familiarise yourself with the Repository Guidelines: `.agents/repo.md`
    - Broad project shape/structure understanding with Bash `tree --gitignore`
    - Search codebase multiple rounds to discover patterns, dependencies, implications. You can use `ripgrep` and `ast-grep` CLI
    - Read code and test files, trace impact through end to end 
@@ -57,5 +58,3 @@ Perform manual QA:
 
 
 [/AGENT OPERATING PROCEDURES]
-
-# Adhere to the Repository Guidelines: `.agents/repo.md`

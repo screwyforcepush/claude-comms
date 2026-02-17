@@ -163,7 +163,8 @@ const statusRuneConfig = {
   running: { color: 'var(--q-teleport-bright)', label: 'RUNNING', pulse: true },
   complete: { color: 'var(--q-slime1)', label: 'DONE', pulse: false },
   failed: { color: 'var(--q-lava1)', label: 'GIBBED', pulse: false },
-  blocked: { color: 'var(--q-torch)', label: 'BLOCKED', pulse: false }
+  blocked: { color: 'var(--q-torch)', label: 'BLOCKED', pulse: false },
+  chunked: { color: 'var(--q-lava1)', label: 'CHUNKED', pulse: false }
 };
 
 /**
@@ -347,7 +348,10 @@ function chunkArray(arr, size) {
  * +-----------------------------------------+
  */
 function JobNode({ job, isSelected, isCurrent, onClick, now }) {
-  const { _id, jobType, harness, status, toolCallCount, subagentCount, totalTokens, lastEventAt, startedAt, completedAt } = job;
+  const { _id, jobType, harness, status, exitForced, toolCallCount, subagentCount, totalTokens, lastEventAt, startedAt, completedAt } = job;
+
+  // Derive effective display status: exitForced jobs show as "chunked"
+  const effectiveStatus = (status === 'complete' && exitForced) ? 'chunked' : status;
 
   // Q palette type colors for job type badge
   const typeColors = {
@@ -366,8 +370,8 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     pm: 'DISPATCH'
   };
 
-  // Build HUD class with status modifier
-  const hudStatusClass = `job-node-hud--${status || 'pending'}`;
+  // Build HUD class with status modifier (use effectiveStatus for visual)
+  const hudStatusClass = `job-node-hud--${effectiveStatus || 'pending'}`;
   const selectedClass = isSelected ? 'job-node-hud--selected' : '';
 
   const subagentTotal = typeof subagentCount === 'number' ? subagentCount : 0;
@@ -427,12 +431,13 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     minWidth: '180px'
   };
 
-  // Status-based glow
+  // Status-based glow (keyed by effectiveStatus)
   const glowStyles = {
     running: { boxShadow: 'inset 0 0 30px var(--q-teleport-08), 0 0 20px var(--q-teleport-10)' },
     complete: { boxShadow: 'inset 0 0 30px var(--q-slime0-08), 0 0 20px var(--q-slime0-10)' },
     failed: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
     blocked: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
+    chunked: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
     pending: { opacity: 0.7 }
   };
 
@@ -441,12 +446,13 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     boxShadow: '0 0 0 2px var(--q-copper3), 0 0 12px var(--q-copper1-44)'
   } : {};
 
-  // Glow bar color based on status
+  // Glow bar color based on effectiveStatus
   const glowBarColors = {
     running: 'var(--q-teleport-bright-44)',
     complete: 'var(--q-slime1-44)',
     failed: 'var(--q-lava1-44)',
     blocked: 'var(--q-lava1-44)',
+    chunked: 'var(--q-lava1-44)',
     pending: 'var(--q-iron1-44)'
   };
 
@@ -455,7 +461,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     className: `job-node flex flex-col cursor-pointer transition-all ${hudStatusClass} ${selectedClass}`,
     style: {
       ...hudBaseStyle,
-      ...glowStyles[status] || glowStyles.pending,
+      ...glowStyles[effectiveStatus] || glowStyles.pending,
       ...selectedStyle
     }
   },
@@ -464,7 +470,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
       className: 'job-node-hud__glow-bar',
       style: {
         height: '3px',
-        background: `linear-gradient(90deg, transparent, ${glowBarColors[status] || glowBarColors.pending}, transparent)`
+        background: `linear-gradient(90deg, transparent, ${glowBarColors[effectiveStatus] || glowBarColors.pending}, transparent)`
       }
     }),
     // Header: Provider Logo + JOB_TYPE + StatusRune
@@ -479,7 +485,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     },
       // Left side: Logo + Type + Subagents
       React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '8px' } },
-        React.createElement(ProviderLogo, { harness, status }),
+        React.createElement(ProviderLogo, { harness, status: effectiveStatus }),
         React.createElement('div', null,
           // Job type badge
           React.createElement('div', {
@@ -519,8 +525,8 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
           )
         )
       ),
-      // Right side: StatusRune
-      React.createElement(StatusRune, { status })
+      // Right side: StatusRune (uses effectiveStatus for chunked display)
+      React.createElement(StatusRune, { status: effectiveStatus })
     ),
     // Stat Bars Section: HP (+ ARM when running)
     React.createElement('div', {

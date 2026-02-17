@@ -566,7 +566,7 @@ INTERACTION:
   key <key>             Press key or combo (e.g., "Enter", "Tab", "Control+A")
   hover <uid>           Hover over element
   drag <from> <to>      Drag element from UID to target UID
-  fillform <json>       Fill multiple form fields
+  fillform <json>       Fill multiple fields at once. JSON: [{"uid":"..","value":".."},...]
 
 DEBUGGING:
   conslist              List console messages (--types, --size)
@@ -624,7 +624,7 @@ EXAMPLES:
     # Browser commands
     nav = subparsers.add_parser("nav", help="Navigate to URL")
     nav.add_argument("url", help="URL to navigate to")
-    nav.add_argument("--timeout", type=int, help="Max wait time in milliseconds")
+    nav.add_argument("--timeout", type=int, default=30000, help="Max wait time in milliseconds")
 
     subparsers.add_parser("snap", help="Take page snapshot")
 

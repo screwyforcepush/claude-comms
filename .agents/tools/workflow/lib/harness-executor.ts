@@ -374,10 +374,15 @@ export class HarnessExecutor {
     let timedOut = false;
     let idleTimedOut = false;
     let spawnFailed = false;
-    let jobCompleted = false; // Set when terminal result event triggers completion
+    let jobCompleted = false;
+    let hasSeenResult = false;
 
-    // Grace period before force-killing after terminal event (ms)
-    const TERMINAL_GRACE_MS = 2000;
+    // Settling timer: after a terminal result event, wait for sustained silence
+    // before firing completion. If ANY event arrives during the settling window
+    // the agent (or its background subagents) is still active, so we cancel the
+    // timer and wait for the next result event to restart it.
+    const SETTLING_MS = 120_000; // 2 minutes
+    let settlingTimer: NodeJS.Timeout | null = null;
 
     // Wire up event handling
     tailer.on("event", (event: Record<string, unknown>, _rawLine: string) => {
@@ -385,31 +390,45 @@ export class HarnessExecutor {
       const eventType = (event.type as string) || "event";
       tracker.recordEvent(eventType);
 
-      // Reset idle timeout on each event
-      resetIdleTimeout();
+      // Reset idle timeout on each event (only before first result)
+      if (!hasSeenResult) {
+        resetIdleTimeout();
+      }
 
       // Call optional user callback
       callbacks.onEvent?.(event);
 
-      // Check for terminal result event — decouple completion from process exit
+      // Cancel settling timer on any event — agent is still active
+      if (settlingTimer) {
+        clearTimeout(settlingTimer);
+        settlingTimer = null;
+      }
+
+      // Check for terminal result event
       if (handler.isTerminal() && !jobCompleted) {
-        jobCompleted = true;
+        if (!hasSeenResult) {
+          hasSeenResult = true;
+          // Clear idle timeout — settling timer takes over
+          if (idleTimeout) {
+            clearTimeout(idleTimeout);
+            idleTimeout = null;
+          }
+          console.log(`[${jobId}] Result event detected, entering settling mode (${SETTLING_MS / 1000}s)`);
+        }
 
-        // Clear all timeouts — we're handling completion now
-        clearTimeout(timeout);
-        if (idleTimeout) clearTimeout(idleTimeout);
+        // Start/restart settling timer — complete after sustained silence
+        settlingTimer = setTimeout(() => {
+          if (jobCompleted) return;
+          jobCompleted = true;
 
-        // Stop tailing — no further events needed
-        tailer.stop();
+          clearTimeout(timeout);
+          tailer.stop();
 
-        console.log(`[${jobId}] Terminal event received, waiting ${TERMINAL_GRACE_MS}ms for process exit`);
+          console.log(`[${jobId}] Settling complete (${SETTLING_MS / 1000}s silence after last result)`);
 
-        // Grace period: let the process exit naturally, then determine exitForced
-        setTimeout(() => {
           const exitForced = child.exitCode === null;
-
           if (exitForced) {
-            console.log(`[${jobId}] Process still alive after grace period, force killing`);
+            console.log(`[${jobId}] Process still alive after settling, force killing`);
             child.kill("SIGTERM");
             setTimeout(() => {
               if (child.exitCode === null) child.kill("SIGKILL");
@@ -428,7 +447,7 @@ export class HarnessExecutor {
             tracker.fail(reason);
             callbacks.onFail(reason, result, exitForced);
           }
-        }, TERMINAL_GRACE_MS);
+        }, SETTLING_MS);
       }
     });
 
@@ -471,6 +490,7 @@ export class HarnessExecutor {
       spawnFailed = true;
       clearTimeout(timeout);
       if (idleTimeout) clearTimeout(idleTimeout);
+      if (settlingTimer) { clearTimeout(settlingTimer); settlingTimer = null; }
       tailer.stop();
       this.activeJobs.delete(jobId);
 
@@ -486,8 +506,8 @@ export class HarnessExecutor {
     });
 
     // 11. Handle process exit
-    // When jobCompleted is set, the terminal event handler already handled
-    // completion — this becomes a no-op for callback purposes.
+    // Process exit is the fast path for completion — the settling timer is the
+    // fallback for when the process lingers after emitting a result event.
     child.on("close", async (code) => {
       if (spawnFailed || jobCompleted) return;
 
@@ -495,13 +515,14 @@ export class HarnessExecutor {
       if (idleTimeout) clearTimeout(idleTimeout);
 
       // Final flush to capture any remaining events
-      // NOTE: flush may process a terminal event, triggering the event handler
-      // which sets jobCompleted and starts its own grace period timer.
-      // Re-check jobCompleted after flush to avoid double-firing callbacks.
       await tailer.flush();
       tailer.stop();
 
+      // Clear settling timer — process exit is the authoritative signal
+      if (settlingTimer) { clearTimeout(settlingTimer); settlingTimer = null; }
+
       if (jobCompleted) return;
+      jobCompleted = true; // Prevent settling timer from double-firing
 
       this.activeJobs.delete(jobId);
 
