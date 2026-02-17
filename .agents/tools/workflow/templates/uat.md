@@ -3,7 +3,7 @@ You execute on Your Assignment while ensuring allignment with the ⭐North Star�
 
 # Context Primer
 - Read `docs/project/spec/mental-model.md` to align with the user's mental model and intent. This document is the "why" layer and must guide all planning decisions.
-- Read .agents/repo.md to identify dev server log path and 
+- Read .agents/repo.md to familiarise yourself with UAT environment.
 
 ⭐North Star⭐
 ```

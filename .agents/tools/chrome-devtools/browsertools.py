@@ -581,7 +581,10 @@ PAGE MANIPULATION:
 
 USAGE TIPS:
 **Snapshots** are verbose. Always try to pipe grep first
-    - Default pattern: snap | grep -iC5 "search term"
+    # Orientation snap (what can I interact with?)                                                                                                                                                                                                 
+    - snap | grep -E '\b(button|textbox|combobox|checkbox|link|spinbutton|radio|heading)\b'                                                                                                                                                                                                                                                                                                                                                                             
+    # Targeted snap (find specific elements)
+    - snap | grep -iC5 "search term"
     - **Interaction commands** return updated page state snapshots: click, fill, key, hover, drag, wait return updated page state
         - Pipe to grep with context. eg. click 1_7 | grep -iC5 "dashboard\|home"
     - No grep hits? Run explicit snap to see full page
