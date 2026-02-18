@@ -142,7 +142,7 @@ export default defineSchema({
       v.literal("codex"),
       v.literal("gemini")
     ),
-    context: v.string(), // JSON with thread info, messages, mode, sessionId
+    context: v.string(), // JSON with thread info, mode, sessionId
     prompt: v.optional(v.string()), // Complete prompt sent to agent
     status: v.union(
       v.literal("pending"),

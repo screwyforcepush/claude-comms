@@ -16,6 +16,7 @@ export const trigger = mutation({
   args: {
     password: v.string(),
     threadId: v.id("chatThreads"),
+    triggerMessageId: v.id("chatMessages"),
     harness: v.optional(
       v.union(v.literal("claude"), v.literal("codex"), v.literal("gemini"))
     ),
@@ -33,33 +34,10 @@ export const trigger = mutation({
       throw new Error("Thread not found");
     }
 
-    // 2. Get all messages for context
-    const messages = await ctx.db
-      .query("chatMessages")
-      .withIndex("by_thread_created", (q) => q.eq("threadId", args.threadId))
-      .collect();
-
-    if (messages.length === 0) {
-      throw new Error("No messages in thread");
-    }
-
-    // For guardian evaluation, find the latest PM message
-    // Otherwise, find the latest user message
-    let latestMessage: string;
-    if (args.isGuardianEvaluation) {
-      const pmMessages = messages.filter((m) => m.role === "pm");
-      const latestPmMessage = pmMessages[pmMessages.length - 1];
-      if (!latestPmMessage) {
-        throw new Error("No PM message found for guardian evaluation");
-      }
-      latestMessage = latestPmMessage.content;
-    } else {
-      const userMessages = messages.filter((m) => m.role === "user");
-      const latestUserMessage = userMessages[userMessages.length - 1];
-      if (!latestUserMessage) {
-        throw new Error("No user message found");
-      }
-      latestMessage = latestUserMessage.content;
+    // 2. Get the trigger message directly — no need to query all messages
+    const triggerMessage = await ctx.db.get(args.triggerMessageId);
+    if (!triggerMessage) {
+      throw new Error("Trigger message not found");
     }
 
     // 3. Build chat context (including session ID for resume)
@@ -73,14 +51,7 @@ export const trigger = mutation({
       // For differential prompting
       effectivePromptMode,
       lastPromptMode: thread.lastPromptMode,
-      messages: messages.map((m) => ({
-        _id: m._id,
-        threadId: m.threadId,
-        role: m.role,
-        content: m.content,
-        createdAt: m.createdAt,
-      })),
-      latestUserMessage: latestMessage,
+      latestUserMessage: triggerMessage.content,
       claudeSessionId: thread.claudeSessionId,
       // Guardian mode fields
       assignmentId: thread.assignmentId,

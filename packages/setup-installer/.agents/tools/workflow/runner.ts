@@ -357,8 +357,9 @@ async function triggerGuardianEvaluation(
 
     console.log(`[Guardian] Found guardian thread ${guardianThread._id}, triggering evaluation`);
 
+    let pmMessageId: string;
     try {
-      await client!.mutation(api.chatMessages.add, {
+      pmMessageId = await client!.mutation(api.chatMessages.add, {
         threadId: guardianThread._id as any,
         role: "pm",
         content: pmResult,
@@ -372,6 +373,7 @@ async function triggerGuardianEvaluation(
     try {
       await client!.mutation(api.chatJobs.trigger, {
         threadId: guardianThread._id as any,
+        triggerMessageId: pmMessageId as any,
         harness: getHarnessForJobType("chat"),
         isGuardianEvaluation: true,
       });

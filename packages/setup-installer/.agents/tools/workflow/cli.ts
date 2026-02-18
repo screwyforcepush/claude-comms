@@ -511,16 +511,16 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
   if (!thread) error("Thread not found");
 
   // Add user message to thread
-  await client.mutation(api.chatMessages.add, {
+  const messageId = await client.mutation(api.chatMessages.add, {
     threadId: threadId as Id<"chatThreads">,
     role: "user",
     content: message,
   });
 
   // Trigger chat job (uses chatJobs table, not assignments/jobs)
-  // The trigger mutation builds context internally
   const result = await client.mutation(api.chatJobs.trigger, {
     threadId: threadId as Id<"chatThreads">,
+    triggerMessageId: messageId as Id<"chatMessages">,
     harness: (harness || getHarnessForJobType("chat")) as Harness,
   });
 

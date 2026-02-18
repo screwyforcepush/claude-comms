@@ -577,7 +577,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
     setSending(true);
     try {
       // 1. Add user message immediately for instant feedback
-      await addMessage({
+      const messageId = await addMessage({
         threadId: selectedThreadId,
         role: 'user',
         content: content
@@ -587,7 +587,8 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
       //    Response is saved to chatMessages by the runner
       //    UI updates via Convex real-time subscription
       await triggerChatJob({
-        threadId: selectedThreadId
+        threadId: selectedThreadId,
+        triggerMessageId: messageId
       });
 
       // WP-6: Clear draft on successful send

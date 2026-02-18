@@ -51,14 +51,6 @@ export interface Job {
   createdAt: number;
 }
 
-export interface ChatMessage {
-  _id: string;
-  threadId: string;
-  role: "user" | "assistant" | "pm";
-  content: string;
-  createdAt: number;
-}
-
 export interface ChatJobContext {
   threadId: string;
   namespaceId: string;
@@ -66,7 +58,6 @@ export interface ChatJobContext {
   // For differential prompting
   effectivePromptMode: "jam" | "cook";
   lastPromptMode?: "jam" | "cook";
-  messages: ChatMessage[];
   latestUserMessage: string;
   claudeSessionId?: string;
   // Guardian mode context
