@@ -1042,7 +1042,7 @@ function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
  * @param {Function} props.onJobSelect - Callback when job is selected
  * @param {string} props.layout - Layout mode: 'vertical' | 'horizontal' | 'auto' (reserved for future)
  */
-export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 'vertical', assignmentStatus, independent }) {
+export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 'vertical', assignmentStatus, independent, onKillJob }) {
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -1136,7 +1136,7 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
             color: 'var(--q-teleport-bright)',
             border: '1px solid rgba(124, 88, 160, 0.44)',
             padding: '2px 8px',
-            borderRadius: '9999px',
+            borderRadius: 0,
           },
         },
         'Independent'
@@ -1308,7 +1308,8 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
     // Modal for large content (D3: modal option for large content)
     showModal && selectedJob && React.createElement(JobDetail, {
       job: selectedJob,
-      onClose: handleCloseModal
+      onClose: handleCloseModal,
+      onKillJob: onKillJob
     })
   );
 }

@@ -257,22 +257,32 @@ export function ThreadIcon({ thread, assignment, isSelected, onClick }) {
 
 /**
  * ThreadItem component - Single thread in sidebar list
- * WP-6: Transformed with Q palette styling
+ * WP-5/WP-6: Transformed with Q palette styling
  * - Copper texture hover state
  * - Torch accent border for selected
  * - Mode badges use Q palette (teleport/torch/slime)
  * - Status dots use Q palette
  * - Text uses bone palette
  * - Display font for mode labels
+ * - WP-5: Namespace badge for cross-namespace identification
+ * - WP-5: Unread Fullbright dot for threads with new messages
  * @param {Object} props
  * @param {Object} props.thread - Thread object
  * @param {Object} props.assignment - Linked assignment (for guardian mode)
  * @param {boolean} props.isSelected - Whether this thread is selected
  * @param {Function} props.onClick - Callback when thread is clicked
+ * @param {string} props.namespaceName - Namespace display name (WP-5)
+ * @param {number} props.latestMessageAt - Timestamp of latest message (WP-5, for unread calc)
  */
-export function ThreadItem({ thread, assignment, isSelected, onClick }) {
+export function ThreadItem({ thread, assignment, isSelected, onClick, namespaceName, latestMessageAt }) {
   const modeConfig = getModeConfig(thread.mode);
   // Note: Alignment is displayed via Fullbright dot in ThreadIcon (top-right position)
+
+  // WP-5: Determine unread status
+  // Unread if latestMessageAt exists and is newer than lastReadAt (or lastReadAt is null)
+  const isUnread = latestMessageAt && (
+    !thread.lastReadAt || latestMessageAt > thread.lastReadAt
+  );
 
   // Base styles for the button
   const baseStyle = {
@@ -302,8 +312,20 @@ export function ThreadItem({ thread, assignment, isSelected, onClick }) {
     type: 'button',
     onClick: onClick,
     className: `w-full text-left px-3 py-3 thread-item-q`,
-    style: selectedStyle
+    style: { ...selectedStyle, position: 'relative' }
   },
+    // Unread indicator — top-right overlay, brandkit fullbright-dot torch variant
+    isUnread && React.createElement('span', {
+      className: 'fullbright-dot fullbright-dot--sm fullbright-dot--torch fullbright-dot--pulse',
+      title: 'Unread messages',
+      style: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        zIndex: 1
+      }
+    }),
+
     React.createElement('div', { className: 'flex items-start gap-3' },
       // Icon
       React.createElement(ThreadIcon, {
@@ -315,6 +337,23 @@ export function ThreadItem({ thread, assignment, isSelected, onClick }) {
 
       // Content
       React.createElement('div', { className: 'flex-1 min-w-0' },
+        // WP-5: Namespace badge — small tag above the title
+        namespaceName && React.createElement('span', {
+          style: {
+            backgroundColor: 'var(--q-stone3)',
+            color: 'var(--q-bone1)',
+            fontFamily: 'var(--font-display)',
+            fontSize: '8px',
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            padding: '2px 6px',
+            borderRadius: 0,
+            display: 'inline-block',
+            marginBottom: '2px',
+            lineHeight: '1.2'
+          }
+        }, namespaceName),
+
         // Title - Q palette bone3 for selected, bone2 for normal
         React.createElement('div', {
           className: 'text-sm font-medium truncate',
@@ -329,14 +368,14 @@ export function ThreadItem({ thread, assignment, isSelected, onClick }) {
         },
           // Mode badge with Q palette and display font
           React.createElement('span', {
-            className: 'text-xs px-1.5 py-0.5 rounded',
-            style: modeConfig.badgeStyle
+            className: 'text-xs px-1.5 py-0.5',
+            style: { ...modeConfig.badgeStyle, borderRadius: 0 }
           }, modeConfig.label),
 
           // Assignment status badge (all modes when assignment exists)
           assignment && React.createElement('span', {
-            className: 'text-xs px-1.5 py-0.5 rounded',
-            style: getAssignmentStatusStyle(assignment.status)
+            className: 'text-xs px-1.5 py-0.5',
+            style: { ...getAssignmentStatusStyle(assignment.status), borderRadius: 0 }
           }, assignment.status),
 
           // Separator - Q palette iron

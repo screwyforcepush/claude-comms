@@ -25,13 +25,20 @@ function getInitialEnterSafe() {
 
 /**
  * ChatInput component - Text input with send button
+ * Supports both controlled (draftText/onDraftChange) and uncontrolled modes.
+ * When draftText is provided, operates as a controlled component for draft persistence.
  * @param {Object} props
  * @param {Function} props.onSend - Callback when message is sent
  * @param {boolean} props.disabled - Whether input is disabled
  * @param {string} props.placeholder - Placeholder text
+ * @param {string} [props.draftText] - Controlled draft value (optional, WP-6)
+ * @param {Function} [props.onDraftChange] - Draft change callback (optional, WP-6)
  */
-export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...' }) {
-  const [message, setMessage] = useState('');
+export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...', draftText, onDraftChange }) {
+  const [internalMessage, setInternalMessage] = useState('');
+
+  // Use controlled value if provided, otherwise internal state
+  const message = draftText !== undefined ? draftText : internalMessage;
   const [isFocused, setIsFocused] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(getInitialInputCollapsed);
   const [enterSafe, setEnterSafe] = useState(getInitialEnterSafe);
@@ -50,20 +57,25 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
       textarea.style.height = `${Math.min(naturalHeight, maxH)}px`;
       setShowToggle(naturalHeight > COLLAPSED_MAX);
     }
-  }, [message, isCollapsed]);
+  }, [message, isCollapsed]); // message is derived from draftText or internalMessage
 
   const handleSubmit = useCallback((e) => {
     e?.preventDefault();
     const trimmedMessage = message.trim();
     if (trimmedMessage && !disabled && onSend) {
       onSend(trimmedMessage);
-      setMessage('');
+      // Clear the appropriate state source
+      if (onDraftChange) {
+        onDraftChange('');
+      } else {
+        setInternalMessage('');
+      }
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     }
-  }, [message, disabled, onSend]);
+  }, [message, disabled, onSend, onDraftChange]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -76,7 +88,11 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
           const end = ta.selectionEnd;
           const val = ta.value;
           const newVal = val.substring(0, start) + '\n' + val.substring(end);
-          setMessage(newVal);
+          if (onDraftChange) {
+            onDraftChange(newVal);
+          } else {
+            setInternalMessage(newVal);
+          }
           // Set cursor position after the inserted newline on next tick
           requestAnimationFrame(() => {
             ta.selectionStart = ta.selectionEnd = start + 1;
@@ -103,8 +119,13 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
   }, [handleSubmit, enterSafe]);
 
   const handleChange = useCallback((e) => {
-    setMessage(e.target.value);
-  }, []);
+    const newValue = e.target.value;
+    if (onDraftChange) {
+      onDraftChange(newValue);
+    } else {
+      setInternalMessage(newValue);
+    }
+  }, [onDraftChange]);
 
   const handleFocus = useCallback(() => {
     setIsFocused(true);
@@ -161,11 +182,9 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
           onFocus: handleFocus,
           onBlur: handleBlur,
           placeholder: placeholder,
-          disabled: disabled,
+          disabled: false,
           rows: 1,
-          className: `w-full resize-none px-4 py-3 focus:outline-none transition-all ${
-            disabled ? 'opacity-50 cursor-not-allowed' : ''
-          }`,
+          className: 'w-full resize-none px-4 py-3 focus:outline-none transition-all',
           style: {
             minHeight: '48px',
             maxHeight: isCollapsed ? '150px' : '70vh',

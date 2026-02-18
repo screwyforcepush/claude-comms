@@ -1,7 +1,7 @@
 // ChatPanel - Main container for chat feature
 // WP-8: Transformed to Q palette brandkit styling
-import React, { useState, useCallback, useEffect } from 'react';
-import { useQuery, useMutation } from '../../hooks/useConvex.js';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useConvex, useQuery, useMutation } from '../../hooks/useConvex.js';
 import { api } from '../../api.js';
 import { ChatSidebar } from './ChatSidebar.js';
 import { ChatView } from './ChatView.js';
@@ -103,6 +103,78 @@ function getAlignmentColor(alignmentStatus) {
 }
 
 /**
+ * CC3 Branding header — replaces the old aside sidebar header
+ * Shows CC3 logo, title, connection status dot, and collapse chevron
+ */
+function CC3BrandingHeader({ onToggleCollapse }) {
+  const { connected, connecting, error } = useConvex();
+
+  // Connection status dot color
+  const statusColor = error ? 'var(--q-lava1)' : connecting ? 'var(--q-torch)' : connected ? 'var(--q-slime1)' : 'var(--q-iron1)';
+  const statusPulse = connected && !error && !connecting;
+
+  return React.createElement('div', {
+    className: 'flex items-center justify-between px-3 py-2',
+    style: { borderBottom: '1px solid var(--q-stone3)' }
+  },
+    React.createElement('div', { className: 'flex items-center gap-2', style: { minWidth: 0 } },
+      React.createElement('img', {
+        src: 'public/cc3icon.png',
+        alt: 'CC3',
+        style: { width: '20px', height: '20px', borderRadius: '3px', flexShrink: 0 }
+      }),
+      React.createElement('h1', {
+        style: {
+          fontFamily: 'var(--font-display)',
+          fontSize: '18px',
+          color: 'var(--q-torch)',
+          letterSpacing: '2px',
+          textTransform: 'uppercase',
+          textShadow: '0 0 30px rgba(212, 160, 48, 0.22), 0 2px 4px var(--q-void0)',
+          margin: 0,
+          animation: 'torchFlicker 6s infinite',
+          whiteSpace: 'nowrap'
+        }
+      }, 'CLAUDE COMMS III')
+    ),
+    React.createElement('div', { className: 'flex items-center gap-2' },
+      // Connection status fullbright dot
+      React.createElement('span', {
+        className: `fullbright-dot fullbright-dot--sm ${statusPulse ? 'fullbright-dot--pulse' : ''}`,
+        style: {
+          background: `radial-gradient(circle, ${statusColor}, ${statusColor}88)`,
+          boxShadow: `0 0 5px ${statusColor}88, 0 0 10px ${statusColor}44`
+        },
+        title: error ? 'Disconnected' : connecting ? 'Connecting' : connected ? 'Connected' : 'Unknown'
+      }),
+      // Collapse chevron
+      React.createElement('button', {
+        className: 'sidebar-collapse-btn p-1 transition-colors',
+        onClick: onToggleCollapse,
+        title: 'Collapse sidebar',
+        'aria-label': 'Collapse sidebar',
+        style: { backgroundColor: 'transparent' }
+      },
+        React.createElement('svg', {
+          className: 'w-4 h-4 transition-transform duration-200',
+          fill: 'none',
+          stroke: 'currentColor',
+          viewBox: '0 0 24 24',
+          strokeWidth: '2',
+          style: { color: 'var(--q-copper2)' }
+        },
+          React.createElement('path', {
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+            d: 'M15 19l-7-7 7-7'
+          })
+        )
+      )
+    )
+  );
+}
+
+/**
  * MobileChatHeader - Compact header for mobile chat view
  * Replaces both the AppLayout mobile-header and ChatHeader on mobile
  */
@@ -110,7 +182,6 @@ function MobileChatHeader({
   thread,
   assignment,
   namespaceName,
-  onOpenNamespaceDrawer,
   onToggleThreadsPane,
   onToggleAssignmentPane,
   paneOpen,
@@ -120,19 +191,10 @@ function MobileChatHeader({
   return React.createElement('header', {
     className: 'mobile-chat-header'
   },
-    // Left group: hamburger + threads button
+    // Left group: threads drawer toggle
     React.createElement('div', {
       className: 'flex items-center gap-1 flex-shrink-0'
     },
-      // Hamburger - open namespace sidebar
-      React.createElement('button', {
-        type: 'button',
-        onClick: onOpenNamespaceDrawer,
-        className: 'mobile-header-btn',
-        'aria-label': 'Open namespaces'
-      },
-        React.createElement(QIcon, { name: 'menu', size: 20, color: 'currentColor' })
-      ),
       // Threads - open threads drawer
       React.createElement('button', {
         type: 'button',
@@ -141,20 +203,7 @@ function MobileChatHeader({
         'aria-label': 'Open threads',
         title: 'Threads'
       },
-        React.createElement('svg', {
-          width: 18,
-          height: 18,
-          viewBox: '0 0 24 24',
-          fill: 'none',
-          stroke: 'currentColor',
-          strokeWidth: 2
-        },
-          React.createElement('path', {
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
-          })
-        )
+        React.createElement(QIcon, { name: 'menu', size: 20, color: 'currentColor' })
       )
     ),
 
@@ -246,13 +295,13 @@ function MobileChatHeader({
 
 /**
  * ChatPanel component - Main container managing chat state
+ * WP-5: Transformed from per-namespace to cross-namespace operations center.
+ * No longer requires namespaceId/namespaceName props — fetches all threads via listAll.
  * @param {Object} props
- * @param {string} props.namespaceId - Current namespace ID for thread scoping
- * @param {string} props.namespaceName - Current namespace name (for display)
+ * @param {Array} props.namespaces - All namespace objects from parent (for filter + map)
  * @param {Object} props.responsive - Responsive mode info (optional, for WP-5)
- * @param {Function} props.onOpenNamespaceDrawer - Callback to open namespace sidebar drawer (mobile)
  */
-export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamespaceDrawer, mobileBackTrigger }) {
+export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -274,11 +323,117 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
     }
   }, [mobileBackTrigger]);
 
-  // Fetch threads for this namespace
-  const { data: threads, loading: loadingThreads } = useQuery(
-    api.chatThreads.list,
-    { namespaceId }
+  // WP-6: Draft state management — in-memory Map + debounced localStorage persistence
+  const draftsRef = useRef(new Map());
+  const draftTimersRef = useRef(new Map());
+
+  // Load draft from localStorage on first access for a given threadId
+  const getDraft = useCallback((threadId) => {
+    if (!threadId) return '';
+    if (draftsRef.current.has(threadId)) {
+      return draftsRef.current.get(threadId);
+    }
+    // Try localStorage fallback
+    try {
+      const stored = localStorage.getItem(`workflow-engine:draft:${threadId}`);
+      if (stored) {
+        draftsRef.current.set(threadId, stored);
+        return stored;
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+    return '';
+  }, []);
+
+  // Save draft (in-memory immediate, localStorage debounced at 500ms)
+  const saveDraft = useCallback((threadId, text) => {
+    if (!threadId) return;
+    draftsRef.current.set(threadId, text);
+    // Debounced localStorage write
+    const existing = draftTimersRef.current.get(threadId);
+    if (existing) clearTimeout(existing);
+    draftTimersRef.current.set(threadId, setTimeout(() => {
+      try {
+        if (text) {
+          localStorage.setItem(`workflow-engine:draft:${threadId}`, text);
+        } else {
+          localStorage.removeItem(`workflow-engine:draft:${threadId}`);
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+    }, 500));
+  }, []);
+
+  // Clear draft from both in-memory and localStorage
+  const clearDraft = useCallback((threadId) => {
+    if (!threadId) return;
+    draftsRef.current.delete(threadId);
+    try {
+      localStorage.removeItem(`workflow-engine:draft:${threadId}`);
+    } catch {
+      // Ignore localStorage errors
+    }
+    const timer = draftTimersRef.current.get(threadId);
+    if (timer) clearTimeout(timer);
+    draftTimersRef.current.delete(threadId);
+  }, []);
+
+  // WP-6: Current draft state for the selected thread (reactive)
+  const [currentDraft, setCurrentDraft] = useState('');
+
+  // WP-6: markRead mutation
+  const markRead = useMutation(api.chatThreads.markRead);
+
+  // WP-5: Namespace filter state — empty set means "show all"
+  const [selectedNamespaceIds, setSelectedNamespaceIds] = useState(new Set());
+
+  // WP-5: Toggle a namespace in/out of the filter set
+  const handleToggleNamespace = useCallback((nsId) => {
+    setSelectedNamespaceIds(prev => {
+      const next = new Set(prev);
+      if (next.has(nsId)) {
+        next.delete(nsId);
+      } else {
+        next.add(nsId);
+      }
+      return next;
+    });
+  }, []);
+
+  // WP-5: Build namespaceMap (id -> name) from namespaces prop
+  const namespaceMap = useMemo(() => {
+    if (!namespaces) return {};
+    const map = {};
+    for (const ns of namespaces) {
+      map[ns._id] = ns.name;
+    }
+    return map;
+  }, [namespaces]);
+
+  // Thread pagination — increase limit to load more
+  const [threadLimit, setThreadLimit] = useState(50);
+
+  // Fetch threads cross-namespace, paginated by limit, sorted by latestMessageAt desc
+  const { data: allThreads, loading: loadingThreads } = useQuery(
+    api.chatThreads.listAll,
+    { limit: threadLimit }
   );
+
+  // Whether there may be more threads beyond current limit
+  const hasMoreThreads = allThreads && allThreads.length >= threadLimit;
+
+  const handleLoadMoreThreads = useCallback(() => {
+    setThreadLimit(prev => prev + 50);
+  }, []);
+
+  // WP-5: Client-side namespace filtering
+  const threads = useMemo(() => {
+    if (!allThreads) return null;
+    if (selectedNamespaceIds.size === 0) return allThreads; // No filter = show all
+    return allThreads.filter(t => selectedNamespaceIds.has(t.namespaceId));
+  }, [allThreads, selectedNamespaceIds]);
 
   // Get selected thread object (must be defined before useMemos that reference it)
   const selectedThread = threads?.find(t => t._id === selectedThreadId) || null;
@@ -318,11 +473,13 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
   const removeThread = useMutation(api.chatThreads.remove);
   const triggerChatJob = useMutation(api.chatJobs.trigger);
 
-  // Reset selection when namespace changes
-  useEffect(() => {
-    setSelectedThreadId(null);
-  }, [namespaceId]);
+  // WP-7: Mutation hooks for assignment & agent control (U5, U6, R1, R2)
+  const updateAssignmentStatus = useMutation(api.assignments.update);
+  const updateFocusAssignment = useMutation(api.chatThreads.updateFocusAssignment);
+  const killJob = useMutation(api.jobs.requestKill);
+  const killChatJob = useMutation(api.chatJobs.requestKill);
 
+  // WP-5: No longer reset selection on namespace change (cross-namespace view)
   // Auto-select first thread if none selected and threads exist
   useEffect(() => {
     if (!selectedThreadId && threads?.length > 0 && !loadingThreads) {
@@ -330,20 +487,67 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
     }
   }, [threads, selectedThreadId, loadingThreads]);
 
-  // Handle creating a new thread
-  const handleCreateThread = useCallback(async () => {
-    if (creating || !namespaceId) return;
+  // FIX-5: Auto-reselect when namespace filter hides the currently selected thread
+  useEffect(() => {
+    if (!threads || !selectedThreadId) return;
+    const stillVisible = threads.some(t => t._id === selectedThreadId);
+    if (!stillVisible) {
+      setSelectedThreadId(threads.length > 0 ? threads[0]._id : null);
+    }
+  }, [threads, selectedThreadId]);
+
+  // WP-6: Load draft when selected thread changes
+  useEffect(() => {
+    setCurrentDraft(getDraft(selectedThreadId));
+  }, [selectedThreadId, getDraft]);
+
+  // WP-6: Handle draft text change from ChatInput
+  const handleDraftChange = useCallback((text) => {
+    setCurrentDraft(text);
+    saveDraft(selectedThreadId, text);
+  }, [selectedThreadId, saveDraft]);
+
+  // WP-6: markRead callback for MessageList — fires when messages render
+  const handleMarkRead = useCallback(() => {
+    if (selectedThreadId) {
+      markRead({ id: selectedThreadId }).catch(() => {});
+    }
+  }, [selectedThreadId, markRead]);
+
+  // WP-6: Also call markRead when thread is first selected
+  useEffect(() => {
+    if (selectedThreadId) {
+      markRead({ id: selectedThreadId }).catch(() => {});
+    }
+  }, [selectedThreadId, markRead]);
+
+  // WP-5: Handle creating a new thread
+  // Accepts optional namespaceId; falls back to first filtered or first available
+  const handleCreateThread = useCallback(async (namespaceId) => {
+    if (creating) return;
+
+    // Determine which namespace to create the thread in
+    let targetNamespaceId = namespaceId || null;
+    if (!targetNamespaceId) {
+      if (selectedNamespaceIds.size > 0) {
+        targetNamespaceId = selectedNamespaceIds.values().next().value;
+      } else if (namespaces && namespaces.length > 0) {
+        targetNamespaceId = namespaces[0]._id;
+      }
+    }
+
+    if (!targetNamespaceId) return;
 
     setCreating(true);
     try {
-      const newThreadId = await createThread({ namespaceId });
+      const newThreadId = await createThread({ namespaceId: targetNamespaceId });
       setSelectedThreadId(newThreadId);
     } catch (err) {
       console.error('Failed to create thread:', err);
     } finally {
       setCreating(false);
     }
-  }, [creating, namespaceId, createThread]);
+  }, [creating, selectedNamespaceIds, namespaces, createThread]);
 
   // Handle selecting a thread
   const handleSelectThread = useCallback((thread) => {
@@ -385,12 +589,16 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
       await triggerChatJob({
         threadId: selectedThreadId
       });
+
+      // WP-6: Clear draft on successful send
+      clearDraft(selectedThreadId);
+      setCurrentDraft('');
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {
       setSending(false);
     }
-  }, [selectedThreadId, sending, addMessage, triggerChatJob]);
+  }, [selectedThreadId, sending, addMessage, triggerChatJob, clearDraft]);
 
   // Handle updating thread title
   const handleUpdateTitle = useCallback(async (title) => {
@@ -413,6 +621,44 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
       console.error('Failed to update mode:', err);
     }
   }, [selectedThreadId, updateMode]);
+
+  // WP-7: Assignment status update callback (U5)
+  const handleUpdateAssignmentStatus = useCallback(async (status) => {
+    if (!selectedAssignment?._id) return;
+    try {
+      await updateAssignmentStatus({ id: selectedAssignment._id, status });
+    } catch (err) {
+      console.error('Failed to update assignment status:', err);
+    }
+  }, [selectedAssignment?._id, updateAssignmentStatus]);
+
+  // WP-7: Focus assignment change callback (U6)
+  const handleChangeFocusAssignment = useCallback(async (assignmentId) => {
+    if (!selectedThreadId) return;
+    try {
+      await updateFocusAssignment({ id: selectedThreadId, assignmentId });
+    } catch (err) {
+      console.error('Failed to change focus assignment:', err);
+    }
+  }, [selectedThreadId, updateFocusAssignment]);
+
+  // WP-7: Kill job callback (R1)
+  const handleKillJob = useCallback(async (jobId) => {
+    try {
+      await killJob({ id: jobId });
+    } catch (err) {
+      console.error('Failed to kill job:', err);
+    }
+  }, [killJob]);
+
+  // WP-7: Kill chat job callback (R2)
+  const handleKillChatJob = useCallback(async (chatJobId) => {
+    try {
+      await killChatJob({ id: chatJobId });
+    } catch (err) {
+      console.error('Failed to kill chat job:', err);
+    }
+  }, [killChatJob]);
 
   // WP-3: Handle toggling threads pane collapse
   const handleToggleThreadsPane = useCallback(() => {
@@ -464,43 +710,8 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
     setPaneOpen(!!selectedAssignment);
   }, [selectedThread?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // No namespace selected - Q palette empty state
-  if (!namespaceId) {
-    return React.createElement('div', {
-      className: 'flex-1 flex items-center justify-center',
-      style: {
-        backgroundColor: 'var(--q-void1)'
-      }
-    },
-      React.createElement('div', { className: 'text-center p-8' },
-        React.createElement('svg', {
-          className: 'w-16 h-16 mx-auto mb-4',
-          style: { color: 'var(--q-iron1)' },
-          fill: 'none',
-          stroke: 'currentColor',
-          viewBox: '0 0 24 24',
-          strokeWidth: '1.5'
-        },
-          React.createElement('path', {
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z'
-          })
-        ),
-        React.createElement('h2', {
-          className: 'text-xl mb-2',
-          style: {
-            fontFamily: 'var(--font-display)',
-            color: 'var(--q-bone2)',
-            letterSpacing: '2px'
-          }
-        }, 'Select a Namespace'),
-        React.createElement('p', {
-          style: { color: 'var(--q-bone0)' }
-        }, 'Choose a namespace from the sidebar to access chat.')
-      )
-    );
-  }
+  // WP-5: Derive namespace name for the selected thread (for mobile header)
+  const selectedThreadNamespaceName = selectedThread ? (namespaceMap[selectedThread.namespaceId] || '') : '';
 
   // WP-5: Build threads pane classes based on responsive mode
   // WP-8: Remove gray-* Tailwind classes, use Q palette via inline styles
@@ -528,8 +739,7 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
     responsive?.isMobile && React.createElement(MobileChatHeader, {
       thread: selectedThread,
       assignment: selectedAssignment || null,
-      namespaceName: namespaceName,
-      onOpenNamespaceDrawer: onOpenNamespaceDrawer,
+      namespaceName: selectedThreadNamespaceName,
       onToggleThreadsPane: handleToggleThreadsPane,
       onToggleAssignmentPane: handleTogglePane,
       paneOpen: paneOpen,
@@ -617,48 +827,33 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
       !threadsPaneCollapsed && React.createElement('div', {
         className: 'threads-pane-expanded-content h-full flex flex-col'
       },
-        // Collapse button in header area - Q palette styling
-        React.createElement('div', {
-          className: 'flex items-center justify-between px-3 py-2',
-          style: {
-            borderBottom: '1px solid var(--q-stone3)'
-          }
-        },
-          React.createElement('span', {
-            className: 'text-xs uppercase tracking-wide',
-            style: {
-              fontFamily: 'var(--font-display)',
-              color: 'var(--q-bone0)',
-              letterSpacing: '2px'
-            }
-          }, 'Threads'),
-          React.createElement('button', {
-            type: 'button',
-            onClick: handleToggleThreadsPane,
-            className: 'p-1.5 transition-colors chat-panel-collapse-btn',
-            style: {
-              color: 'var(--q-bone0)',
-              borderRadius: 0
-            },
-            title: 'Collapse conversations'
-          },
-            React.createElement(CollapseChevron, { collapsed: false })
-          )
-        ),
+        // CC3 Branding header with connection status and collapse toggle
+        React.createElement(CC3BrandingHeader, {
+          onToggleCollapse: handleToggleThreadsPane
+        }),
         // ChatSidebar content (without its own header)
+        // WP-5: Pass namespace filter props and namespaceMap for cross-namespace view
         React.createElement(ChatSidebar, {
           threads: threads || [],
           selectedThreadId: selectedThreadId,
           onSelectThread: handleSelectThread,
           onCreateThread: handleCreateThread,
+          onCreateInNamespace: handleCreateThread,
           onDeleteThread: handleDeleteThread,
           loading: loadingThreads,
-          creating: creating
+          creating: creating,
+          namespaces: namespaces,
+          selectedNamespaceIds: selectedNamespaceIds,
+          onToggleNamespace: handleToggleNamespace,
+          namespaceMap: namespaceMap,
+          hasMore: hasMoreThreads,
+          onLoadMore: handleLoadMoreThreads
         })
       )
     ),
 
     // Main chat view (pass chain data for assignment pane + responsive mode)
+    // WP-6: Added draftText, onDraftChange, onMarkRead props for draft persistence and markRead
     React.createElement(ChatView, {
       thread: selectedThread,
       assignment: selectedAssignment || null,
@@ -673,7 +868,15 @@ export function ChatPanel({ namespaceId, namespaceName, responsive, onOpenNamesp
       onToggleThreadsPane: handleToggleThreadsPane,
       paneOpen: paneOpen,
       onTogglePane: handleTogglePane,
-      onClosePane: handleClosePane
+      onClosePane: handleClosePane,
+      draftText: currentDraft,
+      onDraftChange: handleDraftChange,
+      onMarkRead: handleMarkRead,
+      onUpdateAssignmentStatus: handleUpdateAssignmentStatus,
+      onChangeFocusAssignment: handleChangeFocusAssignment,
+      onKillJob: handleKillJob,
+      onKillChatJob: handleKillChatJob,
+      activeChatJob: activeChatJob || null
     })
   );
 }

@@ -22,17 +22,23 @@ export const api = {
     get: "assignments:get",
     getGroupChain: "assignments:getGroupChain",
     backfillNamespaceCounts: "assignments:backfillNamespaceCounts",
+    // Update assignment status
+    update: "assignments:update",
   },
 
   // Jobs API
   jobs: {
     list: "jobs:list",
+    // Kill signal for running jobs
+    requestKill: "jobs:requestKill",
   },
 
   // Chat threads API
   chatThreads: {
     // List all threads for a namespace
     list: "chatThreads:list",
+    // List all threads cross-namespace
+    listAll: "chatThreads:listAll",
     // Get a single thread by ID
     get: "chatThreads:get",
     // Create a new thread
@@ -42,7 +48,13 @@ export const api = {
     // Update thread title
     updateTitle: "chatThreads:updateTitle",
     // Delete a thread
-    remove: "chatThreads:remove"
+    remove: "chatThreads:remove",
+    // Mark thread as read (unread tracking)
+    markRead: "chatThreads:markRead",
+    // Change focused assignment
+    updateFocusAssignment: "chatThreads:updateFocusAssignment",
+    // Backfill latestMessageAt for existing threads (run once)
+    backfillLatestMessageAt: "chatThreads:backfillLatestMessageAt"
   },
 
   // Chat messages API
@@ -50,7 +62,9 @@ export const api = {
     // List messages for a thread
     list: "chatMessages:list",
     // Add a message to a thread
-    add: "chatMessages:add"
+    add: "chatMessages:add",
+    // Get latest message timestamp for unread calc
+    getLatestTimestamp: "chatMessages:getLatestTimestamp"
   },
 
   // Chat jobs API - LEGACY, kept for future cook mode conversion only
@@ -60,7 +74,9 @@ export const api = {
     // This is for future "Convert to Assignment" feature (cook mode explicit conversion)
     trigger: "chatJobs:trigger",
     // Get active (pending/running) chat job for typing indicator
-    getActiveForThread: "chatJobs:getActiveForThread"
+    getActiveForThread: "chatJobs:getActiveForThread",
+    // Kill signal for chat jobs
+    requestKill: "chatJobs:requestKill"
   },
 
 };

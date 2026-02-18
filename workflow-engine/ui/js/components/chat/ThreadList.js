@@ -9,8 +9,9 @@ import { EmptyState } from '../shared/EmptyState.js';
 /**
  * Wrapper that subscribes to a single assignment for a thread
  * Each thread with an assignmentId gets its own lightweight subscription
+ * WP-5: Passes namespaceName and latestMessageAt for namespace badge and unread dot
  */
-function ThreadItemWithAssignment({ thread, isSelected, onClick }) {
+function ThreadItemWithAssignment({ thread, isSelected, onClick, namespaceName }) {
   const { data: assignment } = useQuery(
     thread.assignmentId ? api.assignments.get : null,
     thread.assignmentId ? { id: thread.assignmentId } : {}
@@ -19,19 +20,23 @@ function ThreadItemWithAssignment({ thread, isSelected, onClick }) {
     thread,
     assignment: assignment || null,
     isSelected,
-    onClick
+    onClick,
+    namespaceName,
+    latestMessageAt: thread.latestMessageAt
   });
 }
 
 /**
  * ThreadList component - List of chat threads
+ * WP-5: Accepts namespaceMap for passing namespace names to ThreadItem
  * @param {Object} props
  * @param {Array} props.threads - Array of thread objects
  * @param {string} props.selectedThreadId - Currently selected thread ID
  * @param {Function} props.onSelectThread - Callback when thread is selected
  * @param {boolean} props.loading - Whether threads are loading
+ * @param {Object} props.namespaceMap - Map of namespace ID to name (WP-5)
  */
-export function ThreadList({ threads = [], selectedThreadId, onSelectThread, loading = false }) {
+export function ThreadList({ threads = [], selectedThreadId, onSelectThread, loading = false, namespaceMap }) {
   // Loading state
   if (loading && threads.length === 0) {
     return React.createElement('div', {
@@ -78,7 +83,8 @@ export function ThreadList({ threads = [], selectedThreadId, onSelectThread, loa
         React.createElement(ThreadItemWithAssignment, {
           thread: thread,
           isSelected: selectedThreadId === thread._id,
-          onClick: () => onSelectThread && onSelectThread(thread)
+          onClick: () => onSelectThread && onSelectThread(thread),
+          namespaceName: namespaceMap?.[thread.namespaceId]
         })
       )
     )

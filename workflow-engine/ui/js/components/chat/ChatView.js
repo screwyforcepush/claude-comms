@@ -1,10 +1,12 @@
 // ChatView - Main chat area for selected thread
+// WP-7: Added Stop/Interrupt button for active chatJob (R2), prop pass-through for U5, U6, R1
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatHeader } from './ChatHeader.js';
 import { MessageList } from './MessageList.js';
 import { ChatInput } from './ChatInput.js';
 import { AssignmentPane } from './AssignmentPane.js';
 import { JobDetail } from '../job/JobDetail.js';
+import { QIcon } from '../shared/index.js';
 
 /**
  * ChatView component - Main chat area with header, messages, and input
@@ -35,7 +37,15 @@ export function ChatView({
   onToggleThreadsPane,
   paneOpen = false,
   onTogglePane,
-  onClosePane
+  onClosePane,
+  draftText,        // WP-6: Per-thread draft text (controlled)
+  onDraftChange,    // WP-6: Draft change callback
+  onMarkRead,       // WP-6: Mark thread as read callback
+  onUpdateAssignmentStatus,  // WP-7 U5: Update assignment status
+  onChangeFocusAssignment,   // WP-7 U6: Change focused assignment
+  onKillJob,                 // WP-7 R1: Kill a running job
+  onKillChatJob,             // WP-7 R2: Kill active chatJob
+  activeChatJob = null       // WP-7 R2: Active chatJob for current thread
 }) {
   // WP-4: State for selected job modal
   const [selectedJob, setSelectedJob] = useState(null);
@@ -65,6 +75,22 @@ export function ChatView({
   const handleCloseJobModal = useCallback(() => {
     setSelectedJob(null);
   }, []);
+
+  // WP-7 R2: Stop/interrupt chat job state
+  const [stopRequested, setStopRequested] = useState(false);
+
+  // Reset stop requested state when activeChatJob changes
+  useEffect(() => {
+    setStopRequested(false);
+  }, [activeChatJob?._id]);
+
+  // WP-7 R2: Handle stop button click
+  const handleStopChatJob = useCallback(() => {
+    if (!activeChatJob?._id || !onKillChatJob) return;
+    setStopRequested(true);
+    onKillChatJob(activeChatJob._id);
+  }, [activeChatJob?._id, onKillChatJob]);
+
   // No thread selected state
   // WP-8: Transformed to Q palette styling
   if (!thread) {
@@ -172,13 +198,51 @@ export function ChatView({
       }),
 
       // Message list (scrollable)
+      // WP-6: Added onMarkRead prop for unread tracking
       React.createElement(MessageList, {
         messages: messages,
         loading: loadingMessages,
-        sending: sending
+        sending: sending,
+        onMarkRead: onMarkRead
       }),
 
+      // WP-7 R2: Stop button for active chatJob
+      activeChatJob && React.createElement('div', {
+        style: {
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '8px 16px 0',
+        }
+      },
+        React.createElement('button', {
+          type: 'button',
+          onClick: handleStopChatJob,
+          disabled: stopRequested || activeChatJob.killRequested,
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 16px',
+            fontFamily: 'var(--font-display)',
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            color: (stopRequested || activeChatJob.killRequested) ? 'var(--q-bone3)' : 'var(--q-lava1)',
+            backgroundColor: (stopRequested || activeChatJob.killRequested) ? 'var(--q-lava0)' : 'rgba(140, 40, 20, 0.2)',
+            border: '1px solid var(--q-lava0)',
+            borderRadius: 0,
+            cursor: (stopRequested || activeChatJob.killRequested) ? 'default' : 'pointer',
+            opacity: (stopRequested || activeChatJob.killRequested) ? 0.7 : 1,
+            transition: 'all var(--t-anim-transition-fast)',
+          }
+        },
+          React.createElement(QIcon, { name: 'skull', size: 14, color: 'currentColor' }),
+          (stopRequested || activeChatJob.killRequested) ? 'Stopping...' : 'Stop'
+        )
+      ),
+
       // Input area
+      // WP-6: Added draftText/onDraftChange props for per-thread draft persistence
       React.createElement(ChatInput, {
         onSend: onSendMessage,
         disabled: sending,
@@ -186,7 +250,9 @@ export function ChatView({
           ? 'Discuss alignment with the Quartermaster...'
           : thread.mode === 'cook'
             ? 'Tell the Quartermaster what to build...'
-            : 'Discuss ideas with the Quartermaster...'
+            : 'Discuss ideas with the Quartermaster...',
+        draftText: draftText,
+        onDraftChange: onDraftChange
       })
     ),
 
@@ -198,20 +264,27 @@ export function ChatView({
     }),
 
     // WP-3: Assignment pane (collapsible right sidebar, drawer on mobile)
+    // WP-7: Added status editing (U5), multi-assignment nav (U6), kill job (R1) props
     assignment && React.createElement(AssignmentPane, {
       assignment: assignment,
       chainGroups: chainData?.groups || [],
       isOpen: paneOpen,
       onClose: handleClosePane,
       onJobSelect: handleJobSelect,
-      responsive: responsive
+      responsive: responsive,
+      onUpdateStatus: onUpdateAssignmentStatus,
+      onChangeFocusAssignment: onChangeFocusAssignment,
+      thread: thread,
+      onKillJob: onKillJob
     }),
 
     // WP-4: Job detail modal
+    // WP-7 R1: Pass onKillJob so Kill button works in modal view
     selectedJob && React.createElement(JobDetail, {
       job: selectedJob,
       onClose: handleCloseJobModal,
-      isModal: true
+      isModal: true,
+      onKillJob: onKillJob
     })
   );
 }

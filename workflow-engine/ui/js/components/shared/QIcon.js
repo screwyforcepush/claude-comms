@@ -74,9 +74,10 @@ export const ICON_PATHS = {
     strokeLinejoin: 'miter'
   }),
   skull: (sw) => React.createElement(React.Fragment, null,
-    React.createElement('path', { d: 'M6 14 C6 7, 18 7, 18 14 L18 16 L15 16 L14 18 L10 18 L9 16 L6 16Z', stroke: 'currentColor', strokeWidth: sw, fill: 'none' }),
-    React.createElement('circle', { cx: 10, cy: 12, r: 1.5, fill: 'currentColor' }),
-    React.createElement('circle', { cx: 14, cy: 12, r: 1.5, fill: 'currentColor' })
+    React.createElement('path', { d: 'M5 12 C5 4, 19 4, 19 12 L19 15 L17 15 L17 18 L15 18 L14 22 L10 22 L9 18 L7 18 L7 15 L5 15Z', stroke: 'currentColor', strokeWidth: sw, fill: 'none', strokeLinejoin: 'miter' }),
+    React.createElement('rect', { x: 8, y: 9, width: 3, height: 4, fill: 'currentColor', opacity: 0.85 }),
+    React.createElement('rect', { x: 13, y: 9, width: 3, height: 4, fill: 'currentColor', opacity: 0.85 }),
+    React.createElement('path', { d: 'M11 14 L12 16 L13 14', stroke: 'currentColor', strokeWidth: sw * 0.6, fill: 'none' })
   ),
   pentagram: (sw) => {
     const pts = [0, 1, 2, 3, 4].map(i => {
@@ -105,9 +106,9 @@ export const ICON_PATHS = {
 
   // --- System UI ---
   eye: (sw) => React.createElement(React.Fragment, null,
-    React.createElement('path', { d: 'M2 12 C5 7, 19 7, 22 12 C19 17, 5 17, 2 12Z', stroke: 'currentColor', strokeWidth: sw, fill: 'none' }),
-    React.createElement('circle', { cx: 12, cy: 12, r: 3, stroke: 'currentColor', strokeWidth: sw, fill: 'none' }),
-    React.createElement('circle', { cx: 12, cy: 12, r: 1, fill: 'currentColor' })
+    React.createElement('path', { d: 'M2 12 C5 3, 19 3, 22 12 C19 21, 5 21, 2 12Z', stroke: 'currentColor', strokeWidth: sw, fill: 'none', strokeLinejoin: 'miter' }),
+    React.createElement('circle', { cx: 12, cy: 12, r: 5, stroke: 'currentColor', strokeWidth: sw, fill: 'none' }),
+    React.createElement('circle', { cx: 12, cy: 12, r: 2, fill: 'currentColor' })
   ),
   search: (sw) => React.createElement(React.Fragment, null,
     React.createElement('circle', { cx: 10, cy: 10, r: 6, stroke: 'currentColor', strokeWidth: sw, fill: 'none' }),

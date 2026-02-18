@@ -94,6 +94,8 @@ export default defineSchema({
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
     exitForced: v.optional(v.boolean()),
+    // Phase 10: Operations Center Upgrade
+    killRequested: v.optional(v.boolean()), // R1: Agent kill signal from UI
     createdAt: v.number(),
   })
     .index("by_group", ["groupId"])
@@ -109,12 +111,17 @@ export default defineSchema({
     lastPromptMode: v.optional(v.union(v.literal("jam"), v.literal("cook"))),
     assignmentId: v.optional(v.id("assignments")),
     claudeSessionId: v.optional(v.string()),
+    // Phase 10: Operations Center Upgrade
+    lastReadAt: v.optional(v.number()), // B1: Unread tracking — timestamp of last read
+    assignmentsCreated: v.optional(v.array(v.id("assignments"))), // U6: Multi-assignment history
+    latestMessageAt: v.optional(v.number()), // Denormalized: timestamp of most recent message
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_namespace", ["namespaceId"])
     .index("by_namespace_updated", ["namespaceId", "updatedAt"])
-    .index("by_assignment", ["assignmentId"]),
+    .index("by_assignment", ["assignmentId"])
+    .index("by_latest_message", ["latestMessageAt"]),
 
   chatMessages: defineTable({
     threadId: v.id("chatThreads"),
@@ -151,6 +158,8 @@ export default defineSchema({
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
     exitForced: v.optional(v.boolean()),
+    // Phase 10: Operations Center Upgrade
+    killRequested: v.optional(v.boolean()), // R1/R2: Chat job kill signal from UI
     createdAt: v.number(),
   })
     .index("by_namespace", ["namespaceId"])

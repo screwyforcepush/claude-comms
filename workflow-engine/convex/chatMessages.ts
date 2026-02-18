@@ -16,6 +16,19 @@ export const list = query({
   },
 });
 
+export const getLatestTimestamp = query({
+  args: { password: v.string(), threadId: v.id("chatThreads") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const latest = await ctx.db
+      .query("chatMessages")
+      .withIndex("by_thread_created", (q) => q.eq("threadId", args.threadId))
+      .order("desc")
+      .first();
+    return latest?.createdAt ?? null;
+  },
+});
+
 // Mutations
 
 export const add = mutation({
@@ -30,8 +43,8 @@ export const add = mutation({
     requirePassword(args);
     const now = Date.now();
 
-    // Update thread's updatedAt
-    await ctx.db.patch(args.threadId, { updatedAt: now });
+    // Update thread's updatedAt + denormalized latestMessageAt
+    await ctx.db.patch(args.threadId, { updatedAt: now, latestMessageAt: now });
 
     return await ctx.db.insert("chatMessages", {
       threadId: args.threadId,

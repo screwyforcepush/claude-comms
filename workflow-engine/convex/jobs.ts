@@ -390,6 +390,19 @@ export const updateMetrics = mutation({
   },
 });
 
+export const requestKill = mutation({
+  args: { password: v.string(), id: v.id("jobs") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const job = await ctx.db.get(args.id);
+    if (!job) throw new Error("Job not found");
+    if (job.status !== "running" && job.status !== "pending") {
+      throw new Error("Can only kill running or pending jobs");
+    }
+    await ctx.db.patch(args.id, { killRequested: true });
+  },
+});
+
 // ============================================================================
 // Internal Helpers
 // ============================================================================

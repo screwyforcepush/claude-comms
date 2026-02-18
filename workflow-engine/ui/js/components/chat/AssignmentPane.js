@@ -1,6 +1,7 @@
 // AssignmentPane - Collapsible right sidebar showing assignment details + job chain
 // WP-8: Transformed to Q palette brandkit styling
-import React, { useState, useMemo } from "react";
+// WP-7: Added StatusPill dropdown (U5) and multi-assignment navigation (U6)
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "../../hooks/useConvex.js";
 import { api } from "../../api.js";
 import { StatusBadge } from "../shared/StatusBadge.js";
@@ -93,6 +94,279 @@ function CloseIcon() {
 
 
 /**
+ * StatusPill - Clickable status badge with dropdown for editing assignment status (U5)
+ * Shows current status as a styled pill; clicking opens a dropdown with pending/active/blocked options.
+ * @param {Object} props
+ * @param {string} props.status - Current assignment status
+ * @param {Function} props.onChangeStatus - Callback when a new status is selected
+ */
+function StatusPill({ status, onChangeStatus }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hoveredStatus, setHoveredStatus] = useState(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const pillRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Close on outside click - check both pillRef and dropdownRef
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => {
+      const inPill = pillRef.current && pillRef.current.contains(e.target);
+      const inDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+      if (!inPill && !inDropdown) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isOpen]);
+
+  // Calculate dropdown position from pill's bounding rect when opening
+  useEffect(() => {
+    if (isOpen && pillRef.current) {
+      const rect = pillRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, [isOpen]);
+
+  const statuses = ["pending", "active", "blocked"];
+  const statusColors = {
+    pending: "var(--q-copper1)",
+    active: "var(--q-teleport-bright)",
+    blocked: "var(--q-lava1)",
+  };
+
+  const currentColor = statusColors[status] || "var(--q-iron1)";
+
+  return React.createElement(
+    "div",
+    {
+      style: { display: "inline-block" },
+    },
+    // Pill button
+    React.createElement(
+      "button",
+      {
+        ref: pillRef,
+        type: "button",
+        onClick: () => setIsOpen(!isOpen),
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "4px",
+          padding: "2px 8px",
+          fontFamily: "var(--font-display)",
+          fontSize: "10px",
+          textTransform: "uppercase",
+          letterSpacing: "2px",
+          color: currentColor,
+          backgroundColor: "transparent",
+          border: "1px solid " + currentColor,
+          borderRadius: 0,
+          cursor: "pointer",
+          transition: "all var(--t-anim-transition-fast)",
+        },
+      },
+      status || "unknown",
+      React.createElement(QIcon, {
+        name: "chevronDown",
+        size: 10,
+        color: "currentColor",
+      }),
+    ),
+    // Dropdown - uses position:fixed to escape overflow:hidden ancestors
+    isOpen &&
+      React.createElement(
+        "div",
+        {
+          ref: dropdownRef,
+          style: {
+            position: "fixed",
+            top: dropdownPos.top + "px",
+            left: dropdownPos.left + "px",
+            minWidth: "120px",
+            backgroundColor: "var(--q-stone2)",
+            border: "1px solid var(--q-copper1)",
+            borderRadius: 0,
+            zIndex: 9999,
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+          },
+        },
+        statuses.map((s) =>
+          React.createElement(
+            "button",
+            {
+              key: s,
+              type: "button",
+              onClick: () => {
+                if (s !== status) {
+                  onChangeStatus(s);
+                }
+                setIsOpen(false);
+              },
+              onMouseEnter: () => setHoveredStatus(s),
+              onMouseLeave: () => setHoveredStatus(null),
+              style: {
+                display: "block",
+                width: "100%",
+                padding: "6px 12px",
+                fontFamily: "var(--font-display)",
+                fontSize: "10px",
+                textTransform: "uppercase",
+                letterSpacing: "2px",
+                textAlign: "left",
+                color:
+                  s === status
+                    ? "var(--q-torch)"
+                    : "var(--q-bone3)",
+                backgroundColor:
+                  s === status
+                    ? "rgba(212, 160, 48, 0.12)"
+                    : hoveredStatus === s
+                      ? "var(--q-stone3)"
+                      : "transparent",
+                border: "none",
+                borderRadius: 0,
+                cursor: "pointer",
+                transition: "all var(--t-anim-transition-fast)",
+              },
+            },
+            s,
+          ),
+        ),
+      ),
+  );
+}
+
+/**
+ * AssignmentNav - Multi-assignment prev/next navigation (U6)
+ * Shows "Assignment X/N" with prev/next arrow buttons when thread has 2+ assignments.
+ * @param {Object} props
+ * @param {Object} props.thread - Thread object with assignmentsCreated array
+ * @param {string} props.assignmentId - Current assignment ID
+ * @param {Function} props.onChangeFocusAssignment - Callback when navigating to a different assignment
+ */
+function AssignmentNav({ thread, assignmentId, onChangeFocusAssignment }) {
+  const [prevHovered, setPrevHovered] = useState(false);
+  const [nextHovered, setNextHovered] = useState(false);
+
+  const assignmentsCreated = thread?.assignmentsCreated;
+  if (!assignmentsCreated || assignmentsCreated.length < 2) return null;
+
+  const currentIndex = assignmentsCreated.indexOf(assignmentId);
+  if (currentIndex === -1) return null;
+
+  const total = assignmentsCreated.length;
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < total - 1;
+
+  const arrowButtonStyle = (enabled, hovered) => ({
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "24px",
+    height: "24px",
+    padding: 0,
+    backgroundColor: hovered && enabled ? "var(--q-stone2)" : "transparent",
+    border: "none",
+    borderRadius: 0,
+    color: enabled
+      ? hovered
+        ? "var(--q-copper3)"
+        : "var(--q-copper2)"
+      : "var(--q-iron0)",
+    cursor: enabled ? "pointer" : "default",
+    opacity: enabled ? 1 : 0.3,
+    transition: "all var(--t-anim-transition-fast)",
+  });
+
+  return React.createElement(
+    "div",
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+      },
+    },
+    // Prev button
+    React.createElement(
+      "button",
+      {
+        type: "button",
+        disabled: !hasPrev,
+        onClick: () => {
+          if (hasPrev) onChangeFocusAssignment(assignmentsCreated[currentIndex - 1]);
+        },
+        onMouseEnter: () => setPrevHovered(true),
+        onMouseLeave: () => setPrevHovered(false),
+        style: arrowButtonStyle(hasPrev, prevHovered),
+        title: "Previous assignment",
+      },
+      React.createElement(
+        "svg",
+        {
+          style: { width: "14px", height: "14px" },
+          fill: "none",
+          stroke: "currentColor",
+          viewBox: "0 0 24 24",
+          strokeWidth: "2",
+        },
+        React.createElement("polyline", {
+          points: "15,18 9,12 15,6",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+        }),
+      ),
+    ),
+    // "Assignment X/N" label
+    React.createElement(
+      "span",
+      {
+        style: {
+          fontFamily: "var(--font-display)",
+          fontSize: "12px",
+          color: "var(--q-bone2)",
+          letterSpacing: "1px",
+          whiteSpace: "nowrap",
+        },
+      },
+      `${currentIndex + 1}/${total}`,
+    ),
+    // Next button
+    React.createElement(
+      "button",
+      {
+        type: "button",
+        disabled: !hasNext,
+        onClick: () => {
+          if (hasNext) onChangeFocusAssignment(assignmentsCreated[currentIndex + 1]);
+        },
+        onMouseEnter: () => setNextHovered(true),
+        onMouseLeave: () => setNextHovered(false),
+        style: arrowButtonStyle(hasNext, nextHovered),
+        title: "Next assignment",
+      },
+      React.createElement(
+        "svg",
+        {
+          style: { width: "14px", height: "14px" },
+          fill: "none",
+          stroke: "currentColor",
+          viewBox: "0 0 24 24",
+          strokeWidth: "2",
+        },
+        React.createElement("polyline", {
+          points: "9,6 15,12 9,18",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+        }),
+      ),
+    ),
+  );
+}
+
+/**
  * Collapsible section header - Q palette styling
  */
 function SectionHeader({ title, count, isOpen, onToggle }) {
@@ -153,7 +427,7 @@ function SectionHeader({ title, count, isOpen, onToggle }) {
               backgroundColor: "var(--q-stone3)",
               color: "var(--q-bone1)",
               padding: "2px 8px",
-              borderRadius: "9999px",
+              borderRadius: 0,
             },
           },
           count,
@@ -350,7 +624,7 @@ function DecisionItem({ decision, index }) {
             style: {
               ...getStatusStyle(decision.status),
               padding: "2px 6px",
-              borderRadius: "9999px",
+              borderRadius: 0,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "1px",
@@ -395,6 +669,10 @@ function DecisionItem({ decision, index }) {
  * @param {Function} props.onClose - Callback to close the pane
  * @param {Function} props.onJobSelect - Callback when a job is selected
  * @param {Object} props.responsive - Responsive mode info (WP-5)
+ * @param {Function} props.onUpdateStatus - Callback to update assignment status (WP-7 U5)
+ * @param {Function} props.onChangeFocusAssignment - Callback to change focused assignment (WP-7 U6)
+ * @param {Object} props.thread - Thread object for multi-assignment navigation (WP-7 U6)
+ * @param {Function} props.onKillJob - Callback to kill a running job (WP-7 R1)
  */
 export function AssignmentPane({
   assignment,
@@ -403,6 +681,10 @@ export function AssignmentPane({
   onClose,
   onJobSelect,
   responsive,
+  onUpdateStatus,
+  onChangeFocusAssignment,
+  thread,
+  onKillJob,
 }) {
   // Subscribe to jobs per group individually
   const groups = useGroupJobs(chainGroups);
@@ -479,6 +761,7 @@ export function AssignmentPane({
               alignItems: "center",
               gap: "8px",
               minWidth: 0,
+              flex: 1,
             },
           },
           React.createElement(
@@ -495,7 +778,7 @@ export function AssignmentPane({
                 margin: 0,
               },
             },
-            "Assignment Details",
+            "Assignment",
           ),
           React.createElement(
             "code",
@@ -508,6 +791,19 @@ export function AssignmentPane({
             },
             shortId,
           ),
+          // WP-7 U5: Status pill dropdown
+          onUpdateStatus &&
+            React.createElement(StatusPill, {
+              status: status,
+              onChangeStatus: onUpdateStatus,
+            }),
+          // WP-7 U6: Multi-assignment navigation
+          onChangeFocusAssignment &&
+            React.createElement(AssignmentNav, {
+              thread: thread,
+              assignmentId: _id,
+              onChangeFocusAssignment: onChangeFocusAssignment,
+            }),
         ),
         React.createElement(
           "button",
@@ -624,6 +920,7 @@ export function AssignmentPane({
             layout: "vertical",
             assignmentStatus: status,
             independent,
+            onKillJob,
           }),
 
         // Artifacts (collapsible)

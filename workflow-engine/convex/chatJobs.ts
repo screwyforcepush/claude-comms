@@ -202,6 +202,22 @@ export const updateMetrics = mutation({
 });
 
 /**
+ * Request kill for a running or pending chat job
+ */
+export const requestKill = mutation({
+  args: { password: v.string(), id: v.id("chatJobs") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const job = await ctx.db.get(args.id);
+    if (!job) throw new Error("Chat job not found");
+    if (job.status !== "running" && job.status !== "pending") {
+      throw new Error("Can only kill running or pending chat jobs");
+    }
+    await ctx.db.patch(args.id, { killRequested: true });
+  },
+});
+
+/**
  * Get pending chat jobs for a namespace
  */
 export const getPending = query({

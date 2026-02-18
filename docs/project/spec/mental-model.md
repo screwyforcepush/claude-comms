@@ -123,13 +123,38 @@ The Runner executes jobs using the user's API tokens (Anthropic, OpenAI, Google)
 
 A simple password wall stops this without adding complexity.
 
+## UI Mental Model — Cross-Namespace Operations Center
+
+### Thread Management
+The user's primary workflow surface is the **thread list**. Key principles:
+- **All-namespace view is the default** — Threads from all namespaces shown together, sorted by most recent activity (`updatedAt`). Active threads (new messages, mode changes, assignment links) naturally bubble to the top. The user manages work across many namespaces and needs a unified view.
+- **Namespace filtering is secondary** — An accordion filter (collapsed by default) above the thread list lets the user toggle namespaces on/off. Multi-select (0 selected = all). No separate namespace drawer.
+- **Thread items show namespace labels** — Since threads from different namespaces are mixed, each thread item needs a namespace badge for context.
+- **Unread indicators** — Threads show an unread dot (Fullbright torch-colored pulse) when messages exist after `lastReadAt`. Binary indicator — no count. Tracked via `lastReadAt` timestamp on the thread and server-enriched `latestMessageAt` from `chatThreads.listAll`.
+
+### Draft Persistence
+When the user types in a chat pane and switches to another thread, the draft text must survive. Per-thread draft state stored client-side (localStorage or in-memory state keyed by threadId). This is critical for the user's multi-tasking workflow — they often start composing in one thread, jump to another for a quick message, and return.
+
+### Assignment Navigation
+A single thread may spawn multiple assignments over its lifetime (e.g., the Outcome Navigator creates assignment 1, then later assignment 2). The current `assignmentId` field is a "focus" pointer — it shows which assignment the UI is focused on. The `assignmentsCreated` array tracks all assignments ever linked from this thread. The user can click through them in the assignment pane to review history and switch focus.
+
+### Agent Control
+The user needs to be able to:
+- **Change assignment status** from the UI (click status pill → dropdown → active/blocked/pending)
+- **Kill running agents** — A button in the job detail modal sets `killRequested` on the job/chatJob. The runner (which owns the process) watches for this and terminates the agent.
+- **Interrupt chat jobs** — Same kill mechanism, but the thread stays conversational so the user can send a follow-up message with more detail.
+
+### Self-Modification Awareness
+Claude Comms is its own upstream — changes here propagate to all client repos. The system must be careful about backward compatibility:
+- Schema changes should be additive (optional fields)
+- Runner-touching changes require manual runner restart by the user
+- The UI and Convex backend deploy atomically, so UI-only or UI+backend changes are safe
+
 ## Non-Goals / Out of Scope
 
 - OAuth, BetterAuth, or complex authentication (single-user system)
-- Business logic modifications
-- New features or capabilities
-- Changes to data contracts or information architecture
 - Mobile-specific redesigns (maintain existing responsive behavior)
+- God-mode / cross-namespace agent interrogation (parked idea — revisit when use case is clearer)
 
 ## Open Questions
 

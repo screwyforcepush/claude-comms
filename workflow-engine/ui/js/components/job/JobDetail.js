@@ -1,9 +1,11 @@
 // JobDetail - Expanded job view with modal support (D3)
 // WP-7: Transformed to Q palette brandkit styling
+// WP-7: Added Kill button for running jobs (R1)
 import React, { useEffect, useCallback } from 'react';
 import { StatusBadge } from '../shared/StatusBadge.js';
 import { Timestamp } from '../shared/Timestamp.js';
 import { JsonViewer } from '../shared/JsonViewer.js';
+import { QIcon } from '../shared/index.js';
 
 /**
  * Close icon
@@ -366,7 +368,7 @@ function Modal({ isOpen, onClose, children }) {
  * @param {Function} props.onClose - Callback to close the modal
  * @param {boolean} props.isModal - Whether displaying as modal (default true)
  */
-export function JobDetail({ job, onClose, isModal = true }) {
+export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
   const {
     _id,
     assignmentId,
@@ -390,6 +392,7 @@ export function JobDetail({ job, onClose, isModal = true }) {
   const shortNextJobId = nextJobId ? nextJobId.slice(-8) : null;
   const [now, setNow] = React.useState(Date.now());
   const [closeHovered, setCloseHovered] = React.useState(false);
+  const [killHovered, setKillHovered] = React.useState(false);
 
   // Calculate duration
   const duration = React.useMemo(() => {
@@ -641,6 +644,71 @@ export function JobDetail({ job, onClose, isModal = true }) {
             }
           }, 'Status'),
           React.createElement(StatusBadge, { status, size: 'sm' })
+        )
+      ),
+
+      // WP-7 R1: Kill button for running jobs
+      onKillJob && status === 'running' && !job.killRequested && React.createElement('div', {
+        style: {
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'flex-start'
+        }
+      },
+        React.createElement('button', {
+          type: 'button',
+          onClick: () => onKillJob(job._id),
+          onMouseEnter: () => setKillHovered(true),
+          onMouseLeave: () => setKillHovered(false),
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 16px',
+            fontFamily: 'var(--font-display)',
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            color: 'var(--q-lava1)',
+            backgroundColor: killHovered ? 'rgba(140, 40, 20, 0.3)' : 'rgba(140, 40, 20, 0.2)',
+            border: '1px solid var(--q-lava0)',
+            borderRadius: 0,
+            cursor: 'pointer',
+            transition: 'all var(--t-anim-transition-fast)',
+          }
+        },
+          React.createElement(QIcon, { name: 'skull', size: 14, color: 'currentColor' }),
+          'Kill Agent'
+        )
+      ),
+
+      // WP-7 R1: Kill requested indicator
+      onKillJob && job.killRequested && React.createElement('div', {
+        style: {
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'flex-start'
+        }
+      },
+        React.createElement('span', {
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 16px',
+            fontFamily: 'var(--font-display)',
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            color: 'var(--q-bone3)',
+            backgroundColor: 'var(--q-lava0)',
+            border: '1px solid var(--q-lava0)',
+            borderRadius: 0,
+            opacity: 0.7,
+          }
+        },
+          React.createElement(QIcon, { name: 'skull', size: 14, color: 'currentColor' }),
+          'Kill Requested'
         )
       ),
 

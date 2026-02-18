@@ -10,8 +10,9 @@ import { EmptyState } from '../shared/EmptyState.js';
  * @param {Array} props.messages - Array of message objects
  * @param {boolean} props.loading - Whether messages are loading
  * @param {boolean} props.sending - Whether a message is being sent
+ * @param {Function} [props.onMarkRead] - Callback to mark thread as read when messages render (WP-6)
  */
-export function MessageList({ messages = [], loading = false, sending = false }) {
+export function MessageList({ messages = [], loading = false, sending = false, onMarkRead }) {
   const containerRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -21,6 +22,13 @@ export function MessageList({ messages = [], loading = false, sending = false })
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, sending]);
+
+  // WP-6: Trigger markRead when messages are viewed (new messages arrive while thread is active)
+  useEffect(() => {
+    if (onMarkRead && messages.length > 0) {
+      onMarkRead();
+    }
+  }, [messages, onMarkRead]);
 
   // Loading state - Q palette bone text
   if (loading && messages.length === 0) {
