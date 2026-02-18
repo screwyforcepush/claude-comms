@@ -88,6 +88,10 @@ const projectRoot = join(__dirname, "..", "..", "..");
 let client: ConvexClient | null = null;
 let unsubscribeJobs: (() => void) | null = null;
 let unsubscribeChatJobs: (() => void) | null = null;
+let unsubscribeHitList: (() => void) | null = null;
+
+// Track jobs killed by user (for "Killed by user" reason in onFail)
+const killedJobIds = new Set<string>();
 
 // Harness executor (handles process spawning, file-based event streaming, orphan recovery)
 const executor = new HarnessExecutor({
@@ -577,11 +581,13 @@ async function executeJob(
       },
       onFail: async (reason, partialResult, exitForced) => {
         stopHeartbeat();
+        const wasKilled = killedJobIds.delete(jobId);
+        const effectiveReason = wasKilled ? "Killed by user" : reason;
         try {
           await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
-            result: partialResult || reason,
+            result: partialResult || effectiveReason,
             toolCallCount: metrics.toolCallCount,
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
@@ -592,7 +598,7 @@ async function executeJob(
             await saveChatResponse(
               chatContext.threadId,
               partialResult || "",
-              `Agent failed (${reason}). Partial response shown above.`
+              wasKilled ? "Killed by user." : `Agent failed (${reason}). Partial response shown above.`
             );
           } else {
             await handleGroupCompletion(group, assignment, true);
@@ -914,11 +920,13 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
       },
       onFail: async (reason, partialResult, exitForced) => {
         stopHeartbeat();
+        const wasKilled = killedJobIds.delete(jobId);
+        const effectiveReason = wasKilled ? "Killed by user" : reason;
         try {
           await client!.mutation(api.chatJobs.fail, {
             password: config.password,
             id: jobId,
-            result: partialResult || reason,
+            result: partialResult || effectiveReason,
             toolCallCount: metrics.toolCallCount,
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
@@ -928,7 +936,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           await saveChatResponse(
             chatContext.threadId,
             partialResult || "",
-            `Agent failed (${reason}). Partial response shown above.`
+            wasKilled ? "Killed by user." : `Agent failed (${reason}). Partial response shown above.`
           );
         } catch (e) {
           console.error(`[${jobId}] Error in onFail:`, e);
@@ -970,6 +978,20 @@ async function processChatQueue(readyChatJobs: ReadyChatJob[]): Promise<void> {
     executeChatJob(chatJob).catch((e) => {
       console.error(`Error executing chat job ${chatJob._id}:`, e);
     });
+  }
+}
+
+// Kill handler - processes hit list from Convex subscription
+function processHitList(hitList: { jobIds: string[]; chatJobIds: string[] }): void {
+  const allIds = [...hitList.jobIds, ...hitList.chatJobIds];
+  if (allIds.length === 0) return;
+
+  for (const id of allIds) {
+    if (!executor.isTracking(id)) continue;
+    console.log(`[Kill] Kill requested for ${id}, sending SIGTERM`);
+    killedJobIds.add(id);
+    const handle = executor.getHandle(id);
+    if (handle) handle.kill();
   }
 }
 
@@ -1037,6 +1059,18 @@ async function startRunner() {
       setTimeout(startRunner, 5000);
     }
   );
+
+  // Subscribe to kill requests (jobs/chatJobs with killRequested=true)
+  unsubscribeHitList = client.onUpdate(
+    api.scheduler.getHitList,
+    { password: config.password },
+    (hitList: { jobIds: string[]; chatJobIds: string[] }) => {
+      processHitList(hitList);
+    },
+    (error: Error) => {
+      console.error("Hit list subscription error:", error);
+    }
+  );
 }
 
 function cleanup() {
@@ -1044,6 +1078,8 @@ function cleanup() {
   unsubscribeJobs = null;
   unsubscribeChatJobs?.();
   unsubscribeChatJobs = null;
+  unsubscribeHitList?.();
+  unsubscribeHitList = null;
 
   // Kill all active jobs via executor
   executor.killAll();

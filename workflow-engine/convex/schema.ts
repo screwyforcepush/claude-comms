@@ -100,7 +100,8 @@ export default defineSchema({
   })
     .index("by_group", ["groupId"])
     .index("by_group_status", ["groupId", "status"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_status_killRequested", ["status", "killRequested"]),
 
   chatThreads: defineTable({
     namespaceId: v.id("namespaces"),
@@ -166,5 +167,6 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_namespace_status", ["namespaceId", "status"])
     .index("by_thread", ["threadId"])
-    .index("by_thread_status", ["threadId", "status"]),
+    .index("by_thread_status", ["threadId", "status"])
+    .index("by_status_killRequested", ["status", "killRequested"]),
 });

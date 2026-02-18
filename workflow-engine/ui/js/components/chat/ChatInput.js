@@ -34,7 +34,7 @@ function getInitialEnterSafe() {
  * @param {string} [props.draftText] - Controlled draft value (optional, WP-6)
  * @param {Function} [props.onDraftChange] - Draft change callback (optional, WP-6)
  */
-export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...', draftText, onDraftChange }) {
+export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...', draftText, onDraftChange, onStop, stopPending = false }) {
   const [internalMessage, setInternalMessage] = useState('');
 
   // Use controlled value if provided, otherwise internal state
@@ -293,29 +293,52 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
           )
         ),
 
-        // Send button
-        React.createElement('button', {
-          type: 'submit',
-          disabled: !canSend,
-          className: 'flex-shrink-0 w-12 h-12 flex items-center justify-center transition-all',
-          style: {
-            background: canSend
-              ? 'linear-gradient(180deg, var(--q-copper1), var(--q-copper0))'
-              : 'var(--q-stone2)',
-            border: `1px solid ${canSend ? 'var(--q-copper2)' : 'var(--q-stone3)'}`,
-            borderBottom: `2px solid ${canSend ? 'var(--q-void0)' : 'var(--q-void0)'}`,
-            borderRadius: 0,
-            color: canSend ? 'var(--q-void0)' : 'var(--q-bone0)',
-            cursor: canSend ? 'pointer' : 'not-allowed'
-          },
-          title: canSend ? 'Send message' : disabled ? 'Sending...' : 'Type a message to send'
-        },
-          React.createElement(QIcon, {
-            name: 'dispatch',
-            size: 20,
-            color: 'currentColor'
-          })
-        )
+        // Send / Stop button
+        disabled && onStop
+          ? React.createElement('button', {
+              type: 'button',
+              onClick: onStop,
+              disabled: stopPending,
+              className: 'flex-shrink-0 w-12 h-12 flex items-center justify-center transition-all',
+              style: {
+                background: stopPending ? 'var(--q-lava0)' : 'rgba(140, 40, 20, 0.2)',
+                border: '1px solid var(--q-lava0)',
+                borderBottom: '2px solid var(--q-void0)',
+                borderRadius: 0,
+                color: stopPending ? 'var(--q-bone3)' : 'var(--q-lava1)',
+                cursor: stopPending ? 'default' : 'pointer',
+                opacity: stopPending ? 0.7 : 1
+              },
+              title: stopPending ? 'Stopping...' : 'Stop'
+            },
+              React.createElement(QIcon, {
+                name: 'skull',
+                size: 20,
+                color: 'currentColor'
+              })
+            )
+          : React.createElement('button', {
+              type: 'submit',
+              disabled: !canSend,
+              className: 'flex-shrink-0 w-12 h-12 flex items-center justify-center transition-all',
+              style: {
+                background: canSend
+                  ? 'linear-gradient(180deg, var(--q-copper1), var(--q-copper0))'
+                  : 'var(--q-stone2)',
+                border: `1px solid ${canSend ? 'var(--q-copper2)' : 'var(--q-stone3)'}`,
+                borderBottom: `2px solid ${canSend ? 'var(--q-void0)' : 'var(--q-void0)'}`,
+                borderRadius: 0,
+                color: canSend ? 'var(--q-void0)' : 'var(--q-bone0)',
+                cursor: canSend ? 'pointer' : 'not-allowed'
+              },
+              title: canSend ? 'Send message' : disabled ? 'Sending...' : 'Type a message to send'
+            },
+              React.createElement(QIcon, {
+                name: 'dispatch',
+                size: 20,
+                color: 'currentColor'
+              })
+            )
       )
     )
   );

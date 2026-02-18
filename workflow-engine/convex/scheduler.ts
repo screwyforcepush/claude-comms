@@ -241,3 +241,30 @@ export const getReadyChatJobs = query({
     return pendingChatJobs.map((chatJob) => ({ chatJob }));
   },
 });
+
+// Get running jobs/chatJobs with killRequested=true (hit list for runner)
+export const getHitList = query({
+  args: { password: v.string() },
+  handler: async (ctx, args): Promise<{ jobIds: string[]; chatJobIds: string[] }> => {
+    requirePassword(args);
+
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_status_killRequested", (q) =>
+        q.eq("status", "running").eq("killRequested", true)
+      )
+      .collect();
+
+    const chatJobs = await ctx.db
+      .query("chatJobs")
+      .withIndex("by_status_killRequested", (q) =>
+        q.eq("status", "running").eq("killRequested", true)
+      )
+      .collect();
+
+    return {
+      jobIds: jobs.map((j) => j._id),
+      chatJobIds: chatJobs.map((j) => j._id),
+    };
+  },
+});

@@ -1,12 +1,11 @@
 // ChatView - Main chat area for selected thread
-// WP-7: Added Stop/Interrupt button for active chatJob (R2), prop pass-through for U5, U6, R1
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatHeader } from './ChatHeader.js';
 import { MessageList } from './MessageList.js';
 import { ChatInput } from './ChatInput.js';
 import { AssignmentPane } from './AssignmentPane.js';
 import { JobDetail } from '../job/JobDetail.js';
-import { QIcon } from '../shared/index.js';
+
 
 /**
  * ChatView component - Main chat area with header, messages, and input
@@ -206,41 +205,6 @@ export function ChatView({
         onMarkRead: onMarkRead
       }),
 
-      // WP-7 R2: Stop button for active chatJob
-      activeChatJob && React.createElement('div', {
-        style: {
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '8px 16px 0',
-        }
-      },
-        React.createElement('button', {
-          type: 'button',
-          onClick: handleStopChatJob,
-          disabled: stopRequested || activeChatJob.killRequested,
-          style: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 16px',
-            fontFamily: 'var(--font-display)',
-            fontSize: '11px',
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-            color: (stopRequested || activeChatJob.killRequested) ? 'var(--q-bone3)' : 'var(--q-lava1)',
-            backgroundColor: (stopRequested || activeChatJob.killRequested) ? 'var(--q-lava0)' : 'rgba(140, 40, 20, 0.2)',
-            border: '1px solid var(--q-lava0)',
-            borderRadius: 0,
-            cursor: (stopRequested || activeChatJob.killRequested) ? 'default' : 'pointer',
-            opacity: (stopRequested || activeChatJob.killRequested) ? 0.7 : 1,
-            transition: 'all var(--t-anim-transition-fast)',
-          }
-        },
-          React.createElement(QIcon, { name: 'skull', size: 14, color: 'currentColor' }),
-          (stopRequested || activeChatJob.killRequested) ? 'Stopping...' : 'Stop'
-        )
-      ),
-
       // Input area
       // WP-6: Added draftText/onDraftChange props for per-thread draft persistence
       React.createElement(ChatInput, {
@@ -252,7 +216,9 @@ export function ChatView({
             ? 'Tell the Quartermaster what to build...'
             : 'Discuss ideas with the Quartermaster...',
         draftText: draftText,
-        onDraftChange: onDraftChange
+        onDraftChange: onDraftChange,
+        onStop: activeChatJob ? handleStopChatJob : null,
+        stopPending: stopRequested || !!activeChatJob?.killRequested
       })
     ),
 
