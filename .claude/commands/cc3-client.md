@@ -123,19 +123,21 @@ update `.claude/settings.json` with the same namespace replace "claude-comms" in
 
 ## Step 3: Start the runner
 
-Check if a runner is already running first (we do NOT want duplicates):
+Check if a runner or its wrapper is already running first (we do NOT want duplicates):
 
 ```bash
-ps aux | grep 'runner.ts' | grep -v grep
+ps aux | grep 'runner.ts\|run-runner.sh' | grep -v grep
 ```
 
-If one exists, ask the user if they want to restart it. Kill the old one first if so.
+If one exists, ask the user if they want to restart it. Kill the wrapper (`run-runner.sh`) first, then the runner (`runner.ts`).
 
-Start the runner:
+Start the runner via the auto-restart wrapper:
 
 ```bash
-cd .agents/tools/workflow && nohup npx tsx runner.ts > /tmp/runner.log 2>&1 &
+nohup bash .agents/tools/workflow/run-runner.sh > /dev/null 2>&1 &
 ```
+
+The wrapper script (`run-runner.sh`) automatically restarts the runner if it exits (e.g. from SIGTERM during container recycle). Logs go to `/tmp/runner.log`.
 
 Verify it started: `tail -20 /tmp/runner.log`
 

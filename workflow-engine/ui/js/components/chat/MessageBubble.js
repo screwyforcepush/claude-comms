@@ -1,5 +1,5 @@
 // MessageBubble - Individual message display
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
@@ -85,6 +85,55 @@ function parseHints(hintString) {
     hints.push({ text: hintString, style: { color: 'var(--q-torch)', backgroundColor: 'rgba(212, 160, 48, 0.08)', borderLeft: '2px solid var(--q-torch)' } });
   }
   return hints;
+}
+
+/**
+ * Copy-to-clipboard button with copied feedback
+ */
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [text]);
+
+  const iconColor = copied ? 'var(--q-slime)' : 'var(--q-bone0)';
+
+  return React.createElement('button', {
+    onClick: handleCopy,
+    'aria-label': copied ? 'Copied' : 'Copy message',
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '4px',
+      minWidth: '32px',
+      minHeight: '32px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'color 0.15s ease',
+    }
+  },
+    React.createElement('svg', {
+      width: 14,
+      height: 14,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: iconColor,
+      strokeWidth: 2,
+    },
+      copied
+        ? React.createElement('path', { d: 'M5 13l4 4L19 7', strokeLinecap: 'square' })
+        : [
+            React.createElement('rect', { key: 'back', x: 8, y: 8, width: 13, height: 13, stroke: iconColor, strokeWidth: 2, fill: 'none' }),
+            React.createElement('path', { key: 'front', d: 'M16 8V3H3v13h5', stroke: iconColor, strokeWidth: 2, fill: 'none' }),
+          ]
+    )
+  );
 }
 
 /**
@@ -229,11 +278,17 @@ export function MessageBubble({ message, isLast = false }) {
           )
         ),
 
-        // Timestamp - Q palette bone0
-        message.createdAt && React.createElement('span', {
-          className: 'text-xs mt-1 px-1',
-          style: { color: 'var(--q-bone0)' }
-        }, formatTime(message.createdAt))
+        // Timestamp + copy button row
+        React.createElement('div', {
+          className: 'flex items-center gap-1 mt-1',
+          style: { flexDirection: config.isRight ? 'row-reverse' : 'row' }
+        },
+          message.createdAt && React.createElement('span', {
+            className: 'text-xs px-1',
+            style: { color: 'var(--q-bone0)' }
+          }, formatTime(message.createdAt)),
+          React.createElement(CopyButton, { text: message.content || '' })
+        )
       )
     )
   );
