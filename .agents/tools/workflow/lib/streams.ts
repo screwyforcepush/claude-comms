@@ -248,6 +248,7 @@ export function buildCommand(
         "--verbose",
         "--output-format",
         "stream-json",
+        "--disable-slash-commands",
       ];
 
       // Add --resume flag for session continuity
