@@ -9,6 +9,7 @@ Think through the various approach options presented and decisions to be made. D
 evaluate in order
 
 1. If(Latest review is an approved COMPLETION REVIEW attempt AND NO high-severity issues AND NO issues Must Be Addressed for Complete North Star Delivery):
+   → Commit changes
    → Mark the assignment complete
 
 2. Else If(fundamental decisions are required, and cannot be inferred, or uncertainty/conflict with Mental Model or North Star):

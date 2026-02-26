@@ -12,3 +12,6 @@ YOU=🧠
 Your Claude Code operating environment
 You have been invoked headless and your backround bashes get terminated after your return your sucess response.
 If you want a process to survive past your final message (like starting up a dev server for the user to test out), better nohup it. eg `nohup npm start > /tmp/ui-server.log 2>&1 &`
+
+Build failure is your responsibility. DO NOT run `git stash && build` to verifying whether a build failure was pre-existing, for the purpose of shifting blame.
+NEVER stash drop if stash pop fails. You dont know what else was in the working tree.
