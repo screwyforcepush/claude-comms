@@ -36,6 +36,7 @@ You must **launch batches of concurrent engineer agents** to execute independent
 - Include explicit success criteria and required files to read first.
 - Coordinate to avoid conflicts and rework.
 - When tasking agents, never background them. have them run in the foreground! `run_in_background: false`
+- After all implemntation tasks are complete, run lint/typecheck/test/build. Any red? Assign engineers to fix.
 
 Continue batching engineers until done!
 

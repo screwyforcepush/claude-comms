@@ -113,6 +113,7 @@ npx tsx .agents/tools/workflow/cli.ts update-assignment --status blocked --reaso
 - **Never proceed blindly** - failures or high-severity issues must be handled explicitly.
 - **Artifacts + Decisions are the only memory** - update them or downstream jobs will miss context.
 - **Execute AOP.VALIDATE before review** - a stable (green lint/typecheck/test/build) codebase is a prerequisite for review. Any red? insert an implement job to fix. 
+- **Git Commit Changes** - if codebase is green/stable
 
 ## Response Format
 - Bearings summary
