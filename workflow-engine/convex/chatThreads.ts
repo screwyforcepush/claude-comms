@@ -239,6 +239,26 @@ export const updateSessionId = mutation({
   },
 });
 
+// Save a guardian-mode forked session ID for a specific assignment
+export const updateGuardianSessionId = mutation({
+  args: {
+    password: v.string(),
+    id: v.id("chatThreads"),
+    assignmentId: v.string(),
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const thread = await ctx.db.get(args.id);
+    if (!thread) throw new Error("Thread not found");
+    const existing = thread.guardianSessions ?? {};
+    await ctx.db.patch(args.id, {
+      guardianSessions: { ...existing, [args.assignmentId]: args.sessionId },
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 // Update the last prompt mode sent (for differential prompting)
 export const updateLastPromptMode = mutation({
   args: {

@@ -27,6 +27,8 @@ export interface StreamHandler {
 export interface CommandOptions {
   /** Session ID for Claude session resume */
   sessionId?: string;
+  /** Fork the session instead of resuming in-place (creates new branch) */
+  forkSession?: boolean;
 }
 
 export interface CommandResult {
@@ -254,6 +256,10 @@ export function buildCommand(
       // Add --resume flag for session continuity
       if (options.sessionId) {
         args.push("--resume", options.sessionId);
+        // Fork creates a new session branch from the resumed session
+        if (options.forkSession) {
+          args.push("--fork-session");
+        }
       }
 
       args.push("-p", prompt);

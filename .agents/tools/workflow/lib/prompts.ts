@@ -60,6 +60,8 @@ export interface ChatJobContext {
   lastPromptMode?: "jam" | "cook";
   latestUserMessage: string;
   claudeSessionId?: string;
+  // Guardian session fork: true when forking from OG session for first guardian eval
+  forkSession?: boolean;
   // Guardian mode context
   assignmentId?: string;
   isGuardianEvaluation?: boolean; // True when PO is evaluating PM response

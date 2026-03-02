@@ -88,6 +88,8 @@ export interface ExecuteOptions {
   prompt: string;
   /** Session ID for Claude resume */
   sessionId?: string;
+  /** Fork the session instead of resuming in-place */
+  forkSession?: boolean;
   /** Additional environment variables */
   env?: Record<string, string>;
 }
@@ -330,7 +332,7 @@ export class HarnessExecutor {
    * Execute a harness job with file-based event streaming
    */
   execute(options: ExecuteOptions, callbacks: ExecutionCallbacks): ExecutionHandle {
-    const { jobId, harness, prompt, sessionId, env } = options;
+    const { jobId, harness, prompt, sessionId, forkSession, env } = options;
 
     // 1. Create job directory and ensure log file exists
     const paths = ensureJobDir(jobId);
@@ -343,6 +345,9 @@ export class HarnessExecutor {
     const commandOptions: CommandOptions = {};
     if (sessionId && harness === "claude") {
       commandOptions.sessionId = sessionId;
+      if (forkSession) {
+        commandOptions.forkSession = true;
+      }
     }
     const { cmd, args } = buildCommand(harness, prompt, commandOptions);
 

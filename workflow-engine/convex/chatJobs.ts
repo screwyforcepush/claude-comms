@@ -44,6 +44,23 @@ export const trigger = mutation({
     // Determine effective prompt mode (guardian uses cook for normal interactions)
     const effectivePromptMode = thread.mode === "guardian" ? "cook" : thread.mode;
 
+    // Session resolution: guardian mode uses per-assignment forked sessions
+    let resolvedSessionId = thread.claudeSessionId;
+    let forkSession = false;
+    if (thread.mode === "guardian" && thread.assignmentId) {
+      const guardianSessions = thread.guardianSessions ?? {};
+      const guardianSessionId = guardianSessions[thread.assignmentId];
+      if (guardianSessionId) {
+        // Existing guardian fork — resume it
+        resolvedSessionId = guardianSessionId;
+      } else if (thread.claudeSessionId) {
+        // No guardian fork yet — fork from OG session
+        resolvedSessionId = thread.claudeSessionId;
+        forkSession = true;
+      }
+      // else: no OG session either — new session (resolvedSessionId stays undefined)
+    }
+
     const chatContext = {
       threadId: args.threadId,
       namespaceId: thread.namespaceId,
@@ -52,7 +69,9 @@ export const trigger = mutation({
       effectivePromptMode,
       lastPromptMode: thread.lastPromptMode,
       latestUserMessage: triggerMessage.content,
-      claudeSessionId: thread.claudeSessionId,
+      claudeSessionId: resolvedSessionId,
+      // Guardian session fork
+      forkSession,
       // Guardian mode fields
       assignmentId: thread.assignmentId,
       isGuardianEvaluation: args.isGuardianEvaluation ?? false,

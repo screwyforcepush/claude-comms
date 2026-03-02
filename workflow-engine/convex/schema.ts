@@ -112,6 +112,9 @@ export default defineSchema({
     lastPromptMode: v.optional(v.union(v.literal("jam"), v.literal("cook"))),
     assignmentId: v.optional(v.id("assignments")),
     claudeSessionId: v.optional(v.string()),
+    // Guardian mode: per-assignment forked session IDs
+    // key: assignmentId (string), value: Claude session ID
+    guardianSessions: v.optional(v.record(v.string(), v.string())),
     // Phase 10: Operations Center Upgrade
     lastReadAt: v.optional(v.number()), // B1: Unread tracking — timestamp of last read
     assignmentsCreated: v.optional(v.array(v.id("assignments"))), // U6: Multi-assignment history
