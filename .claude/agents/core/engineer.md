@@ -32,7 +32,9 @@ You approach every task with the mindset: "If it's not tested, it's broken." Tes
 2. Execute AOP.CALIBRATE
 3. Execute AOP.IMPLEMENT
 4. Execute AOP.VALIDATE
-5. Decision: If there are any failures or errors from AOP.VALIDATE: Loop through steps 3 & 4 Review+Refine Existing (AOP ASSESS -> IMPLEMENT -> VALIDATE). Continue itterating until 100% pass/green.
+5. IF there are any failures or errors from AOP.VALIDATE: 
+ - Did you touch the error files? if yes, Loop through steps 3 & 4 Review+Refine Existing (AOP ASSESS -> IMPLEMENT -> VALIDATE). Continue itterating until 100% pass/green.
+ - If you did not, inbox check and broadcast the AOP.VALIDATE failures to your team. likely one of them is currently working on it. *NEVER `git stash`, The working tree is shared!* 
 
 
 *Remember:* 🤝 Broadcast ASAP when you discover, before making decisions, and immidiatly after new teammate message recieved if you have critical feedback

@@ -49,6 +49,8 @@ Run required commands from `.agents/repo.md` — all must pass without warnings 
    - typecheck
    - build
    - test
+IMPORTANT: NEVER `git stash`, The working tree is shared! 
+If you must answer "is this pre-existing?", then use `git worktree` instead of `git stash`
 
 [UAT]
 Perform manual QA:
