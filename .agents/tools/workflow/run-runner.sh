@@ -4,6 +4,10 @@
 
 cd "$(dirname "$0")"
 
+# Prevent "nested session" errors when the runner spawns Claude Code subprocesses.                                                                                                                                                
+# This var is inherited if the runner was started from within a Claude Code session.                                                                                                                                                     
+unset CLAUDECODE                                                                                                                                                                                                                  
+    
 while true; do
   echo "[$(date)] Runner starting..." >> /tmp/runner.log
   npx tsx runner.ts >> /tmp/runner.log 2>&1
