@@ -19,7 +19,7 @@
  * Commands:
  *   help                                Show this usage information
  *   assignments [--status <status>]     List assignments
- *   assignment <id>                     Get assignment details with groups
+ *   assignment <id> [--nudge]            Get assignment details (--nudge: only pmNudge field)
  *   groups [--status <status>]          List job groups
  *   group <id>                          Get group details with jobs
  *   jobs [--status <status>] [--group <groupId>] [--assignment <assignmentId>]   List jobs
@@ -151,7 +151,7 @@ function error(message: string): never {
 const COMMAND_FLAGS: Record<string, string[]> = {
   help: [],
   assignments: ["status"],
-  assignment: [],
+  assignment: ["nudge"],
   groups: ["status", "assignment"],
   group: [],
   jobs: ["status", "group", "assignment"],
@@ -159,7 +159,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   queue: [],
   create: ["priority", "independent", "thread"],
   "insert-job": ["type", "jobs", "harness", "context", "after"],
-  "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason"],
+  "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason", "nudge", "clear-nudge", "append-northstar"],
   "delete-assignment": [],
   "start-job": [],
   "complete-job": ["result"],
@@ -468,7 +468,10 @@ async function updateAssignment(
   decisions?: string,
   alignment?: string,
   status?: string,
-  reason?: string
+  reason?: string,
+  nudge?: string,
+  clearNudge?: boolean,
+  appendNorthstar?: string
 ) {
   const validAlignments = ["aligned", "uncertain", "misaligned"];
   if (alignment && !validAlignments.includes(alignment)) {
@@ -494,6 +497,25 @@ async function updateAssignment(
   const baseArtifacts = process.env.WORKFLOW_ARTIFACTS;
   const baseDecisions = process.env.WORKFLOW_DECISIONS;
 
+  // Resolve pmNudge: --clear-nudge takes precedence over --nudge
+  let pmNudge: string | undefined = undefined;
+  if (clearNudge) {
+    pmNudge = "";
+  } else if (nudge !== undefined) {
+    pmNudge = nudge;
+  }
+
+  // Resolve northStar: --append-northstar reads current and appends
+  let northStar: string | undefined = undefined;
+  if (appendNorthstar) {
+    const assignment = await client.query(api.assignments.get, {
+      password: config.password,
+      id: id as Id<"assignments">,
+    });
+    if (!assignment) error("Assignment not found");
+    northStar = `${assignment!.northStar}\n\n${appendNorthstar}`;
+  }
+
   await client.mutation(api.assignments.update, {
     password: config.password,
     id: id as Id<"assignments">,
@@ -502,6 +524,8 @@ async function updateAssignment(
     alignmentStatus: alignment as "aligned" | "uncertain" | "misaligned" | undefined,
     status: status as "pending" | "active" | "blocked" | "complete" | undefined,
     blockedReason: status === "blocked" ? reason : undefined,
+    pmNudge,
+    northStar,
   });
   output({ message: "Assignment updated" });
 }
@@ -652,7 +676,7 @@ const USAGE = `Workflow Engine CLI
 Commands:
   help                                Show this usage information
   assignments [--status <status>]     List assignments
-  assignment <id>                     Get assignment details with groups
+  assignment [id] [--nudge]            Get assignment details (--nudge: only pmNudge field, supports WORKFLOW_ASSIGNMENT_ID)
   groups [--status <status>]          List job groups
   group <id>                          Get group details with jobs
   jobs [--status <status>] [--group <groupId>] [--assignment <assignmentId>]
@@ -669,7 +693,10 @@ Commands:
               --after defaults to WORKFLOW_GROUP_ID, then auto-finds tail group
   update-assignment [id] [--status <pending|active|blocked|complete>] [--reason <str>]
                          [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
+                         [--nudge <str>] [--clear-nudge] [--append-northstar <str>]
               --reason required when setting status to blocked
+              --nudge: set pmNudge for next PM   --clear-nudge: clear pmNudge
+              --append-northstar: append amendment text to northStar
   delete-assignment <id>              Delete assignment and all its groups/jobs
 
   start-job <jobId>                   Mark job as running
@@ -719,10 +746,21 @@ async function main() {
         await listAssignments(flags.status);
         break;
 
-      case "assignment":
-        if (!positional[0]) error("Assignment ID required");
-        await getAssignment(positional[0]);
+      case "assignment": {
+        const aId = positional[0] || ("nudge" in flags ? process.env.WORKFLOW_ASSIGNMENT_ID : undefined);
+        if (!aId) error("Assignment ID required");
+        if ("nudge" in flags) {
+          const a = await client.query(api.assignments.get, {
+            password: config.password,
+            id: aId as Id<"assignments">,
+          });
+          if (!a) error("Assignment not found");
+          output({ pmNudge: a!.pmNudge || null });
+        } else {
+          await getAssignment(aId);
+        }
         break;
+      }
 
       case "groups":
         await listGroups(flags.status, flags.assignment);
@@ -804,7 +842,10 @@ async function main() {
           flags.decisions,
           flags.alignment,
           flags.status,
-          flags.reason
+          flags.reason,
+          flags.nudge,
+          "clear-nudge" in flags,
+          flags["append-northstar"]
         );
         break;
       }

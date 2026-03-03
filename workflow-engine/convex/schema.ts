@@ -32,6 +32,7 @@ export default defineSchema({
       v.literal("uncertain"),
       v.literal("misaligned")
     )),
+    pmNudge: v.optional(v.string()),
     independent: v.boolean(),
     priority: v.number(),
     artifacts: v.string(),

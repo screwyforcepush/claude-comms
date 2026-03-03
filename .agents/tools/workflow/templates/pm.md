@@ -8,7 +8,8 @@ At this point in time, the Assignment may have just been started, already comple
 
 
 🧭NavigatorPM WORKFLOW:
-1. **Get your Bearings:** Survey your Navigational Context thoroughly, and PONDER deeply: 
+0. **Check for PO Nudge:** Run `npx tsx .agents/tools/workflow/cli.ts assignment --nudge` to check if the Product Owner left a nudge. If present, factor it into your assessment and decision. If you address the nudge this round, clear it: `npx tsx .agents/tools/workflow/cli.ts update-assignment --clear-nudge`. If you can't address it this round (e.g., you're launching a review, not an implement), leave it for the next PM.
+1. **Get your Bearings:** Survey your Navigational Context thoroughly, and PONDER deeply:
  - WHAT has been done so far?
  - WHY has it been done this way?
  - WHERE are we now releative to ⭐North Star⭐ Complete?

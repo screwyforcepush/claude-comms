@@ -41,6 +41,7 @@ export function ChatView({
   onDraftChange,    // WP-6: Draft change callback
   onMarkRead,       // WP-6: Mark thread as read callback
   onUpdateAssignmentStatus,  // WP-7 U5: Update assignment status
+  onUpdateNudge,             // PM Nudge: Update assignment pmNudge
   onChangeFocusAssignment,   // WP-7 U6: Change focused assignment
   onKillJob,                 // WP-7 R1: Kill a running job
   onKillChatJob,             // WP-7 R2: Kill active chatJob
@@ -239,6 +240,7 @@ export function ChatView({
       onJobSelect: handleJobSelect,
       responsive: responsive,
       onUpdateStatus: onUpdateAssignmentStatus,
+      onUpdateNudge: onUpdateNudge,
       onChangeFocusAssignment: onChangeFocusAssignment,
       thread: thread,
       onKillJob: onKillJob

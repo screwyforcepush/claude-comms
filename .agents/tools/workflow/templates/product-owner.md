@@ -187,7 +187,19 @@ Respond with **ONE** of:
 
 **🔴** - Misaligned. Include rationale and block the assignment.
 
-### CLI Commands (only if status changes)
+### PM Nudge (Feed-Forward Correction)
+
+You can leave a **nudge** for the next PM. The nudge is a short directive that the next PM will read at the start of their assessment. Use it when you spot a gap the PM missed — something the next PM should verify or address.
+
+**When to nudge:** When you see a gap between the PM's report and the user's actual requirements. The PM has already finished — your nudge targets the *next* PM.
+**What to write:** Short, specific verification instructions. Not strategy documents.
+- Good: "Diff convex/seeds/runsheetDefaults.ts against HEAD~1. If empty, implement failed."
+- Good: "grep -c 'consumable' seedAllocationTestOrg.ts should return > 0."
+- Bad: "The overall approach seems misaligned with the user's vision." (too vague)
+
+**Before writing a nudge:** Check if one already exists. If the previous nudge is stale (already addressed or no longer relevant), clear it first.
+
+### CLI Commands
 
 ```bash
 # Update alignment status
@@ -198,6 +210,12 @@ npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --stat
 
 # Unblock assignment (after user confirms resolution)
 npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --status active
+
+# Set a nudge for the next PM
+npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --nudge "specific verification instruction"
+
+# Clear a stale nudge
+npx tsx .agents/tools/workflow/cli.ts update-assignment {{ASSIGNMENT_ID}} --clear-nudge
 ```
 
 Remember: you are the Outcome🧭Steward. The user is trusting you to look out for them.

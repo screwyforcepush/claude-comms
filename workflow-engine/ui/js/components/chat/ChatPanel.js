@@ -633,6 +633,16 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
     }
   }, [selectedAssignment?._id, updateAssignmentStatus]);
 
+  // PM Nudge update callback
+  const handleUpdateNudge = useCallback(async (pmNudge) => {
+    if (!selectedAssignment?._id) return;
+    try {
+      await updateAssignmentStatus({ id: selectedAssignment._id, pmNudge });
+    } catch (err) {
+      console.error('Failed to update nudge:', err);
+    }
+  }, [selectedAssignment?._id, updateAssignmentStatus]);
+
   // WP-7: Focus assignment change callback (U6)
   const handleChangeFocusAssignment = useCallback(async (assignmentId) => {
     if (!selectedThreadId) return;
@@ -874,6 +884,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
       onDraftChange: handleDraftChange,
       onMarkRead: handleMarkRead,
       onUpdateAssignmentStatus: handleUpdateAssignmentStatus,
+      onUpdateNudge: handleUpdateNudge,
       onChangeFocusAssignment: handleChangeFocusAssignment,
       onKillJob: handleKillJob,
       onKillChatJob: handleKillChatJob,

@@ -168,6 +168,8 @@ export const update = mutation({
         v.literal("misaligned")
       )
     ),
+    pmNudge: v.optional(v.string()),
+    northStar: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     requirePassword(args);

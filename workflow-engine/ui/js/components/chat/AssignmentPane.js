@@ -685,6 +685,7 @@ export function AssignmentPane({
   onChangeFocusAssignment,
   thread,
   onKillJob,
+  onUpdateNudge,
 }) {
   // Subscribe to jobs per group individually
   const groups = useGroupJobs(chainGroups);
@@ -692,6 +693,17 @@ export function AssignmentPane({
   const [decisionsOpen, setDecisionsOpen] = useState(false);
   const [northStarOpen, setNorthStarOpen] = useState(false);
   const [closeHovered, setCloseHovered] = useState(false);
+  const [nudgeText, setNudgeText] = useState("");
+  const [nudgeEditing, setNudgeEditing] = useState(false);
+  const [nudgeSaveHovered, setNudgeSaveHovered] = useState(false);
+  const [nudgeClearHovered, setNudgeClearHovered] = useState(false);
+
+  // Sync nudge text with assignment data
+  useEffect(() => {
+    if (!nudgeEditing) {
+      setNudgeText(assignment?.pmNudge || "");
+    }
+  }, [assignment?.pmNudge, nudgeEditing]);
 
   // Parse artifacts and decisions from JSON strings
   const artifactList = useMemo(
@@ -870,6 +882,116 @@ export function AssignmentPane({
               northStar || "No description provided",
             ),
         ),
+
+        // PM Nudge - inline editable field
+        onUpdateNudge &&
+          React.createElement(
+            "div",
+            {
+              style: {
+                padding: "10px",
+                backgroundColor: nudgeText ? "rgba(212, 160, 48, 0.06)" : "var(--q-stone1)",
+                border: nudgeText ? "1px solid rgba(212, 160, 48, 0.25)" : "1px solid var(--q-stone3)",
+                borderRadius: 0,
+              },
+            },
+            React.createElement(
+              "h3",
+              {
+                style: {
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: nudgeText ? "var(--q-torch)" : "var(--q-bone1)",
+                  textTransform: "uppercase",
+                  letterSpacing: "2px",
+                  fontFamily: "var(--font-display)",
+                  marginBottom: "6px",
+                },
+              },
+              "PM Nudge",
+            ),
+            React.createElement("textarea", {
+              value: nudgeText,
+              onChange: (e) => { setNudgeText(e.target.value); setNudgeEditing(true); },
+              onBlur: () => { if (!nudgeText && !assignment?.pmNudge) setNudgeEditing(false); },
+              placeholder: "No active nudge",
+              rows: 2,
+              style: {
+                width: "100%",
+                padding: "6px 8px",
+                fontFamily: "var(--font-console)",
+                fontSize: "12px",
+                color: "var(--q-bone3)",
+                backgroundColor: "var(--q-stone2)",
+                border: "1px solid var(--q-stone3)",
+                borderRadius: 0,
+                resize: "vertical",
+                lineHeight: "1.4",
+                boxSizing: "border-box",
+              },
+            }),
+            React.createElement(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  gap: "6px",
+                  marginTop: "6px",
+                  justifyContent: "flex-end",
+                },
+              },
+              // Clear button (only show when nudge exists)
+              (nudgeText || assignment?.pmNudge) &&
+                React.createElement(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => { setNudgeText(""); setNudgeEditing(false); onUpdateNudge(""); },
+                    onMouseEnter: () => setNudgeClearHovered(true),
+                    onMouseLeave: () => setNudgeClearHovered(false),
+                    style: {
+                      padding: "3px 10px",
+                      fontFamily: "var(--font-display)",
+                      fontSize: "10px",
+                      textTransform: "uppercase",
+                      letterSpacing: "1px",
+                      color: nudgeClearHovered ? "var(--q-lava1)" : "var(--q-bone1)",
+                      backgroundColor: "transparent",
+                      border: "1px solid " + (nudgeClearHovered ? "var(--q-lava1)" : "var(--q-stone3)"),
+                      borderRadius: 0,
+                      cursor: "pointer",
+                      transition: "all var(--t-anim-transition-fast)",
+                    },
+                  },
+                  "Clear",
+                ),
+              // Save button (only show when editing and text differs from saved)
+              nudgeEditing && nudgeText !== (assignment?.pmNudge || "") &&
+                React.createElement(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => { setNudgeEditing(false); onUpdateNudge(nudgeText); },
+                    onMouseEnter: () => setNudgeSaveHovered(true),
+                    onMouseLeave: () => setNudgeSaveHovered(false),
+                    style: {
+                      padding: "3px 10px",
+                      fontFamily: "var(--font-display)",
+                      fontSize: "10px",
+                      textTransform: "uppercase",
+                      letterSpacing: "1px",
+                      color: nudgeSaveHovered ? "var(--q-torch)" : "var(--q-copper2)",
+                      backgroundColor: "transparent",
+                      border: "1px solid " + (nudgeSaveHovered ? "var(--q-torch)" : "var(--q-copper1)"),
+                      borderRadius: 0,
+                      cursor: "pointer",
+                      transition: "all var(--t-anim-transition-fast)",
+                    },
+                  },
+                  "Save",
+                ),
+            ),
+          ),
 
         // Blocked reason - Q lava palette for danger state
         status === "blocked" &&
