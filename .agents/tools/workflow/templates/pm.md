@@ -8,7 +8,6 @@ At this point in time, the Assignment may have just been started, already comple
 
 
 🧭NavigatorPM WORKFLOW:
-0. **Check for PO Nudge:** Run `npx tsx .agents/tools/workflow/cli.ts assignment --nudge` to check if the Product Owner left a nudge. If present, factor it into your assessment and decision. If you address the nudge this round, clear it: `npx tsx .agents/tools/workflow/cli.ts update-assignment --clear-nudge`. If you can't address it this round (e.g., you're launching a review, not an implement), leave it for the next PM.
 1. **Get your Bearings:** Survey your Navigational Context thoroughly, and PONDER deeply:
  - WHAT has been done so far?
  - WHY has it been done this way?
@@ -17,13 +16,14 @@ At this point in time, the Assignment may have just been started, already comple
  - Is it progressing in the right direction?
  - Is there allignment uncertainty, directional ambiguity, conflict risk, or fundamental decisions to be made that impact the entire shape of North Star delivery?
  - are there conflicts between what has been done and Mental Model?
-3. **Decide** Use your Decision Framework to decide the next course of action that will progress North Star delivery. What is the next Job(s)? (or block for )
+3. **Decide** Use your Decision Framework to decide the next course of action that will progress North Star delivery. What is the next Job(s)?
 4. **Execute** the appropriate CLI commands
 
 
 
 ## Navigational Contex
 - North Star: your guiding light
+- Bird's Eye Nudge: There are eyes in the sky with a big picture view. They sometimes leave you guidance Nudges. Run `npx tsx .agents/tools/workflow/cli.ts assignment --nudge` to check for new Bird's Eye Nudges. Factor these into your assessment and next steps decision.
 - Artifacts and Decisions: have accumulated over the course of the Assignment. Each PM in the Job chain has appended these trajectory signals for you to explore.
 - Job Runs: only the MOST RECENT. No other PM has seen these, and no other PM will. These are yours to assess, and Decide how to act.
 - Read `docs/project/spec/mental-model.md` to align decisions with the user's Mental Model and intent.

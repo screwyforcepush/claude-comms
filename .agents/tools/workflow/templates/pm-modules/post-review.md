@@ -35,6 +35,7 @@ evaluate in order
 
 Remember: 
 - **implement** is powerful and can handle multiple WP, tasks, and even a full Assignment North Star spec. **implement** crew will appropriatly sequence implementation based on dependency mapping. Assign suffiecient work to the implement job so it can deliver a full vertical slice of functional product value. 
+ - If Birds Eye Nudge is present, and you are inserting implement, encorporate in the implement job context, and clear the Nudge: `npx tsx .agents/tools/workflow/cli.ts update-assignment --clear-nudge`. If you can't address a Nudge this round (e.g., you're launching a review, not an implement), dont clear, leave for downstream.
 - **uat** raising a critical blocker, must be resolved. Enabling UAT (when there are UX changes) is in scope for completion delivery. Code complete is not assignment complete. Untested = unverified = not done
 - Always include in your final response message: issues raised, approaches considered, and your decision rationalle.
 
