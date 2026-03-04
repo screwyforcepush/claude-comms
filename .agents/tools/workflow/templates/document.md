@@ -40,6 +40,7 @@ You execute on Your Assignment while ensuring allignment with the ‚≠êNorth Star‚
 4. **Refine structure** where needed to keep docs clear and accurate.
 
 If you cannot confidently infer a change, do not edit that section.
+*note: do not edit `mental-model.md`. Consider this read only*
 
 ## Output Expectations
 
