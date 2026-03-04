@@ -37,6 +37,17 @@ export interface CommandResult {
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+const FALLBACK_MAX_CHARS = 5000;
+
+function truncateFallback(text: string): string {
+  if (text.length <= FALLBACK_MAX_CHARS) return text;
+  return "...truncated.\n" + text.slice(-FALLBACK_MAX_CHARS);
+}
+
+// ============================================================================
 // Claude Stream Handler
 // ============================================================================
 
@@ -87,7 +98,7 @@ export class ClaudeStreamHandler implements StreamHandler {
 
   getResult(): string {
     // Prefer the final result field, fall back to accumulated text
-    return this.finalResult || this.textChunks.join("\n\n");
+    return this.finalResult || truncateFallback(this.textChunks.join("\n\n"));
   }
 
   isTerminal(): boolean {
@@ -134,7 +145,7 @@ export class CodexStreamHandler implements StreamHandler {
 
   getResult(): string {
     // Prefer the final agent_message, fall back to all accumulated messages
-    return this.lastMessage || this.messages.join("\n\n");
+    return this.lastMessage || truncateFallback(this.messages.join("\n\n"));
   }
 
   isTerminal(): boolean {
@@ -191,7 +202,7 @@ export class GeminiStreamHandler implements StreamHandler {
 
   getResult(): string {
     // Prefer the last assistant turn, fall back to full accumulated buffer
-    return this.currentTurnBuffer || this.buffer;
+    return this.currentTurnBuffer || truncateFallback(this.buffer);
   }
 
   isTerminal(): boolean {
