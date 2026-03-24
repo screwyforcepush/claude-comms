@@ -38,6 +38,7 @@ mcp_writer = None
 pending_requests = {}  # msg_id -> response_future
 last_activity_time = time.time()
 current_instance_id = None
+screenshot_count = 0
 
 
 def generate_instance_id() -> str:
@@ -180,7 +181,7 @@ async def read_mcp_responses():
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """Handle a client connection."""
-    global mcp_writer, pending_requests, last_activity_time
+    global mcp_writer, pending_requests, last_activity_time, screenshot_count
 
     # Update activity timestamp
     last_activity_time = time.time()
@@ -207,6 +208,21 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                 # Wait for response
                 try:
                     resp = await asyncio.wait_for(response_future, timeout=30.0)
+
+                    # Track screenshot count
+                    tool_name = req.get("params", {}).get("name", "")
+                    if tool_name == "take_screenshot" and "error" not in resp:
+                        screenshot_count += 1
+                        # Inject count into response text content
+                        try:
+                            content = resp.get("result", {}).get("content", [])
+                            for item in content:
+                                if isinstance(item, dict) and item.get("type") == "text":
+                                    item["text"] += f"\n[screenshots taken: {screenshot_count}]"
+                                    break
+                        except (TypeError, AttributeError):
+                            pass
+
                     writer.write(json.dumps(resp).encode() + b'\n')
                     await writer.drain()
                 except asyncio.TimeoutError:
