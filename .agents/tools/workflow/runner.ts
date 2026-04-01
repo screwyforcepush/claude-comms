@@ -195,7 +195,7 @@ function extractSubagentInfo(
       const ids: string[] = [];
       let hadSubagent = false;
       for (const block of message.content) {
-        if (block?.type === "tool_use" && block.name === "Task") {
+        if (block?.type === "tool_use" && (block.name === "Task" || block.name === "Agent")) {
           hadSubagent = true;
           if (block.id) ids.push(String(block.id));
         }
