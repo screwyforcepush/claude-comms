@@ -5,7 +5,7 @@
  * Interface to the Convex backend for managing assignments and job groups.
  * Primary consumers: PM agent, PO agent
  *
- * Environment Variables (auto-set by runner):
+ * Environment Variables (auto-injected):
  *   WORKFLOW_ASSIGNMENT_ID   Current assignment (used as default for assignment commands)
  *   WORKFLOW_GROUP_ID        Current group (used as default --after for insert-job)
  *   WORKFLOW_JOB_ID          Current job
@@ -711,7 +711,7 @@ Chat Commands:
   chat-mode <threadId> <jam|cook|guardian> [--assignment <id>]  Change thread mode
   chat-title <threadId> <title>       Update thread title
 
-Environment Variables (auto-set by runner):
+Environment Variables (auto-injected):
   WORKFLOW_ASSIGNMENT_ID   Default assignment for commands
   WORKFLOW_GROUP_ID        Default --after for insert-job
   WORKFLOW_JOB_ID          Current job

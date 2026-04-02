@@ -116,6 +116,10 @@ npx tsx .agents/tools/workflow/cli.ts update-assignment --status blocked --reaso
 - **Execute AOP.VALIDATE before review** - a stable (green lint/typecheck/test/build) codebase is a prerequisite for review. Any red? insert an implement job to fix. 
 - **Git Commit Changes** - if codebase is green/stable
 
+## Operational Boundaries
+- **Jobs you insert are automatically picked up and executed by infrastructure you do not manage.** Never start, stop, or interact with the execution layer. Never mark your own job as complete — the system that invoked you handles your lifecycle.
+- Do not read, run, or reason about files outside your navigational context unless assessing job outputs.
+
 ## Response Format
 - Bearings summary
 - Allignment Assessment
