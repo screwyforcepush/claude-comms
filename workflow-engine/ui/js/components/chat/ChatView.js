@@ -12,7 +12,7 @@ import { JobDetail } from '../job/JobDetail.js';
  * @param {Object} props
  * @param {Object} props.thread - Selected thread object
  * @param {Object} props.assignment - Linked assignment (for guardian mode)
- * @param {Object} props.chainData - Chain data from getGroupChain (assignment + groups without jobs)
+ * @param {string} props.assignmentId - Assignment ID for two-tier job chain subscription
  * @param {Array} props.messages - Array of message objects
  * @param {Function} props.onSendMessage - Callback when message is sent
  * @param {Function} props.onUpdateTitle - Callback to update thread title
@@ -25,7 +25,7 @@ import { JobDetail } from '../job/JobDetail.js';
 export function ChatView({
   thread,
   assignment = null,
-  chainData = null,
+  assignmentId = null,
   messages = [],
   onSendMessage,
   onUpdateTitle,
@@ -234,7 +234,7 @@ export function ChatView({
     // WP-7: Added status editing (U5), multi-assignment nav (U6), kill job (R1) props
     assignment && React.createElement(AssignmentPane, {
       assignment: assignment,
-      chainGroups: chainData?.groups || [],
+      assignmentId: assignmentId,
       isOpen: paneOpen,
       onClose: handleClosePane,
       onJobSelect: handleJobSelect,

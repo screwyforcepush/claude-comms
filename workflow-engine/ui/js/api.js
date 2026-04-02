@@ -21,6 +21,7 @@ export const api = {
     list: "assignments:list",
     get: "assignments:get",
     getGroupChain: "assignments:getGroupChain",
+    getChainWithTerminalJobs: "assignments:getChainWithTerminalJobs",
     backfillNamespaceCounts: "assignments:backfillNamespaceCounts",
     // Update assignment status
     update: "assignments:update",
@@ -29,6 +30,7 @@ export const api = {
   // Jobs API
   jobs: {
     list: "jobs:list",
+    getActiveGroupsWithJobs: "jobs:getActiveGroupsWithJobs",
     // Kill signal for running jobs
     requestKill: "jobs:requestKill",
   },

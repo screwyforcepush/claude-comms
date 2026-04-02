@@ -28,5 +28,6 @@ An Outcome Navigator monitors its own context pressure. When a configurable thre
 ## Dependencies
 - Session ID storage (exists)
 - Chat job trigger mechanism (exists)
+- Guardian session fork / per-assignment session isolation (exists — see `guardian-session-fork.md`)
 - Context pressure measurement (needs design)
 - Briefing format/protocol (needs design)

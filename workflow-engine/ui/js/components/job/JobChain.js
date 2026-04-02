@@ -1005,8 +1005,7 @@ function GroupRow({ group, selectedJobId, onJobSelect, now }) {
  * Main group chain - renders groups vertically with connectors between
  */
 function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
-  // Filter out groups with no jobs (e.g., beyond subscription limit)
-  const validGroups = groups.filter(g => g.jobs && g.jobs.length > 0);
+  const validGroups = groups;
 
   return React.createElement('div', {
     className: 'flex flex-col items-center'
@@ -1112,7 +1111,7 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
     return () => clearInterval(timer);
   }, [stats.running]);
 
-  if (groups.length === 0 || allJobs.length === 0) {
+  if (groups.length === 0) {
     return React.createElement('div', {
       className: 'text-center py-8',
       style: { color: 'var(--q-bone0)' }

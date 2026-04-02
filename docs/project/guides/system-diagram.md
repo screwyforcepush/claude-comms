@@ -34,10 +34,12 @@
   │  │  mode: jam|cook|guardian    │   │  northStar: "Implement dark mode"             │ │
   │  │  title: "API Auth Design"  │   │  status: pending|active|blocked|complete      │ │
   │  │  claudeSessionId: "abc..."  │   │  priority: 1-99                               │ │
+  │  │  guardianSessions: {id:sid} │   │                                               │ │
   │  │  lastReadAt: (unread track) │   │  independent: bool (parallel vs sequential)   │ │
   │  │  assignmentId ─ ─ ─ ─ ─ ─ ─┼──▶│  artifacts: accumulated output               │ │
   │  │  assignmentsCreated: [...]  │   │  decisions: PM decisions log                  │ │
   │  │  lastPromptMode: jam|cook   │   │  alignmentStatus: aligned|uncertain|misalign  │ │
+  │  │                             │   │  pmNudge: (feed-forward to next PM)            │ │
   │  │                             │   │  headGroupId ──────────────────────┐           │ │
   │  └──────────┬──────────────────┘   └───────────────────────────────────┼───────────┘ │
   │             │                                                          │             │
@@ -142,7 +144,9 @@
   │                                                                                        │
   │    User sends message ──▶ chatJobs.trigger ──▶ pending ──▶ Runner picks up            │
   │      ──▶ running ──▶ complete ──▶ save response as assistant message                  │
-  │                                   save sessionId for resume                            │
+  │                                   save sessionId (routed by mode):                     │
+  │                                     jam/cook → claudeSessionId                         │
+  │                                     guardian → guardianSessions[assignmentId]           │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -154,6 +158,9 @@
   │    cli.ts create "North Star"         →  Creates assignment, links to thread           │
   │    cli.ts insert-job <id> --type impl →  Adds group+job to chain tail                 │
   │    cli.ts update-assignment --status  →  Change status, artifacts, decisions            │
+  │    cli.ts update-assignment --nudge   →  Set PM nudge (guardian/user)                  │
+  │    cli.ts update-assignment --append-northstar → Amend north star mid-flight           │
+  │    cli.ts assignment --nudge          →  PM reads nudge (lightweight, env var aware)   │
   │    cli.ts chat-send <thread> <msg>    →  Send message, trigger chatJob                │
   │    cli.ts chat-mode <thread> cook     →  Switch thread mode                            │
   │                                                                                        │
@@ -184,6 +191,14 @@
   │    - Mode changed    → mode activation prompt only (session resumed)                   │
   │    - Same mode       → minimal (just user message, session resumed)                    │
   │    - Guardian eval   → special guardian prompt with PM report                           │
+  │                                                                                        │
+  │  Session Isolation (Guardian Fork):                                                    │
+  │    - jam/cook        → resumes claudeSessionId (OG session)                            │
+  │    - guardian         → resumes guardianSessions[assignmentId]                          │
+  │      - First eval    → --resume <OG> --fork-session (creates branch)                   │
+  │      - Subsequent    → --resume <guardian fork> (accumulates eval context)              │
+  │    - Per-assignment  → each assignment gets its own guardian fork                       │
+  │    - Mode switching  → instant, non-destructive (OG and forks coexist)                 │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -203,6 +218,12 @@
   │                                                                                        │
   │  Guardian thread watching ◄── PM result injected as "pm" message ──▶ PO evaluates     │
   │                                 sets alignmentStatus on assignment                      │
+  │                                 optionally sets pmNudge for next PM                     │
+  │                                                                                        │
+  │  PM NUDGE FLOW:                                                                        │
+  │    Guardian/User writes nudge ──▶ pmNudge field on assignment                          │
+  │    Next PM starts ──▶ reads nudge via CLI ──▶ factors into decision                    │
+  │    PM addresses nudge ──▶ clears via CLI   (or leaves for next PM if can't address)    │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
 

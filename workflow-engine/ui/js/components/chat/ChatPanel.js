@@ -444,12 +444,6 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
     selectedThread?.assignmentId ? { id: selectedThread.assignmentId } : {}
   );
 
-  // Get group chain for selected assignment (no job data - lightweight)
-  const { data: selectedChainData } = useQuery(
-    selectedThread?.assignmentId ? api.assignments.getGroupChain : null,
-    selectedThread?.assignmentId ? { id: selectedThread.assignmentId } : {}
-  );
-
   // Fetch messages for selected thread
   const { data: messages, loading: loadingMessages } = useQuery(
     selectedThreadId ? api.chatMessages.list : null,
@@ -868,7 +862,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
     React.createElement(ChatView, {
       thread: selectedThread,
       assignment: selectedAssignment || null,
-      chainData: selectedChainData || null,
+      assignmentId: selectedThread?.assignmentId || null,
       messages: messages || [],
       onSendMessage: handleSendMessage,
       onUpdateTitle: handleUpdateTitle,

@@ -144,17 +144,65 @@ The user needs to be able to:
 - **Kill running agents** — A button in the job detail modal sets `killRequested` on the job/chatJob. The runner (which owns the process) watches for this and terminates the agent.
 - **Interrupt chat jobs** — Same kill mechanism, but the thread stays conversational so the user can send a follow-up message with more detail.
 
+### Mid-Flight Assignment Modification
+
+Assignments run autonomously through PM-driven job chains. But the user's understanding evolves faster than assignments complete. Two levers exist for injecting course correction without stopping or restarting work:
+
+**PM Nudge** — A short-lived directive on the assignment, consumed by the next PM.
+- Written by: the guardian (spotting gaps in PM reports), or the user directly via UI
+- Read by: the next PM, at the start of their assessment
+- Lifecycle: single string, overwrite semantics. PM clears after addressing. If PM can't address this round (e.g., launching review not implement), it persists for the next PM. Guardian checks before writing — clears stale, overwrites with new.
+- Content: specific, verification-oriented instructions — not strategy documents. "Check that file X actually changed." "Ensure consumable resources exist, not just equipment."
+- The nudge is a **communication channel into the execution loop**, not just a guardian tool. Anyone with authority can inject a directive into the next PM decision point.
+
+**North Star Amendment** — Permanent scope modification, appended to the north star string.
+- Written by: the Outcome Navigator, only under explicit user instruction
+- Read by: every PM and every job for the rest of the assignment's lifetime
+- Lifecycle: append-only string concatenation. The Outcome Navigator prefixes with "Amendment N:" for tracking.
+- Use when: a nudge is too big for single consumption — scope changes, new requirements, direction shifts that every future PM needs to see.
+
+The two levers differ in weight:
+| | Nudge | North Star Amendment |
+|---|---|---|
+| Lifespan | Consumed once | Permanent |
+| Scope | Tactical verification | Strategic direction |
+| Visibility | Next PM only | Every PM + every job |
+
 ### Self-Modification Awareness
 Claude Comms is its own upstream — changes here propagate to all client repos. The system must be careful about backward compatibility:
 - Schema changes should be additive (optional fields)
 - Runner-touching changes require manual runner restart by the user
 - The UI and Convex backend deploy atomically, so UI-only or UI+backend changes are safe
 
+## Session Context Isolation
+
+### The Problem
+A chat thread has a single Claude session that accumulates context over time. When guardian mode activates, PM evaluation prompts and user conversations would share that same session — guardian evaluations pollute the user's conversation context and vice versa. The PO's evaluative judgment and the user's collaborative discussion serve fundamentally different purposes and shouldn't interfere with each other.
+
+### The Fork Model
+When guardian mode activates for an assignment, the system **forks** the Claude session. The fork inherits all prior conversation context (the user's intent, spec discussions, design decisions) but diverges from that point:
+
+- **OG session** (`claudeSessionId`) — the user's jam/cook conversation. Uncontaminated by guardian traffic.
+- **Guardian fork** (`guardianSessions[assignmentId]`) — per-assignment evaluative context. Accumulates PM evaluation history, alignment judgments, pattern recognition across reports.
+
+### Per-Assignment Isolation
+Each assignment gets its own guardian fork. When the user switches focus assignment, the guardian session follows — different assignment = different fork = different accumulated evaluation context. This means the PO can build nuanced understanding of each assignment's trajectory independently.
+
+### Session Routing
+The system routes based on thread mode:
+- Jam/cook mode → OG session (user conversation)
+- Guardian mode → guardian fork for the focused assignment (all interactions — PM evals AND user messages — go through the fork)
+
+Switching between modes is instant and non-destructive. Nothing is lost.
+
 ## Non-Goals / Out of Scope
 
 - OAuth, BetterAuth, or complex authentication (single-user system)
 - Mobile-specific redesigns (maintain existing responsive behavior)
 - God-mode / cross-namespace agent interrogation (parked idea — revisit when use case is clearer)
+
+### Subscription Efficiency Principle
+Real-time Convex subscriptions should only be maintained for **mutable data** — jobs/groups that are still pending or running. Terminal data (complete/failed) is immutable and should be fetched via bulk queries that rarely invalidate, not per-entity live subscriptions. This principle applies broadly: don't pay the reactive cost for data that has stopped changing.
 
 ## Open Questions
 

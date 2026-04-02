@@ -116,6 +116,47 @@ export const getGroupChain = query({
   },
 });
 
+// Tier 1 (Archive): Chain structure + terminal job data. Rarely invalidates.
+// Supersedes getGroupChain for UI use — includes job data for complete/failed groups.
+export const getChainWithTerminalJobs = query({
+  args: { password: v.string(), id: v.id("assignments") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const assignment = await ctx.db.get(args.id);
+    if (!assignment) return null;
+
+    const groups = [];
+    let currentGroupId = assignment.headGroupId;
+    while (currentGroupId) {
+      const group = await ctx.db.get(currentGroupId);
+      if (!group) break;
+
+      const isTerminal = group.status === "complete" || group.status === "failed";
+      let jobs: any[] = [];
+      if (isTerminal) {
+        jobs = await ctx.db
+          .query("jobs")
+          .withIndex("by_group", (q) => q.eq("groupId", currentGroupId!))
+          .collect();
+      }
+
+      groups.push({
+        _id: group._id,
+        status: group.status,
+        nextGroupId: group.nextGroupId,
+        createdAt: group.createdAt,
+        assignmentId: group.assignmentId,
+        aggregatedResult: group.aggregatedResult,
+        jobs,
+        isTerminal,
+      });
+      currentGroupId = group.nextGroupId;
+    }
+
+    return { ...assignment, groups };
+  },
+});
+
 // Mutations
 
 export const create = mutation({

@@ -98,6 +98,34 @@ export const getGroupWithJobs = query({
   },
 });
 
+// Tier 2 (Live Wire): Active group jobs only. Frequent but tiny payload.
+export const getActiveGroupsWithJobs = query({
+  args: { password: v.string(), assignmentId: v.id("assignments") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+
+    const groups = await ctx.db
+      .query("jobGroups")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
+      .collect();
+
+    const activeGroups = groups.filter(
+      (g) => g.status !== "complete" && g.status !== "failed"
+    );
+
+    const result = [];
+    for (const group of activeGroups) {
+      const jobs = await ctx.db
+        .query("jobs")
+        .withIndex("by_group", (q) => q.eq("groupId", group._id))
+        .collect();
+      result.push({ groupId: group._id, jobs });
+    }
+
+    return result;
+  },
+});
+
 export const listGroups = query({
   args: {
     password: v.string(),
