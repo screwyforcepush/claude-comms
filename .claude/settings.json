@@ -12,7 +12,7 @@
         ]
       },
       {
-        "matcher": "Task",
+        "matcher": "Agent",
         "hooks": [
           {
             "type": "command",
@@ -32,7 +32,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Task",
+        "matcher": "Agent",
         "hooks": [
           {
             "type": "command",

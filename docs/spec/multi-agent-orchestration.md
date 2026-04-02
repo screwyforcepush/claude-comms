@@ -505,7 +505,7 @@ Example: While Engineer-Backend-1 builds the API, they broadcast the contract. E
 2. **Define clear WP boundaries** before spinning up teams
 3. **Maximize batch size** where agents can work in parallel
 4. **Enable support roles** within batches (e.g., Architect + Deep Researcher supporting Engineers)
-5. **Launch agent teams directly** using Task tool with proper context
+5. **Launch agent teams directly** using Agent tool with proper context
 6. **Enforce verification gates** - no shortcuts
 7. **Monitor broadcast channel** for blockers
 8. **Cascade changes** through re-verification
@@ -559,7 +559,7 @@ its changed a bit since then. eg. I merged tester into Engineer (and Architect f
 * todos is the sequence of done and next actions the Primary Orchestrator will perform
 
 Additional thoughts
-* Specific agent naming, Task tool patterns, batching, etc are important. the Language is used with purpose
+* Specific agent naming, Agent tool patterns, batching, etc are important. the Language is used with purpose
 * CLAUDE.md needs to be more concise, less duplication, while remaining unambiguous and authoritative.
 * The Primary Orchestrator is missing the mark with dependency mapping, batching a gatekeeper with the implementation team of engineers... gatekeeper depends on implementation complete! 
 * The planner is not being used at the moment. I dont know why. the planner would help with dependency mapping. similar to gatekeeper, the planner needs something to plan, should follow a research-architect batch.

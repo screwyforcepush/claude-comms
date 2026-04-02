@@ -139,7 +139,7 @@ the stoppage occurred due to a user interrupt.
 
 ### SubagentStop
 
-Runs when a Claude Code subagent (Task tool call) has finished responding.
+Runs when a Claude Code subagent (Agent tool call) has finished responding.
 
 ### PreCompact
 

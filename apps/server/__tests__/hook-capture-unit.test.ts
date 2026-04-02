@@ -95,7 +95,7 @@ describe('Hook Capture Unit Tests', () => {
       // (In real implementation, we'd intercept the HTTP request)
     });
 
-    test('should handle Task tool input without proper description format', async () => {
+    test('should handle Agent tool input without proper description format', async () => {
       const testInput = {
         session_id: 'test-session-002',
         tool_name: 'Task',
@@ -122,7 +122,7 @@ describe('Hook Capture Unit Tests', () => {
       expect(result).toBe(0);
     });
 
-    test('should ignore non-Task tool calls', async () => {
+    test('should ignore non-Agent tool calls', async () => {
       const testInput = {
         session_id: 'test-session-003',
         tool_name: 'Read',
@@ -360,7 +360,7 @@ CharlieArchitect, adopt 🤝 TEAMWORK to achieve maximum value delivered.`;
       // Hook should handle missing metadata gracefully
     });
 
-    test('should ignore non-Task tool completions', async () => {
+    test('should ignore non-Agent tool completions', async () => {
       const testInput = {
         session_id: 'completion-test-session-003',
         tool_name: 'Write',
@@ -387,7 +387,7 @@ CharlieArchitect, adopt 🤝 TEAMWORK to achieve maximum value delivered.`;
       
       expect(result).toBe(0);
       
-      // Hook should do nothing for non-Task tools
+      // Hook should do nothing for non-Agent tools
     });
 
     test('should handle agent not found error gracefully', async () => {

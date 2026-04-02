@@ -21,12 +21,12 @@ def main():
         
         session_id = input_data.get('session_id', 'unknown')
         
-        # Check if this is a Task tool use completion
+        # Check if this is an Agent tool use completion
         tool_name = input_data.get('tool_name', '')
         tool_input = input_data.get('tool_input', {})
         tool_response = input_data.get('tool_response', {})
         
-        if tool_name == 'Task':
+        if tool_name in ('Agent', 'Task'):
             description = tool_input.get('description', '')
             
             # Extract agent name from description (part before colon)
@@ -104,7 +104,7 @@ def main():
                     if response.status_code == 200:
                         print(f"Updated completion for subagent: {agent_name}", file=sys.stderr)
                     elif response.status_code == 404:
-                        # Agent not found, silently ignore (might be a direct Task not created by subagent)
+                        # Agent not found, silently ignore (might be a direct Agent call not created by subagent)
                         pass
                     else:
                         # Other error, log but don't fail

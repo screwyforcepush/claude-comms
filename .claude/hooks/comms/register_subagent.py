@@ -21,11 +21,11 @@ def main():
         
         session_id = input_data.get('session_id', 'unknown')
         
-        # Check if this is a Task tool use and register the subagent
+        # Check if this is an Agent tool use and register the subagent
         tool_name = input_data.get('tool_name', '')
         tool_input = input_data.get('tool_input', {})
         
-        if tool_name == 'Task':
+        if tool_name in ('Agent', 'Task'):
             description = tool_input.get('description', '')
             subagent_type = tool_input.get('subagent_type', '')
             initial_prompt = tool_input.get('prompt', '')

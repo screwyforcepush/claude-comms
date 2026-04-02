@@ -50,7 +50,7 @@ The CRITICAL ORCHESTRATION PROTOCOLS below defines YOUR mandatory operating proc
 ## Tasking Agents
 ### Core Naming Protocol
 
-🚨 CRITICAL: Every agent MUST have a unique name (Unique human FirstName, Abstract obscure LastName) in Task() calls:
+🚨 CRITICAL: Every agent MUST have a unique name (Unique human FirstName, Abstract obscure LastName) in Agent() calls:
 
 Format:
     - description: "<FirstNameLastName>: <3-5 word task description>"
@@ -104,7 +104,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 
 
 ### Intra-Batch Execution (True Parallelism)
-- Launch multiple agents SIMULTANEOUSLY using multiple Task() invocations in a single message
+- Launch multiple agents SIMULTANEOUSLY using multiple Agent() invocations in a single message
 - Agents within a batch have NO blocking dependencies - they work in parallel
 - Agents CAN communicate and support each other through the messaging system
 - All agents in a batch complete independently without waiting for others

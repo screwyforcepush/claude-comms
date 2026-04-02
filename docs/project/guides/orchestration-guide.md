@@ -458,7 +458,7 @@ When upstream changes occur:
 2. **Define Clear WP Boundaries** before spinning up teams
 3. **Maximize Batch Size** where agents can work in parallel
 4. **Enable Support Roles** within implementation batches
-5. **Launch Agent Teams Directly** using Task tool with proper context
+5. **Launch Agent Teams Directly** using Agent tool with proper context
 6. **Enforce Verification Gates** - no shortcuts allowed
 7. **Monitor Broadcast Channel** for blockers and adaptations
 8. **Cascade Changes** through re-verification when needed
