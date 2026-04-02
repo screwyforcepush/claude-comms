@@ -37,7 +37,10 @@ import {
 } from "./lib/prompts.js";
 
 // Harness executor (file-based event streaming for crash resilience)
-import { HarnessExecutor, Harness } from "./lib/harness-executor.js";
+import { HarnessExecutor, Harness, OrphanInfo } from "./lib/harness-executor.js";
+
+// File tracker utilities for orphan reconciliation
+import { writeJobStatus, utcNowIso } from "./lib/file-tracker.js";
 
 // Use anyApi for dynamic function references (works with ConvexClient)
 const api = anyApi;
@@ -1021,6 +1024,127 @@ function processHitList(hitList: { jobIds: string[]; chatJobIds: string[] }): vo
   }
 }
 
+// Orphan reconciliation on runner restart
+async function reconcileAllOrphans(): Promise<void> {
+  const orphans = executor.scanOrphans();
+
+  if (orphans.length === 0) {
+    console.log("[Reconcile] No orphaned jobs found");
+    return;
+  }
+
+  console.log(`[Reconcile] Found ${orphans.length} orphaned jobs`);
+
+  for (const orphan of orphans) {
+    try {
+      await reconcileOneOrphan(orphan);
+    } catch (err) {
+      console.error(`[Reconcile] Error processing ${orphan.jobId} (will retry on next restart):`, err);
+    }
+  }
+}
+
+async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
+  const { jobId } = orphan;
+
+  // 1. Check Convex state — if already terminal, sync file status and skip
+  const jobData = await client!.query(api.jobs.getWithGroup, {
+    password: config.password,
+    id: jobId as any,
+  });
+
+  if (!jobData) {
+    console.log(`[Reconcile] ${jobId}: not found in Convex, skipping`);
+    // Sync file status so we don't re-scan this orphan
+    orphan.status.status = "error";
+    orphan.status.status_reason = "not_found_in_convex";
+    orphan.status.end_time = utcNowIso();
+    writeJobStatus(orphan.paths.statusPath, orphan.status);
+    return;
+  }
+
+  const convexStatus = jobData.status;
+  if (convexStatus === "complete" || convexStatus === "failed") {
+    console.log(`[Reconcile] ${jobId}: already ${convexStatus} in Convex, syncing file status`);
+    orphan.status.status = convexStatus === "complete" ? "complete" : "error";
+    orphan.status.status_reason = `synced_from_convex_${convexStatus}`;
+    orphan.status.end_time = utcNowIso();
+    writeJobStatus(orphan.paths.statusPath, orphan.status);
+    return;
+  }
+
+  const group = jobData.group as JobGroup;
+  const assignment = jobData.assignment as Assignment;
+
+  if (orphan.pidAlive) {
+    // 2. Live orphan — re-adopt with full callbacks
+    console.log(`[Reconcile] ${jobId}: PID ${orphan.status.pid} alive, adopting`);
+
+    executor.adoptOrphan(orphan, {
+      onComplete: async (result, sessionId, exitForced) => {
+        try {
+          await client!.mutation(api.jobs.complete, {
+            password: config.password,
+            id: jobId,
+            result,
+            exitForced: exitForced || undefined,
+          });
+          await handleGroupCompletion(group, assignment, false);
+        } catch (e) {
+          console.error(`[Reconcile] ${jobId}: error in onComplete:`, e);
+        }
+      },
+      onFail: async (reason, partialResult, exitForced) => {
+        try {
+          await client!.mutation(api.jobs.fail, {
+            password: config.password,
+            id: jobId,
+            result: partialResult || reason,
+            exitForced: exitForced || undefined,
+          });
+          await handleGroupCompletion(group, assignment, true);
+        } catch (e) {
+          console.error(`[Reconcile] ${jobId}: error in onFail:`, e);
+        }
+      },
+      onTimeout: async (partialResult) => {
+        try {
+          await client!.mutation(api.jobs.fail, {
+            password: config.password,
+            id: jobId,
+            result: `Timeout. Partial result:\n${partialResult}`,
+          });
+          await handleGroupCompletion(group, assignment, true);
+        } catch (e) {
+          console.error(`[Reconcile] ${jobId}: error in onTimeout:`, e);
+        }
+      },
+    });
+  } else {
+    // 3. Dead orphan — finalize and do Convex writeback
+    console.log(`[Reconcile] ${jobId}: PID ${orphan.status.pid} dead, finalizing`);
+
+    const result = await executor.finalizeDeadOrphan(orphan);
+    console.log(`[Reconcile] ${jobId}: ${result.finalStatus}${result.isComplete ? " (complete)" : ""}`);
+
+    if (result.isComplete) {
+      await client!.mutation(api.jobs.complete, {
+        password: config.password,
+        id: jobId,
+        result: result.result || "",
+      });
+    } else {
+      await client!.mutation(api.jobs.fail, {
+        password: config.password,
+        id: jobId,
+        result: result.result || "Job orphaned without completion",
+      });
+    }
+
+    await handleGroupCompletion(group, assignment, !result.isComplete);
+  }
+}
+
 // Main
 async function startRunner() {
   console.log(`Workflow runner starting for namespace: ${config.namespace}`);
@@ -1043,12 +1167,7 @@ async function startRunner() {
   console.log(`Found namespace ID: ${namespaceId}`);
 
   // Reconcile any orphaned jobs from previous runner crash
-  await executor.reconcileOrphans(async (result) => {
-    console.log(`[Reconcile] ${result.jobId}: ${result.finalStatus}`);
-    // Note: We don't update Convex here because orphaned jobs may have already
-    // been marked as failed/timed out by the scheduler. The file-based status
-    // is the authoritative record for the TUI monitor.
-  });
+  await reconcileAllOrphans();
 
   // Subscribe to assignment-based jobs
   unsubscribeJobs = client.onUpdate(

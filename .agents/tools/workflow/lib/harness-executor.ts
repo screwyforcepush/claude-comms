@@ -30,7 +30,9 @@ import {
   FileJobStatus,
   JobPaths,
   ensureJobDir,
-  findOrphanedJobs,
+  listJobDirs,
+  readJobStatus,
+  getJobPaths,
   isPidAlive,
   utcNowIso,
   writeJobStatus,
@@ -99,6 +101,21 @@ export interface ReconciliationResult {
   finalStatus: "complete" | "error" | "timeout";
   result?: string;
   sessionId?: string;
+}
+
+export interface OrphanInfo {
+  jobId: string;
+  status: FileJobStatus;
+  paths: JobPaths;
+  pidAlive: boolean;
+}
+
+export interface DeadOrphanResult {
+  jobId: string;
+  finalStatus: "complete" | "error";
+  result?: string;
+  sessionId?: string;
+  isComplete: boolean;
 }
 
 // ============================================================================
@@ -317,6 +334,7 @@ export class HarnessExecutor {
       tracker: JobTracker;
       handler: StreamHandler;
       timeout: NodeJS.Timeout;
+      pidPoll?: NodeJS.Timeout;
     }
   >();
 
@@ -566,75 +584,38 @@ export class HarnessExecutor {
   }
 
   /**
-   * Reconcile orphaned jobs on startup.
-   * Reads unprocessed events from log files and determines final status.
+   * Scan for orphaned jobs: status="running" in file tracker but not in activeJobs.
+   * Returns both dead and live PIDs — caller decides how to handle each.
    */
-  async reconcileOrphans(
-    onReconciled: (result: ReconciliationResult) => Promise<void>
-  ): Promise<void> {
-    const orphans = findOrphanedJobs();
+  scanOrphans(): OrphanInfo[] {
+    const orphans: OrphanInfo[] = [];
 
-    if (orphans.length === 0) {
-      console.log("[Reconcile] No orphaned jobs found");
-      return;
+    for (const jobId of listJobDirs()) {
+      if (this.activeJobs.has(jobId)) continue;
+
+      const status = readJobStatus(jobId);
+      if (!status) continue;
+      if (status.status !== "running") continue;
+
+      orphans.push({
+        jobId,
+        status,
+        paths: getJobPaths(jobId),
+        pidAlive: isPidAlive(status.pid),
+      });
     }
 
-    console.log(`[Reconcile] Found ${orphans.length} orphaned jobs`);
-
-    for (const { jobId, status, paths } of orphans) {
-      console.log(`[Reconcile] Processing orphan: ${jobId}`);
-
-      try {
-        const result = await this.reconcileOrphan(jobId, status, paths);
-        await onReconciled(result);
-      } catch (err) {
-        console.error(`[Reconcile] Error processing ${jobId}:`, err);
-
-        // Mark as error
-        status.status = "error";
-        status.status_reason = `reconciliation_error: ${err}`;
-        status.end_time = utcNowIso();
-        writeJobStatus(paths.statusPath, status);
-
-        await onReconciled({
-          jobId,
-          finalStatus: "error",
-          result: `Reconciliation failed: ${err}`,
-        });
-      }
-    }
+    return orphans;
   }
 
   /**
-   * Process a single orphaned job
+   * Finalize a dead orphan: replay ALL events from position 0 to rebuild handler state,
+   * update file status, and return result for Convex writeback by caller.
    */
-  private async reconcileOrphan(
-    jobId: string,
-    status: FileJobStatus,
-    paths: JobPaths
-  ): Promise<ReconciliationResult> {
-    // Check if process is somehow still alive (shouldn't be, but check anyway)
-    if (isPidAlive(status.pid)) {
-      console.log(`[Reconcile] ${jobId} still alive (PID ${status.pid}), killing`);
-      try {
-        process.kill(status.pid!, "SIGTERM");
-        await new Promise((r) => setTimeout(r, 500));
-        if (isPidAlive(status.pid)) {
-          process.kill(status.pid!, "SIGKILL");
-        }
-      } catch {
-        // Ignore kill errors
-      }
-    }
-
-    // Create handler to process events
-    const handler = createStreamHandler(status.harness);
-
-    // Read log from last known position (or 0 if not set)
-    const startPosition = status.read_position ?? 0;
+  async finalizeDeadOrphan(orphan: OrphanInfo): Promise<DeadOrphanResult> {
+    const { jobId, status, paths } = orphan;
 
     if (!existsSync(paths.logPath)) {
-      // No log file - mark as error
       status.status = "error";
       status.status_reason = "orphaned_no_log";
       status.end_time = utcNowIso();
@@ -644,12 +625,17 @@ export class HarnessExecutor {
         jobId,
         finalStatus: "error",
         result: "Job orphaned with no log file",
+        isComplete: false,
       };
     }
 
-    // Process remaining events in log
+    // Replay from position 0 — not read_position. The old runner may have
+    // advanced read_position past a result event but died before the Convex
+    // callback fired. Replaying from 0 rebuilds full handler state.
+    const handler = createStreamHandler(status.harness);
+
     const stream = createReadStream(paths.logPath, {
-      start: startPosition,
+      start: 0,
       encoding: "utf-8",
     });
 
@@ -662,7 +648,6 @@ export class HarnessExecutor {
 
     for await (const line of rl) {
       if (!line.trim()) continue;
-
       try {
         const event = JSON.parse(line);
         handler.onEvent(event);
@@ -673,43 +658,245 @@ export class HarnessExecutor {
     }
 
     console.log(
-      `[Reconcile] ${jobId}: processed ${eventsProcessed} events from position ${startPosition}`
+      `[Reconcile] ${jobId}: replayed ${eventsProcessed} events from position 0`
     );
 
-    // Determine final status
     const result = handler.getResult();
     const sessionId = handler.getSessionId();
+    const isComplete = handler.isComplete();
 
-    if (handler.isComplete()) {
-      // Job actually completed successfully
+    if (isComplete) {
       status.status = "complete";
       status.status_reason = "reconciled_complete";
       status.end_time = utcNowIso();
       status.completion.final_message = result;
-      writeJobStatus(paths.statusPath, status);
-
-      return {
-        jobId,
-        finalStatus: "complete",
-        result,
-        sessionId: sessionId || undefined,
-      };
     } else {
-      // Job was interrupted
       status.status = "error";
       status.status_reason = "orphaned_interrupted";
       status.end_time = utcNowIso();
       if (result) {
         status.completion.final_message = result;
       }
-      writeJobStatus(paths.statusPath, status);
-
-      return {
-        jobId,
-        finalStatus: "error",
-        result: result || "Job orphaned without completion",
-      };
     }
+    writeJobStatus(paths.statusPath, status);
+
+    return {
+      jobId,
+      finalStatus: isComplete ? "complete" : "error",
+      result: result || (isComplete ? undefined : "Job orphaned without completion"),
+      sessionId: sessionId || undefined,
+      isComplete,
+    };
+  }
+
+  /**
+   * Adopt a live orphan: replay events up to current file size, then start a
+   * LogTailer from that position. Uses PID polling instead of child.on('close').
+   */
+  adoptOrphan(orphan: OrphanInfo, callbacks: ExecutionCallbacks): ExecutionHandle {
+    const { jobId, status, paths } = orphan;
+    const pid = status.pid!;
+
+    // Capture file size BEFORE replay — events written during replay won't be
+    // skipped by the tailer because we start the tailer from this boundary.
+    const replayUpTo = existsSync(paths.logPath) ? statSync(paths.logPath).size : 0;
+
+    // Replay events from 0 up to the boundary to rebuild handler state
+    const handler = createStreamHandler(status.harness);
+    const tracker = JobTracker.fromExisting(jobId, status, paths);
+
+    // We need to replay synchronously before starting the tailer.
+    // Use a promise that we await internally via the returned handle pattern.
+    let replayDone = false;
+    const replayPromise = (async () => {
+      if (replayUpTo > 0) {
+        const stream = createReadStream(paths.logPath, {
+          start: 0,
+          end: replayUpTo - 1,
+          encoding: "utf-8",
+        });
+
+        const rl = createInterface({
+          input: stream,
+          crlfDelay: Infinity,
+        });
+
+        let eventsProcessed = 0;
+        for await (const line of rl) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            handler.onEvent(event);
+            eventsProcessed++;
+          } catch {
+            // Not JSON, skip
+          }
+        }
+
+        console.log(
+          `[Adopt] ${jobId}: replayed ${eventsProcessed} events (0..${replayUpTo})`
+        );
+      }
+      replayDone = true;
+      // Check if replay found a terminal result
+      if (handler.isTerminal()) hasSeenResult = true;
+    })();
+
+    // Set up state flags (same pattern as execute())
+    let jobCompleted = false;
+    let hasSeenResult = false;
+
+    const SETTLING_MS = 120_000;
+    let settlingTimer: NodeJS.Timeout | null = null;
+
+    const completeJob = (finalStatus: "complete" | "error" | "timeout", exitForced: boolean) => {
+      if (jobCompleted) return;
+      jobCompleted = true;
+
+      if (settlingTimer) { clearTimeout(settlingTimer); settlingTimer = null; }
+      clearTimeout(timeout);
+      if (pidPoll) clearInterval(pidPoll);
+      tailer.stop();
+      this.activeJobs.delete(jobId);
+
+      const result = handler.getResult();
+      if (finalStatus === "timeout") {
+        callbacks.onTimeout(result || "(no output)");
+      } else if (handler.isComplete()) {
+        tracker.complete(result);
+        callbacks.onComplete(result, handler.getSessionId() || undefined, exitForced);
+      } else {
+        const failureReason = handler.getFailureReason();
+        const reason = failureReason || "orphan_interrupted";
+        tracker.fail(reason);
+        callbacks.onFail(reason, result, exitForced);
+      }
+    };
+
+    // Start tailer from the replay boundary — no gap, no overlap
+    const tailer = new LogTailer(paths.logPath, replayUpTo, {
+      pollIntervalMs: this.config.pollIntervalMs,
+      debounceMs: this.config.debounceMs,
+    });
+
+    // Wire up event handling (same settling logic as execute())
+    tailer.on("event", (event: Record<string, unknown>) => {
+      if (!replayDone) return; // Ignore events until replay is complete
+      handler.onEvent(event);
+      const eventType = (event.type as string) || "event";
+      tracker.recordEvent(eventType);
+
+      callbacks.onEvent?.(event);
+
+      // Cancel settling timer on any event — agent is still active
+      if (settlingTimer) {
+        clearTimeout(settlingTimer);
+        settlingTimer = null;
+      }
+
+      if (handler.isTerminal() && !jobCompleted) {
+        hasSeenResult = true;
+
+        settlingTimer = setTimeout(() => {
+          if (jobCompleted) return;
+
+          console.log(`[Adopt] ${jobId}: settling complete (${SETTLING_MS / 1000}s silence)`);
+
+          const exitForced = isPidAlive(pid);
+          if (exitForced) {
+            try { process.kill(pid, "SIGTERM"); } catch { /* ignore */ }
+            setTimeout(() => {
+              try { if (isPidAlive(pid)) process.kill(pid, "SIGKILL"); } catch { /* ignore */ }
+            }, 5000);
+          }
+
+          completeJob(handler.isComplete() ? "complete" : "error", exitForced);
+        }, SETTLING_MS);
+      }
+    });
+
+    tailer.on("position", (pos: number) => {
+      tracker.setReadPosition(pos);
+    });
+
+    // Start tailer after replay completes
+    replayPromise.then(() => {
+      if (jobCompleted) return;
+      tailer.start();
+
+      // If replay already found a terminal result, start settling immediately
+      if (hasSeenResult && !settlingTimer && !jobCompleted) {
+        console.log(`[Adopt] ${jobId}: terminal result found in replay, entering settling mode`);
+        settlingTimer = setTimeout(() => {
+          if (jobCompleted) return;
+          const exitForced = isPidAlive(pid);
+          if (exitForced) {
+            try { process.kill(pid, "SIGTERM"); } catch { /* ignore */ }
+            setTimeout(() => {
+              try { if (isPidAlive(pid)) process.kill(pid, "SIGKILL"); } catch { /* ignore */ }
+            }, 5000);
+          }
+          completeJob(handler.isComplete() ? "complete" : "error", exitForced);
+        }, SETTLING_MS);
+      }
+    });
+
+    // Max duration timeout
+    const timeout = setTimeout(() => {
+      console.log(`[Adopt] ${jobId}: timeout after ${this.config.timeoutMs}ms`);
+      tracker.timeout();
+      try { process.kill(pid, "SIGTERM"); } catch { /* ignore */ }
+      setTimeout(() => {
+        try { if (isPidAlive(pid)) process.kill(pid, "SIGKILL"); } catch { /* ignore */ }
+      }, 5000);
+      completeJob("timeout", true);
+    }, this.config.timeoutMs);
+
+    // PID liveness polling (replaces child.on('close') for adopted processes)
+    const pidPoll = setInterval(async () => {
+      if (jobCompleted) return;
+      if (!isPidAlive(pid)) {
+        console.log(`[Adopt] ${jobId}: PID ${pid} died`);
+        clearInterval(pidPoll);
+
+        // Final flush to capture remaining events
+        await tailer.flush();
+        tailer.stop();
+
+        if (jobCompleted) return;
+        completeJob(handler.isComplete() ? "complete" : "error", false);
+      }
+    }, 2000);
+
+    // Proxy ChildProcess for activeJobs map compatibility
+    const proxyChild = Object.create(null) as ChildProcess;
+    (proxyChild as any).pid = pid;
+    (proxyChild as any).kill = (signal?: string) => {
+      try { process.kill(pid, (signal as NodeJS.Signals) || "SIGTERM"); } catch { /* ignore */ }
+    };
+    (proxyChild as any).killed = false;
+    (proxyChild as any).exitCode = null;
+
+    this.activeJobs.set(jobId, {
+      child: proxyChild,
+      tailer,
+      tracker,
+      handler,
+      timeout,
+      pidPoll,
+    });
+
+    return {
+      jobId,
+      pid,
+      kill: () => {
+        try { process.kill(pid, "SIGTERM"); } catch { /* ignore */ }
+        setTimeout(() => {
+          try { if (isPidAlive(pid)) process.kill(pid, "SIGKILL"); } catch { /* ignore */ }
+        }, 5000);
+      },
+      getTracker: () => tracker,
+    };
   }
 
   /**
@@ -746,6 +933,7 @@ export class HarnessExecutor {
     for (const [jobId, job] of this.activeJobs) {
       console.log(`[Executor] Killing job ${jobId}`);
       clearTimeout(job.timeout);
+      if (job.pidPoll) clearInterval(job.pidPoll);
       job.tailer.stop();
       job.child.kill("SIGTERM");
     }
