@@ -1,3 +1,7 @@
+---
+name: Install Annotated Feedback Widget
+description: Use only if specifically requested by user. Install the annotated-feedback widget in a web app project.
+---
 # Install Annotated Feedback Widget
 
 Guide the user through installing the `annotated-feedback` widget in their application. This widget provides visual feedback annotation capabilities with screenshot capture and Convex backend integration.

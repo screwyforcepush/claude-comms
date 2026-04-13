@@ -1,3 +1,8 @@
+---
+name: setup cc3 server
+description: Use only if specifically requested by user. Set up and run a new cc3 server.
+---
+
 Start the Claude Comms servers for the user. Guide them through setup.
 
 # System Architecture

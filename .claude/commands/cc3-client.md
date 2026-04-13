@@ -1,3 +1,7 @@
+---
+name: install cc3 client
+description: Use only if specifically requested by user. Set up and run a new cc3 client.
+---
 Set up and start the workflow runner client in this project repo.
 
 # What is the client?

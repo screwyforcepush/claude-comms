@@ -1,3 +1,7 @@
+---
+name: cc3 update
+description: Use only if specifically requested by user. Update existing cc3 client.
+---
 Update the workflow runner client with latest changes from upstream.
 
 ## Step 1: Stop the runner
