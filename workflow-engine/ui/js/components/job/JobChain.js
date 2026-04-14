@@ -947,14 +947,50 @@ function ParallelJobRow({ jobs, selectedJobId, onJobSelect, now }) {
 }
 
 /**
+ * Retry button for a group card — triggers cascade-delete of downstream groups
+ * and reset of this group's jobs back to pending. Power tool; confirm handled
+ * upstream in ChatPanel's handleRetryGroup.
+ */
+function GroupRetryButton({ groupId, downstreamCount, onRetryGroup }) {
+  const [hovered, setHovered] = React.useState(false);
+  return React.createElement('button', {
+    type: 'button',
+    onClick: (e) => {
+      e.stopPropagation();
+      onRetryGroup(groupId, downstreamCount);
+    },
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    title: downstreamCount > 0
+      ? `Retry group (deletes ${downstreamCount} downstream group${downstreamCount === 1 ? '' : 's'})`
+      : 'Retry group',
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      padding: '2px 8px',
+      fontFamily: 'var(--font-display)',
+      fontSize: '11px',
+      letterSpacing: 'var(--t-type-tracking-tight)',
+      color: hovered ? 'var(--q-torch-hot)' : 'var(--q-bone0)',
+      backgroundColor: hovered ? 'var(--q-stone2)' : 'transparent',
+      border: `1px solid ${hovered ? 'var(--q-torch)' : 'var(--q-stone3)'}`,
+      borderRadius: 0,
+      cursor: 'pointer',
+    }
+  }, 'RETRY');
+}
+
+/**
  * Render a single group - handles wrapping for 5+ jobs
  */
-function GroupRow({ group, selectedJobId, onJobSelect, now }) {
+function GroupRow({ group, selectedJobId, onJobSelect, now, onRetryGroup, downstreamCount }) {
   const jobs = group.jobs || [];
 
-  // Single job: render as single node (unchanged behavior)
+  // Group content (original job rendering)
+  let groupContent;
   if (jobs.length === 1) {
-    return React.createElement('div', {
+    groupContent = React.createElement('div', {
       className: 'flex justify-center'
     },
       React.createElement(JobNode, {
@@ -965,47 +1001,56 @@ function GroupRow({ group, selectedJobId, onJobSelect, now }) {
         now
       })
     );
-  }
-
-  // 2-4 jobs: single horizontal row
-  if (jobs.length <= 4) {
-    return React.createElement(ParallelJobRow, {
+  } else if (jobs.length <= 4) {
+    groupContent = React.createElement(ParallelJobRow, {
       jobs,
       selectedJobId,
       onJobSelect,
       now
     });
+  } else {
+    const rows = chunkArray(jobs, 4);
+    groupContent = React.createElement('div', {
+      className: 'flex flex-col items-center gap-2'
+    },
+      rows.map((rowJobs, rowIndex) =>
+        React.createElement(React.Fragment, { key: rowIndex },
+          React.createElement(ParallelJobRow, {
+            jobs: rowJobs,
+            selectedJobId,
+            onJobSelect,
+            now
+          }),
+          rowIndex < rows.length - 1 && React.createElement('div', {
+            className: 'w-px h-2',
+            style: { backgroundColor: 'var(--q-iron1)' }
+          })
+        )
+      )
+    );
   }
 
-  // 5+ jobs: wrap into rows of 4 max
-  const rows = chunkArray(jobs, 4);
+  // Wrap with retry affordance (only if callback provided)
+  if (!onRetryGroup) return groupContent;
 
   return React.createElement('div', {
-    className: 'flex flex-col items-center gap-2'
+    className: 'flex flex-col items-center gap-1'
   },
-    rows.map((rowJobs, rowIndex) =>
-      React.createElement(React.Fragment, { key: rowIndex },
-        React.createElement(ParallelJobRow, {
-          jobs: rowJobs,
-          selectedJobId,
-          onJobSelect,
-          now
-        }),
-        // Add subtle row connector between wrapped rows (Q palette iron)
-        rowIndex < rows.length - 1 && React.createElement('div', {
-          className: 'w-px h-2',
-          style: { backgroundColor: 'var(--q-iron1)' }
-        })
-      )
-    )
+    groupContent,
+    React.createElement(GroupRetryButton, {
+      groupId: group._id,
+      downstreamCount,
+      onRetryGroup
+    })
   );
 }
 
 /**
  * Main group chain - renders groups vertically with connectors between
  */
-function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
+function GroupChain({ groups, selectedJobId, onJobSelect, now, onRetryGroup }) {
   const validGroups = groups;
+  const lastIndex = validGroups.length - 1;
 
   return React.createElement('div', {
     className: 'flex flex-col items-center'
@@ -1014,6 +1059,8 @@ function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
       const prevGroup = validGroups[index - 1];
       const prevJobCount = prevGroup?.jobs?.length || 0;
       const currentJobCount = group.jobs?.length || 0;
+      // Downstream count = groups after this one in the rendered chain
+      const downstreamCount = lastIndex - index;
 
       return React.createElement(React.Fragment, { key: group._id },
         // Connector from previous group (if not first)
@@ -1026,7 +1073,9 @@ function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
           group,
           selectedJobId,
           onJobSelect,
-          now
+          now,
+          onRetryGroup,
+          downstreamCount
         })
       );
     })
@@ -1041,7 +1090,7 @@ function GroupChain({ groups, selectedJobId, onJobSelect, now }) {
  * @param {Function} props.onJobSelect - Callback when job is selected
  * @param {string} props.layout - Layout mode: 'vertical' | 'horizontal' | 'auto' (reserved for future)
  */
-export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 'vertical', assignmentStatus, independent, onKillJob }) {
+export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 'vertical', assignmentStatus, independent, onKillJob, onRetryGroup }) {
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -1286,7 +1335,8 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
         groups,
         selectedJobId,
         onJobSelect: handleJobClick,
-        now
+        now,
+        onRetryGroup
       })
     ),
 

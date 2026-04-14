@@ -666,6 +666,7 @@ export function AssignmentPane({
   thread,
   onKillJob,
   onUpdateNudge,
+  onRetryGroup,
 }) {
   // Two-tier subscription: archive (terminal) + live (active) groups
   const groups = useGroupJobsTwoTier(assignmentId);
@@ -1023,6 +1024,7 @@ export function AssignmentPane({
             assignmentStatus: status,
             independent,
             onKillJob,
+            onRetryGroup,
           }),
 
         // Artifacts (collapsible)

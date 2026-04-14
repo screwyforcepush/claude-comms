@@ -33,6 +33,8 @@ export const api = {
     getActiveGroupsWithJobs: "jobs:getActiveGroupsWithJobs",
     // Kill signal for running jobs
     requestKill: "jobs:requestKill",
+    // Retry a job group (cascade-deletes downstream, resets this group)
+    retryGroup: "jobs:retryGroup",
   },
 
   // Chat threads API

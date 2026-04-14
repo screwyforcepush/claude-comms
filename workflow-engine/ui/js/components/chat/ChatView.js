@@ -45,6 +45,7 @@ export function ChatView({
   onChangeFocusAssignment,   // WP-7 U6: Change focused assignment
   onKillJob,                 // WP-7 R1: Kill a running job
   onKillChatJob,             // WP-7 R2: Kill active chatJob
+  onRetryGroup,              // Retry a job group (cascade-deletes downstream)
   activeChatJob = null       // WP-7 R2: Active chatJob for current thread
 }) {
   // WP-4: State for selected job modal
@@ -243,7 +244,8 @@ export function ChatView({
       onUpdateNudge: onUpdateNudge,
       onChangeFocusAssignment: onChangeFocusAssignment,
       thread: thread,
-      onKillJob: onKillJob
+      onKillJob: onKillJob,
+      onRetryGroup: onRetryGroup
     }),
 
     // WP-4: Job detail modal

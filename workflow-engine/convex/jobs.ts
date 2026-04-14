@@ -431,6 +431,67 @@ export const requestKill = mutation({
   },
 });
 
+// Retry a job group: cascade-delete all downstream groups, reset this group
+// and its jobs back to pending. Preserves prompt/jobType/harness/context.
+// Power tool — no safety checks on running state. Caller is responsible.
+// Execution record only; filesystem state (code on disk) is not touched,
+// so stale artifacts/decisions/PM messages from prior groups remain valid
+// history of what produced the current filesystem.
+export const retryGroup = mutation({
+  args: { password: v.string(), id: v.id("jobGroups") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const group = await ctx.db.get(args.id);
+    if (!group) throw new Error("Group not found");
+
+    // Walk + delete downstream chain
+    let downstreamId = group.nextGroupId;
+    while (downstreamId) {
+      const downstream = await ctx.db.get(downstreamId);
+      if (!downstream) break;
+      const nextId = downstream.nextGroupId;
+
+      const downstreamJobs = await ctx.db
+        .query("jobs")
+        .withIndex("by_group", (q) => q.eq("groupId", downstreamId!))
+        .collect();
+      for (const j of downstreamJobs) {
+        await ctx.db.delete(j._id);
+      }
+      await ctx.db.delete(downstreamId);
+
+      downstreamId = nextId;
+    }
+
+    // Reset target group
+    await ctx.db.patch(args.id, {
+      status: "pending",
+      aggregatedResult: undefined,
+      nextGroupId: undefined,
+    });
+
+    // Reset each member job (preserve prompt/jobType/harness/context)
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_group", (q) => q.eq("groupId", args.id))
+      .collect();
+    for (const j of jobs) {
+      await ctx.db.patch(j._id, {
+        status: "pending",
+        result: undefined,
+        startedAt: undefined,
+        completedAt: undefined,
+        toolCallCount: undefined,
+        subagentCount: undefined,
+        totalTokens: undefined,
+        lastEventAt: undefined,
+        exitForced: undefined,
+        killRequested: undefined,
+      });
+    }
+  },
+});
+
 // ============================================================================
 // Internal Helpers
 // ============================================================================

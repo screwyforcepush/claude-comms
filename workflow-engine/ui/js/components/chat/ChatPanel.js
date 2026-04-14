@@ -472,6 +472,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
   const updateFocusAssignment = useMutation(api.chatThreads.updateFocusAssignment);
   const killJob = useMutation(api.jobs.requestKill);
   const killChatJob = useMutation(api.chatJobs.requestKill);
+  const retryGroup = useMutation(api.jobs.retryGroup);
 
   // WP-5: No longer reset selection on namespace change (cross-namespace view)
   // Auto-select first thread if none selected and threads exist
@@ -664,6 +665,19 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
       console.error('Failed to kill chat job:', err);
     }
   }, [killChatJob]);
+
+  // Retry a job group (cascade-deletes downstream, resets this group)
+  const handleRetryGroup = useCallback(async (groupId, downstreamCount) => {
+    const msg = downstreamCount > 0
+      ? `Retry this group? ${downstreamCount} downstream group${downstreamCount === 1 ? '' : 's'} will be deleted.`
+      : 'Retry this group?';
+    if (!confirm(msg)) return;
+    try {
+      await retryGroup({ id: groupId });
+    } catch (err) {
+      console.error('Failed to retry group:', err);
+    }
+  }, [retryGroup]);
 
   // WP-3: Handle toggling threads pane collapse
   const handleToggleThreadsPane = useCallback(() => {
@@ -882,6 +896,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
       onChangeFocusAssignment: handleChangeFocusAssignment,
       onKillJob: handleKillJob,
       onKillChatJob: handleKillChatJob,
+      onRetryGroup: handleRetryGroup,
       activeChatJob: activeChatJob || null
     })
   );

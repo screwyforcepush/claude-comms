@@ -204,6 +204,9 @@ Switching between modes is instant and non-destructive. Nothing is lost.
 ### Subscription Efficiency Principle
 Real-time Convex subscriptions should only be maintained for **mutable data** — jobs/groups that are still pending or running. Terminal data (complete/failed) is immutable and should be fetched via bulk queries that rarely invalidate, not per-entity live subscriptions. This principle applies broadly: don't pay the reactive cost for data that has stopped changing.
 
+### Execution Records vs. Filesystem State
+Job execution records (groups, jobs, results, aggregated decisions, artifacts, PM messages) are a **log of how the system got here** — not the source of truth about what exists. The real state is the code on disk. This matters most for **retry semantics**: when a job group is retried, downstream execution records are cascade-deleted, but stale decisions, artifacts, and PM chat messages from earlier groups are preserved. They still accurately describe what happened and what the filesystem now reflects. The execution record is history; the code is state.
+
 ## Open Questions
 
 *None currently.*
