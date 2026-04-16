@@ -9,6 +9,11 @@
 // Types
 // ============================================================================
 
+export interface RateLimitInfo {
+  resetsAt: number;       // Unix seconds
+  rateLimitType: string;  // "five_hour" or "seven_day"
+}
+
 export interface StreamHandler {
   /** Process a JSON event from the harness output stream */
   onEvent(event: Record<string, unknown>): void;
@@ -22,6 +27,8 @@ export interface StreamHandler {
   getSessionId(): string | null;
   /** Get a failure reason if a terminal error was observed */
   getFailureReason(): string | null;
+  /** Get rate-limit info if a rate_limit_event was detected (Claude only) */
+  getRateLimitInfo(): RateLimitInfo | null;
 }
 
 export interface CommandOptions {
@@ -58,9 +65,25 @@ export class ClaudeStreamHandler implements StreamHandler {
   private success = false;
   private sessionId: string | null = null;
   private failureReason: string | null = null;
+  private rateLimitInfo: RateLimitInfo | null = null;
 
   onEvent(event: Record<string, unknown>): void {
     const type = event.type as string;
+
+    // Capture rate_limit_event (fires before the synthetic result)
+    if (type === "rate_limit_event") {
+      const info = event.rate_limit_info as {
+        status?: string;
+        resetsAt?: number;
+        rateLimitType?: string;
+      } | undefined;
+      if (info?.status === "rejected" && info.resetsAt && info.rateLimitType) {
+        this.rateLimitInfo = {
+          resetsAt: info.resetsAt,
+          rateLimitType: info.rateLimitType,
+        };
+      }
+    }
 
     // Capture assistant text messages
     if (type === "assistant" && event.message) {
@@ -116,6 +139,10 @@ export class ClaudeStreamHandler implements StreamHandler {
   getFailureReason(): string | null {
     return this.failureReason;
   }
+
+  getRateLimitInfo(): RateLimitInfo | null {
+    return this.rateLimitInfo;
+  }
 }
 
 // ============================================================================
@@ -161,6 +188,10 @@ export class CodexStreamHandler implements StreamHandler {
   }
 
   getFailureReason(): string | null {
+    return null;
+  }
+
+  getRateLimitInfo(): RateLimitInfo | null {
     return null;
   }
 }
@@ -219,6 +250,10 @@ export class GeminiStreamHandler implements StreamHandler {
 
   getFailureReason(): string | null {
     return this.failureReason;
+  }
+
+  getRateLimitInfo(): RateLimitInfo | null {
+    return null;
   }
 }
 

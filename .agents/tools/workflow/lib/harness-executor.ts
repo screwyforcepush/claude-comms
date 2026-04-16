@@ -40,6 +40,7 @@ import {
 
 import {
   StreamHandler,
+  RateLimitInfo,
   createStreamHandler,
   buildCommand,
   CommandOptions,
@@ -58,6 +59,8 @@ export interface ExecutionCallbacks {
   onFail: (reason: string, partialResult?: string, exitForced?: boolean) => void;
   /** Called when job times out (max duration or idle timeout before terminal event) */
   onTimeout: (partialResult: string) => void;
+  /** Called when job hits a provider rate limit (Claude only). If not provided, falls through to onFail. */
+  onRateLimit?: (rateLimitInfo: RateLimitInfo, partialResult?: string) => void;
   /** Optional: called for each event (for custom handling) */
   onEvent?: (event: Record<string, unknown>) => void;
 }
@@ -116,6 +119,7 @@ export interface DeadOrphanResult {
   result?: string;
   sessionId?: string;
   isComplete: boolean;
+  rateLimitInfo?: RateLimitInfo;
 }
 
 // ============================================================================
@@ -465,10 +469,17 @@ export class HarnessExecutor {
             tracker.complete(result);
             callbacks.onComplete(result, handler.getSessionId() || undefined, exitForced);
           } else {
-            const failureReason = handler.getFailureReason();
-            const reason = failureReason || "terminal_error";
-            tracker.fail(reason);
-            callbacks.onFail(reason, result, exitForced);
+            // Check for rate limit before generic failure
+            const rateLimitInfo = handler.getRateLimitInfo();
+            if (rateLimitInfo && callbacks.onRateLimit) {
+              tracker.fail("rate_limited");
+              callbacks.onRateLimit(rateLimitInfo, result);
+            } else {
+              const failureReason = handler.getFailureReason();
+              const reason = failureReason || "terminal_error";
+              tracker.fail(reason);
+              callbacks.onFail(reason, result, exitForced);
+            }
           }
         }, SETTLING_MS);
       }
@@ -558,12 +569,19 @@ export class HarnessExecutor {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, false);
       } else {
-        const failureReason = handler.getFailureReason();
-        const reason = failureReason
-          ? `process_exit_${code} (${failureReason})`
-          : `process_exit_${code}`;
-        tracker.fail(reason);
-        callbacks.onFail(reason, result, false);
+        // Check for rate limit before generic failure
+        const rateLimitInfo = handler.getRateLimitInfo();
+        if (rateLimitInfo && callbacks.onRateLimit) {
+          tracker.fail("rate_limited");
+          callbacks.onRateLimit(rateLimitInfo, result);
+        } else {
+          const failureReason = handler.getFailureReason();
+          const reason = failureReason
+            ? `process_exit_${code} (${failureReason})`
+            : `process_exit_${code}`;
+          tracker.fail(reason);
+          callbacks.onFail(reason, result, false);
+        }
       }
     });
 
@@ -686,6 +704,7 @@ export class HarnessExecutor {
       result: result || (isComplete ? undefined : "Job orphaned without completion"),
       sessionId: sessionId || undefined,
       isComplete,
+      rateLimitInfo: handler.getRateLimitInfo() || undefined,
     };
   }
 
@@ -766,10 +785,17 @@ export class HarnessExecutor {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, exitForced);
       } else {
-        const failureReason = handler.getFailureReason();
-        const reason = failureReason || "orphan_interrupted";
-        tracker.fail(reason);
-        callbacks.onFail(reason, result, exitForced);
+        // Check for rate limit before generic failure
+        const rateLimitInfo = handler.getRateLimitInfo();
+        if (rateLimitInfo && callbacks.onRateLimit) {
+          tracker.fail("rate_limited");
+          callbacks.onRateLimit(rateLimitInfo, result);
+        } else {
+          const failureReason = handler.getFailureReason();
+          const reason = failureReason || "orphan_interrupted";
+          tracker.fail(reason);
+          callbacks.onFail(reason, result, exitForced);
+        }
       }
     };
 

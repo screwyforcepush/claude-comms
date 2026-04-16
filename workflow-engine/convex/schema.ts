@@ -85,7 +85,8 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("running"),
       v.literal("complete"),
-      v.literal("failed")
+      v.literal("failed"),
+      v.literal("awaiting_retry")
     ),
     result: v.optional(v.string()),
     startedAt: v.optional(v.number()),
@@ -95,6 +96,10 @@ export default defineSchema({
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
     exitForced: v.optional(v.boolean()),
+    // Rate-limit auto-retry fields
+    retryCount: v.optional(v.number()),      // Increments each retry cycle
+    retryAfter: v.optional(v.number()),      // Absolute timestamp (ms) of next retry
+    rateLimitType: v.optional(v.string()),   // "five_hour" or "seven_day"
     // Phase 10: Operations Center Upgrade
     killRequested: v.optional(v.boolean()), // R1: Agent kill signal from UI
     createdAt: v.number(),

@@ -629,6 +629,21 @@ async function executeJob(
           console.error(`[${jobId}] Error in onFail:`, e);
         }
       },
+      onRateLimit: async (rateLimitInfo, partialResult) => {
+        stopHeartbeat();
+        try {
+          await client!.mutation(api.jobs.rateLimited, {
+            password: config.password,
+            id: jobId,
+            resetsAt: rateLimitInfo.resetsAt,
+            rateLimitType: rateLimitInfo.rateLimitType,
+          });
+          console.log(`[${jobId}] Rate limited (${rateLimitInfo.rateLimitType}), retry scheduled for ${new Date(rateLimitInfo.resetsAt * 1000).toISOString()}`);
+          // Do NOT call handleGroupCompletion — group stays in progress
+        } catch (e) {
+          console.error(`[${jobId}] Error in onRateLimit:`, e);
+        }
+      },
       onTimeout: async (partialResult) => {
         stopHeartbeat();
         try {
@@ -1107,6 +1122,19 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
           console.error(`[Reconcile] ${jobId}: error in onFail:`, e);
         }
       },
+      onRateLimit: async (rateLimitInfo) => {
+        try {
+          await client!.mutation(api.jobs.rateLimited, {
+            password: config.password,
+            id: jobId,
+            resetsAt: rateLimitInfo.resetsAt,
+            rateLimitType: rateLimitInfo.rateLimitType,
+          });
+          console.log(`[Reconcile] ${jobId}: rate limited, retry scheduled`);
+        } catch (e) {
+          console.error(`[Reconcile] ${jobId}: error in onRateLimit:`, e);
+        }
+      },
       onTimeout: async (partialResult) => {
         try {
           await client!.mutation(api.jobs.fail, {
@@ -1133,15 +1161,25 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
         id: jobId,
         result: result.result || "",
       });
+      await handleGroupCompletion(group, assignment, false);
+    } else if (result.rateLimitInfo) {
+      // Dead orphan was rate-limited — schedule retry instead of failing
+      await client!.mutation(api.jobs.rateLimited, {
+        password: config.password,
+        id: jobId,
+        resetsAt: result.rateLimitInfo.resetsAt,
+        rateLimitType: result.rateLimitInfo.rateLimitType,
+      });
+      console.log(`[Reconcile] ${jobId}: rate limited, retry scheduled`);
+      // Do NOT call handleGroupCompletion — group stays in progress
     } else {
       await client!.mutation(api.jobs.fail, {
         password: config.password,
         id: jobId,
         result: result.result || "Job orphaned without completion",
       });
+      await handleGroupCompletion(group, assignment, true);
     }
-
-    await handleGroupCompletion(group, assignment, !result.isComplete);
   }
 }
 

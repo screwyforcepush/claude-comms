@@ -384,7 +384,10 @@ export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
     toolCallCount,
     subagentCount,
     totalTokens,
-    lastEventAt
+    lastEventAt,
+    retryCount,
+    retryAfter,
+    rateLimitType
   } = job;
 
   const shortId = _id ? _id.slice(-12) : 'unknown';
@@ -418,7 +421,7 @@ export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
   }, [lastEventAt, startedAt, status, now]);
 
   React.useEffect(() => {
-    if (status !== 'running') return;
+    if (status !== 'running' && status !== 'awaiting_retry') return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [status]);
@@ -645,6 +648,44 @@ export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
           }, 'Status'),
           React.createElement(StatusBadge, { status, size: 'sm' })
         )
+      ),
+
+      // Rate-limit retry info (shown when awaiting_retry)
+      status === 'awaiting_retry' && React.createElement('div', {
+        style: {
+          marginBottom: '16px',
+          padding: '10px 14px',
+          background: 'rgba(212, 160, 48, 0.08)',
+          border: '1px solid rgba(212, 160, 48, 0.25)',
+          borderRadius: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }
+      },
+        React.createElement('span', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '10px',
+            color: 'var(--q-torch)',
+            textTransform: 'uppercase',
+            letterSpacing: '2px'
+          }
+        }, rateLimitType ? `Rate Limited (${rateLimitType})` : 'Rate Limited'),
+        React.createElement('span', {
+          style: {
+            fontFamily: 'var(--font-console)',
+            fontSize: '12px',
+            color: 'var(--q-bone2)'
+          }
+        }, (() => {
+          const retryIn = retryAfter ? Math.max(0, retryAfter - now) : 0;
+          const attempt = retryCount || 0;
+          if (retryIn <= 0) return `Retry #${attempt} imminent`;
+          const mins = Math.floor(retryIn / 60000);
+          const secs = Math.floor((retryIn % 60000) / 1000);
+          return `Retry #${attempt} in ${mins > 0 ? mins + 'm ' : ''}${secs}s`;
+        })())
       ),
 
       // WP-7 R1: Kill button for running jobs

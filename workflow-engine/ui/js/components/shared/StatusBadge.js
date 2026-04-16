@@ -20,6 +20,7 @@ const statusModifiers = {
   error: 'status-rune--error',
   complete: 'status-rune--complete',
   chunked: 'status-rune--failed',
+  awaiting_retry: 'status-rune--pending',
   offline: 'status-rune--offline',
   unknown: 'status-rune--unknown',
   warp: 'status-rune--warp',

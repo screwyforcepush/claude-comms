@@ -164,7 +164,8 @@ const statusRuneConfig = {
   complete: { color: 'var(--q-slime1)', label: 'DONE', pulse: false },
   failed: { color: 'var(--q-lava1)', label: 'GIBBED', pulse: false },
   blocked: { color: 'var(--q-torch)', label: 'BLOCKED', pulse: false },
-  chunked: { color: 'var(--q-lava1)', label: 'CHUNKED', pulse: false }
+  chunked: { color: 'var(--q-lava1)', label: 'CHUNKED', pulse: false },
+  awaiting_retry: { color: 'var(--q-torch)', label: 'RETRYING', pulse: false }
 };
 
 /**
@@ -438,6 +439,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     failed: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
     blocked: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
     chunked: { boxShadow: 'inset 0 0 30px var(--q-lava0-08), 0 0 20px var(--q-lava0-10)' },
+    awaiting_retry: { opacity: 0.7 },
     pending: { opacity: 0.7 }
   };
 
@@ -453,6 +455,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
     failed: 'var(--q-lava1-44)',
     blocked: 'var(--q-lava1-44)',
     chunked: 'var(--q-lava1-44)',
+    awaiting_retry: 'var(--q-torch-33)',
     pending: 'var(--q-iron1-44)'
   };
 
@@ -551,7 +554,21 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
         fill: armFill,
         value: idleDisplay,
         color: 'var(--q-copper3)'
-      })
+      }),
+      // RETRY Bar (Countdown to retry) - only shown when awaiting_retry
+      status === 'awaiting_retry' && job.retryAfter && (() => {
+        const retryInMs = Math.max(0, job.retryAfter - now);
+        const totalWait = job.retryAfter - (job.completedAt || job.startedAt || now);
+        const elapsed = Math.max(0, totalWait - retryInMs);
+        const retryFill = totalWait > 0 ? Math.min(100, (elapsed / totalWait) * 100) : 100;
+        const retryDisplay = retryInMs > 0 ? formatDuration(retryInMs) : 'NOW';
+        return React.createElement(StatBar, {
+          label: 'RETRY',
+          fill: retryFill,
+          value: retryDisplay,
+          color: 'var(--q-torch)'
+        });
+      })()
     ),
     // FRAGS + DMG Section (Tool calls + Tokens)
     React.createElement('div', {
@@ -1125,7 +1142,8 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
     const running = allJobs.filter(j => j.status === 'running').length;
     const pending = allJobs.filter(j => j.status === 'pending').length;
     const failed = allJobs.filter(j => j.status === 'failed').length;
-    return { completed, running, pending, failed, total: allJobs.length, groupCount: groups.length };
+    const awaitingRetry = allJobs.filter(j => j.status === 'awaiting_retry').length;
+    return { completed, running, pending, failed, awaitingRetry, total: allJobs.length, groupCount: groups.length };
   }, [allJobs, groups.length]);
 
   // Assignment-level rollup metrics (computed client-side from job data)
@@ -1155,10 +1173,10 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
   }, [groups, now]);
 
   React.useEffect(() => {
-    if (stats.running === 0) return;
+    if (stats.running === 0 && stats.awaitingRetry === 0) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [stats.running]);
+  }, [stats.running, stats.awaitingRetry]);
 
   if (groups.length === 0) {
     return React.createElement('div', {
@@ -1211,6 +1229,12 @@ export function JobChain({ groups = [], selectedJobId, onJobSelect, layout = 've
         count: stats.failed,
         label: 'FAILED',
         color: 'var(--q-lava1)',
+        pulse: false
+      }),
+      stats.awaitingRetry > 0 && React.createElement(RollupBadge, {
+        count: stats.awaitingRetry,
+        label: 'RETRY',
+        color: 'var(--q-torch)',
         pulse: false
       })
     ),

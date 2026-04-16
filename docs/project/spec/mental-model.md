@@ -207,6 +207,22 @@ Real-time Convex subscriptions should only be maintained for **mutable data** �
 ### Execution Records vs. Filesystem State
 Job execution records (groups, jobs, results, aggregated decisions, artifacts, PM messages) are a **log of how the system got here** — not the source of truth about what exists. The real state is the code on disk. This matters most for **retry semantics**: when a job group is retried, downstream execution records are cascade-deleted, but stale decisions, artifacts, and PM chat messages from earlier groups are preserved. They still accurately describe what happened and what the filesystem now reflects. The execution record is history; the code is state.
 
+### Rate-Limit Resilience
+External provider rate limits (Anthropic's 5-hour and 7-day usage windows) are an operational reality that the workflow engine must handle gracefully. The core principle: **a rate limit is not a failure — it's a pause.**
+
+When a Claude job hits a rate limit:
+- The job enters `awaiting_retry` status — a non-terminal state that freezes the group in place
+- No PM auto-spawns (the group never completes, so the cascade never starts)
+- A server-side timer retries the job when the rate-limit window resets
+- If the window hasn't cleared, exponential backoff kicks in (capped at 30 minutes)
+- The user sees a countdown timer on the job card in the UI
+
+This design keeps retry coordination state minimal — just `retryCount` on the job record. The Convex scheduled function handles the timer server-side (independent of runner uptime). The runner has zero retry state.
+
+**Emergency brake:** Setting the assignment to `blocked` prevents the runner from picking up retried jobs. The Convex timer still fires and flips the job to `pending`, but the runner skips blocked assignments.
+
+**Scope:** Claude harness only. Assignment jobs only (chat jobs fail normally — the user can re-send). No cap on total retries — keeps going at 30m intervals until the window clears.
+
 ## Open Questions
 
 *None currently.*

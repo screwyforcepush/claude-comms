@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { requirePassword } from "./auth";
 
 // ============================================================================
@@ -431,6 +432,92 @@ export const requestKill = mutation({
   },
 });
 
+// Rate-limit auto-retry: mark job as awaiting_retry and schedule re-pend
+// Backoff schedule: first retry trusts resetsAt, subsequent: 2m, 5m, 15m, 30m(cap)
+const BACKOFF_SCHEDULE_MS = [
+  2 * 60_000,   // 2m
+  5 * 60_000,   // 5m
+  15 * 60_000,  // 15m
+  30 * 60_000,  // 30m (cap)
+];
+
+export const rateLimited = mutation({
+  args: {
+    password: v.string(),
+    id: v.id("jobs"),
+    resetsAt: v.number(),       // Unix seconds from rate_limit_event
+    rateLimitType: v.string(),  // "five_hour" or "seven_day"
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const job = await ctx.db.get(args.id);
+    if (!job) throw new Error("Job not found");
+
+    const now = Date.now();
+    const currentRetryCount = job.retryCount ?? 0;
+
+    // Compute delay
+    let delayMs: number;
+    if (currentRetryCount === 0) {
+      // First retry: trust Anthropic's resetsAt + 30s grace, min 60s
+      delayMs = Math.max(args.resetsAt * 1000 - now + 30_000, 60_000);
+    } else {
+      // Subsequent retries: backoff schedule (capped at last entry)
+      const backoffIndex = Math.min(currentRetryCount - 1, BACKOFF_SCHEDULE_MS.length - 1);
+      delayMs = BACKOFF_SCHEDULE_MS[backoffIndex];
+    }
+
+    const retryAfter = now + delayMs;
+
+    await ctx.db.patch(args.id, {
+      status: "awaiting_retry",
+      retryCount: currentRetryCount + 1,
+      retryAfter,
+      rateLimitType: args.rateLimitType,
+      completedAt: undefined,
+    });
+
+    // Schedule the re-pend
+    await ctx.scheduler.runAfter(delayMs, internal.jobs.executeRetry, { id: args.id });
+  },
+});
+
+// Internal: flip an awaiting_retry job back to pending for re-execution
+export const executeRetry = internalMutation({
+  args: { id: v.id("jobs") },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.id);
+    if (!job) return;
+
+    // Guard: only act on awaiting_retry (manual intervention may have changed it)
+    if (job.status !== "awaiting_retry") return;
+
+    // Reset job to pending (preserve retryCount for next backoff, clear execution state)
+    await ctx.db.patch(args.id, {
+      status: "pending",
+      result: undefined,
+      startedAt: undefined,
+      completedAt: undefined,
+      toolCallCount: undefined,
+      subagentCount: undefined,
+      totalTokens: undefined,
+      lastEventAt: undefined,
+      exitForced: undefined,
+      retryAfter: undefined,
+      killRequested: undefined,
+    });
+
+    // Reset parent group to pending so scheduler re-visits it
+    const group = await ctx.db.get(job.groupId);
+    if (group && group.status !== "pending") {
+      await ctx.db.patch(job.groupId, {
+        status: "pending",
+        aggregatedResult: undefined,
+      });
+    }
+  },
+});
+
 // Retry a job group: cascade-delete all downstream groups, reset this group
 // and its jobs back to pending. Preserves prompt/jobType/harness/context.
 // Power tool — no safety checks on running state. Caller is responsible.
@@ -487,6 +574,9 @@ export const retryGroup = mutation({
         lastEventAt: undefined,
         exitForced: undefined,
         killRequested: undefined,
+        retryCount: undefined,
+        retryAfter: undefined,
+        rateLimitType: undefined,
       });
     }
   },

@@ -45,6 +45,64 @@ describe("ClaudeStreamHandler", () => {
 
     assert.strictEqual(handler.isComplete(), false);
   });
+
+  it("captures rate_limit_event info on rejected rate limit", () => {
+    const handler = new ClaudeStreamHandler();
+
+    // Exact sequence from Anthropic rate-limit response
+    handler.onEvent({
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "rejected",
+        resetsAt: 1776243600,
+        rateLimitType: "five_hour",
+        overageStatus: "rejected",
+        overageDisabledReason: "org_level_disabled",
+        isUsingOverage: false,
+      },
+    });
+    handler.onEvent({
+      type: "assistant",
+      message: {
+        model: "<synthetic>",
+        content: [{ type: "text", text: "You've hit your limit · resets 9am (UTC)" }],
+      },
+      error: "rate_limit",
+    });
+    handler.onEvent({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      result: "You've hit your limit · resets 9am (UTC)",
+      session_id: "d00aa306-932f-4486-aace-223dad74378a",
+    });
+
+    // Terminal but not complete (is_error = true)
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), false);
+    assert.strictEqual(handler.getFailureReason(), "claude_result_success");
+
+    // Rate-limit info captured
+    const info = handler.getRateLimitInfo();
+    assert.ok(info, "getRateLimitInfo should return non-null");
+    assert.strictEqual(info!.resetsAt, 1776243600);
+    assert.strictEqual(info!.rateLimitType, "five_hour");
+  });
+
+  it("does not capture rate_limit_event when status is not rejected", () => {
+    const handler = new ClaudeStreamHandler();
+
+    handler.onEvent({
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "accepted",
+        resetsAt: 1776243600,
+        rateLimitType: "five_hour",
+      },
+    });
+
+    assert.strictEqual(handler.getRateLimitInfo(), null);
+  });
 });
 
 // ============================================================================
