@@ -77,7 +77,7 @@ function NamespaceFilterChip({ name, isActive, onClick }) {
  * WP-5: Collapsible section above thread list for namespace multi-select filtering
  * Collapsed by default. 0 selected = all namespaces shown.
  */
-function NamespaceFilterAccordion({ namespaces, selectedNamespaceIds, onToggleNamespace }) {
+function NamespaceFilterAccordion({ namespaces, selectedNamespaceIds, onToggleNamespace, onOpenSettings }) {
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpanded = useCallback(() => {
@@ -118,18 +118,38 @@ function NamespaceFilterAccordion({ namespaces, selectedNamespaceIds, onToggleNa
           }
         }, 'Namespaces')
       ),
-      // Active filter count badge
-      activeCount > 0 && React.createElement('span', {
-        style: {
-          fontFamily: 'var(--font-display)',
-          fontSize: '9px',
-          color: 'var(--q-torch)',
-          backgroundColor: 'rgba(212, 160, 48, 0.15)',
-          padding: '1px 6px',
-          borderRadius: 0,
-          letterSpacing: '1px'
-        }
-      }, activeCount)
+      React.createElement('div', { className: 'flex items-center gap-2' },
+        // Active filter count badge
+        activeCount > 0 && React.createElement('span', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '9px',
+            color: 'var(--q-torch)',
+            backgroundColor: 'rgba(212, 160, 48, 0.15)',
+            padding: '1px 6px',
+            borderRadius: 0,
+            letterSpacing: '1px'
+          }
+        }, activeCount),
+        // Settings gear icon
+        onOpenSettings && React.createElement('button', {
+          type: 'button',
+          onClick: (e) => { e.stopPropagation(); onOpenSettings(); },
+          title: 'Harness settings',
+          style: {
+            background: 'none',
+            border: 'none',
+            color: 'var(--q-bone0)',
+            cursor: 'pointer',
+            padding: '2px',
+            display: 'flex',
+            alignItems: 'center',
+            transition: 'color 0.1s',
+          }
+        },
+          React.createElement(QIcon, { name: 'config', size: 14, color: 'currentColor' })
+        ),
+      )
     ),
 
     // Accordion body — chips grid
@@ -394,7 +414,8 @@ export function ChatSidebar({
   onToggleNamespace,
   namespaceMap,
   hasMore = false,
-  onLoadMore
+  onLoadMore,
+  onOpenSettings
 }) {
   const handleCreateThread = useCallback(() => {
     if (!creating && onCreateThread) {
@@ -418,7 +439,8 @@ export function ChatSidebar({
     React.createElement(NamespaceFilterAccordion, {
       namespaces: namespaces,
       selectedNamespaceIds: selectedNamespaceIds,
-      onToggleNamespace: onToggleNamespace
+      onToggleNamespace: onToggleNamespace,
+      onOpenSettings: onOpenSettings,
     }),
 
     // Header with new chat button - Q palette: stone3 border

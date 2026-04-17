@@ -229,20 +229,21 @@ The workflow engine supports three AI harnesses: Claude, Codex, and Gemini. Each
 
 **Core principle:** The user configures which harness + model combination runs for each job type, per namespace. This is stored in Convex on the namespace record — not in local file config.
 
-**Config shape** — Object notation. Single entry = one job. Array = fan-out to parallel jobs in a group:
+**Config shape** — Object notation. Single entry = one job. Array = fan-out to parallel jobs in a group. Model is optional — omit to use the harness's own default:
 ```json
 {
-  "default": { "harness": "claude", "model": "claude-sonnet-4-6" },
-  "implement": { "harness": "claude", "model": "claude-sonnet-4-6" },
+  "default": { "harness": "claude" },
+  "implement": { "harness": "claude" },
   "review": [
-    { "harness": "claude", "model": "claude-opus-4-6" },
-    { "harness": "codex", "model": "o4-mini" },
-    { "harness": "gemini", "model": "gemini-2.5-pro" }
+    { "harness": "claude" },
+    { "harness": "codex" },
+    { "harness": "gemini", "model": "auto-gemini-3" }
   ],
-  "pm": { "harness": "claude", "model": "claude-haiku-4-5-20251001" },
-  "chat": { "harness": "claude", "model": "claude-sonnet-4-6" }
+  "pm": { "harness": "claude" },
+  "chat": { "harness": "claude" }
 }
 ```
+The user configures specific models when they choose to via the UI settings modal (e.g., `{ "harness": "claude", "model": "claude-opus-4-6" }`).
 
 **Key design decisions:**
 - **Model string is exact CLI argument** — passed verbatim to `--model` / `-m`. No aliases, no mapping layer. The user types what the harness CLI expects.

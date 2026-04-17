@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requirePassword } from "./auth";
+import {
+  DEFAULT_HARNESS_DEFAULTS,
+  parseHarnessDefaults,
+  resolveJobType,
+  HarnessModelEntry,
+} from "./lib/harnessDefaults";
 
 /**
  * Chat Jobs - Separate from assignment-based jobs
@@ -20,12 +26,12 @@ export const trigger = mutation({
     harness: v.optional(
       v.union(v.literal("claude"), v.literal("codex"), v.literal("gemini"))
     ),
+    model: v.optional(v.string()),
     // Guardian mode: if true, this is a PO evaluation of PM report
     isGuardianEvaluation: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
-    const harness = args.harness ?? "claude";
     const now = Date.now();
 
     // 1. Get thread
@@ -34,13 +40,28 @@ export const trigger = mutation({
       throw new Error("Thread not found");
     }
 
-    // 2. Get the trigger message directly — no need to query all messages
+    // 2. Resolve harness+model: explicit args > namespace config > default
+    let harness = args.harness;
+    let model = args.model;
+    if (!harness) {
+      const ns = await ctx.db.get(thread.namespaceId);
+      const defaults = ns?.harnessDefaults
+        ? parseHarnessDefaults(ns.harnessDefaults)
+        : DEFAULT_HARNESS_DEFAULTS;
+      const resolved = resolveJobType(defaults, "chat");
+      // Chat doesn't fan out — take first entry if array
+      const entry: HarnessModelEntry = Array.isArray(resolved) ? resolved[0] : resolved;
+      harness = entry.harness;
+      if (!model) model = entry.model;
+    }
+
+    // 3. Get the trigger message directly
     const triggerMessage = await ctx.db.get(args.triggerMessageId);
     if (!triggerMessage) {
       throw new Error("Trigger message not found");
     }
 
-    // 3. Build chat context (including session ID for resume)
+    // 4. Build chat context (including session ID for resume)
     // Determine effective prompt mode (guardian uses cook for normal interactions)
     const effectivePromptMode = thread.mode === "guardian" ? "cook" : thread.mode;
 
@@ -51,37 +72,32 @@ export const trigger = mutation({
       const guardianSessions = thread.guardianSessions ?? {};
       const guardianSessionId = guardianSessions[thread.assignmentId];
       if (guardianSessionId) {
-        // Existing guardian fork — resume it
         resolvedSessionId = guardianSessionId;
       } else if (thread.claudeSessionId) {
-        // No guardian fork yet — fork from OG session
         resolvedSessionId = thread.claudeSessionId;
         forkSession = true;
       }
-      // else: no OG session either — new session (resolvedSessionId stays undefined)
     }
 
     const chatContext = {
       threadId: args.threadId,
       namespaceId: thread.namespaceId,
       mode: thread.mode,
-      // For differential prompting
       effectivePromptMode,
       lastPromptMode: thread.lastPromptMode,
       latestUserMessage: triggerMessage.content,
       claudeSessionId: resolvedSessionId,
-      // Guardian session fork
       forkSession,
-      // Guardian mode fields
       assignmentId: thread.assignmentId,
       isGuardianEvaluation: args.isGuardianEvaluation ?? false,
     };
 
-    // 4. Create chat job (no assignment!)
+    // 5. Create chat job (no assignment!)
     const jobId = await ctx.db.insert("chatJobs", {
       threadId: args.threadId,
       namespaceId: thread.namespaceId,
       harness,
+      model,
       context: JSON.stringify(chatContext),
       status: "pending",
       createdAt: now,

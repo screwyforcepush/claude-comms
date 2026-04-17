@@ -174,6 +174,7 @@ const jobDefValidator = v.object({
     v.literal("codex"),
     v.literal("gemini")
   ),
+  model: v.optional(v.string()),
   context: v.optional(v.string()),
 });
 
@@ -201,7 +202,7 @@ export const createGroup = mutation({
       createdAt: now,
     });
 
-    // Insert jobs as-is (each job has its own type/harness/context)
+    // Insert jobs as-is (each job has its own type/harness/context/model)
     const jobIds: Id<"jobs">[] = [];
 
     for (const jobDef of args.jobs) {
@@ -209,6 +210,7 @@ export const createGroup = mutation({
         groupId,
         jobType: jobDef.jobType,
         harness: jobDef.harness,
+        model: jobDef.model,
         context: jobDef.context,
         status: "pending",
         createdAt: now,
@@ -265,6 +267,7 @@ export const insertGroupAfter = mutation({
         groupId,
         jobType: jobDef.jobType,
         harness: jobDef.harness,
+        model: jobDef.model,
         context: jobDef.context,
         status: "pending",
         createdAt: now,

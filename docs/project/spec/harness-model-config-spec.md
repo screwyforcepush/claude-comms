@@ -1,5 +1,23 @@
 # Harness Model Configuration -- Implementation Plan
 
+## Implementation Context
+
+This spec touches the workflow engine's own infrastructure: CLI, runner, schema, and UI. Since the runner and CLI are the tools that execute assignments, implementing this feature via the normal assignment pipeline would be **self-surgery** -- the agent modifying the very system executing it. This work should be done **offline by a manually invoked agent**, not through the standard assignment/PM job chain.
+
+**Key files in scope:**
+- `.agents/tools/workflow/cli.ts` -- CLI job insertion, fan-out logic, config reading
+- `.agents/tools/workflow/runner.ts` -- job execution, PM triggering, harness resolution
+- `.agents/tools/workflow/lib/streams.ts` -- command building per harness
+- `.agents/tools/workflow/lib/harness-executor.ts` -- execution options, process spawning
+- `workflow-engine/convex/schema.ts` -- Convex schema (namespaces, jobs, chatJobs)
+- `workflow-engine/convex/namespaces.ts` -- namespace queries/mutations
+- `workflow-engine/convex/jobs.ts` -- job creation mutations
+- `workflow-engine/convex/chatJobs.ts` -- chat job trigger mutation
+- `workflow-engine/ui/` -- UI components (React.createElement, no JSX)
+- `.agents/tools/workflow/init.ts` -- namespace bootstrap
+
+**Out of scope:** `packages/setup-installer/` -- client installs pull from this repo; changes propagate via git.
+
 ## Purpose
 
 The workflow engine supports three AI harnesses (Claude, Codex, Gemini), each with multiple models. Currently, harness selection per job type lives in a local `config.json` file and only maps job types to harnesses -- not models. Fan-out logic for review jobs is hardcoded in CLI code (`AUTO_EXPAND_CONFIG`). Model selection within a harness is either hardcoded (Gemini hardcodes `auto-gemini-3` in `buildCommand`) or absent (Claude and Codex get provider defaults).
@@ -64,6 +82,7 @@ This plan delivers **namespace-scoped harness + model configuration stored in Co
 - Current `buildCommand` uses `codex exec` (aliased as `codex e`) with `--yolo` and `--json`
 - The `-m` flag goes on the `exec` subcommand, which is where we spawn
 - Model passed via `-m` on exec overrides config.toml default
+- **Validated:** `codex --yolo e -m <model> <prompt> --json` works correctly (tested with `gpt-5.4`)
 
 ### Gemini (`gemini` CLI)
 
@@ -469,15 +488,15 @@ async function resolveJobs(
 +--------------------------------------------------+
 | Harness Defaults                                 |
 |                                                  |
-| default    [claude  v]  [claude-sonnet-4-6    ]  |
-| implement  [claude  v]  [claude-sonnet-4-6    ]  |
-| pm         [claude  v]  [claude-haiku-4-5-... ]  |
-| chat       [claude  v]  [claude-sonnet-4-6    ]  |
+| default    [claude  v]  [                    ]  |
+| implement  [claude  v]  [                    ]  |
+| pm         [claude  v]  [                    ]  |
+| chat       [claude  v]  [                    ]  |
 |                                                  |
 | review (fan-out)                                 |
-|   1. [claude  v]  [claude-opus-4-6        ] [-]  |
-|   2. [codex   v]  [o4-mini                ] [-]  |
-|   3. [gemini  v]  [gemini-2.5-pro         ] [-]  |
+|   1. [claude  v]  [                       ] [-]  |
+|   2. [codex   v]  [                       ] [-]  |
+|   3. [gemini  v]  [auto-gemini-3          ] [-]  |
 |   [+ Add entry]                                  |
 |                                                  |
 | [+ Add job type]                                 |
@@ -501,18 +520,18 @@ async function resolveJobs(
 
 ### New Namespaces
 
-When `init.ts` creates a new namespace, it seeds `harnessDefaults` with:
+When `init.ts` creates a new namespace, it seeds `harnessDefaults` to match current behavior exactly. No model = harness uses its own default. Only Gemini gets an explicit model because `buildCommand` currently hardcodes `auto-gemini-3`:
 ```json
 {
-  "default": { "harness": "claude", "model": "claude-sonnet-4-6" },
-  "implement": { "harness": "claude", "model": "claude-sonnet-4-6" },
+  "default": { "harness": "claude" },
+  "implement": { "harness": "claude" },
   "review": [
-    { "harness": "claude", "model": "claude-opus-4-6" },
-    { "harness": "codex", "model": "o4-mini" },
-    { "harness": "gemini", "model": "gemini-2.5-pro" }
+    { "harness": "claude" },
+    { "harness": "codex" },
+    { "harness": "gemini", "model": "auto-gemini-3" }
   ],
-  "pm": { "harness": "claude", "model": "claude-haiku-4-5-20251001" },
-  "chat": { "harness": "claude", "model": "claude-sonnet-4-6" }
+  "pm": { "harness": "claude" },
+  "chat": { "harness": "claude" }
 }
 ```
 

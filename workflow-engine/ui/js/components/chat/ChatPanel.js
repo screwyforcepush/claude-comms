@@ -8,6 +8,7 @@ import { ChatView } from './ChatView.js';
 import { ThreadIconWithAssignment } from './ThreadItem.js';
 import { ModeToggle } from './ModeToggle.js';
 import { QIcon } from '../shared/index.js';
+import { NamespaceSettings } from '../namespace/index.js';
 
 // localStorage keys for collapse states
 const THREADS_PANE_COLLAPSED_KEY = 'workflow-engine:threads-pane-collapsed';
@@ -388,6 +389,31 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
 
   // WP-5: Namespace filter state — empty set means "show all"
   const [selectedNamespaceIds, setSelectedNamespaceIds] = useState(new Set());
+
+  // Settings modal state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsNamespaceId, setSettingsNamespaceId] = useState(null);
+
+  // Open settings — if one namespace is filtered, use that; otherwise use first
+  const handleOpenSettings = useCallback(() => {
+    let targetNsId = null;
+    if (selectedNamespaceIds.size === 1) {
+      targetNsId = selectedNamespaceIds.values().next().value;
+    } else if (namespaces && namespaces.length === 1) {
+      targetNsId = namespaces[0]._id;
+    } else if (namespaces && namespaces.length > 0) {
+      // Multiple namespaces, none filtered — use first
+      targetNsId = namespaces[0]._id;
+    }
+    if (targetNsId) {
+      setSettingsNamespaceId(targetNsId);
+      setSettingsOpen(true);
+    }
+  }, [selectedNamespaceIds, namespaces]);
+
+  const handleCloseSettings = useCallback(() => {
+    setSettingsOpen(false);
+  }, []);
 
   // WP-5: Toggle a namespace in/out of the filter set
   const handleToggleNamespace = useCallback((nsId) => {
@@ -866,7 +892,8 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
           onToggleNamespace: handleToggleNamespace,
           namespaceMap: namespaceMap,
           hasMore: hasMoreThreads,
-          onLoadMore: handleLoadMoreThreads
+          onLoadMore: handleLoadMoreThreads,
+          onOpenSettings: handleOpenSettings
         })
       )
     ),
@@ -898,6 +925,15 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
       onKillChatJob: handleKillChatJob,
       onRetryGroup: handleRetryGroup,
       activeChatJob: activeChatJob || null
+    }),
+
+    // Settings modal
+    React.createElement(NamespaceSettings, {
+      isOpen: settingsOpen,
+      onClose: handleCloseSettings,
+      namespaceId: settingsNamespaceId,
+      namespaceName: settingsNamespaceId ? (namespaceMap[settingsNamespaceId] || '') : '',
+      allNamespaceIds: namespaces ? namespaces.map(ns => ns._id) : [],
     })
   );
 }

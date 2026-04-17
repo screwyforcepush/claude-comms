@@ -91,6 +91,8 @@ export interface ExecuteOptions {
   jobId: string;
   harness: Harness;
   prompt: string;
+  /** Model to pass to harness CLI */
+  model?: string;
   /** Session ID for Claude resume */
   sessionId?: string;
   /** Fork the session instead of resuming in-place */
@@ -365,6 +367,9 @@ export class HarnessExecutor {
 
     // 3. Build command
     const commandOptions: CommandOptions = {};
+    if (options.model) {
+      commandOptions.model = options.model;
+    }
     if (sessionId && harness === "claude") {
       commandOptions.sessionId = sessionId;
       if (forkSession) {

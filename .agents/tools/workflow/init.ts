@@ -14,6 +14,7 @@ import { anyApi } from "convex/server";
 import { readFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
 
 const api = anyApi;
 const __filename = fileURLToPath(import.meta.url);
@@ -58,11 +59,12 @@ async function main() {
       console.log(`Namespace "${config.namespace}" already exists with ID: ${existing._id}`);
       console.log("No action needed - idempotent check passed.");
     } else {
-      // Create the namespace
+      // Create the namespace with default harness config
       const namespaceId = await client.mutation(api.namespaces.create, {
         name: config.namespace,
         password: config.password,
         description: `Namespace for ${config.namespace} repo`,
+        harnessDefaults: JSON.stringify(DEFAULT_HARNESS_DEFAULTS),
       });
       console.log(`Created namespace "${config.namespace}" with ID: ${namespaceId}`);
     }

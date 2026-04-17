@@ -2,3 +2,4 @@
 export { NamespaceCard } from './NamespaceCard.js';
 export { NamespaceList } from './NamespaceList.js';
 export { NamespaceHeader } from './NamespaceHeader.js';
+export { NamespaceSettings } from './NamespaceSettings.js';

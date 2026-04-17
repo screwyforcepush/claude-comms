@@ -56,6 +56,7 @@ import { anyApi } from "convex/server";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { HarnessDefaults, HarnessModelEntry, parseHarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
 
 // Use anyApi for portability (same as runner.ts)
 const api = anyApi;
@@ -70,27 +71,8 @@ interface Config {
   namespace: string;
   password: string;
   timeoutMs: number;
-  harnessDefaults: {
-    default: Harness;
-    [jobType: string]: Harness;
-  };
 }
 
-// Auto-expansion config: job types that automatically fan out to multiple harnesses
-// CLI expands these before sending to Convex (not in Convex mutations)
-const AUTO_EXPAND_CONFIG: Record<string, Harness[]> = {
-  review: ["claude", "codex", "gemini"],
-  "architecture-review": ["claude", "codex", "gemini"],
-  "spec-review": ["claude", "codex", "gemini"],
-};
-
-/**
- * Get the harness for a job type from config
- * Resolution order: config.harnessDefaults[jobType] -> config.harnessDefaults.default
- */
-function getHarnessForJobType(jobType: string): Harness {
-  return config.harnessDefaults[jobType] || config.harnessDefaults.default;
-}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "config.json");
@@ -115,6 +97,19 @@ async function getNamespaceId(): Promise<Id<"namespaces">> {
 
   namespaceId = namespace._id as Id<"namespaces">;
   return namespaceId;
+}
+
+async function getHarnessDefaults(): Promise<HarnessDefaults> {
+  const nsId = await getNamespaceId();
+  try {
+    const defaults = await client.query(api.namespaces.getHarnessDefaults, {
+      password: config.password,
+      namespaceId: nsId,
+    });
+    return defaults as HarnessDefaults;
+  } catch {
+    return DEFAULT_HARNESS_DEFAULTS;
+  }
 }
 
 // Argument parsing helpers
@@ -158,7 +153,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   job: [],
   queue: [],
   create: ["priority", "independent", "thread"],
-  "insert-job": ["type", "jobs", "harness", "context", "after"],
+  "insert-job": ["type", "jobs", "harness", "model", "context", "after"],
   "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason", "nudge", "clear-nudge", "append-northstar"],
   "delete-assignment": [],
   "start-job": [],
@@ -348,50 +343,62 @@ async function findTailGroup(assignmentId: string): Promise<string | null> {
   return tailGroupId;
 }
 
-// Job definition for CLI input (before expansion)
+// Job definition for CLI input (before resolution)
 interface JobDefInput {
   jobType: string;
-  harness?: "claude" | "codex" | "gemini"; // Optional - will use default or expand
+  harness?: "claude" | "codex" | "gemini";
+  model?: string;
   context?: string;
 }
 
-// Job definition after expansion (ready for mutation)
+// Job definition after resolution (ready for mutation)
 interface JobDef {
   jobType: string;
   harness: "claude" | "codex" | "gemini";
+  model?: string;
   context?: string;
 }
 
 /**
- * Expand jobs using AUTO_EXPAND_CONFIG
- * e.g., { jobType: "review" } -> 3 jobs with different harnesses
+ * Resolve jobs using namespace harnessDefaults from Convex
+ * Replaces expandJobs() + AUTO_EXPAND_CONFIG
  */
-function expandJobs(jobs: JobDefInput[]): JobDef[] {
-  const expanded: JobDef[] = [];
+function resolveJobs(harnessDefaults: HarnessDefaults, jobs: JobDefInput[]): JobDef[] {
+  const resolved: JobDef[] = [];
 
   for (const job of jobs) {
-    const expandHarnesses = AUTO_EXPAND_CONFIG[job.jobType];
-
-    if (expandHarnesses && !job.harness) {
-      // Auto-expand to multiple harnesses
-      for (const harness of expandHarnesses) {
-        expanded.push({
+    if (job.harness) {
+      // Explicit harness override — use as-is
+      resolved.push({
+        jobType: job.jobType,
+        harness: job.harness,
+        model: job.model,
+        context: job.context,
+      });
+    } else {
+      const config = resolveJobType(harnessDefaults, job.jobType);
+      if (Array.isArray(config)) {
+        // Fan-out: create one job per entry
+        for (const entry of config) {
+          resolved.push({
+            jobType: job.jobType,
+            harness: entry.harness,
+            model: job.model || entry.model,
+            context: job.context,
+          });
+        }
+      } else {
+        resolved.push({
           jobType: job.jobType,
-          harness,
+          harness: config.harness,
+          model: job.model || config.model,
           context: job.context,
         });
       }
-    } else {
-      // Single job - use specified harness or default
-      expanded.push({
-        jobType: job.jobType,
-        harness: job.harness || getHarnessForJobType(job.jobType),
-        context: job.context,
-      });
     }
   }
 
-  return expanded;
+  return resolved;
 }
 
 async function insertJobs(
@@ -403,8 +410,9 @@ async function insertJobs(
     error("At least one job required");
   }
 
-  // Expand jobs (auto-expansion happens here, not in Convex)
-  const expandedJobs = expandJobs(jobs);
+  // Resolve jobs from namespace config (replaces expandJobs + AUTO_EXPAND_CONFIG)
+  const harnessDefaults = await getHarnessDefaults();
+  const expandedJobs = resolveJobs(harnessDefaults, jobs);
 
   const validHarnesses = ["claude", "codex", "gemini"];
   for (const job of expandedJobs) {
@@ -455,7 +463,7 @@ async function insertJobs(
   const out: any = {
     groupId: result.groupId,
     jobIds: result.jobIds,
-    jobs: expandedJobs.map(j => ({ jobType: j.jobType, harness: j.harness })),
+    jobs: expandedJobs.map(j => ({ jobType: j.jobType, harness: j.harness, model: j.model })),
     message: `Group ${linkInfo} with ${result.jobIds.length} job(s)`,
   };
   if (warning) out.warning = warning;
@@ -659,7 +667,7 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
     password: config.password,
     threadId: threadId as Id<"chatThreads">,
     triggerMessageId: messageId as Id<"chatMessages">,
-    harness: (harness || getHarnessForJobType("chat")) as Harness,
+    harness: harness as Harness | undefined,
   });
 
   output({
@@ -814,6 +822,7 @@ async function main() {
             jobs = parsed.map((j: any) => ({
               jobType: j.jobType,
               harness: j.harness,
+              model: j.model,
               context: j.context,
             }));
           } catch (e) {
@@ -823,6 +832,7 @@ async function main() {
           jobs = [{
             jobType: flags.type,
             harness: flags.harness as "claude" | "codex" | "gemini" | undefined,
+            model: flags.model,
             context: flags.context,
           }];
         } else {

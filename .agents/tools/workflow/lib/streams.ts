@@ -36,6 +36,8 @@ export interface CommandOptions {
   sessionId?: string;
   /** Fork the session instead of resuming in-place (creates new branch) */
   forkSession?: boolean;
+  /** Model to pass to harness CLI */
+  model?: string;
 }
 
 export interface CommandResult {
@@ -298,6 +300,9 @@ export function buildCommand(
         "stream-json",
         "--disable-slash-commands",
       ];
+      if (options.model) {
+        args.push("--model", options.model);
+      }
 
       // Add --resume flag for session continuity
       if (options.sessionId) {
@@ -311,24 +316,22 @@ export function buildCommand(
       args.push("-p", prompt);
       return { cmd: "claude", args };
     }
-    case "codex":
-      return {
-        cmd: "codex",
-        args: ["--yolo", "e", prompt, "--json"],
-      };
-    case "gemini":
-      return {
-        cmd: "gemini",
-        args: [
-          "--yolo",
-          "-m",
-          "auto-gemini-3",
-          "--output-format",
-          "stream-json",
-          "-p",
-          prompt,
-        ],
-      };
+    case "codex": {
+      const args = ["--yolo", "e"];
+      if (options.model) {
+        args.push("-m", options.model);
+      }
+      args.push(prompt, "--json");
+      return { cmd: "codex", args };
+    }
+    case "gemini": {
+      const args = ["--yolo"];
+      if (options.model) {
+        args.push("-m", options.model);
+      }
+      args.push("--output-format", "stream-json", "-p", prompt);
+      return { cmd: "gemini", args };
+    }
     default:
       throw new Error(`Unknown harness: ${harness}`);
   }

@@ -14,6 +14,8 @@ export const api = {
   // Namespaces API
   namespaces: {
     list: "namespaces:list",
+    getHarnessDefaults: "namespaces:getHarnessDefaults",
+    updateHarnessDefaults: "namespaces:updateHarnessDefaults",
   },
 
   // Assignments API

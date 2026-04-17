@@ -39,6 +39,9 @@ import {
 // Harness executor (file-based event streaming for crash resilience)
 import { HarnessExecutor, Harness, OrphanInfo } from "./lib/harness-executor.js";
 
+// Harness defaults (namespace-scoped harness+model config)
+import { HarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
+
 // File tracker utilities for orphan reconciliation
 import { writeJobStatus, utcNowIso } from "./lib/file-tracker.js";
 
@@ -52,6 +55,7 @@ interface ChatJob {
   threadId: string;
   namespaceId: string;
   harness: "claude" | "codex" | "gemini";
+  model?: string;
   context: string;
   status: "pending" | "running" | "complete" | "failed";
   result?: string;
@@ -67,17 +71,6 @@ interface Config {
   password: string;
   timeoutMs: number;
   idleTimeoutMs?: number;
-  harnessDefaults: {
-    default: Harness;
-    [jobType: string]: Harness;
-  };
-}
-
-/**
- * Get the harness for a job type from config
- */
-function getHarnessForJobType(jobType: string): Harness {
-  return config.harnessDefaults[jobType] || config.harnessDefaults.default;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -102,6 +95,18 @@ const executor = new HarnessExecutor({
   idleTimeoutMs: config.idleTimeoutMs,
   cwd: projectRoot,
 });
+
+async function fetchHarnessDefaults(namespaceId: string): Promise<HarnessDefaults> {
+  try {
+    const defaults = await client!.query(api.namespaces.getHarnessDefaults, {
+      password: config.password,
+      namespaceId: namespaceId as any,
+    });
+    return defaults as HarnessDefaults;
+  } catch {
+    return DEFAULT_HARNESS_DEFAULTS;
+  }
+}
 
 const METRICS_HEARTBEAT_MS = 60_000;
 const CODEX_TOOL_ITEM_TYPES = new Set([
@@ -431,7 +436,6 @@ async function triggerGuardianEvaluation(
         password: config.password,
         threadId: guardianThread._id as any,
         triggerMessageId: pmMessageId as any,
-        harness: getHarnessForJobType("chat"),
         isGuardianEvaluation: true,
       });
       console.log(`[Guardian] Triggered PO evaluation chatJob`);
@@ -561,6 +565,7 @@ async function executeJob(
       jobId,
       harness: job.harness as Harness,
       prompt,
+      model: (job as any).model || undefined,
       sessionId: isChat && chatContext?.claudeSessionId ? chatContext.claudeSessionId : undefined,
       env,
     },
@@ -756,12 +761,18 @@ async function triggerPMGroup(
 
   console.log(`[${completedGroup._id}] Triggering ${jobType} group`);
 
+  // Resolve harness+model from namespace config
+  const defaults = await fetchHarnessDefaults(assignment.namespaceId);
+  const resolved = resolveJobType(defaults, jobType);
+  const entry = Array.isArray(resolved) ? resolved[0] : resolved;
+
   await client!.mutation(api.jobs.insertGroupAfter, {
     password: config.password,
     afterGroupId: completedGroup._id,
     jobs: [{
       jobType,
-      harness: getHarnessForJobType(jobType),
+      harness: entry.harness,
+      model: entry.model,
       context,
     }],
   });
@@ -906,6 +917,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
       jobId,
       harness: chatJob.harness as Harness,
       prompt,
+      model: chatJob.model || undefined,
       sessionId: chatContext.claudeSessionId || undefined,
       forkSession: chatContext.forkSession || undefined,
       env: {

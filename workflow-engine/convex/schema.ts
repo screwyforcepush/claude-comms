@@ -11,6 +11,7 @@ export default defineSchema({
       blocked: v.number(),
       complete: v.number(),
     })),
+    harnessDefaults: v.optional(v.string()), // JSON-encoded HarnessDefaults
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -95,6 +96,7 @@ export default defineSchema({
     subagentCount: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    model: v.optional(v.string()), // Model string passed to harness CLI
     exitForced: v.optional(v.boolean()),
     // Rate-limit auto-retry fields
     retryCount: v.optional(v.number()),      // Increments each retry cycle
@@ -152,6 +154,7 @@ export default defineSchema({
       v.literal("codex"),
       v.literal("gemini")
     ),
+    model: v.optional(v.string()), // Model string passed to harness CLI
     context: v.string(), // JSON with thread info, mode, sessionId
     prompt: v.optional(v.string()), // Complete prompt sent to agent
     status: v.union(
