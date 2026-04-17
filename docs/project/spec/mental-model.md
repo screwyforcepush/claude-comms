@@ -223,6 +223,38 @@ This design keeps retry coordination state minimal — just `retryCount` on the 
 
 **Scope:** Claude harness only. Assignment jobs only (chat jobs fail normally — the user can re-send). No cap on total retries — keeps going at 30m intervals until the window clears.
 
+### Harness Model Configuration
+
+The workflow engine supports three AI harnesses: Claude, Codex, and Gemini. Each harness is a different CLI binary with its own stream format, but they all accept a `--model` flag to select which model to use.
+
+**Core principle:** The user configures which harness + model combination runs for each job type, per namespace. This is stored in Convex on the namespace record — not in local file config.
+
+**Config shape** — Object notation. Single entry = one job. Array = fan-out to parallel jobs in a group:
+```json
+{
+  "default": { "harness": "claude", "model": "claude-sonnet-4-6" },
+  "implement": { "harness": "claude", "model": "claude-sonnet-4-6" },
+  "review": [
+    { "harness": "claude", "model": "claude-opus-4-6" },
+    { "harness": "codex", "model": "o4-mini" },
+    { "harness": "gemini", "model": "gemini-2.5-pro" }
+  ],
+  "pm": { "harness": "claude", "model": "claude-haiku-4-5-20251001" },
+  "chat": { "harness": "claude", "model": "claude-sonnet-4-6" }
+}
+```
+
+**Key design decisions:**
+- **Model string is exact CLI argument** — passed verbatim to `--model` / `-m`. No aliases, no mapping layer. The user types what the harness CLI expects.
+- **Fan-out is fully flexible** — an array can contain any mix of harness+model entries, including multiple entries for the same harness with different models (e.g., three Claude models at different tiers for capability-diverse review).
+- **Resolution order:** job type key → `default` key → config error.
+- **Stamped at insert time** — when a job is created, `harness` and `model` are resolved from config and written onto the job record. The job is a complete execution spec. The runner doesn't need to look up config.
+- **Review result anonymity** — fan-out review results are deliberately unattributed by harness/model to prevent bias in PM evaluation.
+- **Namespace-scoped, not assignment-scoped** — config applies to all assignments in the namespace.
+- **Convex-only** — no file-based fallback. The local `config.json` retains only connection params and timeouts.
+- **UI settings modal** — namespace harness config is viewable and editable from the Workflow Engine UI.
+- **Bootstrap** — default harnessDefaults are seeded during namespace init (client setup).
+
 ## Open Questions
 
 *None currently.*
