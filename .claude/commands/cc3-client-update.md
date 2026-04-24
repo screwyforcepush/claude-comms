@@ -6,16 +6,21 @@ Update the workflow runner client with latest changes from upstream.
 
 ## Step 1: Stop the runner
 
-Kill the wrapper and runner processes:
+Kill the wrapper and runner processes. SIGTERM does not reliably kill the `npm exec → tsx → node` tree (npm exec doesn't propagate signals, and runner.ts may trap SIGTERM for graceful shutdown and hang), so try SIGTERM first, then escalate to SIGKILL for any survivors:
 
 ```bash
-pkill -f 'run-runner.sh' 2>/dev/null; pkill -f 'runner.ts' 2>/dev/null
+pkill -TERM -f 'run-runner.sh' 2>/dev/null; pkill -TERM -f 'runner.ts' 2>/dev/null
+sleep 3
+pkill -KILL -f 'run-runner.sh' 2>/dev/null; pkill -KILL -f 'runner.ts' 2>/dev/null
+sleep 1
 ```
 
-Verify they're stopped:
+Verify they're stopped (should print only `---done---`):
 ```bash
-ps aux | grep 'runner.ts\|run-runner.sh' | grep -v grep
+ps aux | grep -E 'runner\.ts|run-runner\.sh' | grep -v grep; echo '---done---'
 ```
+
+If any processes remain after the SIGKILL pass, something external is respawning them — investigate before proceeding.
 
 ## Step 2: Pull latest changes
 
