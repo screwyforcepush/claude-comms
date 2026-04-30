@@ -6,3 +6,4 @@ export { LoadingSkeleton, LoadingSpinner } from './LoadingSkeleton.js';
 export { EmptyState } from './EmptyState.js';
 export { ErrorBoundary, withErrorBoundary } from './ErrorBoundary.js';
 export { QIcon, ICON_PATHS, ICON_CONFIG } from './QIcon.js';
+export { ConfirmDialogProvider, useConfirm } from './ConfirmDialog.js';

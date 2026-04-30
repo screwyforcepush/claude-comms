@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { useQuery } from './hooks/useConvex.js';
 import { api } from './api.js';
 import { ErrorBoundary } from './components/shared/ErrorBoundary.js';
+import { ConfirmDialogProvider } from './components/shared/ConfirmDialog.js';
 import { ChatPanel } from './components/chat/index.js';
 import { GrainOverlay, ScanlineSweep } from './components/effects/index.js';
 import { LoginGate } from './components/auth/index.js';
@@ -116,13 +117,15 @@ function AppLayout() {
 function App() {
   return React.createElement(LoginGate, null,
     React.createElement(ErrorBoundary, null,
-      React.createElement('div', {
-        className: 'h-screen flex flex-col',
-        style: { backgroundColor: 'var(--q-void1)' }
-      },
-        React.createElement(GrainOverlay),
-        React.createElement(ScanlineSweep),
-        React.createElement(AppLayout)
+      React.createElement(ConfirmDialogProvider, null,
+        React.createElement('div', {
+          className: 'h-screen flex flex-col',
+          style: { backgroundColor: 'var(--q-void1)' }
+        },
+          React.createElement(GrainOverlay),
+          React.createElement(ScanlineSweep),
+          React.createElement(AppLayout)
+        )
       )
     )
   );

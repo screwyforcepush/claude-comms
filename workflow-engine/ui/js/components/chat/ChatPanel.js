@@ -7,7 +7,7 @@ import { ChatSidebar } from './ChatSidebar.js';
 import { ChatView } from './ChatView.js';
 import { ThreadIconWithAssignment } from './ThreadItem.js';
 import { ModeToggle } from './ModeToggle.js';
-import { QIcon } from '../shared/index.js';
+import { QIcon, useConfirm } from '../shared/index.js';
 import { NamespaceSettings } from '../namespace/index.js';
 
 // localStorage keys for collapse states
@@ -303,6 +303,7 @@ function MobileChatHeader({
  * @param {Object} props.responsive - Responsive mode info (optional, for WP-5)
  */
 export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
+  const confirm = useConfirm();
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -577,9 +578,13 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
 
   // Handle deleting a thread
   const handleDeleteThread = useCallback(async (threadId) => {
-    if (!confirm('Are you sure you want to delete this conversation?')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete conversation',
+      message: 'Are you sure you want to delete this conversation? This cannot be undone.',
+      confirmLabel: 'DELETE',
+      danger: true
+    });
+    if (!ok) return;
 
     try {
       await removeThread({ id: threadId });
@@ -589,7 +594,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
     } catch (err) {
       console.error('Failed to delete thread:', err);
     }
-  }, [removeThread, selectedThreadId]);
+  }, [removeThread, selectedThreadId, confirm]);
 
   // Handle sending a message
   const handleSendMessage = useCallback(async (content) => {
@@ -697,13 +702,19 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
     const msg = downstreamCount > 0
       ? `Retry this group? ${downstreamCount} downstream group${downstreamCount === 1 ? '' : 's'} will be deleted.`
       : 'Retry this group?';
-    if (!confirm(msg)) return;
+    const ok = await confirm({
+      title: 'Retry group',
+      message: msg,
+      confirmLabel: 'RETRY',
+      danger: downstreamCount > 0
+    });
+    if (!ok) return;
     try {
       await retryGroup({ id: groupId });
     } catch (err) {
       console.error('Failed to retry group:', err);
     }
-  }, [retryGroup]);
+  }, [retryGroup, confirm]);
 
   // WP-3: Handle toggling threads pane collapse
   const handleToggleThreadsPane = useCallback(() => {
