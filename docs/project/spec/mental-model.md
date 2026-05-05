@@ -256,6 +256,58 @@ The user configures specific models when they choose to via the UI settings moda
 - **UI settings modal** — namespace harness config is viewable and editable from the Workflow Engine UI.
 - **Bootstrap** — default harnessDefaults are seeded during namespace init (client setup).
 
+## Job Type Catalog
+
+The workflow engine has a fixed set of job types, each backed by a prompt template in `.agents/tools/workflow/templates/`:
+
+- **plan** — design work; produces an implementation plan
+- **implement** — execution; writes code/changes against a plan
+- **review** — independent evaluation of changes; often fan-out across harnesses
+- **uat** — user-acceptance testing; manual/exploratory verification
+- **pm** — product manager; assesses group output, decides next group
+- **chat** — interactive conversation, not bounded by a single deliverable
+
+Job types are referenced in the harness config (per-namespace) and stamped onto job records at insert time.
+
+## Agent Reflection Feedback Loop
+
+A planned telemetry layer that captures **the agent's operating experience**, not its output. The premise: every job is also a usability test of its own tooling and workflow, and that signal is currently invisible.
+
+### Two Distinct Products
+- **Ergonomics reflection (v1)** — outcome-blind. About *how* the agent operated: tool friction, environment issues, repetition, mistakes, suggested improvements. Fires after every non-chat job.
+- **Workflow effectiveness reflection (later)** — outcome-aware. About *what* the agent produced and whether it landed. Different lens, different timing, different downstream questions.
+
+The two are separate features. v1 is ergonomics-only.
+
+### Loop Shape
+- A job completes (success or failure); the runner spawns a fire-and-forget reflection wrapper as a background task and moves on.
+- The wrapper resurrects the agent via the captured `sessionId` using `claude --resume <sessionId> --fork-session` — the forked session is throwaway, so the original session record stays clean.
+- The agent is directed to a CLI script (`reflect.ts`) that mirrors the existing assignment toolkit pattern: `--help` to learn the interface, then a single invocation with structured input. No MCP, no custom tool registration.
+- The CLI validates input, denormalises job-weight metadata (namespace, harness, jobtype, tokens, duration, tool calls) onto the row at write time, and writes one record to Convex linked by `jobId`.
+- No response parsing. No retry. No failure handling. The agent runs the CLI, exits.
+
+### Reflection Content
+- A 1-line description (debugging convenience — the only "what" field; everything else is "how")
+- Critique of operating environment, tool friction, mistakes and their causes
+- Alternative approach in hindsight
+- Suggested improvements for future agents
+- A **flexible boolean rubric** — a key/value map of yes/no questions about operating experience. Keys are not typed at the schema level so the question set can evolve without migrations; the v1 question list ships as a draft, expected to evolve based on real reflection data. Field omission is itself signal ("the agent had no opinion on this dimension")
+- Free-form keywords (no taxonomy at v1; normalize later if needed)
+- Captured automatically: `reflectionCliVersion` (const in the CLI source, bumped per push), `clientGitSha` (the consuming repo's HEAD), `engineGitSha` (the runner-side workflow engine's HEAD)
+
+### Job Types That Reflect
+plan, implement, review, uat, pm, document. **Not chat** — chat reflection is on-demand by user request only.
+
+Fan-out review groups: each member reflects independently, peer-blind. Reflection is job-level.
+
+Failed jobs reflect too — failure is exactly when friction signal is highest. Failed-but-no-`sessionId` jobs (immediate harness crash) skip silently and surface in the coverage metric.
+
+### Self-Diagnostic
+Coverage rate is the health metric: terminal jobs without paired reflection records flag pipeline issues (harness crash, unresumable session, agent skipped the tool). The metric is exposed both as a single number and broken down by harness — the by-harness breakdown makes the non-Claude expected-zero visible at a glance, which prevents the headline number from being misread.
+
+### Analysis Surface
+The Outcome Steward (Product Owner agent, per-namespace) is the meta-reflector. The same Convex query functions that drive the reflection dashboard also power the Steward's analysis toolkit — DRY across human-facing UI and agent-facing introspection. Each project's Steward sees only its own namespace's data; cross-namespace analysis is out of scope.
+
 ## Open Questions
 
 *None currently.*
