@@ -305,6 +305,8 @@ Failed jobs reflect too — failure is exactly when friction signal is highest. 
 ### Self-Diagnostic
 Coverage rate is the health metric: terminal jobs without paired reflection records flag pipeline issues (harness crash, unresumable session, agent skipped the tool). The metric is exposed both as a single number and broken down by harness — the by-harness breakdown makes the non-Claude expected-zero visible at a glance, which prevents the headline number from being misread.
 
+The coverage denominator starts at reflection integration time. New assignment jobs carry a denormalized optional `jobs.namespaceId`, and only terminal jobs with that field present are counted. Historical jobs are not backfilled and are not treated as missed reflections.
+
 ### Analysis Surface
 The Outcome Steward (Product Owner agent, per-namespace) is the meta-reflector. The same Convex query functions that drive the reflection dashboard also power the Steward's analysis toolkit — DRY across human-facing UI and agent-facing introspection. Each project's Steward sees only its own namespace's data; cross-namespace analysis is out of scope.
 

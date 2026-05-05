@@ -56,9 +56,9 @@ export interface ExecutionCallbacks {
   /** Called when job completes successfully */
   onComplete: (result: string, sessionId?: string, exitForced?: boolean) => void;
   /** Called when job fails */
-  onFail: (reason: string, partialResult?: string, exitForced?: boolean) => void;
+  onFail: (reason: string, partialResult?: string, exitForced?: boolean, sessionId?: string) => void;
   /** Called when job times out (max duration or idle timeout before terminal event) */
-  onTimeout: (partialResult: string) => void;
+  onTimeout: (partialResult: string, sessionId?: string) => void;
   /** Called when job hits a provider rate limit (Claude only). If not provided, falls through to onFail. */
   onRateLimit?: (rateLimitInfo: RateLimitInfo, partialResult?: string) => void;
   /** Optional: called for each event (for custom handling) */
@@ -483,7 +483,7 @@ export class HarnessExecutor {
               const failureReason = handler.getFailureReason();
               const reason = failureReason || "terminal_error";
               tracker.fail(reason);
-              callbacks.onFail(reason, result, exitForced);
+              callbacks.onFail(reason, result, exitForced, handler.getSessionId() || undefined);
             }
           }
         }, SETTLING_MS);
@@ -536,7 +536,7 @@ export class HarnessExecutor {
       const reason = `spawn_error: ${err.message}`;
       console.error(`[${jobId}] Spawn failed: ${err.message}`);
       tracker.fail(reason);
-      callbacks.onFail(reason, undefined);
+      callbacks.onFail(reason, undefined, undefined, handler.getSessionId() || undefined);
     });
 
     // 10. Handle stderr
@@ -569,7 +569,7 @@ export class HarnessExecutor {
       console.log(`[${jobId}] Exited with code ${code}`);
 
       if (timedOut || idleTimedOut) {
-        callbacks.onTimeout(result || "(no output)");
+        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined);
       } else if (code === 0 && handler.isComplete()) {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, false);
@@ -585,7 +585,7 @@ export class HarnessExecutor {
             ? `process_exit_${code} (${failureReason})`
             : `process_exit_${code}`;
           tracker.fail(reason);
-          callbacks.onFail(reason, result, false);
+          callbacks.onFail(reason, result, false, handler.getSessionId() || undefined);
         }
       }
     });
@@ -729,6 +729,10 @@ export class HarnessExecutor {
     const handler = createStreamHandler(status.harness);
     const tracker = JobTracker.fromExisting(jobId, status, paths);
 
+    // Set up state flags (same pattern as execute())
+    let jobCompleted = false;
+    let hasSeenResult = false;
+
     // We need to replay synchronously before starting the tailer.
     // Use a promise that we await internally via the returned handle pattern.
     let replayDone = false;
@@ -766,10 +770,6 @@ export class HarnessExecutor {
       if (handler.isTerminal()) hasSeenResult = true;
     })();
 
-    // Set up state flags (same pattern as execute())
-    let jobCompleted = false;
-    let hasSeenResult = false;
-
     const SETTLING_MS = 120_000;
     let settlingTimer: NodeJS.Timeout | null = null;
 
@@ -785,7 +785,7 @@ export class HarnessExecutor {
 
       const result = handler.getResult();
       if (finalStatus === "timeout") {
-        callbacks.onTimeout(result || "(no output)");
+        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined);
       } else if (handler.isComplete()) {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, exitForced);
@@ -799,7 +799,7 @@ export class HarnessExecutor {
           const failureReason = handler.getFailureReason();
           const reason = failureReason || "orphan_interrupted";
           tracker.fail(reason);
-          callbacks.onFail(reason, result, exitForced);
+          callbacks.onFail(reason, result, exitForced, handler.getSessionId() || undefined);
         }
       }
     };

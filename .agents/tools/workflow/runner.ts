@@ -18,6 +18,7 @@
 
 import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import { spawn } from "child_process";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -79,6 +80,27 @@ const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
 
 // Project root is 3 levels up from .agents/tools/workflow
 const projectRoot = join(__dirname, "..", "..", "..");
+
+function spawnReflection(jobId: string): void {
+  try {
+    const child = spawn(
+      "npx",
+      ["tsx", join(__dirname, "reflect-spawn.ts"), jobId],
+      {
+        detached: true,
+        stdio: "ignore",
+        cwd: __dirname,
+        env: process.env,
+      }
+    );
+    child.on("error", () => {
+      // Silent: reflection coverage is the alarm.
+    });
+    child.unref();
+  } catch {
+    // Silent: reflection coverage is the alarm.
+  }
+}
 
 // State
 let client: ConvexClient | null = null;
@@ -585,6 +607,7 @@ async function executeJob(
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
+            sessionId: sessionId || undefined,
             exitForced: exitForced || undefined,
           });
           if (isChat && chatContext) {
@@ -601,12 +624,13 @@ async function executeJob(
             }
           } else {
             await handleGroupCompletion(group, assignment, false);
+            spawnReflection(jobId);
           }
         } catch (e) {
           console.error(`[${jobId}] Error in onComplete:`, e);
         }
       },
-      onFail: async (reason, partialResult, exitForced) => {
+      onFail: async (reason, partialResult, exitForced, sessionId) => {
         stopHeartbeat();
         const wasKilled = killedJobIds.delete(jobId);
         const effectiveReason = wasKilled ? "Killed by user" : reason;
@@ -619,6 +643,7 @@ async function executeJob(
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
+            sessionId: sessionId || undefined,
             exitForced: exitForced || undefined,
           });
           if (isChat && chatContext) {
@@ -629,6 +654,7 @@ async function executeJob(
             );
           } else {
             await handleGroupCompletion(group, assignment, true);
+            spawnReflection(jobId);
           }
         } catch (e) {
           console.error(`[${jobId}] Error in onFail:`, e);
@@ -649,7 +675,7 @@ async function executeJob(
           console.error(`[${jobId}] Error in onRateLimit:`, e);
         }
       },
-      onTimeout: async (partialResult) => {
+      onTimeout: async (partialResult, sessionId) => {
         stopHeartbeat();
         try {
           await client!.mutation(api.jobs.fail, {
@@ -660,6 +686,7 @@ async function executeJob(
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
             lastEventAt: metrics.lastEventAt ?? undefined,
+            sessionId: sessionId || undefined,
           });
           if (isChat && chatContext) {
             await saveChatResponse(
@@ -669,6 +696,7 @@ async function executeJob(
             );
           } else {
             await handleGroupCompletion(group, assignment, true);
+            spawnReflection(jobId);
           }
         } catch (e) {
           console.error(`[${jobId}] Error in onTimeout:`, e);
@@ -1114,22 +1142,26 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
             password: config.password,
             id: jobId,
             result,
+            sessionId: sessionId || undefined,
             exitForced: exitForced || undefined,
           });
           await handleGroupCompletion(group, assignment, false);
+          spawnReflection(jobId);
         } catch (e) {
           console.error(`[Reconcile] ${jobId}: error in onComplete:`, e);
         }
       },
-      onFail: async (reason, partialResult, exitForced) => {
+      onFail: async (reason, partialResult, exitForced, sessionId) => {
         try {
           await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
             result: partialResult || reason,
+            sessionId: sessionId || undefined,
             exitForced: exitForced || undefined,
           });
           await handleGroupCompletion(group, assignment, true);
+          spawnReflection(jobId);
         } catch (e) {
           console.error(`[Reconcile] ${jobId}: error in onFail:`, e);
         }
@@ -1147,14 +1179,16 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
           console.error(`[Reconcile] ${jobId}: error in onRateLimit:`, e);
         }
       },
-      onTimeout: async (partialResult) => {
+      onTimeout: async (partialResult, sessionId) => {
         try {
           await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
             result: `Timeout. Partial result:\n${partialResult}`,
+            sessionId: sessionId || undefined,
           });
           await handleGroupCompletion(group, assignment, true);
+          spawnReflection(jobId);
         } catch (e) {
           console.error(`[Reconcile] ${jobId}: error in onTimeout:`, e);
         }
@@ -1172,8 +1206,10 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
         password: config.password,
         id: jobId,
         result: result.result || "",
+        sessionId: result.sessionId || undefined,
       });
       await handleGroupCompletion(group, assignment, false);
+      spawnReflection(jobId);
     } else if (result.rateLimitInfo) {
       // Dead orphan was rate-limited — schedule retry instead of failing
       await client!.mutation(api.jobs.rateLimited, {
@@ -1189,8 +1225,10 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
         password: config.password,
         id: jobId,
         result: result.result || "Job orphaned without completion",
+        sessionId: result.sessionId || undefined,
       });
       await handleGroupCompletion(group, assignment, true);
+      spawnReflection(jobId);
     }
   }
 }

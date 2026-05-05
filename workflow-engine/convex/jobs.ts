@@ -194,6 +194,8 @@ export const createGroup = mutation({
     }
 
     const now = Date.now();
+    const assignment = await ctx.db.get(args.assignmentId);
+    if (!assignment) throw new Error("Assignment not found");
 
     // Create the group (just a container - no jobType/context)
     const groupId = await ctx.db.insert("jobGroups", {
@@ -208,6 +210,7 @@ export const createGroup = mutation({
     for (const jobDef of args.jobs) {
       const jobId = await ctx.db.insert("jobs", {
         groupId,
+        namespaceId: assignment.namespaceId,
         jobType: jobDef.jobType,
         harness: jobDef.harness,
         model: jobDef.model,
@@ -219,8 +222,7 @@ export const createGroup = mutation({
     }
 
     // If assignment has no head group, set this as head
-    const assignment = await ctx.db.get(args.assignmentId);
-    if (assignment && !assignment.headGroupId) {
+    if (!assignment.headGroupId) {
       await ctx.db.patch(args.assignmentId, {
         headGroupId: groupId,
         updatedAt: now,
@@ -248,6 +250,8 @@ export const insertGroupAfter = mutation({
 
     const afterGroup = await ctx.db.get(args.afterGroupId);
     if (!afterGroup) throw new Error("Group not found");
+    const assignment = await ctx.db.get(afterGroup.assignmentId);
+    if (!assignment) throw new Error("Assignment not found");
 
     const now = Date.now();
 
@@ -265,6 +269,7 @@ export const insertGroupAfter = mutation({
     for (const jobDef of args.jobs) {
       const jobId = await ctx.db.insert("jobs", {
         groupId,
+        namespaceId: assignment.namespaceId,
         jobType: jobDef.jobType,
         harness: jobDef.harness,
         model: jobDef.model,
@@ -342,6 +347,7 @@ export const complete = mutation({
     subagentCount: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    sessionId: v.optional(v.string()),
     exitForced: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -356,6 +362,7 @@ export const complete = mutation({
     if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
     if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
     if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    if (args.sessionId !== undefined) update.sessionId = args.sessionId;
     if (args.exitForced !== undefined) update.exitForced = args.exitForced;
     await ctx.db.patch(args.id, update);
 
@@ -376,6 +383,7 @@ export const fail = mutation({
     subagentCount: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    sessionId: v.optional(v.string()),
     exitForced: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -390,6 +398,7 @@ export const fail = mutation({
     if (args.subagentCount !== undefined) update.subagentCount = args.subagentCount;
     if (args.totalTokens !== undefined) update.totalTokens = args.totalTokens;
     if (args.lastEventAt !== undefined) update.lastEventAt = args.lastEventAt;
+    if (args.sessionId !== undefined) update.sessionId = args.sessionId;
     if (args.exitForced !== undefined) update.exitForced = args.exitForced;
     await ctx.db.patch(args.id, update);
 
@@ -478,6 +487,7 @@ export const rateLimited = mutation({
       retryAfter,
       rateLimitType: args.rateLimitType,
       completedAt: undefined,
+      sessionId: undefined,
     });
 
     // Schedule the re-pend
@@ -505,6 +515,7 @@ export const executeRetry = internalMutation({
       subagentCount: undefined,
       totalTokens: undefined,
       lastEventAt: undefined,
+      sessionId: undefined,
       exitForced: undefined,
       retryAfter: undefined,
       killRequested: undefined,
@@ -575,6 +586,7 @@ export const retryGroup = mutation({
         subagentCount: undefined,
         totalTokens: undefined,
         lastEventAt: undefined,
+        sessionId: undefined,
         exitForced: undefined,
         killRequested: undefined,
         retryCount: undefined,

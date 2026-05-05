@@ -40,14 +40,16 @@ export interface Job {
   _id: string;
   _creationTime: number;
   groupId: string;
+  namespaceId?: string;
   jobType: string;
   harness: "claude" | "codex" | "gemini";
   context?: string;
-  status: "pending" | "running" | "complete" | "failed";
+  status: "pending" | "running" | "complete" | "failed" | "awaiting_retry";
   result?: string;
   prompt?: string;
   startedAt?: number;
   completedAt?: number;
+  sessionId?: string;
   createdAt: number;
 }
 

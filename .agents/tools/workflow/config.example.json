@@ -3,5 +3,6 @@
   "namespace": "my-project",
   "password": "your-admin-password-here",
   "timeoutMs": 3600000,
-  "idleTimeoutMs": 600000
+  "idleTimeoutMs": 600000,
+  "reflectionTimeoutMs": 300000
 }

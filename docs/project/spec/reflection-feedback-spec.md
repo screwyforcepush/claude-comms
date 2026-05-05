@@ -12,6 +12,9 @@
 >   - Reflection wall-clock timeout moved to `config.json` (`reflectionTimeoutMs`, default 5 min).
 >   - `jobs.by_completedAt` index changed to `by_namespace_completedAt` compound (queries always filter by namespace).
 >   - `--fork-session` flag spelling verified against `streams.ts:312`.
+> - **v0.4** -- implementation clarification:
+>   - `jobs.namespaceId` is added as an optional denormalized field, with no historical backfill. Its presence marks jobs created after reflection integration and defines the coverage-rate denominator. Historical jobs without `namespaceId` are excluded from reflection coverage.
+>   - Removed the stale Phase 2 mention of `bySessionId`; `sessionId` remains row metadata only.
 > - **v0.2** -- amended after fan-out review at `docs/project/spec/reflection-feedback-critique.md`. Major architectural pivot: dropped MCP-stdio tool in favour of a CLI script (consistent with the existing assignment toolkit). All eight High-severity issues resolved or pinned. Mediums and Lows applied where applicable.
 > - **v0.1** -- initial draft.
 
@@ -74,7 +77,7 @@ If implementation stops at any phase boundary, the system is in a valid state. P
 This spec touches the workflow engine's own infrastructure: schema, runner, and two new scripts. Since the runner is the live process that would be modified, implementing this feature via the standard assignment/PM job chain risks **self-surgery** -- the runner restarting mid-execution. This work must be done **offline by a manually invoked agent**, not through the normal assignment pipeline.
 
 **Key files in scope:**
-- `workflow-engine/convex/schema.ts` -- new `reflections` table; `jobs.sessionId` field; `jobs.by_namespace_completedAt` compound index
+- `workflow-engine/convex/schema.ts` -- new `reflections` table; optional `jobs.namespaceId`; `jobs.sessionId`; `jobs.by_namespace_completedAt` compound index
 - `workflow-engine/convex/jobs.ts` -- both `complete` AND `fail` mutations gain optional `sessionId`; retry-flow paths (`executeRetry`, `retryGroup`, related) clear `sessionId` on reset
 - `workflow-engine/convex/reflections.ts` -- **new** -- mutations + queries for the reflections table
 - `.agents/tools/workflow/lib/harness-executor.ts` -- `onFail` / `onTimeout` callback signatures extended to carry `sessionId`
@@ -96,7 +99,7 @@ This spec touches the workflow engine's own infrastructure: schema, runner, and 
 
 **What changes:**
 1. New Convex table `reflections` joined to `jobs` by `jobId`, with denormalized job-weight metadata (namespace, harness, tokens, duration, tool calls) frozen at reflection time.
-2. `jobs` table gains a `sessionId` field (currently captured but discarded for assignment jobs).
+2. `jobs` table gains optional `namespaceId` and `sessionId` fields. `namespaceId` is written only for new jobs after this integration and intentionally marks jobs included in reflection coverage.
 3. Both `api.jobs.complete` AND `api.jobs.fail` accept optional `sessionId`.
 4. `HarnessExecutor.ExecutionCallbacks.onFail` and `onTimeout` are extended to pass `sessionId` (sourced from the active stream handler's `getSessionId()`); the dead-orphan finalize path threads `result.sessionId` through to `api.jobs.fail`.
 5. Runner's three job-completion paths (live `onComplete`, live `onFail`/`onTimeout`, reconcile/dead-orphan) pass `sessionId` through to mutations.
@@ -199,7 +202,7 @@ reflections: defineTable({
   sessionId: v.string(),             // Captured for traceability
 
   // Denormalized job-weight metadata (frozen at reflection time)
-  namespaceId: v.id("namespaces"),
+  namespaceId: v.id("namespaces"),      // Required on reflection rows; source job must have it
   harness: v.union(
     v.literal("claude"),
     v.literal("codex"),
@@ -237,9 +240,10 @@ reflections: defineTable({
   .index("by_created", ["createdAt"]),
 ```
 
-### `jobs` table -- add `sessionId`
+### `jobs` table -- add optional `namespaceId` and `sessionId`
 
 ```typescript
+namespaceId: v.optional(v.id("namespaces")), // Integration-era denominator marker; no backfill
 sessionId: v.optional(v.string()),  // Harness session id (Claude-only at v1)
 ```
 
@@ -250,7 +254,7 @@ Add a namespace-scoped `completedAt` compound index for coverage queries (querie
 .index("by_namespace_completedAt", ["namespaceId", "completedAt"])
 ```
 
-Note: the existing `jobs` table does not currently have a direct `namespaceId` field -- it's reachable via `groupId -> assignmentId -> namespaceId`. Confirm during Phase 1 whether the index can be built directly on `jobs` or requires denormalising `namespaceId` onto the job record. Denormalising is cheap (set at insert time, never mutates) and makes the index trivial.
+Note: the existing `jobs` table does not currently have a direct `namespaceId` field -- it's reachable via `groupId -> assignmentId -> namespaceId`. Phase 1 denormalises `namespaceId` onto new job records only. It stays optional and is not backfilled. Coverage-rate queries treat `jobs.namespaceId` presence as the reflection-integration denominator marker, so historical jobs without the field are excluded instead of counted as missing reflections.
 
 ### `api.jobs.complete` and `api.jobs.fail` -- accept `sessionId`
 
@@ -282,7 +286,7 @@ For the dead-orphan recovery path: `DeadOrphanResult.sessionId` is materialised 
 Exports:
 - `insert` mutation -- writes a reflection row. Accepts all content + denormalized + auto-captured fields. Validates ownership (the `jobId` must exist and be terminal). Rubric is `v.record(v.string(), v.boolean())` -- accepts any boolean keys.
 - `byJob` query -- given a `jobId`, returns the most recent reflection (last-write-wins under v1's permissive duplicate semantics).
-- `coverageRate` query -- the pipeline-health metric. See **Coverage Rate Self-Diagnostic** for the full arg shape and semantics.
+- `coverageRate` query -- the pipeline-health metric. See **Coverage Rate Self-Diagnostic** for the full arg shape and semantics. The denominator is terminal jobs with `namespaceId` present.
 - `recent` query -- list reflections with the same filter / window args as `coverageRate`. Returns full reflection rows for analysis. Cursor-paginated when window is `{ since, until }` or `{ since }`; not paginated when window is `{ last: N }` (caller already chose N).
 
 All mutations and queries enforce password auth, matching the project's pattern.
@@ -530,6 +534,7 @@ Window resolution:
 ### Notes
 
 - `namespaceId` is always required because metrics are scoped to a single namespace. The Steward analysis toolkit injects this from its config; cross-namespace aggregation is out of scope.
+- Only jobs with denormalized `jobs.namespaceId` participate in coverage. This intentionally excludes historical jobs from before the reflection integration; no backfill is required.
 - `byHarness` is intentionally retained: the non-Claude expected-zero is the single most informative signal in the breakdown -- it makes the harness gap visible at a glance.
 - Drops in `eligibleCoverage` indicate harness crashes, broken sessionId capture, or agents skipping the tool.
 - Indexes used: `jobs.by_namespace_completedAt` (Phase 1 adds this index, scoped to namespace), `reflections.by_namespace_created`. The `last: N` form requires a `by_namespace_completedAt_desc` traversal limited to N rows.
@@ -580,6 +585,7 @@ The implementer runs through these manually. Phases are ordered so each one is i
 **Goal:** persist the harness session id for every assignment job — success and failure paths both. This unblocks reflection but is also a useful debugging affordance on its own (sessions can be resumed for inspection).
 
 1. **Schema** (`workflow-engine/convex/schema.ts`):
+   - Add `namespaceId: v.optional(v.id("namespaces"))` to the `jobs` table. Write it only for newly created jobs; do not backfill historical rows.
    - Add `sessionId: v.optional(v.string())` to the `jobs` table.
    - Add `by_namespace_completedAt` compound index on `jobs` (used by the coverageRate query in Phase 2; namespace-scoped traversal is more efficient than a global completedAt index given queries always filter by namespace).
 2. **Mutations** (`workflow-engine/convex/jobs.ts`): extend BOTH `complete` AND `fail` to accept and write optional `sessionId`. Both must be done — failed jobs reflect.
@@ -605,7 +611,7 @@ The implementer runs through these manually. Phases are ordered so each one is i
 **Goal:** stand up the reflections table and Convex queries. Nothing yet writes to it via the workflow.
 
 1. **Schema** (`workflow-engine/convex/schema.ts`): add the `reflections` table per the **Schema Changes** section, including all indexes (`by_job`, `by_namespace_created`, `by_namespace_harness_created`, `by_created`).
-2. **Convex module**: create `workflow-engine/convex/reflections.ts` with `insert`, `byJob`, `coverageRate`, `recent`, `bySessionId`. All authed (password from `auth.ts`).
+2. **Convex module**: create `workflow-engine/convex/reflections.ts` with `insert`, `byJob`, `coverageRate`, `recent`. All authed (password from `auth.ts`).
 3. **Convex deploy.** Verify functions bundled.
 4. **Validate**: insert one row manually via the Convex dashboard against a real recent `jobId`. Confirm `byJob` returns it. Confirm `coverageRate` runs against a recent time window without errors.
 
@@ -693,6 +699,7 @@ The implementation plan is solid when:
 6. `--fork-session` prevents session contamination; pinned, not deferred.
 7. Distribution path is explicit: `.agents/` auto-propagates via tarball; raw-URL fallback gap is acknowledged and accepted.
 8. The coverage-rate query (`{ rate, byHarness, eligibleCoverage }`) is precisely defined and indexed.
+   Its denominator is terminal integration-era jobs: rows with `jobs.namespaceId` present and matching the requested namespace.
 9. Failure modes (Claude unavailable, sessionId missing, agent skips the tool, duplicate writes) all degrade silently with the coverage rate as the alarm.
 10. Non-Claude harnesses skip cleanly; their expected-zero is visible in `byHarness`.
 

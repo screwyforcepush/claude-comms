@@ -74,6 +74,7 @@ export default defineSchema({
   // Each job has its own type, harness, and context
   jobs: defineTable({
     groupId: v.id("jobGroups"), // FK to parent group
+    namespaceId: v.optional(v.id("namespaces")), // Denormalized for reflection coverage; historical jobs may omit
     jobType: v.string(), // e.g., "review", "pm", "implement", "uat"
     harness: v.union(
       v.literal("claude"),
@@ -97,6 +98,7 @@ export default defineSchema({
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
     model: v.optional(v.string()), // Model string passed to harness CLI
+    sessionId: v.optional(v.string()), // Harness session ID for resume/debugging; Claude-only at v1
     exitForced: v.optional(v.boolean()),
     // Rate-limit auto-retry fields
     retryCount: v.optional(v.number()),      // Increments each retry cycle
@@ -109,7 +111,42 @@ export default defineSchema({
     .index("by_group", ["groupId"])
     .index("by_group_status", ["groupId", "status"])
     .index("by_status", ["status"])
+    .index("by_namespace_completedAt", ["namespaceId", "completedAt"])
     .index("by_status_killRequested", ["status", "killRequested"]),
+
+  reflections: defineTable({
+    jobId: v.id("jobs"),
+    sessionId: v.string(),
+
+    // Denormalized job-weight metadata, frozen when the reflection is written.
+    namespaceId: v.id("namespaces"),
+    harness: v.union(
+      v.literal("claude"),
+      v.literal("codex"),
+      v.literal("gemini")
+    ),
+    jobType: v.string(),
+    totalTokens: v.optional(v.number()),
+    toolCallCount: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+
+    description: v.string(),
+    critique: v.string(),
+    alternativeApproach: v.string(),
+    improvements: v.string(),
+    rubric: v.record(v.string(), v.boolean()),
+    keywords: v.array(v.string()),
+
+    reflectionCliVersion: v.string(),
+    clientGitSha: v.optional(v.string()),
+    engineGitSha: v.optional(v.string()),
+
+    createdAt: v.number(),
+  })
+    .index("by_job", ["jobId"])
+    .index("by_namespace_created", ["namespaceId", "createdAt"])
+    .index("by_namespace_harness_created", ["namespaceId", "harness", "createdAt"])
+    .index("by_created", ["createdAt"]),
 
   chatThreads: defineTable({
     namespaceId: v.id("namespaces"),
