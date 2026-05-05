@@ -39,6 +39,14 @@ export const api = {
     retryGroup: "jobs:retryGroup",
   },
 
+  // Reflection introspection API
+  reflections: {
+    byJob: "reflections:byJob",
+    coverageRate: "reflections:coverageRate",
+    recent: "reflections:recent",
+    gaps: "reflections:gaps",
+  },
+
   // Chat threads API
   chatThreads: {
     // List all threads for a namespace

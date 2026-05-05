@@ -175,6 +175,23 @@ function CC3BrandingHeader({ onToggleCollapse }) {
   );
 }
 
+function IntrospectionSidebarButton({ onOpenIntrospection }) {
+  if (!onOpenIntrospection) return null;
+
+  return React.createElement('div', { className: 'introspection-sidebar-nav' },
+    React.createElement('button', {
+      type: 'button',
+      className: 'q-btn q-btn--sm q-btn--slime introspection-sidebar-nav__button',
+      onClick: onOpenIntrospection,
+      title: 'Open reflection introspection',
+      'aria-label': 'Open reflection introspection'
+    },
+      React.createElement(QIcon, { name: 'eye', size: 16, color: 'currentColor' }),
+      'REFLECTIONS DASH'
+    )
+  );
+}
+
 /**
  * MobileChatHeader - Compact header for mobile chat view
  * Replaces both the AppLayout mobile-header and ChatHeader on mobile
@@ -187,7 +204,8 @@ function MobileChatHeader({
   onToggleAssignmentPane,
   paneOpen,
   onUpdateMode,
-  sending
+  sending,
+  onOpenIntrospection
 }) {
   return React.createElement('header', {
     className: 'mobile-chat-header'
@@ -282,6 +300,19 @@ function MobileChatHeader({
           color: paneOpen ? 'var(--q-copper2)' : 'currentColor'
         })
       ),
+      onOpenIntrospection && React.createElement('button', {
+        type: 'button',
+        onClick: onOpenIntrospection,
+        className: 'mobile-header-btn',
+        'aria-label': 'Open reflection introspection',
+        title: 'Reflection introspection'
+      },
+        React.createElement(QIcon, {
+          name: 'eye',
+          size: 16,
+          color: 'currentColor'
+        })
+      ),
       // Compact mode toggle
       React.createElement(ModeToggle, {
         mode: thread?.mode || 'jam',
@@ -302,7 +333,7 @@ function MobileChatHeader({
  * @param {Array} props.namespaces - All namespace objects from parent (for filter + map)
  * @param {Object} props.responsive - Responsive mode info (optional, for WP-5)
  */
-export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
+export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenIntrospection }) {
   const confirm = useConfirm();
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -800,7 +831,8 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
       onToggleAssignmentPane: handleTogglePane,
       paneOpen: paneOpen,
       onUpdateMode: handleUpdateMode,
-      sending: sending || isProcessing
+      sending: sending || isProcessing,
+      onOpenIntrospection: onOpenIntrospection
     }),
 
     // WP-5: Mobile threads overlay
@@ -863,6 +895,20 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
              })
            )
         ),
+        onOpenIntrospection && React.createElement('button', {
+          type: 'button',
+          onClick: onOpenIntrospection,
+          className: 'p-2 transition-colors flex-shrink-0 chat-panel-new-btn introspection-collapsed-btn',
+          style: {
+            backgroundColor: 'rgba(60, 116, 32, 0.14)',
+            color: 'var(--q-slime1)',
+            borderRadius: 0
+          },
+          title: 'Reflection Introspection',
+          'aria-label': 'Reflection Introspection'
+        },
+          React.createElement(QIcon, { name: 'eye', size: 18, color: 'currentColor' })
+        ),
 
         // Scrollable Thread Icons
         React.createElement('div', {
@@ -886,6 +932,9 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger }) {
         // CC3 Branding header with connection status and collapse toggle
         React.createElement(CC3BrandingHeader, {
           onToggleCollapse: handleToggleThreadsPane
+        }),
+        React.createElement(IntrospectionSidebarButton, {
+          onOpenIntrospection: onOpenIntrospection
         }),
         // ChatSidebar content (without its own header)
         // WP-5: Pass namespace filter props and namespaceMap for cross-namespace view

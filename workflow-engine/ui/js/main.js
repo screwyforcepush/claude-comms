@@ -6,6 +6,7 @@ import { api } from './api.js';
 import { ErrorBoundary } from './components/shared/ErrorBoundary.js';
 import { ConfirmDialogProvider } from './components/shared/ConfirmDialog.js';
 import { ChatPanel } from './components/chat/index.js';
+import { IntrospectionDashboard } from './components/introspection/index.js';
 import { GrainOverlay, ScanlineSweep } from './components/effects/index.js';
 import { LoginGate } from './components/auth/index.js';
 
@@ -74,6 +75,7 @@ function useResponsiveMode() {
  */
 function AppLayout() {
   const responsive = useResponsiveMode();
+  const [activeView, setActiveView] = useState('threads');
 
   // Subscribe to live namespace data
   const { data: namespaces } = useQuery(api.namespaces.list);
@@ -87,23 +89,34 @@ function AppLayout() {
     history.pushState(null, '');
 
     const handlePopState = () => {
-      setMobileBackTrigger(c => c + 1);
+      if (activeView === 'introspection') {
+        setActiveView('threads');
+      } else {
+        setMobileBackTrigger(c => c + 1);
+      }
       history.pushState(null, '');
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [responsive.isMobile]);
+  }, [activeView, responsive.isMobile]);
 
   return React.createElement('div', { className: 'app-layout' },
     // Main content area — ChatPanel is the full operations center
     React.createElement('main', { className: 'main-content flex flex-col', style: { marginLeft: 0 } },
       React.createElement('div', { className: 'flex-1 flex flex-col min-h-0' },
-        React.createElement(ChatPanel, {
-          namespaces: namespaces,
-          responsive: responsive,
-          mobileBackTrigger: mobileBackTrigger
-        })
+        activeView === 'introspection'
+          ? React.createElement(IntrospectionDashboard, {
+              namespaces: namespaces,
+              responsive: responsive,
+              onBack: () => setActiveView('threads')
+            })
+          : React.createElement(ChatPanel, {
+              namespaces: namespaces,
+              responsive: responsive,
+              mobileBackTrigger: mobileBackTrigger,
+              onOpenIntrospection: () => setActiveView('introspection')
+            })
       )
     )
   );
