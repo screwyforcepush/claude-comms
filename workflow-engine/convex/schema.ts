@@ -182,6 +182,18 @@ export default defineSchema({
     .index("by_thread", ["threadId"])
     .index("by_thread_created", ["threadId", "createdAt"]),
 
+  // Lightweight peer comms for hand-cranked agent batches.
+  // groupId is a capability-style string passed in the prompt; position is
+  // monotonic within the group and lets agents poll without registration.
+  agentComms: defineTable({
+    groupId: v.string(),
+    position: v.number(),
+    instance: v.optional(v.string()),
+    message: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_group_position", ["groupId", "position"]),
+
   // Separate table for chat jobs - not tied to assignments
   chatJobs: defineTable({
     threadId: v.id("chatThreads"),
