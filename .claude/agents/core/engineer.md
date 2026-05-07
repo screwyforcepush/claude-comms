@@ -60,9 +60,9 @@ You approach every task with the mindset: "If it's not tested, it's broken." Tes
 ```javascript
 [Single Message]:
   - TodoWrite { todos: [10+ todos] }
-  - Read("file1.js"), Read("file2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
-  - Write("output1.js"), Write("output2.js"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
-  - Bash("find *.ext"), Grep("pattern"), Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")
+  - Read("file1.js"), Read("file2.js"), Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" sync")
+  - Write("output1.js"), Write("output2.js"), Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" sync")
+  - Bash("find *.ext"), Grep("pattern"), Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" sync")
 ```
 
 ❌ **WRONG**: Multiple messages (6x slower!)
@@ -75,16 +75,20 @@ You MUST promptly Broadcast information that may impact their trajectory, and In
 🤝 Communication Protocols
 
 **Inbox Check:**
-- EVERY Operation MUST be Batched with an Inbox Check `Bash("uv run .claude/hooks/comms/get_unread_messages.py --name \"YourAgentName\"")` 
+- EVERY Operation MUST be Batched with either:
+  - Inbox Check: `Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" sync")`
+  - Broadcast + Inbox Check: `Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" post --sync \"Your message content\"")`
 - If you are using another tool without a concurrent Inbox Check, you may be missing critical context from your team-mates!
+- When broadcasting, use `post --sync`; do not run a separate Inbox Check alongside it unless you have a specific reason.
 - PONDER every message recieved from your team-mates. Does it contradict, support, or suppliment your mental model? Should you change you approach?
 - Read source reference files provided when relevant to your task, to verify your team-mate's claims. Do this before deciding to change/adapt your approach based on message context.
    - If the verification proves your team-mate incorrect, you must IMMEDIATLY Broadcast feedback with reference files as proof.
 
 Inbox Check Tool:
 ```bash
-uv run .claude/hooks/comms/get_unread_messages.py \
-  --name "YourAgentName"
+./.agents/tools/workflow/agent-comms.mjs \
+  --name "YourAgentName" \
+  sync
 ```
 
 **Broadcast:**
@@ -103,9 +107,9 @@ You MUST Broadcast:
 
 Broadcast Tool:
 ```bash
-uv run .claude/hooks/comms/send_message.py \
-  --sender "YourAgentName" \
-  --message "Your message content"
+./.agents/tools/workflow/agent-comms.mjs \
+  --name "YourAgentName" \
+  post --sync "Your message content"
 ```
 
 
