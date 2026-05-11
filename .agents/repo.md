@@ -1,10 +1,10 @@
 
 # Repository Guidelines
 VALIDATE by Running required commands — all must pass without warnings or errors:
-   - `pnpm lint`
-   - `pnpm ts:check`
-   - `pnpm test:all`
-   - `pnpm build`
+   - `nohup pnpm lint > /tmp/lint.log 2>&1 &`
+   - `nohup pnpm ts:check > /tmp/typecheck.log 2>&1 &`
+   - `nohup pnpm test > /tmp/test.log 2>&1 &`
+   - `nohup pnpm build > /tmp/build.log 2>&1 &`
 
 
 ## Dev server

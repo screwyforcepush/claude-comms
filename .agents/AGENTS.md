@@ -49,8 +49,10 @@ Run required commands from `.agents/repo.md` — all must pass without warnings 
    - typecheck
    - build
    - test
-IMPORTANT: NEVER `git stash`, The working tree is shared! 
-If you must answer "is this pre-existing?", then use `git worktree` instead of `git stash`
+IMPORTANT: this is a shared workingtree and environment.
+- Multiple of the same command can conflict. check running processes before running lint/typecheck/build/test commands. If the command is already running, wait for it to finish or just check the log file for results (freshness `mtime`). 
+- Run the commands nohup and pipe to log file. eg. `nohup npm ts:check > /tmp/typecheck.log 2>&1 &`. This way, parallel agents can check the output instead of waiting and running the command again.
+- NEVER `git stash`. if you must answer "is this pre-existing?", then use `git worktree` instead of `git stash`
 
 [UAT]
 Perform manual QA:

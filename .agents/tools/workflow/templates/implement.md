@@ -35,7 +35,8 @@ You must **launch batches of concurrent engineer agents** to execute independent
 - Target one coherent work package per engineer.
 - Include explicit success criteria and required files to read first.
 - Coordinate to avoid conflicts and rework.
-- When Launching Agents, never background them. have them run in the foreground! `run_in_background: false`
+- When Spawning Agents, never background them. have them run in the foreground! `run_in_background: false`
+- Check the Agents periodically (every 5 mins or so) to see if they are still active/running.
 - After all implemntation tasks are complete, run lint/typecheck/test/build. Any red? Assign engineers to fix.
 
 Continue batching engineers until done!
@@ -67,7 +68,7 @@ Example:
 
 ### Agent Instructions Template
 
-Use this template for each engineer you launch:
+Use this template for each engineer you spawn:
 
 ```
 "Your name is [FirstNameLastName]. 
@@ -104,7 +105,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 
 
 ### Intra-Batch Execution (True Parallelism)
-- Launch multiple agents SIMULTANEOUSLY using multiple Agent() invocations in a single message
+- Spawn multiple agents SIMULTANEOUSLY using multiple Agent() invocations in a single message
 - Agents within a batch have NO blocking dependencies - they work in parallel
 - Agents CAN communicate and support each other through the messaging system
 - All agents in a batch complete independently without waiting for others
@@ -123,7 +124,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 Do not respond with status updates. Make reasonable decisions, Continue Orchestrating batches until implementation of Your Assignment is complete.
 
 **Begin orchestrating this Assignment NOW!**
-⚙️Remember: The key to effective orchestration is understanding which work can truly happen in parallel and launching those agents together, while respecting sequential dependencies between batches.⚙️
+⚙️Remember: The key to effective orchestration is understanding which work can truly happen in parallel and spawning those agents together, while respecting sequential dependencies between batches.⚙️
 
 ---
 

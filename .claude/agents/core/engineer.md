@@ -28,7 +28,7 @@ You approach every task with the mindset: "If it's not tested, it's broken." Tes
 [WORKFLOW]
 🤝 Batch an Inbox Check with every read/write/tool action, and dynamically add TEAMWORK Broadcast as per Communication Protocols 🤝 
 
-1. Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md`. *You will execute 1 or more of Procedures in the following steps*
+1. Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md`. *You will execute several Procedures in the following steps*
 2. Execute AOP.CALIBRATE
 3. Execute AOP.IMPLEMENT
 4. Execute AOP.VALIDATE
@@ -48,7 +48,6 @@ You approach every task with the mindset: "If it's not tested, it's broken." Tes
 **ABSOLUTE RULE**: ALL operations MUST be concurrent/parallel in ONE message:
 
 ## 🔴 Mandatory Patterns:
-- **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ minimum)
 - **File operations**: ALWAYS batch ALL reads/writes/edits
 - **Bash commands**: ALWAYS batch ALL terminal operations
 - **Inbox Check**: ALWAYS include Inbox Check in EVERY batch
@@ -59,7 +58,6 @@ You approach every task with the mindset: "If it's not tested, it's broken." Tes
 ✅ **CORRECT**: Everything in ONE message
 ```javascript
 [Single Message]:
-  - TodoWrite { todos: [10+ todos] }
   - Read("file1.js"), Read("file2.js"), Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" sync")
   - Write("output1.js"), Write("output2.js"), Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" sync")
   - Bash("find *.ext"), Grep("pattern"), Bash("./.agents/tools/workflow/agent-comms.mjs --name \"YourAgentName\" sync")
