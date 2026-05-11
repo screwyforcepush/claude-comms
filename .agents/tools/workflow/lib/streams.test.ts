@@ -110,7 +110,7 @@ describe("ClaudeStreamHandler", () => {
 // ============================================================================
 
 describe("CodexStreamHandler", () => {
-  it("extracts agent_message text and marks complete on turn.completed", () => {
+  it("extracts final agent_message text and marks complete on turn.completed", () => {
     const handler = new CodexStreamHandler();
 
     handler.onEvent({
@@ -123,9 +123,19 @@ describe("CodexStreamHandler", () => {
     });
     handler.onEvent({ type: "turn.completed" });
 
-    assert.ok(handler.getResult().includes("First message"));
-    assert.ok(handler.getResult().includes("Second message"));
+    assert.strictEqual(handler.getResult(), "Second message");
     assert.strictEqual(handler.isComplete(), true);
+  });
+
+  it("captures thread_id from thread.started for resume", () => {
+    const handler = new CodexStreamHandler();
+
+    handler.onEvent({
+      type: "thread.started",
+      thread_id: "019e1662-7864-7d91-b3f7-663ced63e87d",
+    });
+
+    assert.strictEqual(handler.getSessionId(), "019e1662-7864-7d91-b3f7-663ced63e87d");
   });
 
   it("ignores non-agent_message items", () => {
@@ -164,6 +174,17 @@ describe("GeminiStreamHandler", () => {
 
     assert.strictEqual(handler.getResult(), "");
   });
+
+  it("captures session_id from init for resume", () => {
+    const handler = new GeminiStreamHandler();
+
+    handler.onEvent({
+      type: "init",
+      session_id: "915d455b-c502-4f48-829e-a3858cd370f8",
+    });
+
+    assert.strictEqual(handler.getSessionId(), "915d455b-c502-4f48-829e-a3858cd370f8");
+  });
 });
 
 // ============================================================================
@@ -186,10 +207,49 @@ describe("buildCommand", () => {
     const codex = buildCommand("codex", "test");
     assert.strictEqual(codex.cmd, "codex");
     assert.ok(codex.args.includes("--json"));
+    assert.ok(!codex.args.includes("resume"));
 
     const gemini = buildCommand("gemini", "test");
     assert.strictEqual(gemini.cmd, "gemini");
     assert.ok(gemini.args.includes("stream-json"));
+    assert.ok(!gemini.args.includes("--resume"));
+  });
+
+  it("builds codex resume command when sessionId is provided", () => {
+    const codex = buildCommand("codex", "test", {
+      sessionId: "019e1662-7864-7d91-b3f7-663ced63e87d",
+      model: "gpt-5.5",
+    });
+
+    assert.deepStrictEqual(codex.args, [
+      "--yolo",
+      "e",
+      "resume",
+      "-m",
+      "gpt-5.5",
+      "019e1662-7864-7d91-b3f7-663ced63e87d",
+      "test",
+      "--json",
+    ]);
+  });
+
+  it("builds gemini resume command when sessionId is provided", () => {
+    const gemini = buildCommand("gemini", "test", {
+      sessionId: "915d455b-c502-4f48-829e-a3858cd370f8",
+      model: "auto-gemini-3",
+    });
+
+    assert.deepStrictEqual(gemini.args, [
+      "--yolo",
+      "--resume",
+      "915d455b-c502-4f48-829e-a3858cd370f8",
+      "-m",
+      "auto-gemini-3",
+      "--output-format",
+      "stream-json",
+      "-p",
+      "test",
+    ]);
   });
 
   it("throws for unknown harness", () => {

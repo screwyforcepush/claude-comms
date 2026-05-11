@@ -93,7 +93,7 @@ export interface ExecuteOptions {
   prompt: string;
   /** Model to pass to harness CLI */
   model?: string;
-  /** Session ID for Claude resume */
+  /** Harness session/thread ID for resume */
   sessionId?: string;
   /** Fork the session instead of resuming in-place */
   forkSession?: boolean;
@@ -370,7 +370,7 @@ export class HarnessExecutor {
     if (options.model) {
       commandOptions.model = options.model;
     }
-    if (sessionId && harness === "claude") {
+    if (sessionId && (harness === "claude" || harness === "codex" || harness === "gemini")) {
       commandOptions.sessionId = sessionId;
       if (forkSession) {
         commandOptions.forkSession = true;

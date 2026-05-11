@@ -21,6 +21,8 @@ interface Config {
   reflectionTimeoutMs?: number;
 }
 
+type ReflectableHarness = "claude" | "codex" | "gemini";
+
 function debug(message: string): void {
   if (process.env.REFLECT_DEBUG) {
     console.error(`[reflect-spawn] ${message}`);
@@ -45,28 +47,13 @@ function terminate(child: ChildProcess): void {
   }, KILL_GRACE_MS).unref();
 }
 
-async function runClaude(prompt: string, sessionId: string, timeoutMs: number): Promise<void> {
+async function runWithTimeout(command: string, args: string[], timeoutMs: number): Promise<void> {
   await new Promise<void>((resolve) => {
-    const child = spawn(
-      "claude",
-      [
-        "--dangerously-skip-permissions",
-        "--verbose",
-        "--output-format",
-        "stream-json",
-        "--disable-slash-commands",
-        "--resume",
-        sessionId,
-        "--fork-session",
-        "-p",
-        prompt,
-      ],
-      {
-        cwd: projectRoot,
-        env: process.env,
-        stdio: "ignore",
-      }
-    );
+    const child = spawn(command, args, {
+      cwd: projectRoot,
+      env: process.env,
+      stdio: "ignore",
+    });
 
     const timeout = setTimeout(() => {
       debug(`timeout after ${timeoutMs}ms`);
@@ -86,6 +73,55 @@ async function runClaude(prompt: string, sessionId: string, timeoutMs: number): 
   });
 }
 
+async function runClaude(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
+  const args = [
+    "--dangerously-skip-permissions",
+    "--verbose",
+    "--output-format",
+    "stream-json",
+    "--disable-slash-commands",
+  ];
+  if (model) {
+    args.push("--model", model);
+  }
+  args.push("--resume", sessionId, "--fork-session", "-p", prompt);
+  await runWithTimeout("claude", args, timeoutMs);
+}
+
+async function runCodex(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
+  const args = ["--yolo", "e", "resume"];
+  if (model) {
+    args.push("-m", model);
+  }
+  args.push(sessionId, prompt, "--json");
+  await runWithTimeout("codex", args, timeoutMs);
+}
+
+async function runGemini(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
+  const args = ["--yolo", "--resume", sessionId];
+  if (model) {
+    args.push("-m", model);
+  }
+  args.push("--output-format", "stream-json", "-p", prompt);
+  await runWithTimeout("gemini", args, timeoutMs);
+}
+
+async function runReflectionHarness(
+  harness: ReflectableHarness,
+  prompt: string,
+  sessionId: string,
+  timeoutMs: number,
+  model?: string
+): Promise<void> {
+  if (harness === "claude") {
+    await runClaude(prompt, sessionId, timeoutMs, model);
+  } else if (harness === "codex") {
+    await runCodex(prompt, sessionId, timeoutMs, model);
+  } else {
+    await runGemini(prompt, sessionId, timeoutMs, model);
+  }
+}
+
 async function main(): Promise<void> {
   const jobId = process.argv[2];
   if (!jobId) return;
@@ -101,7 +137,11 @@ async function main(): Promise<void> {
     if (!jobData) return;
     if (jobData.status !== "complete" && jobData.status !== "failed") return;
     if (jobData.status === "awaiting_retry") return;
-    if (jobData.harness !== "claude") return;
+    if (
+      jobData.harness !== "claude" &&
+      jobData.harness !== "codex" &&
+      jobData.harness !== "gemini"
+    ) return;
     if (!jobData.sessionId) return;
     if (!jobData.namespaceId) return;
 
@@ -116,10 +156,13 @@ async function main(): Promise<void> {
       ASSIGNMENT_SCOPE_HINT: northStar.slice(0, 200),
     });
 
-    await runClaude(
+    const model = typeof jobData.model === "string" ? jobData.model : undefined;
+    await runReflectionHarness(
+      jobData.harness,
       prompt,
       jobData.sessionId,
-      config.reflectionTimeoutMs ?? DEFAULT_REFLECTION_TIMEOUT_MS
+      config.reflectionTimeoutMs ?? DEFAULT_REFLECTION_TIMEOUT_MS,
+      model
     );
   } catch (err) {
     debug((err as Error).message);

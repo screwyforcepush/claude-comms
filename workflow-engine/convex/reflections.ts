@@ -21,8 +21,14 @@ type WindowMode =
   | { kind: "last"; count: number }
   | { kind: "range"; since: number; until: number };
 
+const REFLECTABLE_HARNESSES = new Set<Harness>(["claude", "codex", "gemini"]);
+
 function isTerminal(status: string): boolean {
   return status === "complete" || status === "failed";
+}
+
+function isReflectableHarness(harness: Harness): boolean {
+  return REFLECTABLE_HARNESSES.has(harness);
 }
 
 function validateWindow(args: {
@@ -228,15 +234,20 @@ export const coverageRate = query({
 
     const terminalJobs = jobs.length;
     const reflectedJobs = reflected.size;
-    const claudeTerminal = byHarness.claude.terminal;
-    const claudeReflected = byHarness.claude.reflected;
+    let eligibleTerminal = 0;
+    let eligibleReflected = 0;
+    for (const harness of Object.keys(byHarness) as Harness[]) {
+      if (!isReflectableHarness(harness)) continue;
+      eligibleTerminal += byHarness[harness].terminal;
+      eligibleReflected += byHarness[harness].reflected;
+    }
 
     return {
       terminalJobs,
       reflectedJobs,
       rate: terminalJobs === 0 ? 0 : reflectedJobs / terminalJobs,
       byHarness,
-      eligibleCoverage: claudeTerminal === 0 ? 0 : claudeReflected / claudeTerminal,
+      eligibleCoverage: eligibleTerminal === 0 ? 0 : eligibleReflected / eligibleTerminal,
     };
   },
 });
@@ -337,7 +348,7 @@ export const gaps = query({
       .filter((job) => !reflected.has(job._id))
       .map((job) => {
         let skipReason: string;
-        if (job.harness !== "claude") {
+        if (!isReflectableHarness(job.harness)) {
           skipReason = "unsupported_harness";
         } else if (!job.sessionId) {
           skipReason = "missing_session_id";

@@ -98,7 +98,7 @@ export default defineSchema({
     totalTokens: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
     model: v.optional(v.string()), // Model string passed to harness CLI
-    sessionId: v.optional(v.string()), // Harness session ID for resume/debugging; Claude-only at v1
+    sessionId: v.optional(v.string()), // Harness session/thread ID for resume/debugging
     exitForced: v.optional(v.boolean()),
     // Rate-limit auto-retry fields
     retryCount: v.optional(v.number()),      // Increments each retry cycle

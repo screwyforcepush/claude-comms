@@ -23,7 +23,7 @@ export interface StreamHandler {
   isTerminal(): boolean;
   /** Check if the stream indicates successful completion */
   isComplete(): boolean;
-  /** Get session ID for resume functionality (Claude only) */
+  /** Get session ID for resume functionality */
   getSessionId(): string | null;
   /** Get a failure reason if a terminal error was observed */
   getFailureReason(): string | null;
@@ -32,7 +32,7 @@ export interface StreamHandler {
 }
 
 export interface CommandOptions {
-  /** Session ID for Claude session resume */
+  /** Session/thread ID for harness resume */
   sessionId?: string;
   /** Fork the session instead of resuming in-place (creates new branch) */
   forkSession?: boolean;
@@ -155,9 +155,14 @@ export class CodexStreamHandler implements StreamHandler {
   private messages: string[] = [];
   private lastMessage: string | null = null;
   private complete = false;
+  private threadId: string | null = null;
 
   onEvent(event: Record<string, unknown>): void {
     const type = event.type as string;
+
+    if (type === "thread.started" && event.thread_id) {
+      this.threadId = String(event.thread_id);
+    }
 
     if (type === "item.completed") {
       const item = event.item as { type?: string; text?: string } | undefined;
@@ -186,7 +191,7 @@ export class CodexStreamHandler implements StreamHandler {
   }
 
   getSessionId(): string | null {
-    return null; // Codex doesn't support session resume
+    return this.threadId;
   }
 
   getFailureReason(): string | null {
@@ -207,9 +212,14 @@ export class GeminiStreamHandler implements StreamHandler {
   private currentTurnBuffer = "";
   private complete = false;
   private failureReason: string | null = null;
+  private sessionId: string | null = null;
 
   onEvent(event: Record<string, unknown>): void {
     const type = event.type as string;
+
+    if (type === "init" && event.session_id) {
+      this.sessionId = String(event.session_id);
+    }
 
     if (type === "message" && event.role === "assistant") {
       const content = event.content as string | undefined;
@@ -247,7 +257,7 @@ export class GeminiStreamHandler implements StreamHandler {
   }
 
   getSessionId(): string | null {
-    return null; // Gemini doesn't support session resume
+    return this.sessionId;
   }
 
   getFailureReason(): string | null {
@@ -318,14 +328,25 @@ export function buildCommand(
     }
     case "codex": {
       const args = ["--yolo", "e"];
-      if (options.model) {
-        args.push("-m", options.model);
+      if (options.sessionId) {
+        args.push("resume");
+        if (options.model) {
+          args.push("-m", options.model);
+        }
+        args.push(options.sessionId, prompt, "--json");
+      } else {
+        if (options.model) {
+          args.push("-m", options.model);
+        }
+        args.push(prompt, "--json");
       }
-      args.push(prompt, "--json");
       return { cmd: "codex", args };
     }
     case "gemini": {
       const args = ["--yolo"];
+      if (options.sessionId) {
+        args.push("--resume", options.sessionId);
+      }
       if (options.model) {
         args.push("-m", options.model);
       }

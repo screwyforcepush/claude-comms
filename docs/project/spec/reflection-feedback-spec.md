@@ -41,12 +41,12 @@ The operator wants:
 
 ### What success looks like
 
-When implementation is complete, after a Claude job ends (success or failure):
+When implementation is complete, after a reflectable job ends (success or failure):
 1. The runner fire-and-forgets a reflection wrapper (`reflect-spawn.ts`).
-2. The wrapper resurrects the agent into a forked session (`claude --resume <sessionId> --fork-session`) and delivers a reflection prompt.
+2. The wrapper resurrects the agent via the harness resume command and delivers a reflection prompt.
 3. The agent runs `npx tsx .agents/tools/workflow/reflect.ts --help`, constructs a structured JSON payload, and submits via the CLI.
 4. A row lands in the `reflections` table with denormalised job-weight metadata, a flexible boolean rubric (v1 draft: ~20 questions; freely extensible), free-form fields, and three version axes.
-5. `api.reflections.coverageRate` returns a healthy ratio for Claude jobs. Non-Claude harnesses appear at 0% in the `byHarness` breakdown -- expected, intentionally visible.
+5. `api.reflections.coverageRate` returns a healthy ratio for Claude, Codex, and Gemini jobs, with per-harness detail in the `byHarness` breakdown.
 6. The Outcome Steward (and eventually a dashboard) can answer questions like *"what's broken across this namespace's last 30 days of jobs?"*
 
 If implementation stops at any phase boundary, the system is in a valid state. Phase 1 alone (sessionId capture) is independently valuable as a debugging affordance.
@@ -57,9 +57,9 @@ If implementation stops at any phase boundary, the system is in a valid state. P
 - **Fire-and-forget.** No retry, no error recovery in the reflection path. Coverage rate is the alarm; missed reflections degrade silently.
 - **No parsing of agent output.** The reflection CLI takes structured JSON as input. Free-text agent output is never parsed.
 - **CLI-script pattern, not MCP.** Mirrors the existing assignment toolkit (`cli.ts` + `--help` discovery). MCP-stdio was considered and rejected for complexity.
-- **`--fork-session` always.** The reflection turn lives in a throwaway forked session so the original `sessionId` thread stays clean.
+- **Resume reflection sessions.** Use the harness resume path for reflection. Claude uses `--fork-session` to keep the original session clean; Codex uses `exec resume --json`, and Gemini uses `--resume --output-format stream-json`. Codex/Gemini original-thread contamination is accepted because reflections run only after terminal jobs.
 - **Flexible rubric.** Stored as a kvp (`v.record(v.string(), v.boolean())`) so the question set can evolve without schema migrations. Field omission is itself signal.
-- **Claude-only at v1.** Codex/Gemini reflect-equivalents deferred. Non-Claude jobs skip silently.
+- **All current harnesses reflect.** Claude, Codex, and Gemini all provide a resume identifier that the runner can capture and pass to the reflection wrapper.
 - **Failed jobs reflect.** Failure is exactly when friction signal is highest; the contract changes in `HarnessExecutor` and `api.jobs.fail` exist to support this.
 
 ### Reference documents (read these before starting)
@@ -83,12 +83,11 @@ This spec touches the workflow engine's own infrastructure: schema, runner, and 
 - `.agents/tools/workflow/lib/harness-executor.ts` -- `onFail` / `onTimeout` callback signatures extended to carry `sessionId`
 - `.agents/tools/workflow/runner.ts` -- onComplete/onFail/onTimeout pass `sessionId`; spawn wrapper post-completion
 - `.agents/tools/workflow/reflect.ts` -- **new** -- agent-facing CLI (the tool the agent invokes)
-- `.agents/tools/workflow/reflect-spawn.ts` -- **new** -- runner-side wrapper that resurrects the agent via `claude --resume --fork-session`
+- `.agents/tools/workflow/reflect-spawn.ts` -- **new** -- runner-side wrapper that resurrects the agent via harness resume (`claude --resume --fork-session`, `codex exec resume --json`, or `gemini --resume --output-format stream-json`)
 - `.agents/tools/workflow/templates/reflect.md` -- **new** -- reflection prompt template
 
 **Out of scope (deferred):**
 - Workflow effectiveness reflection (outcome-aware variant) -- separate product
-- Codex / Gemini session resume -- v1 is Claude-only; non-Claude jobs skip reflection silently
 - Steward analysis toolkit -- separate phase, consumes the same Convex query functions as the dashboard
 - Dashboard UI for reflection slicing -- separate phase
 - Reflection-on-reflections meta-aggregator -- separate phase
@@ -105,7 +104,7 @@ This spec touches the workflow engine's own infrastructure: schema, runner, and 
 5. Runner's three job-completion paths (live `onComplete`, live `onFail`/`onTimeout`, reconcile/dead-orphan) pass `sessionId` through to mutations.
 6. Retry-flow paths clear `sessionId` on reset so retried jobs reflect on their own session, not the prior attempt's.
 7. Runner fire-and-forgets `reflect-spawn.ts <jobId>` after a successful or failed job-completion mutation.
-8. New `reflect-spawn.ts` (runner-facing wrapper): reads the job from Convex, renders the reflection prompt, spawns `claude --resume <sessionId> --fork-session` with a 5-min wall-clock timeout, exits.
+8. New `reflect-spawn.ts` (runner-facing wrapper): reads the job from Convex, renders the reflection prompt, spawns the harness resume command with a 5-min wall-clock timeout, exits.
 9. New `reflect.ts` (agent-facing CLI): the agent calls this from inside the resurrected session with structured input. Validates, denormalizes job metadata, captures versions/SHAs, writes one `reflections` row, exits.
 10. Coverage-rate query (`{ rate, byHarness }`) is queryable as the pipeline-health self-diagnostic.
 
@@ -132,12 +131,12 @@ Runner.onComplete | onFail | onTimeout (each carries sessionId)
     |       v
     |   reflect-spawn.ts <jobId>:
     |     read job from Convex (sessionId, harness, jobtype, status)
-    |     skip if harness != claude OR sessionId missing
+    |     skip if harness is unsupported OR sessionId missing
     |     render reflection prompt from templates/reflect.md
-    |     spawn: claude --resume <sessionId> --fork-session  (5-min wall-clock)
+    |     spawn: harness resume command (5-min wall-clock)
     |       |
     |       v
-    |   Claude resumes session into a *forked* throwaway:
+    |   Agent resumes session:
     |     reads reflection prompt
     |     runs `npx tsx .agents/tools/workflow/reflect.ts --help` to learn the interface
     |     constructs structured payload (description, critique, rubric subset, keywords, etc.)
@@ -160,7 +159,7 @@ Runner.onComplete | onFail | onTimeout (each carries sessionId)
     |     prints success / exits 0
     |       |
     |       v
-    |   Claude's forked session exits.
+    |   Agent session exits.
     |   reflect-spawn.ts exits (or SIGKILL'd by 5-min timer).
     |
     +--> handleGroupCompletion(...)                          (continues normal cascade)
@@ -172,9 +171,9 @@ Runner.onComplete | onFail | onTimeout (each carries sessionId)
 
 2. **Two scripts, two responsibilities.**
    - `reflect.ts` -- agent-facing. Single responsibility: take structured input, validate, denormalize job metadata, write to Convex.
-   - `reflect-spawn.ts` -- runner-facing. Single responsibility: resurrect the agent with `--resume --fork-session` and a reflection prompt. The agent never sees this file; `--help` on the agent tool stays uncluttered.
+   - `reflect-spawn.ts` -- runner-facing. Single responsibility: resurrect the agent via the harness resume command and a reflection prompt. The agent never sees this file; `--help` on the agent tool stays uncluttered.
 
-3. **`--fork-session` prevents session contamination.** The runner already supports `forkSession` for guardian (`harness-executor.ts`). Reusing the pattern means the reflection turn lives in a throwaway forked session; the original `sessionId` remains a clean trace pointer. Pinned, not "verify during implementation."
+3. **Session contamination policy is harness-specific.** Claude reflections use `--fork-session`, preserving the original session as a clean trace pointer. Codex and Gemini resume the terminal session directly; that contamination is acceptable because reflection runs after terminal jobs.
 
 4. **Failed jobs reflect.** The `onFail`/`onTimeout` callback contracts and `api.jobs.fail` mutation are extended to carry `sessionId`. Failure is exactly when friction signal is highest; dropping it would lose the most valuable slice of the dataset.
 
@@ -184,7 +183,7 @@ Runner.onComplete | onFail | onTimeout (each carries sessionId)
 
 7. **Auto-captured metadata vs joined metadata.** Auto-captured fields snapshot at reflection time (`reflectionCliVersion`, `clientGitSha`, `engineGitSha`). Job-weight fields (`namespaceId`, `harness`, `totalTokens`, `toolCallCount`, duration) are denormalized onto the row at write time so analysis queries are single-table and the *weight at the moment of reflection* is frozen even if the job is retried/edited later.
 
-8. **Self-diagnostic over guarantees.** No retry, no error handling, no failure recovery. Coverage rate (`reflectedJobs / terminalJobs`, broken down by harness) surfaces drops -- harness crashes, broken sessionId capture, agents skipping the tool. Single number plus `byHarness` breakdown so the non-Claude expected-zero is visible at a glance.
+8. **Self-diagnostic over guarantees.** No retry, no error handling, no failure recovery. Coverage rate (`reflectedJobs / terminalJobs`, broken down by harness) surfaces drops -- harness crashes, broken sessionId capture, agents skipping the tool. Single number plus `byHarness` breakdown makes harness-specific drops visible at a glance.
 
 9. **5-min wall-clock timeout** in `reflect-spawn.ts`. SIGTERM, then SIGKILL on expiry. Hung children don't hold runner resources; missed reflections show in coverage rate.
 
@@ -244,10 +243,10 @@ reflections: defineTable({
 
 ```typescript
 namespaceId: v.optional(v.id("namespaces")), // Integration-era denominator marker; no backfill
-sessionId: v.optional(v.string()),  // Harness session id (Claude-only at v1)
+sessionId: v.optional(v.string()),  // Harness session/thread id
 ```
 
-The harness executor's `ClaudeStreamHandler` captures `session_id` from streamed events; the runner's `onComplete` callback already receives it. Currently this is only persisted for chat jobs (routed to `chatThreads.claudeSessionId`). Adding the field here lets assignment jobs persist it for reflection.
+The harness executor's stream handlers capture resumable identifiers from streamed events: Claude captures `session_id`, Codex captures `thread.started.thread_id`, and Gemini captures `init.session_id`. The runner's `onComplete` callback receives that value and persists it for assignment-job reflection.
 
 Add a namespace-scoped `completedAt` compound index for coverage queries (queries always filter by namespace, so the compound index avoids a full scan):
 ```typescript
@@ -348,17 +347,17 @@ Entry: `npx tsx .agents/tools/workflow/reflect-spawn.ts <jobId>`
 4. **Eligibility checks** (silent skip on any):
    - status is `complete` or `failed` (not `running`/`pending`).
    - **Not `awaiting_retry`.** Rate-limited jobs would resurrect into a rate-limited harness -- the reflection invocation would also be rate-limited. The reflection happens (or doesn't) on the eventual terminal completion of the retried run.
-   - harness is `claude` (others deferred to a follow-up).
+   - harness is `claude`, `codex`, or `gemini`.
    - `sessionId` is non-empty.
 5. **Render the reflection prompt** from `templates/reflect.md` with placeholders bound to:
    - `{{JOB_TYPE}}` -- `job.jobType`
    - `{{JOB_STATUS}}` -- `job.status`
    - `{{JOB_ID}}` -- `job._id` (so the agent can pass it to `reflect.ts`)
    - `{{ASSIGNMENT_SCOPE_HINT}}` -- first 200 chars of the assignment's north star
-6. **Spawn Claude** with:
-   - `--resume <sessionId>`
-   - `--fork-session` (forks the resumed session into a throwaway; original session record stays clean)
-   - The prompt on stdin
+6. **Spawn the harness resume command**:
+   - Claude: `claude --resume <sessionId> --fork-session -p <prompt>`
+   - Codex: `codex --yolo e resume <sessionId> <prompt> --json`
+   - Gemini: `gemini --yolo --resume <sessionId> --output-format stream-json -p <prompt>`
    - Wall-clock timer (default 5 min, configurable via `config.json` `reflectionTimeoutMs`): SIGTERM at expiry; SIGKILL if not exited within 10s
 7. **Wait** for the child to exit. No output parsing.
 8. **Exit.**
@@ -366,7 +365,7 @@ Entry: `npx tsx .agents/tools/workflow/reflect-spawn.ts <jobId>`
 **Failure modes (all silent, all OK):**
 - Convex unreachable -> exit 0
 - Job not found / not eligible -> exit 0
-- Claude CLI fails to start / hangs -> exit 0 after timeout
+- Harness CLI fails to start / hangs -> exit 0 after timeout
 - Agent never invokes `reflect.ts` -> no row, surfaces in coverage rate
 
 ---
@@ -527,7 +526,7 @@ Window resolution:
     terminal: number,
     reflected: number,
   }>,
-  eligibleCoverage: number,    // reflected / terminal restricted to harnesses that support reflection (Claude-only at v1)
+  eligibleCoverage: number,    // reflected / terminal restricted to harnesses that support reflection
 }
 ```
 
@@ -535,7 +534,7 @@ Window resolution:
 
 - `namespaceId` is always required because metrics are scoped to a single namespace. The Steward analysis toolkit injects this from its config; cross-namespace aggregation is out of scope.
 - Only jobs with denormalized `jobs.namespaceId` participate in coverage. This intentionally excludes historical jobs from before the reflection integration; no backfill is required.
-- `byHarness` is intentionally retained: the non-Claude expected-zero is the single most informative signal in the breakdown -- it makes the harness gap visible at a glance.
+- `byHarness` is intentionally retained: per-harness coverage is the single most informative signal in the breakdown -- it makes harness-specific gaps visible at a glance.
 - Drops in `eligibleCoverage` indicate harness crashes, broken sessionId capture, or agents skipping the tool.
 - Indexes used: `jobs.by_namespace_completedAt` (Phase 1 adds this index, scoped to namespace), `reflections.by_namespace_created`. The `last: N` form requires a `by_namespace_completedAt_desc` traversal limited to N rows.
 
@@ -560,7 +559,7 @@ Self-reflection is biased toward optimism. Mitigation: the prompt explicitly inv
 One small extra harness invocation per reflectable job, dominated by `--resume` context loading. The reflection turn itself is short. Cost is acceptable.
 
 ### Session contamination
-**Mitigated by `--fork-session`.** Original session record stays clean.
+**Harness-specific.** Claude is mitigated by `--fork-session`; Codex and Gemini resume directly, so the reflection prompt becomes part of the terminal session. This is accepted because reflection only runs after terminal jobs.
 
 ### Failed-but-unresumable jobs
 Some failures leave no `sessionId`. `reflect-spawn.ts` skips silently; coverage breakdown reflects this.
@@ -633,7 +632,7 @@ The implementer runs through these manually. Phases are ordered so each one is i
    - Queries the job to denormalise `namespaceId`, `harness`, `jobType`, `totalTokens`, `toolCallCount`, `durationMs`.
    - Captures `reflectionCliVersion` (const), `clientGitSha` (cwd HEAD), `engineGitSha` (runner `__dirname` HEAD).
    - Calls `api.reflections.insert`. Prints `ok` and exits 0 on success; non-zero with diagnostic on validation failure.
-2. **Manual test**: pick a recent Claude-harness completed job. Hand-craft a reflection JSON (cover required fields and a partial rubric). Invoke `reflect.ts --job-id <id> --input <file>`. Confirm the row lands with all denormalised + auto fields populated correctly.
+2. **Manual test**: pick a recent completed job with a supported harness. Hand-craft a reflection JSON (cover required fields and a partial rubric). Invoke `reflect.ts --job-id <id> --input <file>`. Confirm the row lands with all denormalised + auto fields populated correctly.
 
 **Rollback**: delete the file.
 
@@ -647,16 +646,16 @@ The implementer runs through these manually. Phases are ordered so each one is i
 
 1. **Implement** `.agents/tools/workflow/reflect-spawn.ts` per the **Reflection Spawn Wrapper** section:
    - Single positional `<jobId>`.
-   - Eligibility checks (silent skip on any): job is terminal; harness is `claude`; `sessionId` non-empty.
+   - Eligibility checks (silent skip on any): job is terminal; harness is `claude`, `codex`, or `gemini`; `sessionId` non-empty.
    - Render `templates/reflect.md` with bound placeholders (`{{JOB_TYPE}}`, `{{JOB_STATUS}}`, `{{JOB_ID}}`, `{{ASSIGNMENT_SCOPE_HINT}}`).
-   - Spawn `claude --resume <sessionId> --fork-session` with the rendered prompt on stdin.
+   - Spawn the harness resume command with the rendered prompt.
    - 5-min wall-clock timeout: SIGTERM at expiry, SIGKILL after 10s.
    - Exit silently on any failure; coverage rate is the alarm.
 2. **Draft** `.agents/tools/workflow/templates/reflect.md`: skeleton from the **Reflection Prompt Template** section. Operator iterates the wording in-flow as it gets used.
-3. **Manual test**: pick a recent Claude-harness completed job. Run `reflect-spawn.ts <jobId>` from the runner's cwd. Confirm:
+3. **Manual test**: pick a recent completed job with a supported harness. Run `reflect-spawn.ts <jobId>` from the runner's cwd. Confirm:
    - The agent runs `reflect.ts --help`, then submits.
    - A row lands.
-   - The original session record is uncontaminated (the forked session is throwaway). Spot-check by inspecting the on-disk session file or running another `--resume` against the original sessionId and confirming the reflection turn isn't there.
+   - Session behavior matches the harness policy: Claude reflection lands in a fork, while Codex/Gemini reflection is visible in the resumed terminal session.
 
 **Rollback**: delete both files.
 
@@ -673,7 +672,7 @@ The implementer runs through these manually. Phases are ordered so each one is i
 3. **Runner restart #2.**
 4. **Validate**:
    - Run a test assignment; confirm reflections appear naturally for each completed job.
-   - Confirm `coverageRate` returns sensible numbers; confirm `byHarness` shows non-Claude at 0%.
+   - Confirm `coverageRate` returns sensible numbers; confirm `byHarness` separates Claude, Codex, and Gemini counts.
    - Force a job failure (e.g., kill via UI) and confirm a reflection still lands.
 5. **Bump** `REFLECTION_CLI_VERSION` const in `reflect.ts` if any tweaks landed during phases 3–5.
 
@@ -696,18 +695,17 @@ The implementation plan is solid when:
 3. The `reflect.ts` CLI contract (one invocation per job, structured input file, Convex auth via `config.json`) is unambiguous and consistent with the existing toolkit pattern.
 4. The boolean rubric is fully optional and stored as a typed Convex object (not JSON blob), so the dashboard can index/filter.
 5. Failed jobs reflect: `onFail`/`onTimeout` and `api.jobs.fail` carry `sessionId`; retry-flow paths clear `sessionId` on reset.
-6. `--fork-session` prevents session contamination; pinned, not deferred.
+6. Session contamination behavior is explicit: Claude forks, Codex/Gemini resume directly after terminal jobs.
 7. Distribution path is explicit: `.agents/` auto-propagates via tarball; raw-URL fallback gap is acknowledged and accepted.
 8. The coverage-rate query (`{ rate, byHarness, eligibleCoverage }`) is precisely defined and indexed.
    Its denominator is terminal integration-era jobs: rows with `jobs.namespaceId` present and matching the requested namespace.
-9. Failure modes (Claude unavailable, sessionId missing, agent skips the tool, duplicate writes) all degrade silently with the coverage rate as the alarm.
-10. Non-Claude harnesses skip cleanly; their expected-zero is visible in `byHarness`.
+9. Failure modes (harness unavailable, sessionId missing, agent skips the tool, duplicate writes) all degrade silently with the coverage rate as the alarm.
+10. Harness-specific coverage gaps are visible in `byHarness`.
 
 ---
 
 ## Out of Scope -- Explicit
 
-- **Codex / Gemini reflection.** Deferred until those harnesses' resume-equivalents are validated.
 - **Workflow effectiveness reflection** (outcome-aware variant). Separate product.
 - **Steward analysis toolkit.** Separate phase, consumes the same Convex query functions as the dashboard.
 - **Reflection dashboard UI.** Separate phase.
@@ -724,7 +722,7 @@ The implementation plan is solid when:
 | H2 | Applied (`api.jobs.fail` accepts `sessionId`). |
 | H3 | Applied & extended in v0.3: rubric reshaped to a flexible kvp (`v.record(v.string(), v.boolean())`). Keys are not typed at the schema level so the question set can evolve without migrations; v1 ships a draft list of 20 questions. |
 | H4 | Obsolete (no MCP, no env propagation). |
-| H5 | Applied (`--fork-session` pinned). |
+| H5 | Updated: Claude uses `--fork-session`; Codex/Gemini use direct terminal-session resume after operator acceptance of contamination. |
 | H6 | Applied (`.agents/` propagation made canonical; raw-URL fallback gap explicitly accepted, not closed). |
 | H7 | Applied (duplicates accepted at v1; `byJob` returns latest; revisit if real). |
 | H8 | Partially applied (5-min wall-clock timeout default, configurable via `config.json` `reflectionTimeoutMs`; `--allowedTools` dropped per user direction -- agent may use any tools during reflection; only the `reflect.ts` invocation matters as output). |

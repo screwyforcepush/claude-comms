@@ -197,7 +197,7 @@ async function coverage(flags: Record<string, string | boolean>): Promise<void> 
   }
 
   console.log(`Coverage: ${result.reflectedJobs}/${result.terminalJobs} (${pct(result.rate)})`);
-  console.log(`Eligible Claude coverage: ${pct(result.eligibleCoverage)}`);
+  console.log(`Eligible harness coverage: ${pct(result.eligibleCoverage)}`);
   for (const [harness, counts] of Object.entries(result.byHarness as Record<string, { reflected: number; terminal: number }>)) {
     console.log(`${harness}: ${counts.reflected}/${counts.terminal}`);
   }
