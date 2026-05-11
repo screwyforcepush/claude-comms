@@ -68,10 +68,15 @@ function mockGroup(overrides: Partial<JobGroup> = {}): JobGroup {
 }
 
 function mockChatContext(overrides: Partial<ChatJobContext> = {}): ChatJobContext {
+  const mode = overrides.mode ?? 'jam';
+  const effectivePromptMode =
+    overrides.effectivePromptMode ?? (mode === 'guardian' ? 'cook' : mode);
+
   return {
     threadId: 'thread_123',
     namespaceId: 'ns_xyz',
-    mode: 'jam',
+    mode,
+    effectivePromptMode,
     messages: [
       { _id: 'msg1', threadId: 'thread_123', role: 'user', content: 'Hello', createdAt: Date.now() - 1000 },
     ],
@@ -151,7 +156,7 @@ Job: {{CURRENT_JOB_ID}}
     });
     const group = mockGroup();
 
-    const prompt = buildPrompt(group, assignment, job, []);
+    const prompt = buildPrompt(group, assignment, job, [], [], []);
 
     // North star injected
     assert.ok(prompt.includes('Build a user authentication system'));
@@ -176,9 +181,9 @@ Job: {{CURRENT_JOB_ID}}
     const group = mockGroup();
     const previousResult = 'Successfully implemented login form with validation. Tests passing.';
 
-    const prompt = buildPrompt(group, assignment, job, [
+    const prompt = buildPrompt(group, assignment, job, [], [
       { jobType: 'implement', harness: 'claude', result: previousResult },
-    ]);
+    ], []);
 
     // Artifacts present
     assert.ok(prompt.includes('src/auth/login.ts'));
@@ -197,9 +202,9 @@ Job: {{CURRENT_JOB_ID}}
     const group = mockGroup();
     const previousResult = 'Error: JWT token validation failed. Stack trace...';
 
-    const prompt = buildPrompt(group, assignment, job, [
+    const prompt = buildPrompt(group, assignment, job, [], [
       { jobType: 'implement', harness: 'claude', result: previousResult },
-    ]);
+    ], []);
 
     // Previous error visible
     assert.ok(prompt.includes('JWT token validation failed'));
