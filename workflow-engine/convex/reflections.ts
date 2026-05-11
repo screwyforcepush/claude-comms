@@ -295,6 +295,31 @@ export const recent = query({
   },
 });
 
+export const normalizeKeywords = mutation({
+  args: {
+    password: v.string(),
+    mapping: v.record(v.string(), v.string()),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const all = await ctx.db.query("reflections").collect();
+    let scanned = 0;
+    let updated = 0;
+    for (const row of all) {
+      scanned += 1;
+      const original = row.keywords ?? [];
+      const mapped = [...new Set(original.map((k) => args.mapping[k] ?? k))];
+      const beforeKey = [...new Set(original)].sort().join("|");
+      const afterKey = [...mapped].sort().join("|");
+      if (beforeKey !== afterKey) {
+        await ctx.db.patch(row._id, { keywords: mapped });
+        updated += 1;
+      }
+    }
+    return { scanned, updated };
+  },
+});
+
 export const gaps = query({
   args: {
     password: v.string(),

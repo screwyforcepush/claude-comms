@@ -295,6 +295,18 @@ The two are separate features. v1 is ergonomics-only.
 - Free-form keywords (no taxonomy at v1; normalize later if needed)
 - Captured automatically: `reflectionCliVersion` (const in the CLI source, bumped per push), `clientGitSha` (the consuming repo's HEAD), `engineGitSha` (the runner-side workflow engine's HEAD)
 
+### Design Principles for Capture
+
+Three choices in the capture shape are intentional, each protecting a different property:
+
+**Rubric is boolean by design.** Severity withholding isn't simplicity — it's honesty. A reflector has no comparison frame for "how bad" something was. An implement job and a plan job that both burn 60% of context will both report "a lot of context" because neither has a baseline. Integer scoring inherits the same fiction. Severity, where it matters, belongs in the *phrasing* of a boolean question (e.g. "did this block you for >5 minutes?"), not as a separate dimension. If a rubric question feels like it needs severity, the question itself is too broad and should be tightened.
+
+**Keywords are free-form by design.** Pre-enumerating closes the discovery loop on what friction *exists*. An enumerated keyword set is functionally identical to a wider rubric — same problem, different field name. Capture stays open; canonicalization happens later as a Steward task, not as a write-time constraint.
+
+**Reflection is critical-leaning by design.** There will never be a clean entry — the prompt asks for friction, so friction will be reported. The product question is therefore not "is there a problem?" but "what is the *loudest* problem?" Frequency-across-reflections is the severity signal the system already produces. No reflector needs to grade "how bad" anything is; aggregation does that honestly via volume.
+
+A consequence: the loudest signal can be one we choose not to act on (e.g. a harness-internal behaviour we can't remove). That's still useful — knowing what's being tolerated most loudly is decision-grade information even when the decision is "leave it."
+
 ### Job Types That Reflect
 plan, implement, review, uat, pm, document. **Not chat** — chat reflection is on-demand by user request only.
 
@@ -310,6 +322,22 @@ The coverage denominator starts at reflection integration time. New assignment j
 ### Analysis Surface
 The Outcome Steward (Product Owner agent, per-namespace) is the meta-reflector. The same Convex query functions that drive the reflection dashboard also power the Steward's analysis toolkit — DRY across human-facing UI and agent-facing introspection. Each project's Steward sees only its own namespace's data; cross-namespace analysis is out of scope.
 
+**Exception under consideration:** the claude-comms Steward is a special case because this repo *is* the upstream tooling that other namespaces consume. Reflections from any namespace are largely about that shared tooling, so reading across namespaces here is closer to "looking at my own product's user feedback" than to god-mode interrogation. Whether this warrants a permanent boundary amendment or stays a Steward-authorised one-off action is open (see Open Questions).
+
+### Structural Direction (Evolving)
+
+The current capture splits prose into three buckets (`critique`, `alternativeApproach`, `improvements`) plus free-form `keywords`. This makes aggregation lossy: keywords don't carry which prose passage justifies them, and prose isn't tagged with which theme it speaks to. Filtering the rubric or a keyword leads to a row, not to the relevant span.
+
+Direction the capture should evolve toward:
+
+- **One narrative block per entry** — a single long-form reflection that holds rationale and context. Read on drill-down only, when an aggregated view warrants understanding why a specific entry was graded as it was.
+- **An array of structured feedback items** — each item carries a key pain point, a suggestion, and the keywords it relates to. Keywords become the **join key** between items across entries.
+- **Post-processing normalizes keywords in place** — a Steward-triggered batch that maps freeform keywords to a curated taxonomy and **overwrites the `keywords` field** on existing rows. Lossy by intent: once normalized, the raw form is gone. The discovery loop still works because the Steward reviews fresh, un-normalized entries *before* running the batch — that's where novel keywords get noticed and either folded into the taxonomy or decided to be noise. Re-runs are idempotent and cheap to repeat as the taxonomy evolves. Because feedback items carry keywords, they aggregate cleanly under the canonical form for free.
+
+This collapses the current three-bucket prose into one drill-down narrative plus a list of join-keyed items. The aggregation layer reaches into the prose for the first time, and the discovery loop on what friction exists stays open through the freeform-keyword choice.
+
 ## Open Questions
 
-*None currently.*
+- **Cross-namespace reflection access for the claude-comms Steward.** Per-namespace isolation is the default, but tooling friction signal lands in *every* namespace's reflections because tooling is upstream from here. Decide whether to amend the isolation principle for this Steward only, or keep it case-by-case.
+- **Rubric question rework.** Several v1 questions (e.g. `intentInferred` firing on ~98% of entries) are too broadly worded to be answered without an implicit severity comparison. Pass over the question set and tighten phrasing so each question is falsifiable on its own.
+- **Rollout timing for keyword-linked items.** Switching the capture shape resets history — old reflections won't carry the new structure. Decide whether to cut over cleanly (drop pre-cutover analysis) or run both shapes in parallel during a transition window.
