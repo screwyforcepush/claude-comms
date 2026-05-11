@@ -309,6 +309,17 @@ export function buildCommand(
         "--output-format",
         "stream-json",
         "--disable-slash-commands",
+        "--disallowedTools",
+        "AskUserQuestion",
+        "NotebookEdit",
+        "PushNotification",
+        "RemoteTrigger",
+        "mcp__claude_ai_Gmail__authenticate",
+        "mcp__claude_ai_Gmail__complete_authentication",
+        "mcp__claude_ai_Google_Calendar__authenticate",
+        "mcp__claude_ai_Google_Calendar__complete_authentication",
+        "mcp__claude_ai_Google_Drive__authenticate",
+        "mcp__claude_ai_Google_Drive__complete_authentication",
       ];
       if (options.model) {
         args.push("--model", options.model);
