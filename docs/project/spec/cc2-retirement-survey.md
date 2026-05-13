@@ -26,7 +26,7 @@ Files/directories that are pure CC2 with no salvageable content. After deletion,
 
 ### 1.1 `.claude/hooks/` (entire directory)
 
-All nine Python scripts plus `__pycache__`. Dormant since `.claude/settings.json` deletion was staged.
+All nine Python scripts plus `__pycache__`. Dormant since `.claude/settings.json` was removed from the working tree (see §1 dormancy evidence above).
 
 | Path | Rationale |
 |---|---|
@@ -427,7 +427,29 @@ The table relies on the CC2 PreToolUse / PostToolUse / UserPromptSubmit / Notifi
 
 **Proposed:** Delete the table; replace with one paragraph on workflow-engine job-level observability (links to `docs/project/spec/reflection-feedback-spec.md`).
 
-### 2.4 `docs/project/guides/browsertools-guide.md` (line 657–659)
+### 2.4 `.claude/commands/cc3-client-update.md`
+
+The client-update slash command (`/cc3 update`) runs after `npx claude-comms` to bring a client repo current. Step 3 currently re-installs the deleted CC2 hook wiring on every update, so it needs to change before retirement lands — otherwise every update re-resurrects `.claude/settings.json` from git history.
+
+**Quote (Step 3, lines 33–39 — REWRITE):**
+```
+## Step 3: Restore settings
+
+The previous step overrides `.claude/settings.json` with defaults. Restore the project's version:
+
+```bash
+git restore .claude/settings.json
+```
+```
+
+**Proposed:** Two options, user picks based on whether `.claude/settings.json` survives in any CC3-only form (permissions, env, etc.) after retirement:
+
+- **(a) Delete the whole Step 3 section** — if `.claude/settings.json` is genuinely going away (it is the CC2 hook config and §1.1 marks the hooks for deletion; if there's no CC3 reason to keep this file, drop it from this command entirely). Renumber Step 4–6 accordingly.
+- **(b) Rewrite the step** — if the post-retirement `.claude/settings.json` carries CC3-only config (permissions / env). Replace the `git restore` body with whatever the post-retirement settings format demands. Defer the wording until the follow-on execution assignment knows the answer.
+
+Either way the current `git restore .claude/settings.json` line must not survive retirement, since it would re-stage the deleted CC2 wiring from HEAD.
+
+### 2.5 `docs/project/guides/browsertools-guide.md` (line 657–659)
 
 Currently:
 ```
@@ -438,7 +460,7 @@ Currently:
 
 **Proposed:** Delete the three bullets (they point to CC2 guides being deleted). Surrounding "Related Docs" section can stay.
 
-### 2.5 `docs/project/guides/prompt-architecture.md` (line 10–11)
+### 2.6 `docs/project/guides/prompt-architecture.md` (line 10–11)
 
 Currently the Context Primer block tells templates to align with:
 ```
@@ -509,11 +531,11 @@ apps/server/observability.db-wal
 
 ### 4.5 `docs/project/guides/browsertools-guide.md`
 
-Covered in §2.4 (Refresh) — three "Related Docs" bullets to delete.
+Covered in §2.5 (Refresh) — three "Related Docs" bullets to delete.
 
 ### 4.6 `docs/project/guides/prompt-architecture.md`
 
-Covered in §2.5 (Refresh) — two Context Primer lines to swap.
+Covered in §2.6 (Refresh) — two Context Primer lines to swap.
 
 ### 4.7 `.claude/.gitignore`
 
@@ -572,14 +594,14 @@ Items the surveyor explicitly considered, intentionally **did not catalog** in �
 | Bucket | File count | Notes |
 |---|---:|---|
 | Delete | ~80 files across `.claude/hooks/` (10), `apps/server/` (~10), `apps/client/` (~50+ Vue components/tests/configs), `scripts/` (20), `docs/project/guides/` (6), `docs/project/spec/` (2 sessions-tab) | Five `.claude/hooks/` inbound references need Section 2/4 sweep first to avoid broken links / dead commands. |
-| Refresh | 5 docs: root `README.md`, `.claude/commands/cc3-server.md`, `.claude/commands/cc3-client.md`, `docs/project/guides/browsertools-guide.md`, `docs/project/guides/prompt-architecture.md` | Specific quotes + proposed wording in §2. |
+| Refresh | 6 docs: root `README.md`, `.claude/commands/cc3-server.md`, `.claude/commands/cc3-client.md`, `.claude/commands/cc3-client-update.md`, `docs/project/guides/browsertools-guide.md`, `docs/project/guides/prompt-architecture.md` | Specific quotes + proposed wording in §2. |
 | Historical (keep) | All of `docs/project/phases/11-CCHarnessAnalysis/`, `docs/project/research/cc-harness-analysis.md`, all of `docs/project/archive/`, all non-CC2 phase docs, `docs/spec/`, `docs/tech-docs/`, `docs/project/features/` | These describe the project's recorded history; rewriting them erases the comparison frame for past decisions. |
 | Sweep | `LICENSE` (1 line), root `.gitignore` (7 lines), `.claude/.gitignore` (deletes with hooks). `package.json` and root `CLAUDE.md` checked — no fixes needed. | Covered by Refresh edits where the line lives inside a Refresh target. |
 | Out of scope, checked | Browser tools; feedback widget (with apps/client tension); two `.agents/` files that reference CC2; `workflow-engine/`/`convex/`; `packages/setup-installer/` (the installer that bundles CC2 — separately warrants retirement work). | Flagged in §5 so nothing is silently missed. |
 
 The recommended retirement order, when the user is ready to authorize the follow-on assignment:
 
-1. **Refresh edits first** (§2) — README, both `cc3-*` commands, browsertools-guide, prompt-architecture, LICENSE, root .gitignore. This removes all live references to the to-be-deleted CC2 surface so step 2's deletions don't break any inbound links.
+1. **Refresh edits first** (§2) — README, all three `cc3-*` slash commands (`cc3-server`, `cc3-client`, `cc3-client-update`), browsertools-guide, prompt-architecture, LICENSE, root .gitignore. This removes all live references to the to-be-deleted CC2 surface so step 2's deletions don't break any inbound links.
 2. **Resolve the feedback-widget tension** (§5.2) — user decides rehost / preserve / let-it-go before §3 fires.
 3. **Bulk delete** (§1) — `.claude/hooks/`, `apps/server/`, `apps/client/`, `scripts/`, the six CC2 guides, the two sessions-tab specs.
 4. **Verify** — `pnpm ts:check`, `pnpm build`, `vercel build --yes`, and a `grep -r "CC2\|Multi-Agent Observability\|localhost:4000\|localhost:5173\|\.claude/hooks\|apps/server\|apps/client\|scripts/start-system"` pass returning only Historical-bucket hits and the items explicitly preserved in §5.
