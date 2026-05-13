@@ -148,6 +148,31 @@ describe("CodexStreamHandler", () => {
 
     assert.strictEqual(handler.getResult(), "");
   });
+
+  it("returns full accumulated trail when no turn.completed (timeout case)", () => {
+    const handler = new CodexStreamHandler();
+
+    // Simulate the example: multiple intermediate agent_messages, no turn.completed
+    handler.onEvent({
+      type: "item.completed",
+      item: { type: "agent_message", text: "Spawning two subagents in parallel." },
+    });
+    handler.onEvent({
+      type: "item.completed",
+      item: { type: "agent_message", text: "Both subagents are started; waiting." },
+    });
+    handler.onEvent({
+      type: "item.completed",
+      item: { type: "agent_message", text: "Ohm: hello world\nMill: hello world" },
+    });
+    // No turn.completed — simulates a timeout kill
+
+    assert.strictEqual(handler.isComplete(), false);
+    assert.strictEqual(
+      handler.getResult(),
+      "Spawning two subagents in parallel.\n\nBoth subagents are started; waiting.\n\nOhm: hello world\nMill: hello world"
+    );
+  });
 });
 
 // ============================================================================

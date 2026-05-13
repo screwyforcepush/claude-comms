@@ -155,6 +155,7 @@ export class CodexStreamHandler implements StreamHandler {
   private messages: string[] = [];
   private lastMessage: string | null = null;
   private complete = false;
+  private finalResult: string | null = null;
   private threadId: string | null = null;
 
   onEvent(event: Record<string, unknown>): void {
@@ -174,12 +175,15 @@ export class CodexStreamHandler implements StreamHandler {
 
     if (type === "turn.completed") {
       this.complete = true;
+      // Snapshot the last agent_message as the final result at the terminal
+      // event. Mirrors Claude's pattern: getResult() prefers finalResult and
+      // falls back to the full accumulated trail on timeout / no completion.
+      this.finalResult = this.lastMessage;
     }
   }
 
   getResult(): string {
-    // Prefer the final agent_message, fall back to all accumulated messages
-    return this.lastMessage || truncateFallback(this.messages.join("\n\n"));
+    return this.finalResult || truncateFallback(this.messages.join("\n\n"));
   }
 
   isTerminal(): boolean {
