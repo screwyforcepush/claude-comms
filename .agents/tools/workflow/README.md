@@ -96,12 +96,19 @@ cli.ts queue
 # Create assignment
 cli.ts create "<north_star>" [--priority N] [--independent]
 
-# Insert job
+# Insert job (single-job shorthand)
 cli.ts insert-job <assignment_id> \
   --type <plan|implement|review|uat|document> \
   --harness <claude|codex|gemini> \
   [--context "instructions"] \
   [--after <job_id>]
+
+# Insert job(s) from inline JSON (parallel jobs share a groupId)
+cli.ts insert-job <assignment_id> \
+  --jobs '[{"jobType":"review"},{"jobType":"implement","harness":"codex"}]'
+
+# Insert job(s) from a JSON file (escape heredoc/JSON quoting)
+cli.ts insert-job <assignment_id> --jobs-file ./path/to/jobs.json
 
 # Update assignment metadata
 cli.ts update-assignment <id> \

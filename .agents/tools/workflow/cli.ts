@@ -27,10 +27,12 @@
  *   queue                               Show queue status
  *
  *   create <northStar> [--priority N] [--independent] [--thread <threadId>]   Create assignment
- *   insert-job [assignmentId] [--type <type>] [--jobs <json>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
+ *   insert-job [assignmentId] [--type <type>] [--jobs <json>] [--jobs-file <path>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
  *              assignmentId defaults to WORKFLOW_ASSIGNMENT_ID
  *              --jobs: JSON array of job definitions: [{"jobType":"review"},{"jobType":"implement","harness":"codex"}]
  *                      Jobs in the same group run in parallel and share a groupId
+ *              --jobs-file: path to a JSON file containing the same array shape as --jobs
+ *                           (use this to escape heredoc/JSON quoting)
  *              --type: single job type (shorthand for --jobs with one entry)
  *              --after defaults to WORKFLOW_GROUP_ID, then auto-finds tail group of assignment
  *   update-assignment [id] [--status <pending|active|blocked|complete>] [--reason <str>]
@@ -53,7 +55,7 @@
 
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { HarnessDefaults, HarnessModelEntry, parseHarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
@@ -153,7 +155,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   job: [],
   queue: [],
   create: ["priority", "independent", "thread"],
-  "insert-job": ["type", "jobs", "harness", "model", "context", "after"],
+  "insert-job": ["type", "jobs", "jobs-file", "harness", "model", "context", "after"],
   "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason", "nudge", "clear-nudge", "append-northstar"],
   "delete-assignment": [],
   "start-job": [],
@@ -694,9 +696,10 @@ Commands:
 
   create <northStar> [--priority N] [--independent] [--thread <threadId>]
                                       Create assignment
-  insert-job [assignmentId] [--type <type>] [--jobs <json>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
+  insert-job [assignmentId] [--type <type>] [--jobs <json>] [--jobs-file <path>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
               assignmentId defaults to WORKFLOW_ASSIGNMENT_ID
               --jobs: JSON array [{\"jobType\":\"review\"},{\"jobType\":\"implement\",\"harness\":\"codex\"}]
+              --jobs-file: path to JSON file with the same array shape (escapes heredoc/quoting)
               --type: single job type (shorthand for --jobs with one entry)
               --after defaults to WORKFLOW_GROUP_ID, then auto-finds tail group
   update-assignment [id] [--status <pending|active|blocked|complete>] [--reason <str>]
@@ -810,14 +813,33 @@ async function main() {
         // After group ID: --after flag > env var > auto-find tail
         const afterGroupId = flags.after || process.env.WORKFLOW_GROUP_ID;
 
-        // Build jobs array - either from --jobs JSON or from --type (single job)
+        // Build jobs array - from --jobs (inline JSON), --jobs-file (path to JSON), or --type (single job)
+        const jobsFlagCount = [flags.jobs, flags["jobs-file"], flags.type].filter(Boolean).length;
+        if (jobsFlagCount === 0) {
+          error("One of --jobs (JSON array), --jobs-file (path), or --type required");
+        }
+        if (jobsFlagCount > 1) {
+          error("Use only one of --jobs, --jobs-file, or --type");
+        }
+
         let jobs: JobDefInput[];
 
-        if (flags.jobs) {
+        if (flags.jobs || flags["jobs-file"]) {
+          let raw: string;
+          let source: string;
+          if (flags["jobs-file"]) {
+            const path = flags["jobs-file"];
+            if (!existsSync(path)) error(`--jobs-file not found: ${path}`);
+            raw = readFileSync(path, "utf-8");
+            source = `--jobs-file ${path}`;
+          } else {
+            raw = flags.jobs;
+            source = "--jobs";
+          }
           try {
-            const parsed = JSON.parse(flags.jobs);
+            const parsed = JSON.parse(raw);
             if (!Array.isArray(parsed)) {
-              error("--jobs must be a JSON array");
+              error(`${source} must be a JSON array`);
             }
             jobs = parsed.map((j: any) => ({
               jobType: j.jobType,
@@ -826,17 +848,15 @@ async function main() {
               context: j.context,
             }));
           } catch (e) {
-            error(`Invalid --jobs JSON: ${e instanceof Error ? e.message : String(e)}`);
+            error(`Invalid JSON for ${source}: ${e instanceof Error ? e.message : String(e)}`);
           }
-        } else if (flags.type) {
+        } else {
           jobs = [{
             jobType: flags.type,
             harness: flags.harness as "claude" | "codex" | "gemini" | undefined,
             model: flags.model,
             context: flags.context,
           }];
-        } else {
-          error("Either --jobs (JSON array) or --type required");
         }
 
         await insertJobs(assignmentId, jobs, afterGroupId);
