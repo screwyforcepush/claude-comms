@@ -21,7 +21,7 @@ on:
         type: boolean
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '24'
   WORKING_DIR: 'packages/setup-installer'
   PACKAGE_NAME: 'claude-comms'
 
