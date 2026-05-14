@@ -18,6 +18,7 @@ import type * as jobs from "../jobs.js";
 import type * as lib_harnessDefaults from "../lib/harnessDefaults.js";
 import type * as namespaces from "../namespaces.js";
 import type * as reflections from "../reflections.js";
+import type * as reflectionsV2 from "../reflectionsV2.js";
 import type * as scheduler from "../scheduler.js";
 
 import type {
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   "lib/harnessDefaults": typeof lib_harnessDefaults;
   namespaces: typeof namespaces;
   reflections: typeof reflections;
+  reflectionsV2: typeof reflectionsV2;
   scheduler: typeof scheduler;
 }>;
 
