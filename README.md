@@ -8,9 +8,9 @@
 
 Transform one Claude into collaborative teams of specialized agents working in parallel:
 
-**Model Diversity**: Claude and Codex agents collaborate seamlessly - each checking the other's work, bringing unique strengths to the team. Architects research while engineers build, consultants review while UAT validates, all communicating in real-time through the shared message bus.
+**Model Diversity**: Claude, Codex, and Gemini jobs collaborate through the workflow engine - each checking the other's work and bringing unique strengths to the team. Architects research while engineers build, review jobs add independent model perspectives, and UAT validates outcomes.
 
-**True Parallelism**: 10+ agents working simultaneously on independent tasks, broadcasting discoveries and coordinating through team messages. Support agents provide guidance while implementation agents build.
+**True Parallelism**: 10+ agents can work simultaneously on independent tasks, posting discoveries through Convex-backed Peer-Comms and coordinating through workflow state. Support agents provide guidance while implementation agents build.
 
 Watch your legion work through the Workflow Engine UI. Feel the power.
 
@@ -30,7 +30,7 @@ Context-engineered for extended battles without bankruptcy:
 Claude will sort you and and tell you what to do next.
 
 ### Level Up
-1. **Model Diversity**: Install [Codex CLI](https://github.com/openai/codex) and [Gemini CLI](https://github.com/google-gemini/gemini-cli) for multi-model orchestration. The system can spawn Codex and Gemini consultants alongside Claude agents—different models checking each other's work, diverse perspectives on research tasks. See [Consultant Paradigm Guide](docs/project/guides/consultant-paradigm-guide.md).
+1. **Model Diversity**: Install [Codex CLI](https://github.com/openai/codex) and [Gemini CLI](https://github.com/google-gemini/gemini-cli) for multi-model orchestration. The workflow engine can run Claude, Codex, and Gemini directly through per-job harness selection and namespace-level model defaults; see [Harness Model Config Spec](docs/project/spec/harness-model-config-spec.md).
 
 2. Visual Feedback Loop - Add the feedback widget to your app for human-in-the-loop UI refinement:
 - `/install-feedback-widget` - Installs annotated feedback widget in your project
@@ -52,7 +52,7 @@ My man Deckard Cain will teach you everything I know.
   │                          Workflow Engine                         │
   │  ┌───────────┐  ┌──────┐                                       │
   │  │ Convex DB │  │  UI  │                                       │
-  │  │ cloud/local│  │:3500 │                                       │
+  │  │ cloud/local│  │:3000 │                                       │
   │  │ jobs,chat │  │manage│                                       │
   │  └─────┬─────┘  └──┬───┘                                       │
   │        │  Convex    │                                           │
@@ -77,8 +77,6 @@ My man Deckard Cain will teach you everything I know.
 **Tech Stack**: Convex, React, TypeScript, Node.js
 
 See [System Diagram](docs/project/guides/system-diagram.md) for the full architecture reference.
-
-![Agent Data Flow Animation](images/AgentDataFlowV2.gif)
 
 ## 📦 Core Components
 
@@ -143,16 +141,18 @@ npx tsx cli.ts chat-send <threadId> "message"      # Send chat message
 
 ## 📚 Documentation Hub
 
-### Getting Started
-
 ### Technical Reference
+- [Project Mental Model](docs/project/spec/mental-model.md) - Why-layer authority for system intent
 - [Workflow Engine Spec](docs/project/spec/workflow-engine-spec.md) - Job queue specification
+- [Workflow Engine UI Spec](docs/project/spec/workflow-engine-ui-spec.md) - Current UI surface and interaction model
 - [Guardian Mode Spec](docs/project/spec/guardian-mode-spec.md) - PO alignment monitoring
+- [Harness Model Config Spec](docs/project/spec/harness-model-config-spec.md) - Harness and model defaults
+- [Reflection Feedback Spec](docs/project/spec/reflection-feedback-spec.md) - Agent reflection telemetry
+- [Password Wall](docs/project/spec/password-wall.md) - Single-user UI and backend protection
+- [Convex Bandwidth Optimization](docs/project/spec/convex-bandwidth-optimization.md) - Subscription efficiency model
 - [System Diagram](docs/project/guides/system-diagram.md) - Architecture overview
 
 ### Multi-Agent Development
-- [Orchestration Guide](docs/project/guides/orchestration-guide.md) - Multi-agent coordination patterns
-- [Consultant Paradigm Guide](docs/project/guides/consultant-paradigm-guide.md) - Codex & Gemini model diversity
 - [Parallel Job Groups](docs/project/guides/parallel-job-groups-architecture.md) - Group-based parallel execution
 
 ## 🔌 API Quick Reference
@@ -178,11 +178,15 @@ chatJobs.trigger          # Trigger PO agent response
 ### Peer-Comms CLI
 ```bash
 # Send message between agents
-node .agents/tools/workflow/agent-comms.mjs post --message "discovery" --namespace my-project
+node .agents/tools/workflow/agent-comms.mjs post "discovery"
+node .agents/tools/workflow/agent-comms.mjs --group <groupId> --name agent-a post --sync "Posted and catching up"
 
 # Sync messages
-node .agents/tools/workflow/agent-comms.mjs sync --namespace my-project
+node .agents/tools/workflow/agent-comms.mjs sync
+node .agents/tools/workflow/agent-comms.mjs --group <groupId> --name agent-a --json sync --after <position> --limit <n>
 ```
+
+Peer-Comms defaults to `AGENT_COMMS_GROUP` or `WORKFLOW_GROUP_ID` for the group. Pass `--name` for each subagent; `post` publishes unless `--sync` is provided, while `sync` advances the local cursor.
 
 ## 🧪 Testing & Validation
 
@@ -200,7 +204,7 @@ cd .agents/tools/workflow && npx tsx cli.ts queue
 - **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** - Optional, for multi-model job execution
 
 ### Server Ports
-- **Workflow Engine UI**: `localhost:3500` (Chat, assignments, job monitoring)
+- **Workflow Engine UI**: `localhost:3000` (Chat, assignments, job monitoring)
 - **Workflow Engine Backend**: Convex (cloud-hosted or `npx convex dev` for local)
 
 ## 📊 Key Features

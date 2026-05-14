@@ -1,10 +1,12 @@
 # Consultant Paradigm Guide
 
+> **Superseded.** The workflow engine now handles multi-harness execution directly — jobs specify `harness: codex|gemini|claude` and the runner daemon spawns the appropriate CLI (see [System Diagram](system-diagram.md)). The standalone consultant proxy agents and `consultant_template.txt` were removed in the CC2 retirement (commit `9adb2929`). The `agent_job.py` adapter still exists for ad-hoc CLI harness spawning outside the workflow engine, but the `--consultant` template injection no longer functions (template file deleted). This guide is preserved for historical context on the proxy pattern.
+
 ## Overview
 
-The Consultant Paradigm brings **model diversity** to the multi-agent orchestration system. By wrapping OpenAI's Codex CLI and Google's Gemini CLI as "consultant" subagents, the system gains diverse perspectives without the Primary Orchestrator needing to know the underlying implementation.
+The Consultant Paradigm brought **model diversity** to the multi-agent orchestration system. By wrapping OpenAI's Codex CLI and Google's Gemini CLI as "consultant" subagents, the system gained diverse perspectives without the Primary Orchestrator needing to know the underlying implementation.
 
-This is a key application of the **Progressive Disclosure** principle: the orchestrator simply tasks a "consultant" and receives a response—completely unaware that the work was executed by Codex or Gemini rather than Claude.
+This was a key application of the **Progressive Disclosure** principle: the orchestrator simply tasked a "consultant" and received a response—completely unaware that the work was executed by Codex or Gemini rather than Claude.
 
 ## Architecture
 
@@ -26,12 +28,12 @@ Primary ⚙️Orchestrator
 
 ### Component Breakdown
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Codex Consultant | `.claude/agents/core/consultants/codex.md` | Claude proxy that spawns Codex jobs |
-| Gemini Consultant | `.claude/agents/core/consultants/gemini.md` | Claude proxy that spawns Gemini jobs |
-| Agent Job Adapter | `.agents/tools/agent-job/agent_job.py` | File-backed job manager for CLI harnesses |
-| Consultant Template | `.agents/tools/agent-job/consultant_template.txt` | WORKFLOW + TEAMWORK injection |
+| Component | Location | Status |
+|-----------|----------|--------|
+| Codex Consultant | `.claude/agents/core/consultants/codex.md` | **Removed** — proxy pattern superseded by workflow engine harness executor |
+| Gemini Consultant | `.claude/agents/core/consultants/gemini.md` | **Removed** — same |
+| Agent Job Adapter | `.agents/tools/agent-job/agent_job.py` | Active — still usable for ad-hoc CLI harness spawning |
+| Consultant Template | `.agents/tools/agent-job/consultant_template.txt` | **Removed** in CC2 retirement (commit `9adb2929`) |
 
 ## How It Works
 
@@ -62,9 +64,11 @@ uv run .agents/tools/agent-job/agent_job.py status <job_id>
 uv run .agents/tools/agent-job/agent_job.py list
 ```
 
-The `--consultant` flag appends the `consultant_template.txt` which injects:
+The `--consultant` flag previously appended the `consultant_template.txt` which injected:
 - **WORKFLOW**: The AOP procedures (CALIBRATE → IMPLEMENT/ASSESS → VALIDATE)
 - **TEAMWORK**: Inter-agent communication protocols (Broadcast/Inbox Check)
+
+> The template file was removed in the CC2 retirement. The `--consultant` flag still exists in `agent_job.py` but will fail at runtime. Workflow engine jobs now receive their prompts via the template system in `.agents/tools/workflow/templates/`.
 
 ### 3. Background Execution
 

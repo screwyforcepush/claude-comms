@@ -1,7 +1,7 @@
 # Workflow Engine — System Diagram
 
 > ASCII architecture diagram of the claude-comms workflow engine.
-> For detailed specs see `workflow-engine-spec.md`, `parallel-job-groups-architecture.md`, and `orchestration-guide.md`.
+> For detailed specs see [Workflow Engine Spec](../spec/workflow-engine-spec.md) and [Parallel Job Groups Architecture](parallel-job-groups-architecture.md).
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════╗
