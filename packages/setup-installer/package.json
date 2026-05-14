@@ -1,7 +1,7 @@
 {
   "name": "claude-comms",
   "version": "1.0.46",
-  "description": "NPX installer for Claude Code hooks and observability setup",
+  "description": "NPX installer for Claude Code workflow engine client setup",
   "main": "src/index.js",
   "bin": {
     "claude-comms": "bin/claude-setup.js"
@@ -26,13 +26,12 @@
   },
   "keywords": [
     "claude-code",
-    "hooks",
-    "observability",
     "npx",
     "installer",
-    "multi-agent"
+    "workflow-engine",
+    "convex"
   ],
-  "author": "Claude Code Team",
+  "author": "Alex Savage (https://github.com/screwyforcepush)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -77,10 +76,7 @@
     "src/",
     "templates/",
     "README.md",
-    "CHANGELOG.md",
-    ".claude/",
-    ".agents/",
-    "CLAUDE.md"
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"

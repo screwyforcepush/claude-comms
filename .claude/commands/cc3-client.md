@@ -6,15 +6,12 @@ Set up and start the workflow runner client in this project repo.
 
 # What is the client?
 
-This project repo is a **client** in the multi-agent orchestration system. The servers (CC2 + CC3) run elsewhere as a single shared instance. This client:
+This project repo is a **client** in the workflow engine. The Convex workflow engine runs elsewhere as a single shared instance. This client:
 
 ```
-  Servers (shared, already running)          This Project (client)
+  Server (shared, already running)           This Project (client)
   ┌────────────────────────────────┐         ┌──────────────────────────────┐
-  │ CC2: localhost:4000            │◄────────│ .claude/hooks (Python)       │
-  │   SQLite events, agent comms   │  events │   hook events, agent comms   │
-  │                                │         │                              │
-  │ CC3: Convex (cloud or local)   │◄────────│ .agents/tools/workflow/      │
+  │ Convex (cloud or local)        │◄────────│ .agents/tools/workflow/      │
   │   jobs, assignments, chat      │  poll   │   runner.ts (daemon)         │
   └────────────────────────────────┘  +write │   - polls for ready jobs     │
                                              │   - spawns claude/codex/     │
@@ -122,8 +119,6 @@ Check if `.agents/tools/workflow/config.json` exists. If not, create it from the
 - `namespace`: Identifies this project in the workflow engine. Suggest the current directory name. Must match what they'll use in the Workflow Engine UI.
 - `password`: The `ADMIN_PASSWORD` set on the Convex server. All Convex calls require this. Must match exactly.
 
-update `.claude/settings.json` with the same namespace replace "claude-comms" in the sections `--source-app claude-comms`
-
 
 ## Step 3: Start the runner
 
@@ -152,12 +147,11 @@ This creates the namespace in the Convex database if it doesn't already exist:
 cd .agents/tools/workflow && npx tsx init.ts
 ```
 
-## Step 5: Tell the user they're ready
+## Step 4: Tell the user they're ready
 
 The client is now running and listening for jobs in the `<namespace>` namespace.
 
 **How to use it:**
 - Open the **Workflow Engine UI** (where the servers are running) to create threads, chat with the PO, and kick off work
 - Monitor agent execution with the TUI: `uv run .agents/tools/agent-job/agent_monitor.py`
-- Watch real-time observability at the **CC2 Dashboard** (http://localhost:5173)
 - Check runner logs: `tail -f /tmp/runner.log`

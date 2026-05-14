@@ -5,6 +5,25 @@ All notable changes to the `@claude-code/setup-installer` package will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-05-14
+
+### BREAKING CHANGE
+
+CC2 (hooks, observability server, Vue dashboard) has been retired. `npx claude-comms` now installs **only** the workflow engine client tooling (`.agents/` directory with runner, templates, and CLI).
+
+#### Removed
+- `.claude/hooks/` — Python hook scripts for CC2 event capture and inter-agent messaging (replaced by `.agents/tools/workflow/agent-comms.mjs`)
+- `.claude/settings.json` — CC2 hook wiring configuration
+- CC2 server (`apps/server/`) and dashboard (`apps/client/`) are no longer part of the system
+
+#### What clients get now
+- `.agents/` — workflow engine client: runner daemon, prompt templates, CLI tools, peer-comms
+- `CLAUDE.md` — agent operating instructions
+
+Clients that depend on CC2 hooks or the observability server should pin to `claude-comms@1.x`.
+
+---
+
 ## [1.0.4] - 2025-01-15
 
 ### 🚨 EMERGENCY FIX

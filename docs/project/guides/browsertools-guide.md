@@ -651,9 +651,3 @@ The Browser Automation Toolkit provides a **62% token efficiency improvement** o
 - ❌ Visual regression testing (needs additional tooling)
 - ❌ Windows environments (Unix socket dependency)
 
----
-
-**Related Documentation:**
-- Architecture Guide: `architecture-guide.md`
-- Development Guide: `development-guide.md`
-- Integration Guide: `integration-guide.md`

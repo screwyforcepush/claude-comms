@@ -1,4 +1,4 @@
-# 🧙‍♂️ Multi-Agent Orchestration for Claude Code
+# Multi-Agent Orchestration for Claude Code
 
 > *"Stay awhile and listen... Transform one Claude into an infinite swarm."*
 
@@ -12,12 +12,12 @@ Transform one Claude into collaborative teams of specialized agents working in p
 
 **True Parallelism**: 10+ agents working simultaneously on independent tasks, broadcasting discoveries and coordinating through team messages. Support agents provide guidance while implementation agents build.
 
-Watch your legion work through the real-time dashboard. Feel the power.
+Watch your legion work through the Workflow Engine UI. Feel the power.
 
 ## Token Efficiency Mastery
 
 Context-engineered for extended battles without bankruptcy:
-- Minimal context per agent (they share memory through SQLite)
+- Minimal context per agent (they share state through Convex)
 - File references, not contents (massive token savings)
 - Agentic harness engineering reduced token burn by 45% (A/B tested methodology)
 - **From the Maker**: I rarely hit my claude usage cap, even with 3-5 concurrent sessions running all day.
@@ -46,46 +46,43 @@ My man Deckard Cain will teach you everything I know.
 
 ## 🏗️ Architecture Overview
 
-The system has two layers that work together:
-
 ```
-                        SERVERS (one instance, this repo)
+                        SERVER (one instance, this repo)
   ┌─────────────────────────────────────────────────────────────────┐
-  │                                                                 │
-  │  CC2: Subagent Comms & Observability        CC3: Workflow Engine│
-  │  ┌───────────────┐  ┌──────────────┐   ┌───────────┐  ┌──────┐│
-  │  │ Bun Server    │  │ Vue Dashboard│   │ Convex DB │  │  UI  ││
-  │  │ :4000 (SQLite)│  │ :5173        │   │ cloud/local│  │:3500 ││
-  │  │ events, comms │  │ read-only    │   │ jobs,chat │  │manage││
-  │  └───────┬───────┘  └──────┬───────┘   └─────┬─────┘  └──┬───┘│
-  │          │  WebSocket      │                  │  Convex    │    │
-  └──────────┼─────────────────┼──────────────────┼────────────┼────┘
-             │                 │                  │            │
-  ┌──────────┼─────────────────┼──────────────────┼────────────┼────┐
-  │          ▼                 ▼                  ▼            ▼    │
-  │  CLIENTS (one per project repo)                                 │
-  │  ┌────────────────────────────────────┐  ┌─────────────────┐   │
-  │  │ .claude/hooks (Python)             │  │ runner.ts        │   │
-  │  │ - sends events to CC2 server :4000 │  │ - subscribes to  │   │
-  │  │ - inter-agent messaging            │  │   Convex backend │   │
-  │  │ - subagent registration            │  │ - spawns agents  │   │
-  │  └────────────────────────────────────┘  │ - reports results│   │
-  │                                          └─────────────────┘   │
+  │                          Workflow Engine                         │
+  │  ┌───────────┐  ┌──────┐                                       │
+  │  │ Convex DB │  │  UI  │                                       │
+  │  │ cloud/local│  │:3500 │                                       │
+  │  │ jobs,chat │  │manage│                                       │
+  │  └─────┬─────┘  └──┬───┘                                       │
+  │        │  Convex    │                                           │
+  └────────┼────────────┼───────────────────────────────────────────┘
+           │            │
+  ┌────────┼────────────┼───────────────────────────────────────────┐
+  │        ▼            ▼                                           │
+  │  CLIENTS (one per project repo, installed via npx claude-comms) │
+  │  ┌─────────────────┐                                           │
+  │  │ runner.ts        │                                           │
+  │  │ - subscribes to  │                                           │
+  │  │   Convex backend │                                           │
+  │  │ - spawns agents  │                                           │
+  │  │ - reports results│                                           │
+  │  └─────────────────┘                                           │
   │  Each project repo has its own client instance                  │
   └─────────────────────────────────────────────────────────────────┘
 ```
 
-**CC2 (Subagent Comms & Observability):** SQLite-backed Bun server + Vue dashboard. Captures all hook events (tool use, prompts, notifications), inter-agent messages, and subagent lifecycle. The dashboard at `:5173` is a read-only observability view. Subagents communicate via Python hook scripts.
+**Workflow Engine:** Convex-powered orchestration that manages assignments (work objectives), job groups (parallel execution batches), and jobs (individual agent tasks). A chat-based UI lets users interact with a Product Owner agent, create work, and monitor execution. The runner daemon (client-side) subscribes to Convex for ready jobs and spawns Claude/Codex/Gemini sessions.
 
-**CC3 (Workflow Engine):** Convex-powered orchestration layer on top of CC2. Manages assignments (work objectives), job groups (parallel execution batches), and jobs (individual agent tasks). A chat-based UI lets users interact with a Product Owner agent, create work, and monitor execution. The runner daemon (client-side) subscribes to Convex for ready jobs and spawns Claude/Codex/Gemini sessions.
+**Tech Stack**: Convex, React, TypeScript, Node.js
 
-**Tech Stack**: Bun, Convex, React, Vue 3, TypeScript, SQLite, WebSocket, Python hooks
+See [System Diagram](docs/project/guides/system-diagram.md) for the full architecture reference.
 
 ![Agent Data Flow Animation](images/AgentDataFlowV2.gif)
 
 ## 📦 Core Components
 
-### CC3: Workflow Engine
+### Workflow Engine
 
 #### Chat Interface & Modes
 The primary user interface is a chat-based system with three modes:
@@ -131,73 +128,36 @@ npx tsx cli.ts queue                               # Show queue status
 npx tsx cli.ts chat-send <threadId> "message"      # Send chat message
 ```
 
-### CC2: Observability & Subagent Comms
-
-#### Observability System
-- **Hook Events**: Pre/Post tool use, notifications, user prompts
-- **Real-time Capture**: SQLite storage with WebSocket broadcasting
-- **Timeline View**: Visual event stream with filtering and search
-
-#### Multi-Agent Communication
-- **Agent Registry**: Automatic discovery and session tracking
-- **Message Queue**: Inter-agent messaging with read receipts
-- **Dashboard Views**: Live communication monitoring
-
 ### Integration
-- **Copy `.claude` directory** to any project for CC2 observability
-- **Copy `.agents` directory** for CC3 workflow engine client
-- **Or run `npx claude-comms`** in the target project to install both
-- **Start monitoring** - no code changes required
+- **Copy `.agents` directory** to any project for workflow engine client
+- **Or run `npx claude-comms`** in the target project to install the client tooling
+- **Start the runner** - `/cc3-client` guides you through configuration
 
 ## 🛠️ Quick Commands
 
 | Command | Description |
 |---------|-------------|
-| `/cc3-server` | Setup and start both CC2 + CC3 servers (guided) |
+| `/cc3-server` | Setup and start the workflow engine server (guided) |
 | `/cc3-client` | Setup and start the workflow runner in a project |
-| `./scripts/start-system.sh` | Launch CC2 server and dashboard |
-| `./scripts/reset-system.sh` | Clean shutdown and reset |
-| `./scripts/test-system.sh` | System validation |
+| `/cc3-client-update` | Update client with latest upstream changes |
 
 ## 📚 Documentation Hub
 
 ### Getting Started
-- [Setup Guide](docs/project/guides/setup-guide.md) - Installation and quick start
-- [Integration Guide](docs/project/guides/integration-guide.md) - Adding to your projects
 
 ### Technical Reference
-- [Architecture Guide](docs/project/guides/architecture-guide.md) - System design and components
-- [Workflow Engine Spec](workflow-engine/SPEC.md) - CC3 job queue specification
+- [Workflow Engine Spec](docs/project/spec/workflow-engine-spec.md) - Job queue specification
 - [Guardian Mode Spec](docs/project/spec/guardian-mode-spec.md) - PO alignment monitoring
-- [API Reference](docs/project/guides/api-reference.md) - Complete endpoint documentation
-- [Design System Guide](docs/project/guides/design-system-guide.md) - UI components and patterns
+- [System Diagram](docs/project/guides/system-diagram.md) - Architecture overview
 
 ### Multi-Agent Development
 - [Orchestration Guide](docs/project/guides/orchestration-guide.md) - Multi-agent coordination patterns
 - [Consultant Paradigm Guide](docs/project/guides/consultant-paradigm-guide.md) - Codex & Gemini model diversity
 - [Parallel Job Groups](docs/project/guides/parallel-job-groups-architecture.md) - Group-based parallel execution
-- [Development Guide](docs/project/guides/development-guide.md) - Contributing and local setup
-- [Troubleshooting Guide](docs/project/guides/troubleshooting-guide.md) - Common issues and solutions
-
-### Archive
-- [Legacy Documentation](docs/project/guides-archive/) - Archived guides and historical documentation
 
 ## 🔌 API Quick Reference
 
-### CC2 Endpoints (Bun Server :4000)
-```bash
-# Observability
-POST /events              # Submit hook events
-GET  /events/recent       # Retrieve event timeline
-WS   /stream              # Real-time event stream
-
-# Multi-Agent Communication
-POST /subagents/register  # Register new agent
-POST /subagents/message   # Send inter-agent message
-POST /subagents/unread    # Get unread messages
-```
-
-### CC3 Convex Functions (Workflow Engine)
+### Convex Functions (Workflow Engine)
 ```bash
 # Assignments
 assignments.create        # Create work objective
@@ -215,32 +175,19 @@ chatMessages.add          # Add message to thread
 chatJobs.trigger          # Trigger PO agent response
 ```
 
-### Hook Commands
+### Peer-Comms CLI
 ```bash
 # Send message between agents
-uv run .claude/hooks/comms/send_message.py --sender "AgentName" --message "Hello"
+node .agents/tools/workflow/agent-comms.mjs post --message "discovery" --namespace my-project
 
-# Check for unread messages
-uv run .claude/hooks/comms/get_unread_messages.py --name "AgentName"
+# Sync messages
+node .agents/tools/workflow/agent-comms.mjs sync --namespace my-project
 ```
-
-[Full API Reference →](docs/project/guides/api-reference.md)
 
 ## 🧪 Testing & Validation
 
 ```bash
-# System validation
-./scripts/test-system.sh
-
-# CC2 manual event test
-curl -X POST http://localhost:4000/events \
-  -H "Content-Type: application/json" \
-  -d '{"source_app": "test", "session_id": "test-123", "hook_event_type": "PreToolUse"}'
-
-# CC2 multi-agent communication test
-python3 .claude/hooks/comms/send_message.py --sender "Agent-Alpha" --message "Test message"
-
-# CC3 workflow CLI
+# Workflow CLI
 cd .agents/tools/workflow && npx tsx cli.ts queue
 ```
 
@@ -248,17 +195,13 @@ cd .agents/tools/workflow && npx tsx cli.ts queue
 
 ### Prerequisites
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** - Anthropic's official CLI (required)
-- **[Astral uv](https://docs.astral.sh/uv/)** - Python package manager for hooks
-- **[Bun](https://bun.sh/)** - JavaScript runtime for CC2 server
-- **[Convex](https://www.convex.dev/)** - Backend for CC3 workflow engine (cloud or local)
+- **[Convex](https://www.convex.dev/)** - Backend for workflow engine (cloud or local)
 - **[Codex CLI](https://github.com/openai/codex)** - Optional, for multi-model job execution
 - **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** - Optional, for multi-model job execution
 
 ### Server Ports
-- **CC2 Server**: `localhost:4000` (Bun HTTP/WebSocket - events & agent comms)
-- **CC2 Dashboard**: `localhost:5173` (Vue dev server - observability)
-- **CC3 UI**: `localhost:3500` (Workflow Engine - chat, assignments, job monitoring)
-- **CC3 Backend**: Convex (cloud-hosted or `npx convex dev` for local)
+- **Workflow Engine UI**: `localhost:3500` (Chat, assignments, job monitoring)
+- **Workflow Engine Backend**: Convex (cloud-hosted or `npx convex dev` for local)
 
 ## 📊 Key Features
 
@@ -280,30 +223,23 @@ cd .agents/tools/workflow && npx tsx cli.ts queue
 - **File References Over Contents**: Massive token savings through intelligent reference passing
 - **Strategic Research Offloading**: Perplexity MCP integration extends Claude budget by ~20%
 
-### 🧠 Zero-Code Integration
-- **Copy `.claude` + `.agents` Directories**: Instant observability + workflow for any project
-- **Hook-Based Architecture**: No code modifications required
-- **Automatic Agent Discovery**: Self-registering agents with session tracking
+### 🔧 Easy Integration
+- **Copy `.agents` Directory**: Instant workflow engine client for any project
 - **Per-Project Namespaces**: Each repo gets its own namespace in the shared backend
+- **`npx claude-comms`**: One-command client installation
 
-### 🔍 Complete Observability
-| Event Type | Capture Point | Power Unlock |
-|------------|---------------|--------------|
-| **PreToolUse** | Before execution | Block dangerous operations, validate inputs |
-| **PostToolUse** | After completion | Track results, measure performance |
-| **UserPromptSubmit** | Prompt entry | Session analysis, requirement capture |
-| **Notification** | User interactions | UX monitoring, workflow insights |
-| **SubagentStop** | Agent completion | Orchestration state, handoff timing |
+### 🔍 Job-Level Observability
+The workflow engine tracks job lifecycle, tool call counts, token usage, duration, and agent reflections. Job results, PM decisions, and alignment status are surfaced through the Workflow Engine UI. See [Reflection Feedback Spec](docs/project/spec/reflection-feedback-spec.md) for the agent reflection telemetry system.
 
-### 🎯 Advanced Communication Bus
-- **Inter-Agent Messaging**: Agents broadcast discoveries, ask questions, coordinate work
-- **Message Queue with Receipts**: Guaranteed delivery with read tracking
-- **Shared Knowledge Base**: SQLite-backed memory accessible to entire swarm
-- **Real-Time Routing**: WebSocket-based instant message delivery
+### 🎯 Peer-to-Peer Agent Comms
+- **Convex-Backed Messaging**: Agents communicate through `.agents/tools/workflow/agent-comms.mjs`
+- **Cursor-Tracked Reads**: Each agent tracks its own read position -- no message loss
+- **Namespace-Aware**: Messages scoped per project namespace
 
-### 📺 Dual Dashboard System
-- **CC3 Workflow UI**: Chat interface, assignment management, job chain visualization with Quake-inspired AgentHUD cards, real-time job metrics (tool calls, tokens, duration)
-- **CC2 Observability Dashboard**: Live event timeline, session visualization, agent communications, advanced filtering and search
+### 📺 Workflow Engine UI
+- **Chat Interface**: Jam, Cook, and Guardian modes for PO interaction
+- **Assignment Management**: Create, prioritize, and monitor work objectives
+- **Job Chain Visualization**: Quake-inspired AgentHUD cards with real-time metrics (tool calls, tokens, duration)
 
 ## 📄 License
 
@@ -314,7 +250,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **Anthropic Claude Code Team** - For the fantastic hooks system
 - **[Convex](https://www.convex.dev/)** - Real-time backend powering the workflow engine
 - **Contributors** - Community feedback and improvements
-- **Open Source Dependencies** - Vue, Bun, React, and ecosystem tools
+- **Open Source Dependencies** - React, Convex, and ecosystem tools
 
 ---
 

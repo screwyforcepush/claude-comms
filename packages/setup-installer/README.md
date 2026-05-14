@@ -1,43 +1,42 @@
-# @claude-code/setup-installer
+# claude-comms
 
-NPX-installable package to set up Claude multi-agent orchestration in any project.
+NPX installer for Claude Code workflow engine client setup.
 
 ## Installation & Usage
 
 ### Quick Start
 ```bash
-npx @claude-code/setup-installer
+npx claude-comms
 ```
 
 ### Options
 ```bash
 # Install to specific directory
-npx @claude-code/setup-installer --dir ./my-project
+npx claude-comms --dir ./my-project
 
 # Install specific version
-npx @claude-code/setup-installer --version v1.2.0
+npx claude-comms --version v1.2.0
 
 # Force overwrite existing files
-npx @claude-code/setup-installer --force
+npx claude-comms --force
 
 # Skip Python/uv dependency check
-npx @claude-code/setup-installer --no-python-check
+npx claude-comms --no-python-check
 
 # Development mode with verbose logging
-npx @claude-code/setup-installer --dev
+npx claude-comms --dev
 
 # Verify mode (no changes)
-npx @claude-code/setup-installer --verify
+npx claude-comms --verify
 
 # Dry run (show what would be done)
-npx @claude-code/setup-installer --dry-run
+npx claude-comms --dry-run
 ```
 
 ## What Gets Installed
 
-- `.claude/` directory with hooks, agents, and configuration
-- `CLAUDE.md` project instructions file
-- `settings.local.json` template for local configuration
+- `.agents/` directory with workflow runner, prompt templates, and CLI tools
+- `CLAUDE.md` agent operating instructions
 
 ## Development
 

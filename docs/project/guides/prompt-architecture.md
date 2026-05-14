@@ -7,8 +7,8 @@ This document describes how prompts are constructed and selected within the work
 - Each job type maps to a template file with placeholders.
 - A shared **Context Primer** appears near the top of each job template to ensure alignment with:
   - `docs/project/spec/mental-model.md` (the user's conceptual model)
-  - `docs/project/guides/architecture-guide.md`
-  - `docs/project/guides/design-system-guide.md`
+  - `docs/project/guides/system-diagram.md`
+  - `docs/project/spec/workflow-engine-spec.md`
   - Other relevant guides (when applicable)
 
 ## Job Types → Templates

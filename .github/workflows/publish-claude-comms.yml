@@ -174,8 +174,6 @@ jobs:
       - name: Publish to npm
         id: publish_step
         if: steps.dry_run_check.outputs.is_dry_run == 'false'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd ${{ env.WORKING_DIR }}
           echo "Publishing ${{ env.PACKAGE_NAME }}@${{ steps.version_info.outputs.version }}"
@@ -249,5 +247,5 @@ jobs:
           echo "  - Test failures"
           echo "  - Linting errors"  
           echo "  - Security audit issues"
-          echo "  - NPM_TOKEN not configured"
+          echo "  - OIDC trusted-publisher not configured or repo not authorized"
           echo "  - Version already exists on registry"

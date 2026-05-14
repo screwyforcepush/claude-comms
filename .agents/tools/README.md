@@ -10,7 +10,7 @@ Chrome DevTools MCP wrapper for browser automation and UAT.
 **Quick start:**
 ```bash
 uv run .agents/tools/chrome-devtools/browsertools.py daemon start
-uv run .agents/tools/chrome-devtools/browsertools.py nav http://localhost:5173/
+uv run .agents/tools/chrome-devtools/browsertools.py nav http://localhost:3500/
 uv run .agents/tools/chrome-devtools/browsertools.py snap
 uv run .agents/tools/chrome-devtools/browsertools.py daemon stop
 ```

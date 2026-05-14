@@ -10,7 +10,7 @@ uv run .agents/tools/chrome-devtools/browsertools.py daemon start &
 sleep 5
 
 # Use commands - state persists across invocations!
-uv run .agents/tools/chrome-devtools/browsertools.py nav http://localhost:5173/
+uv run .agents/tools/chrome-devtools/browsertools.py nav http://localhost:3500/
 uv run .agents/tools/chrome-devtools/browsertools.py snap
 uv run .agents/tools/chrome-devtools/browsertools.py click 1_7
 uv run .agents/tools/chrome-devtools/browsertools.py snap

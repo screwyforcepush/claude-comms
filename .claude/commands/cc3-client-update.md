@@ -30,15 +30,7 @@ npx claude-comms
 
 This pulls the latest client files from upstream.
 
-## Step 3: Restore settings
-
-The previous step overrides `.claude/settings.json` with defaults. Restore the project's version:
-
-```bash
-git restore .claude/settings.json
-```
-
-## Step 4: Sync Codex custom agents
+## Step 3: Sync Codex custom agents
 
 Regenerate Codex custom agent TOML files from Claude agent definitions:
 
@@ -46,7 +38,7 @@ Regenerate Codex custom agent TOML files from Claude agent definitions:
 node .agents/tools/workflow/sync-codex-agents.mjs
 ```
 
-## Step 5: Update global CLI tools
+## Step 4: Update global CLI tools
 
 ```bash
 sudo npm install -g @google/gemini-cli@latest
@@ -54,7 +46,7 @@ sudo npm install -g @openai/codex
 sudo npm install -g @anthropic-ai/claude-code
 ```
 
-## Step 6: Restart the runner
+## Step 5: Restart the runner
 
 ```bash
 nohup bash .agents/tools/workflow/run-runner.sh > /dev/null 2>&1 &

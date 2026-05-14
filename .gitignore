@@ -197,14 +197,6 @@ temp/
 *.db-shm
 *.db-wal
 
-# Server database files
-apps/server/events.db
-apps/server/events.db-shm
-apps/server/events.db-wal
-apps/server/observability.db
-apps/server/observability.db-shm
-apps/server/observability.db-wal
-
 # Logs (but preserve logs directory structure)
 logs/*
 !logs/.gitkeep
