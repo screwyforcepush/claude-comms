@@ -1,15 +1,16 @@
 # CC2 Retirement — As-Shipped Record
 
-**Commit:** `549077db` (on `main`, not yet pushed)
+**Commits:** `9d14edb9` (retirement) + `3aabddc5` (as-shipped record + publish runbook) + `e6d0f2e2` (as-shipped polish-2 sync) — all three on `main`, not yet pushed, all carry `[skip ci]` in body
 **Date:** 2026-05-14
 **Author:** Alex Savage + Claude Opus 4.6
 **Companion to:** `docs/project/spec/cc2-retirement-survey.md` (the decision receipt — untouched)
+**Supersedes:** earlier commit ids `549077db` and `d540342c` referenced in prior review passes — those were amended into the final pair above
 
 ---
 
 ## What shipped
 
-261 files changed: 250 deleted, 11 modified. Net delta: −78,080 / +133 lines.
+264 files changed. Net delta: −78,097 / +148 lines.
 
 The commit removes the entire CC2 surface (SQLite-backed Bun event hub, Vue 3 observability dashboard, Python hook scripts, and all supporting infrastructure) and repositions the project as a single-system Convex workflow engine. The `claude-comms` npm package is primed for a v2.0.0 publish via GitHub Actions `workflow_dispatch`.
 
@@ -29,6 +30,7 @@ The commit removes the entire CC2 surface (SQLite-backed Bun event hub, Vue 3 ob
 | `package.json` version left at 1.0.46 | DONE | Workflow's `npm version major` bumps to 2.0.0 at publish time |
 | `package.json` files array trimmed | DONE | `["bin/","src/","templates/","README.md","CHANGELOG.md"]` |
 | CHANGELOG `[2.0.0]` entry | DONE | Prepended at line 8; frames the breaking change — CC2 hooks/server/dashboard no longer installed |
+| `README.md` fully refreshed | DONE | `@claude-code/setup-installer` → `claude-comms` in all 8 occurrences; description refreshed; "What Gets Installed" section updated to list `.agents/` + `CLAUDE.md` only (removed `settings.local.json` line). Resolved prior Review-B Med-1 finding — the package README now matches the post-CC2 product identity and ships accurate content in the v2.0.0 npm tarball. Polish-3 also fixed CHANGELOG.md:3 preamble (`@claude-code/setup-installer` → `claude-comms`) — 9th occurrence of the old package name across installer docs. |
 
 ### AC.B — `.agents/` tweaks
 
@@ -52,7 +54,8 @@ The commit removes the entire CC2 surface (SQLite-backed Bun event hub, Vue 3 ob
 |---|---|---|
 | Single-system architecture diagram | DONE | CC2/CC3 framing removed |
 | CC2 Endpoints, Hook Commands, Quick Commands CC2 rows, Testing CC2 lines, Server Ports CC2 entries, broken links, 5 CC2 doc links, Bun prerequisite — all removed | DONE | `M README.md` |
-| Link at line 150 points to `docs/project/spec/workflow-engine-spec.md` | DONE | Fixed in polish pass |
+| Link at line 150 points to `docs/project/spec/workflow-engine-spec.md` | DONE | Fixed in polish pass 1 |
+| Broken `setup-guide.md` link at line 147 removed | DONE | Link was freshly introduced by the README rewrite and pointed to a nonexistent file. Removed in polish pass 2. **Cosmetic side-effect:** `README.md:146` now has an empty `### Getting Started` heading (the link was its only child). Left as-is — placeholder for a future setup doc, or can be deleted before push. |
 
 ### AC.E — Incidental refreshes
 
@@ -86,6 +89,7 @@ The commit removes the entire CC2 surface (SQLite-backed Bun event hub, Vue 3 ob
 |---|---|---|
 | `id-token: write` permission | DONE | Already present at line 36 |
 | `NODE_AUTH_TOKEN` env var removed from Publish step | DONE | Publish step (line 174) is bare `npm publish --access public` with no `env:` block |
+| Failure-panel text updated | DONE | Line 250: `NPM_TOKEN not configured` → `OIDC trusted-publisher not configured or repo not authorized`. Aligns messaging with the OIDC auth path. Resolved prior Review-A/B Low convergence finding. |
 | `contents: read` permission | NOTE | Workflow has `contents: write` (needed for git tag push step at line 201–204). Not changed — correct for this workflow. |
 
 ### AC.I — Pre-commit verification
@@ -95,13 +99,17 @@ The commit removes the entire CC2 surface (SQLite-backed Bun event hub, Vue 3 ob
 | Root `pnpm ts:check` / `pnpm build` | N/A — root package.json has no scripts (CC2 apps that owned those scripts are now deleted). Degenerately green. |
 | `packages/setup-installer` `npm run build` | PASS |
 | Grep for CC2 markers | Historical-only hits in `docs/project/archive/`, `docs/project/phases/`, `docs/project/research/`, `_research/`, and the surviving survey doc. No in-scope leaks. |
+| `.agents/tools/README.md:13` — `localhost:5173` → `localhost:3500` | DONE | CC2 dashboard port reference swapped to workflow engine server port. Resolved prior Review-B Med-3. |
+| `.agents/tools/chrome-devtools/README.md:13` — `localhost:5173` → `localhost:3500` | DONE | Same CC2 port cleanup. |
 
 ### AC.J — Commit and stop
 
 | Item | Status |
 |---|---|
-| Single atomic commit | DONE — `549077db`, 261 files |
-| `[skip ci]` in body | DONE |
+| Single atomic retirement commit | DONE — `9d14edb9`, 264 files |
+| As-shipped record + publish runbook commit | DONE — `3aabddc5`, on top of retirement |
+| As-shipped polish-2 sync commit | DONE — `e6d0f2e2`, `[skip ci]` in body |
+| `[skip ci]` in body (both commits) | DONE |
 | NOT pushed | DONE — local `main` only |
 
 ---
