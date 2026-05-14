@@ -324,20 +324,84 @@ The Outcome Steward (Product Owner agent, per-namespace) is the meta-reflector. 
 
 **Exception under consideration:** the claude-comms Steward is a special case because this repo *is* the upstream tooling that other namespaces consume. Reflections from any namespace are largely about that shared tooling, so reading across namespaces here is closer to "looking at my own product's user feedback" than to god-mode interrogation. Whether this warrants a permanent boundary amendment or stays a Steward-authorised one-off action is open (see Open Questions).
 
-### Structural Direction (Evolving)
+### Structural Direction (Converging on V2)
 
-The current capture splits prose into three buckets (`critique`, `alternativeApproach`, `improvements`) plus free-form `keywords`. This makes aggregation lossy: keywords don't carry which prose passage justifies them, and prose isn't tagged with which theme it speaks to. Filtering the rubric or a keyword leads to a row, not to the relevant span.
+The V1 capture splits prose into three buckets (`critique`, `alternativeApproach`, `improvements`) plus free-form top-level `keywords`. This makes aggregation lossy: keywords don't carry which prose passage justifies them, and prose isn't tagged with which theme it speaks to. Filtering the rubric or a keyword leads to a row, not to the relevant span.
 
-Direction the capture should evolve toward:
+V2 capture shape:
 
 - **One narrative block per entry** — a single long-form reflection that holds rationale and context. Read on drill-down only, when an aggregated view warrants understanding why a specific entry was graded as it was.
-- **An array of structured feedback items** — each item carries a key pain point, a suggestion, and the keywords it relates to. Keywords become the **join key** between items across entries.
-- **Post-processing normalizes keywords in place** — a Steward-triggered batch that maps freeform keywords to a curated taxonomy and **overwrites the `keywords` field** on existing rows. Lossy by intent: once normalized, the raw form is gone. The discovery loop still works because the Steward reviews fresh, un-normalized entries *before* running the batch — that's where novel keywords get noticed and either folded into the taxonomy or decided to be noise. Re-runs are idempotent and cheap to repeat as the taxonomy evolves. Because feedback items carry keywords, they aggregate cleanly under the canonical form for free.
+- **An array of structured feedback items** — each item carries `{keywords, painPoint, suggestion}`. Items are leaf nodes hanging off keywords; keywords are the **join key** between items across entries.
+- **Top-level `keywords` is derived at write-time** as the union of `items[].keywords`. Existing inventory + normalize tooling keep working unchanged; entry-level frequency stays the honest severity signal (counting at item-level would inflate when one entry breaks a theme into multiple items).
+- **`normalizeKeywords` mutation rewrites both layers** — the top-level array AND each `items[].keywords` — keeping referential consistency with the canonical taxonomy.
+- **Items semantics**: each item requires 1+ keywords; multi-keyword allowed; zero items is permitted (rare in practice if prompt bites hard enough); soft cap via prompt (3-5 typical, no schema enforcement).
+- **Rubric and items are complementary, not partitioned**: rubric = fixed-cardinality presence checks (cheap to fill, hard to inflate); items = the loudest few with remedies. A friction can be hit by both layers.
 
-This collapses the current three-bucket prose into one drill-down narrative plus a list of join-keyed items. The aggregation layer reaches into the prose for the first time, and the discovery loop on what friction exists stays open through the freeform-keyword choice.
+### V2 Rollout Strategy (Cutover, Not Migration)
+
+V1 has active client deployments writing in. Cutover, not in-place migration:
+
+- **New Convex table `reflectionsV2`** with the V2 shape. V1 `reflections` stays alive.
+- **Client roll-out at user's pace** — V1 keeps working until each client is patched. No moment where V1 writes break.
+- **V1 data remains queryable** for analysis until the user decides to migrate-or-drop. Optionality preserved.
+- **V2 introspection tooling lives separately** (e.g. `keywords-inventory-v2.ts`, `keywords-normalize-v2.ts`); V1 tooling stays intact for the dual-life window.
+
+### RubricV2 — Greenfield, Evidence-Based, Framing-Led
+
+V1 rubric was authored blind. Several questions are too broad to be answered without an implicit severity comparison (e.g. `intentInferred` fires ~98% of rows). RubricV2 is greenfield — not anchored to V1 keys.
+
+**Focus areas the rubric must probe** (these are what the user actually cares about):
+1. **Intent / context conflicts** — places where the agent has to silently reconcile incompatible steers across north star, system prompt, CLAUDE.md, AGENTS.md, prompt template, decision framework, training defaults.
+2. **CLI / best-tool-for-job availability** — did the agent reach for the right CLI / registered tool, or kludge with bash because no dedicated tool exists? Did a better-fitting tool exist that the agent missed?
+3. **Agent ergonomics of tools used** — input marshaling, output extraction, error message quality, schema discoverability of the tools the agent actually invoked.
+
+**Out-of-scope as rubric signal** (not because they don't exist, but because the rubric is not the right surface):
+- **Dirty-worktree state** — tooling/CI concern, not agent-experience signal. Belongs in CI hygiene, not in reflection rubric.
+- **Harness-loaded questions** — anything that fires ~100% on one harness and ~0% on others is just a harness flag. Rephrase or drop.
+
+**Data discipline**: V1 reflection data is reference, not constraint. V1 data is already biased toward what V1 reflectors knew to flag — leaning on it alone misses blind spots. Rubric questions in the three focus areas may be drafted on framing alone, with `evidenceFromV1` explicitly marked "blind spot — predict to discriminate, validate against future reflections."
+
+**Falsifiability test** for every question: a reflector must be able to answer yes/no WITHOUT comparing to other jobs. If a baseline is needed, the question is too broad — tighten or drop.
+
+**Discrimination test**: questions firing near 0% or near 100% are useless. Aim 10-30 questions, 30-70% expected fire rate.
+
+**Rubric/items partition**: themes well-captured by item-keywords don't need a rubric question — items carry that signal richer. Rubric covers binary presence patterns where the remedy isn't the interesting part.
+
+**Iteration discipline**: refinement cycles are explicitly capped (e.g., 2 max per refinement assignment). Residual gaps go in `meta.knownGaps` rather than triggering further cycles.
+
+### Reflection Data Dump Utility
+
+`.agents/tools/workflow/introspection/dump-reflections.ts` writes all V1 reflection rows from all namespaces to a single JSON file. Feeds analysis assignments without making them invoke the introspection CLI.
+
+### V2 Implementation Surface
+
+The V2 capture cutover lands in a small set of files:
+
+- `workflow-engine/convex/schema.ts` — add `reflectionsV2` table (V1 `reflections` untouched)
+- `workflow-engine/convex/reflectionsV2.ts` — new module mirroring V1 module shape (insert/byJob/recent/coverageRate/gaps/normalizeKeywords), but writing the V2 shape with two-layer keyword normalization
+- `.agents/tools/workflow/reflect.ts` — updated in place to write V2 shape; bumps `reflectionCliVersion` to `0.2.0`; bakes rubricV2 question keys+phrasing into `--help`
+- `.agents/tools/workflow/templates/reflect.md` — replaced with reflector-POV prompt: layers framing (rubric/narrative/items), keywords-as-themes-not-locators guidance, no downstream-aggregation talk
+
+**Deploy order matters.** Convex schema + reflectionsV2 module deploy FIRST; only after that succeeds does the local CLI flip to write V2. This way, a reflection firing during the work uses the old CLI writing to V1 (still healthy). New reflections only land in V2 after the CLI flip.
+
+Other clients keep writing to V1 from their pinned SHAs. V1 inventory/normalize tooling stays intact for the dual-life window.
+
+**Read-side cutover (follow-on).** Once the local CLI flips, this engine's reflections become invisible until the read surfaces catch up. The read-side cutover is hard (no parallel V1 view in the UI) and lands in:
+
+- `workflow-engine/ui/js/components/introspection/IntrospectionDashboard.js` — swap `api.reflections.*` → `api.reflectionsV2.*`; replace V1 anchor/risk rubric label maps with rubricV2 keys + phrasings; replace ReflectionDetail prose-bucket rendering (description/critique/alternativeApproach/improvements) with narrative + items[] rendering
+- `.agents/tools/workflow/introspection/dump-reflections-v2.ts`, `keywords-inventory-v2.ts`, `keywords-normalize-v2.ts` — new files alongside the V1 ones (V1 introspection CLIs preserved untouched for the dual-life window, mirroring the convex module pattern)
+
+The dashboard's anchor/risk visual split is a V1 artifact — rubricV2 is greenfield as a friction-presence detector with no anchor counterpart, so the cutover collapses to a single rubric surface unless a deliberate cluster-based partition is introduced.
+
+**Read-side cutover (landed Phase 14).** The IntrospectionDashboard now queries
+`api.reflectionsV2.*` exclusively (hard cutover — no V1 toggle). Anchor/risk
+visual split collapsed into a single rubric surface because rubricV2 has no
+anchor counterpart. New V2 introspection CLIs (`dump-reflections-v2.ts`,
+`keywords-inventory-v2.ts`, `keywords-normalize-v2.ts`) ship alongside the
+V1 ones; V1 introspection tooling preserved for the dual-life window.
 
 ## Open Questions
 
 - **Cross-namespace reflection access for the claude-comms Steward.** Per-namespace isolation is the default, but tooling friction signal lands in *every* namespace's reflections because tooling is upstream from here. Decide whether to amend the isolation principle for this Steward only, or keep it case-by-case.
-- **Rubric question rework.** Several v1 questions (e.g. `intentInferred` firing on ~98% of entries) are too broadly worded to be answered without an implicit severity comparison. Pass over the question set and tighten phrasing so each question is falsifiable on its own.
-- **Rollout timing for keyword-linked items.** Switching the capture shape resets history — old reflections won't carry the new structure. Decide whether to cut over cleanly (drop pre-cutover analysis) or run both shapes in parallel during a transition window.
+- ~~**Rubric question rework.**~~ Resolved: greenfield rubricV2 via analysis assignment (see §RubricV2 — Greenfield, Evidence-Based). Will ship together with the items+narrative shape change.
+- ~~**Rollout timing for keyword-linked items.**~~ Resolved: new `reflectionsV2` table, client-by-client cutover at user's pace, V1 data preserved (see §V2 Rollout Strategy).

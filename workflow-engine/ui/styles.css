@@ -4055,6 +4055,38 @@ p, h1, h2, h3, h4, h5, h6 {
   white-space: pre-wrap;
 }
 
+.introspection-detail-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-sm);
+}
+
+.introspection-detail-item {
+  padding: var(--t-space-md);
+  background: rgba(6, 5, 4, 0.36);
+  border: 1px solid var(--q-stone2);
+}
+
+.introspection-detail-item h5 {
+  margin: var(--t-space-sm) 0 var(--t-space-xs);
+  color: var(--q-copper2);
+  font-family: var(--font-console);
+  font-size: var(--t-type-size-label);
+  text-transform: uppercase;
+}
+
+.introspection-detail-item p {
+  margin: 0;
+  color: var(--q-bone2);
+  font-family: var(--font-body);
+  font-size: var(--t-type-size-body-small);
+  white-space: pre-wrap;
+}
+
+.introspection-detail-item .introspection-chip-row {
+  margin-bottom: var(--t-space-sm);
+}
+
 .introspection-rubric-grid {
   display: flex;
   flex-wrap: wrap;

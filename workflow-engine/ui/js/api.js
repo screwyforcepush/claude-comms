@@ -39,12 +39,12 @@ export const api = {
     retryGroup: "jobs:retryGroup",
   },
 
-  // Reflection introspection API
-  reflections: {
-    byJob: "reflections:byJob",
-    coverageRate: "reflections:coverageRate",
-    recent: "reflections:recent",
-    gaps: "reflections:gaps",
+  // Reflection introspection API (V2 hard cutover — Phase 14)
+  reflectionsV2: {
+    byJob: "reflectionsV2:byJob",
+    coverageRate: "reflectionsV2:coverageRate",
+    recent: "reflectionsV2:recent",
+    gaps: "reflectionsV2:gaps",
   },
 
   // Chat threads API

@@ -7,31 +7,30 @@ const WINDOW_OPTIONS = [10, 25, 50, 100];
 const HARNESSES = ['all', 'claude', 'codex', 'gemini'];
 const JOB_TYPES = ['all', 'implement', 'pm', 'review', 'uat', 'plan', 'document'];
 
-const ANCHOR_RUBRIC_LABELS = {
-  assignmentMatchedWork: 'Assignment matched work',
-  projectStateClean: 'Project state clean',
-  followedConventions: 'Followed conventions',
-  docsSufficient: 'Docs were sufficient',
+const RUBRIC_V2_LABELS = {
+  unsolicitedContextReceived: 'Unsolicited context received',
+  shellQuotingRetry: 'Shell quoting retry needed',
+  parallelReadsMissed: 'Parallel reads missed',
+  sameFileReadMultipleTimes: 'Same file read multiple times',
+  toolFailedRecoveredSameTurn: 'Tool failed, recovered same turn',
+  validationRunBeforeCompletion: 'Validation run before completion',
+  subagentReportNeededVerification: 'Subagent report needed verification',
+  externalSoTDocsNeeded: 'External SoT docs needed',
+  artifactReadBackNeeded: 'Artifact readback needed',
+  assignmentInstructionConflict: 'Assignment instruction conflict',
+  decisionFrameworkAmbiguous: 'Decision framework ambiguous',
+  toolSchemaLookupRequired: 'Tool schema lookup required',
+  oversizedSingleDocEncountered: 'Oversized single doc encountered',
+  trainingDefaultOverriddenByProject: 'Training default overridden by project',
+  silentReconciliationForced: 'Silent reconciliation forced',
+  intentDriftMidJob: 'Intent drift mid-job',
+  kludgedBashForMissingTool: 'Kludged bash for missing tool',
+  betterToolMissedAtTime: 'Better tool missed at time',
+  inputShapeMismatch: 'Input shape mismatch',
+  errorMessageUninformative: 'Error message uninformative',
 };
 
-const RISK_RUBRIC_LABELS = {
-  intentInferred: 'Intent had to be inferred',
-  toolErrorsBlocked: 'Tool errors blocked progress',
-  toolRepetitionRequired: 'Tool repetition required',
-  neededToolMissing: 'Needed tool missing',
-  toolOutputNoise: 'Tool output noise',
-  toolOutputInsufficient: 'Tool output insufficient',
-  undocumentedSetup: 'Undocumented setup',
-  hiddenContextDiscovered: 'Hidden context discovered',
-  priorStateInterfered: 'Prior state interfered',
-  repeatedWork: 'Repeated work',
-  wrongPathFirst: 'Wrong path first',
-  contextLoadingExcessive: 'Context loading excessive',
-  sameApproachAgain: 'Same approach likely again',
-  overengineeredPart: 'Overengineered part',
-  underdeliveredPart: 'Underdelivered part',
-  assumedUnverified: 'Assumed unverified',
-};
+const RUBRIC_V2_POSITIVE_POLARITY_KEYS = new Set(['validationRunBeforeCompletion']);
 
 const GAP_REASON_LABELS = {
   unsupported_harness: 'Unsupported harness',
@@ -119,8 +118,6 @@ function summarizeReflections(rows, gaps) {
   const rubricCounts = {};
   const rubricByJobType = {};
   const jobTypeGroups = {};
-  const riskKeys = new Set(Object.keys(RISK_RUBRIC_LABELS));
-  const anchorKeys = new Set(Object.keys(ANCHOR_RUBRIC_LABELS));
 
   for (const row of rows) {
     const jobType = row.jobType || 'unknown';
@@ -130,8 +127,6 @@ function summarizeReflections(rows, gaps) {
         count: 0,
         riskYes: 0,
         riskAnswered: 0,
-        anchorYes: 0,
-        anchorAnswered: 0,
         keywordCounts: {},
         riskCounts: {},
         tokens: [],
@@ -160,19 +155,16 @@ function summarizeReflections(rows, gaps) {
       if (!rubricCounts[key]) {
         rubricCounts[key] = {
           key,
-          label: ANCHOR_RUBRIC_LABELS[key] || RISK_RUBRIC_LABELS[key] || humanizeKey(key),
+          label: RUBRIC_V2_LABELS[key] || humanizeKey(key),
           trueCount: 0,
           falseCount: 0,
           total: 0,
-          isAnchor: Boolean(ANCHOR_RUBRIC_LABELS[key]),
         };
       }
       if (!rubricByJobType[key]) {
         rubricByJobType[key] = {
           key,
-          label: ANCHOR_RUBRIC_LABELS[key] || RISK_RUBRIC_LABELS[key] || humanizeKey(key),
-          isAnchor: Boolean(ANCHOR_RUBRIC_LABELS[key]),
-          isRisk: Boolean(RISK_RUBRIC_LABELS[key]),
+          label: RUBRIC_V2_LABELS[key] || humanizeKey(key),
           cells: {},
           trueCount: 0,
           total: 0,
@@ -193,17 +185,12 @@ function summarizeReflections(rows, gaps) {
         rubricCounts[key].falseCount += 1;
       }
 
-      if (riskKeys.has(key)) {
+      // Only count friction-polarity keys for risk aggregation
+      if (!RUBRIC_V2_POSITIVE_POLARITY_KEYS.has(key)) {
         jobGroup.riskAnswered += 1;
         if (value) {
           jobGroup.riskYes += 1;
           jobGroup.riskCounts[key] = (jobGroup.riskCounts[key] || 0) + 1;
-        }
-      }
-      if (anchorKeys.has(key)) {
-        jobGroup.anchorAnswered += 1;
-        if (value) {
-          jobGroup.anchorYes += 1;
         }
       }
     }
@@ -214,10 +201,15 @@ function summarizeReflections(rows, gaps) {
     gapReasonCounts[gap.skipReason || 'unknown'] = (gapReasonCounts[gap.skipReason || 'unknown'] || 0) + 1;
   }
 
-  const rubricRows = Object.values(rubricCounts).map((entry) => ({
+  const allRubricRows = Object.values(rubricCounts).map((entry) => ({
     ...entry,
     rate: entry.total === 0 ? 0 : entry.trueCount / entry.total,
-  }));
+  })).sort((a, b) => b.trueCount - a.trueCount || b.rate - a.rate || a.label.localeCompare(b.label));
+
+  const radarRows = allRubricRows
+    .filter((r) => !RUBRIC_V2_POSITIVE_POLARITY_KEYS.has(r.key))
+    .slice(0, 6);
+
   const jobTypeKeys = countMapToRows(jobTypeCounts).map((row) => row.key);
   const rubricMatrixRows = Object.values(rubricByJobType).map((entry) => {
     for (const cell of Object.values(entry.cells)) {
@@ -230,24 +222,21 @@ function summarizeReflections(rows, gaps) {
   });
   const jobTypeAttentionRows = Object.values(jobTypeGroups).map((group) => {
     const riskRate = group.riskAnswered === 0 ? 0 : group.riskYes / group.riskAnswered;
-    const anchorRate = group.anchorAnswered === 0 ? 1 : group.anchorYes / group.anchorAnswered;
     const topRisk = countMapToRows(group.riskCounts)[0] || null;
     const topKeyword = countMapToRows(group.keywordCounts)[0] || null;
     const attentionScore = Math.round(
-      riskRate * 70 +
-      (1 - anchorRate) * 20 +
-      Math.min(group.count / 5, 1) * 10
+      riskRate * 80 +
+      Math.min(group.count / 5, 1) * 20
     );
 
     return {
       jobType: group.jobType,
       count: group.count,
       riskRate,
-      anchorRate,
       attentionScore,
       topRisk: topRisk ? {
         key: topRisk.key,
-        label: RISK_RUBRIC_LABELS[topRisk.key] || humanizeKey(topRisk.key),
+        label: RUBRIC_V2_LABELS[topRisk.key] || humanizeKey(topRisk.key),
         count: topRisk.count,
       } : null,
       topKeyword,
@@ -265,12 +254,8 @@ function summarizeReflections(rows, gaps) {
     jobTypeAttentionRows,
     harnessRows: countMapToRows(harnessCounts),
     gapReasonRows: countMapToRows(gapReasonCounts),
-    riskRubricRows: rubricRows
-      .filter((entry) => !entry.isAnchor)
-      .sort((a, b) => b.trueCount - a.trueCount || b.rate - a.rate || a.label.localeCompare(b.label)),
-    anchorRubricRows: rubricRows
-      .filter((entry) => entry.isAnchor)
-      .sort((a, b) => b.rate - a.rate || b.trueCount - a.trueCount || a.label.localeCompare(b.label)),
+    rubricRows: allRubricRows,
+    radarRows,
     rubricMatrixRows,
     avgTokens: average(rows.map((row) => row.totalTokens)),
     avgToolCalls: average(rows.map((row) => row.toolCallCount)),
@@ -283,7 +268,7 @@ function buildInsights(coverage, gaps, analytics) {
   const terminalJobs = coverage?.terminalJobs || 0;
   const reflectedJobs = coverage?.reflectedJobs || 0;
   const coverageRate = terminalJobs === 0 ? 0 : reflectedJobs / terminalJobs;
-  const topRisk = analytics.riskRubricRows.find((row) => row.trueCount > 0);
+  const topRisk = analytics.radarRows[0];
   const topKeyword = analytics.keywordRows[0];
   const topGap = analytics.gapReasonRows[0];
 
@@ -570,7 +555,6 @@ function JobTypeAttentionPanel({ analytics, activeJobType, onSelectJobType }) {
               ),
               React.createElement('div', { className: 'introspection-jobtype-card__signals' },
                 React.createElement('span', null, `risk ${formatPct(row.riskRate)}`),
-                React.createElement('span', null, `anchor ${formatPct(row.anchorRate)}`),
                 React.createElement('span', null, formatDuration(row.avgDurationMs))
               ),
               React.createElement('p', null,
@@ -587,33 +571,18 @@ function JobTypeAttentionPanel({ analytics, activeJobType, onSelectJobType }) {
 }
 
 function RubricPanel({ analytics }) {
-  const riskRows = analytics.riskRubricRows.slice(0, 6);
-  const anchorRows = analytics.anchorRubricRows.slice(0, 4);
-  return React.createElement(Panel, { title: 'Rubric Radar', eyebrow: 'boolean signal shape', icon: 'rune', className: 'introspection-panel--radar' },
-    riskRows.length > 0
-      ? React.createElement(RadarChart, { rows: riskRows })
-      : React.createElement('div', { className: 'introspection-empty' }, 'No friction rubric answers yet.'),
-    React.createElement('div', { className: 'introspection-anchor-row' },
-      anchorRows.length > 0
-        ? anchorRows.map((row) =>
-            React.createElement('div', { key: row.key, className: 'introspection-anchor-chip' },
-              React.createElement('span', null, row.label),
-              React.createElement('strong', null, `${Math.round(row.rate * 100)}%`)
-            )
-          )
-        : React.createElement('div', { className: 'introspection-empty' }, 'No anchor answers yet.')
-    )
+  const radarRows = analytics.radarRows;
+  return React.createElement(Panel, { title: 'Rubric Radar', eyebrow: 'friction presence', icon: 'rune', className: 'introspection-panel--radar' },
+    radarRows.length > 0
+      ? React.createElement(RadarChart, { rows: radarRows })
+      : React.createElement('div', { className: 'introspection-empty' }, 'No friction rubric answers yet.')
   );
 }
 
 function RubricMatrixPanel({ analytics }) {
   const jobTypeKeys = analytics.jobTypeKeys.slice(0, 5);
   const rows = analytics.rubricMatrixRows
-    .filter((row) => row.isRisk || row.isAnchor)
-    .sort((a, b) => {
-      if (a.isAnchor !== b.isAnchor) return a.isAnchor ? 1 : -1;
-      return b.trueCount - a.trueCount || b.rate - a.rate || a.label.localeCompare(b.label);
-    })
+    .sort((a, b) => b.trueCount - a.trueCount || b.rate - a.rate || a.label.localeCompare(b.label))
     .slice(0, 10);
 
   return React.createElement(Panel, { title: 'Rubric By Job Type', eyebrow: 'cross-section heatmap', icon: 'config', className: 'introspection-panel--matrix' },
@@ -628,15 +597,15 @@ function RubricMatrixPanel({ analytics }) {
           ),
           rows.map((row) =>
             React.createElement(React.Fragment, { key: row.key },
-              React.createElement('div', { className: `introspection-rubric-matrix__label ${row.isAnchor ? 'is-anchor' : 'is-risk'}` }, row.label),
+              React.createElement('div', { className: 'introspection-rubric-matrix__label' }, row.label),
               jobTypeKeys.map((jobType) => {
                 const cell = row.cells[jobType] || { trueCount: 0, total: 0, rate: 0 };
                 const pct = Math.round(cell.rate * 100);
-                const heatRgb = row.isAnchor ? '60, 116, 32' : '196, 56, 24';
-                const heatAlpha = row.isAnchor ? 0.10 + cell.rate * 0.54 : 0.12 + cell.rate * 0.58;
+                const heatRgb = '196, 56, 24';
+                const heatAlpha = 0.12 + cell.rate * 0.58;
                 return React.createElement('div', {
                   key: `${row.key}-${jobType}`,
-                  className: `introspection-rubric-cell ${row.isAnchor ? 'is-anchor' : 'is-risk'}`,
+                  className: 'introspection-rubric-cell',
                   style: {
                     background: `linear-gradient(180deg, rgba(${heatRgb}, ${heatAlpha.toFixed(2)}), rgba(12, 10, 7, 0.86))`,
                   },
@@ -766,8 +735,8 @@ function ReflectionStream({ rows, activeKeyword, onSelectReflection }) {
             },
               React.createElement('span', { className: 'introspection-stream-card__type' }, row.jobType || 'job'),
               React.createElement('span', { className: 'introspection-stream-card__time' }, formatTimestamp(row.createdAt)),
-              React.createElement('strong', null, previewText(row.description || row.critique, 120)),
-              React.createElement('small', null, previewText(row.improvements || row.alternativeApproach, 110))
+              React.createElement('strong', null, previewText(row.narrative, 120)),
+              React.createElement('small', null, previewText(row.items?.[0]?.painPoint, 110))
             )
           )
         )
@@ -843,16 +812,29 @@ function ReflectionDetail({ row }) {
     row.keywords?.length > 0 && React.createElement('div', { className: 'introspection-chip-row' },
       row.keywords.map((keyword) => React.createElement('span', { key: keyword, className: 'introspection-chip' }, keyword))
     ),
-    React.createElement(DetailField, { title: 'Description' }, row.description),
-    React.createElement(DetailField, { title: 'Critique' }, row.critique),
-    React.createElement(DetailField, { title: 'Alternative Approach' }, row.alternativeApproach),
-    React.createElement(DetailField, { title: 'Improvements' }, row.improvements),
+    React.createElement(DetailField, { title: 'Narrative' }, row.narrative),
+    row.items?.length > 0 && React.createElement('section', { className: 'introspection-detail-field' },
+      React.createElement('h4', null, 'Items'),
+      React.createElement('div', { className: 'introspection-detail-items' },
+        row.items.map((item, index) =>
+          React.createElement('div', { key: index, className: 'introspection-detail-item' },
+            item.keywords?.length > 0 && React.createElement('div', { className: 'introspection-chip-row' },
+              item.keywords.map((kw) => React.createElement('span', { key: kw, className: 'introspection-chip' }, kw))
+            ),
+            React.createElement('h5', null, 'Pain'),
+            React.createElement('p', null, item.painPoint),
+            React.createElement('h5', null, 'Suggestion'),
+            React.createElement('p', null, item.suggestion)
+          )
+        )
+      )
+    ),
     React.createElement('section', { className: 'introspection-detail-field' },
       React.createElement('h4', null, 'Rubric'),
       React.createElement('div', { className: 'introspection-rubric-grid' },
         Object.entries(row.rubric || {}).map(([key, value]) =>
           React.createElement('span', { key, className: `introspection-rubric-token ${value ? 'is-true' : 'is-false'}` },
-            `${value ? 'YES' : 'NO'} ${ANCHOR_RUBRIC_LABELS[key] || RISK_RUBRIC_LABELS[key] || humanizeKey(key)}`
+            `${value ? 'YES' : 'NO'} ${RUBRIC_V2_LABELS[key] || humanizeKey(key)}`
           )
         )
       )
@@ -908,10 +890,10 @@ export function IntrospectionDashboard({ namespaces, responsive, onBack }) {
     };
   }, [jobTypeFilter, portfolioArgs]);
 
-  const coverageQuery = useQuery(portfolioArgs ? api.reflections.coverageRate : null, portfolioArgs || {});
-  const portfolioRecentQuery = useQuery(portfolioArgs ? api.reflections.recent : null, portfolioArgs || {});
-  const gapsQuery = useQuery(portfolioArgs ? api.reflections.gaps : null, portfolioArgs || {});
-  const recentQuery = useQuery(queryArgs ? api.reflections.recent : null, queryArgs || {});
+  const coverageQuery = useQuery(portfolioArgs ? api.reflectionsV2.coverageRate : null, portfolioArgs || {});
+  const portfolioRecentQuery = useQuery(portfolioArgs ? api.reflectionsV2.recent : null, portfolioArgs || {});
+  const gapsQuery = useQuery(portfolioArgs ? api.reflectionsV2.gaps : null, portfolioArgs || {});
+  const recentQuery = useQuery(queryArgs ? api.reflectionsV2.recent : null, queryArgs || {});
 
   const coverage = coverageQuery.data;
   const recentRows = recentQuery.data?.page || [];
