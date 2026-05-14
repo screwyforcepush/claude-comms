@@ -148,6 +148,41 @@ export default defineSchema({
     .index("by_namespace_harness_created", ["namespaceId", "harness", "createdAt"])
     .index("by_created", ["createdAt"]),
 
+  reflectionsV2: defineTable({
+    jobId: v.id("jobs"),
+    sessionId: v.string(),
+
+    namespaceId: v.id("namespaces"),
+    harness: v.union(
+      v.literal("claude"),
+      v.literal("codex"),
+      v.literal("gemini")
+    ),
+    jobType: v.string(),
+    totalTokens: v.optional(v.number()),
+    toolCallCount: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+
+    narrative: v.string(),
+    items: v.array(v.object({
+      keywords: v.array(v.string()),
+      painPoint: v.string(),
+      suggestion: v.string(),
+    })),
+    keywords: v.array(v.string()),
+    rubric: v.record(v.string(), v.boolean()),
+
+    reflectionCliVersion: v.string(),
+    clientGitSha: v.optional(v.string()),
+    engineGitSha: v.optional(v.string()),
+
+    createdAt: v.number(),
+  })
+    .index("by_job", ["jobId"])
+    .index("by_namespace_created", ["namespaceId", "createdAt"])
+    .index("by_namespace_harness_created", ["namespaceId", "harness", "createdAt"])
+    .index("by_created", ["createdAt"]),
+
   chatThreads: defineTable({
     namespaceId: v.id("namespaces"),
     title: v.string(),
