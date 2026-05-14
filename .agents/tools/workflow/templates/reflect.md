@@ -27,7 +27,7 @@ of rubric question keys with their phrasings.
 
 Tell the story of the job: what was hard, what surprised you, what you would
 say if you sat down with the system designer for two minutes. This is the
-rationale and context layer — it is read on drill-down, not aggregated.
+rationale and context layer.
 
 ## 3. Items (3–5 specific frictions)
 
