@@ -1,6 +1,6 @@
 {
   "name": "claude-comms",
-  "version": "1.0.46",
+  "version": "2.0.0",
   "description": "NPX installer for Claude Code workflow engine client setup",
   "main": "src/index.js",
   "bin": {
