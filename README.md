@@ -111,7 +111,9 @@ A long-lived Node process per project that:
 - Subscribes to Convex via WebSocket for instant reaction to DB changes
 - Schedules ready jobs (independent assignments run in parallel, sequential ones queue)
 - Spawns harness processes (`claude`, `codex`, or `gemini` CLI)
-- Streams JSON output, tracks metrics (tool calls, tokens, subagents)
+- Streams harness events, tracks metrics (tool calls, context pressure, subagents)
+- Runs Claude either through the default headless `-p` stream-json path or an
+  interactive PTY wrapper selected by the project runner config
 - Triggers PM review on group completion
 - File-based event streaming for crash resilience and orphan recovery
 

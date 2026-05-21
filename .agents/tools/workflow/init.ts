@@ -25,10 +25,6 @@ interface Config {
   namespace: string;
   password: string;
   timeoutMs?: number;
-  harnessDefaults?: {
-    default: "claude" | "codex" | "gemini";
-    [jobType: string]: "claude" | "codex" | "gemini";
-  };
 }
 
 function loadConfig(): Config {

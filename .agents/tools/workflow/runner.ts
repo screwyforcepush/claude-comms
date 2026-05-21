@@ -20,7 +20,7 @@ import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
 import { spawn } from "child_process";
 import { readFileSync } from "fs";
-import { dirname, join } from "path";
+import { dirname, isAbsolute, join } from "path";
 import { fileURLToPath } from "url";
 
 // Prompt building (extracted module)
@@ -80,6 +80,10 @@ interface Config {
   password: string;
   timeoutMs: number;
   idleTimeoutMs?: number;
+  claudeExecutionMode?: "headless" | "interactive";
+  claudeInteractiveSettingsPath?: string;
+  claudeInteractiveSettingSources?: string;
+  claudeInteractiveStopGraceMs?: number;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -88,6 +92,11 @@ const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
 
 // Project root is 3 levels up from .agents/tools/workflow
 const projectRoot = join(__dirname, "..", "..", "..");
+
+function resolveProjectPath(path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  return isAbsolute(path) ? path : join(projectRoot, path);
+}
 
 function spawnReflection(jobId: string): void {
   try {
@@ -124,6 +133,10 @@ const executor = new HarnessExecutor({
   timeoutMs: config.timeoutMs,
   idleTimeoutMs: config.idleTimeoutMs,
   cwd: projectRoot,
+  claudeExecutionMode: config.claudeExecutionMode ?? "headless",
+  claudeInteractiveSettingsPath: resolveProjectPath(config.claudeInteractiveSettingsPath),
+  claudeInteractiveSettingSources: config.claudeInteractiveSettingSources,
+  claudeInteractiveStopGraceMs: config.claudeInteractiveStopGraceMs,
 });
 
 async function fetchHarnessDefaults(namespaceId: string): Promise<HarnessDefaults> {

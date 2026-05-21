@@ -1,6 +1,6 @@
 # Workflow Engine
 
-Job queue system for orchestrating sequential Claude/Codex/Gemini headless runs.
+Job queue system for orchestrating sequential Claude/Codex/Gemini runs.
 
 ## Architecture
 
@@ -13,7 +13,10 @@ Runner Daemon (runner.ts)
         │
         │ spawns
         ↓
-Claude/Codex/Gemini headless processes
+Claude/Codex/Gemini harness processes
+        │
+        ├─ Claude headless: claude -p --output-format stream-json
+        └─ Claude interactive: PTY wrapper + explicit hook settings
 ```
 
 ## Quick Start
@@ -32,19 +35,29 @@ Edit `config.json`:
 {
   "convexUrl": "https://utmost-vulture-618.convex.cloud",
   "namespace": "your-repo-name",
+  "password": "your-admin-password",
   "timeoutMs": 600000,
-  "harnessDefaults": {
-    "default": "claude",
-    "plan": "claude",
-    "implement": "claude",
-    "review": "claude",
-    "uat": "claude",
-    "document": "claude",
-    "pm": "claude",
-    "chat": "claude"
-  }
+  "idleTimeoutMs": 600000,
+  "reflectionTimeoutMs": 300000,
+  "claudeExecutionMode": "headless",
+  "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
+  "claudeInteractiveSettingSources": "user",
+  "claudeInteractiveStopGraceMs": 3000
 }
 ```
+
+`claudeExecutionMode` is optional and defaults to `headless`, the existing
+`claude -p --output-format stream-json` path. Set it to `interactive` to run
+Claude through the PTY wrapper. Interactive mode starts Claude without `-p`,
+injects the prompt into the TUI, and captures lifecycle/tool/subagent events
+through explicit hook settings.
+
+The hook settings live at `.agents/tools/workflow/claude-hook-settings.json`
+and are passed only through `--settings` in interactive mode. They are not
+installed under project `.claude/`, so the feature flag is benign when
+`claudeExecutionMode` is `headless`. `claudeInteractiveSettingSources` may be
+set to `user` to keep project/local Claude settings from being loaded alongside
+the explicit wrapper hook settings.
 
 ### 2. Start the Runner
 
@@ -146,7 +159,7 @@ cli.ts fail-job <job_id> [--result "error"]
 1. **Assignment created** with north star (human intent)
 2. **Jobs added** to assignment's linked list
 3. **Runner picks up** ready jobs (pending + predecessor complete)
-4. **Job executes** via Claude/Codex/Gemini headless
+4. **Job executes** via Claude/Codex/Gemini harness process
 5. **PM job triggers** automatically after each completion
 6. **PM decides**: insert more jobs, complete, or block
 7. **Loop** until assignment complete or blocked

@@ -5,6 +5,8 @@
  * format changes can be covered with small unit tests.
  */
 
+import { existsSync, readFileSync } from "fs";
+
 export type MetricsHarness = "claude" | "codex" | "gemini";
 
 export const METRICS_HEARTBEAT_MS = 60_000;
@@ -52,8 +54,16 @@ function extractToolCallInfo(
   event: Record<string, unknown>
 ): { ids: string[]; hadToolUse: boolean } {
   const type = event.type as string | undefined;
+  const hookEventName = event.hook_event_name as string | undefined;
   switch (harness) {
     case "claude": {
+      if (hookEventName === "PreToolUse") {
+        const toolName = event.tool_name as string | undefined;
+        if (!toolName) return { ids: [], hadToolUse: false };
+        const toolUseId = event.tool_use_id as string | undefined;
+        return { ids: toolUseId ? [String(toolUseId)] : [], hadToolUse: true };
+      }
+
       if (type !== "assistant") return { ids: [], hadToolUse: false };
       const message = event.message as { content?: Array<{ type?: string; id?: string }> } | undefined;
       if (!message?.content) return { ids: [], hadToolUse: false };
@@ -96,8 +106,18 @@ function extractSubagentInfo(
   event: Record<string, unknown>
 ): { ids: string[]; hadSubagent: boolean } {
   const type = event.type as string | undefined;
+  const hookEventName = event.hook_event_name as string | undefined;
   switch (harness) {
     case "claude": {
+      if (hookEventName === "PreToolUse") {
+        const toolName = event.tool_name as string | undefined;
+        if (toolName !== "Agent" && toolName !== "Task") {
+          return { ids: [], hadSubagent: false };
+        }
+        const toolUseId = event.tool_use_id as string | undefined;
+        return { ids: toolUseId ? [String(toolUseId)] : [], hadSubagent: true };
+      }
+
       if (type !== "assistant") return { ids: [], hadSubagent: false };
       const message = event.message as { content?: Array<{ type?: string; id?: string; name?: string }> } | undefined;
       if (!message?.content) return { ids: [], hadSubagent: false };
@@ -154,6 +174,12 @@ function extractTotalTokens(
   event: Record<string, unknown>
 ): number | null {
   const type = event.type as string | undefined;
+  const hookEventName = event.hook_event_name as string | undefined;
+
+  if (harness === "claude" && hookEventName === "Stop") {
+    return extractClaudeHookStopTotalTokens(event);
+  }
+
   if (harness === "claude" && type === "assistant") {
     const message = event.message as {
       usage?: {
@@ -190,6 +216,83 @@ function extractTotalTokens(
   }
 
   return null;
+}
+
+function usageContextTokens(usage: {
+  input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}): number {
+  return (usage.input_tokens ?? 0)
+    + (usage.cache_creation_input_tokens ?? 0)
+    + (usage.cache_read_input_tokens ?? 0);
+}
+
+function extractTextContent(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((block) => {
+      if (!block || typeof block !== "object") return "";
+      const typedBlock = block as { type?: string; text?: string };
+      return typedBlock.type === "text" && typeof typedBlock.text === "string"
+        ? typedBlock.text
+        : "";
+    })
+    .join("");
+}
+
+function extractClaudeHookStopTotalTokens(event: Record<string, unknown>): number | null {
+  const transcriptPath = event.transcript_path as string | undefined;
+  if (!transcriptPath || !existsSync(transcriptPath)) return null;
+
+  const finalMessage =
+    typeof event.last_assistant_message === "string"
+      ? event.last_assistant_message.trim()
+      : "";
+
+  try {
+    const lines = readFileSync(transcriptPath, "utf-8")
+      .split("\n")
+      .filter((line) => line.trim());
+
+    let fallbackUsage: {
+      input_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    } | null = null;
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(lines[i]) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+
+      if (parsed.type !== "assistant") continue;
+      const message = parsed.message as {
+        content?: unknown;
+        usage?: {
+          input_tokens?: number;
+          cache_creation_input_tokens?: number;
+          cache_read_input_tokens?: number;
+        };
+      } | undefined;
+      if (!message?.usage) continue;
+
+      const text = extractTextContent(message.content).trim();
+      if (!text) continue;
+
+      fallbackUsage ??= message.usage;
+      if (finalMessage && text === finalMessage) {
+        return usageContextTokens(message.usage);
+      }
+    }
+
+    return fallbackUsage ? usageContextTokens(fallbackUsage) : null;
+  } catch {
+    return null;
+  }
 }
 
 function extractContextPressure(
@@ -241,7 +344,7 @@ export function recordMetricsEvent(
     metrics.totalTokens = totalTokens;
   }
 
-  const contextPressure = extractContextPressure(harness, event);
+  const contextPressure = totalTokens ?? extractContextPressure(harness, event);
   if (contextPressure !== null) {
     metrics.contextPressure = contextPressure;
   }

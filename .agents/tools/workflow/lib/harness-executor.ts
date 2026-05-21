@@ -24,6 +24,8 @@ import {
 } from "fs";
 import { createInterface } from "readline";
 import { EventEmitter } from "events";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
 import {
   JobTracker,
@@ -43,6 +45,7 @@ import {
   RateLimitInfo,
   createStreamHandler,
   buildCommand,
+  buildInteractiveClaudeCommand,
   CommandOptions,
 } from "./streams.js";
 
@@ -85,6 +88,16 @@ export interface ExecutorConfig {
   pollIntervalMs?: number;
   /** Debounce time for file change events (ms) */
   debounceMs?: number;
+  /** Claude execution mode. Defaults to headless, the existing -p stream-json path. */
+  claudeExecutionMode?: "headless" | "interactive";
+  /** Explicit settings file for interactive Claude hooks. Defaults to workflow/claude-hook-settings.json. */
+  claudeInteractiveSettingsPath?: string;
+  /** Optional setting source override passed to Claude interactive mode. */
+  claudeInteractiveSettingSources?: string;
+  /** Grace period after Stop/StopFailure before killing the interactive TUI. */
+  claudeInteractiveStopGraceMs?: number;
+  /** Path to the Python PTY bridge. Defaults to workflow/claude-interactive-driver.py. */
+  claudeInteractiveDriverPath?: string;
 }
 
 export interface ExecuteOptions {
@@ -327,6 +340,12 @@ export class LogTailer extends EventEmitter {
 // HarnessExecutor - Main executor class
 // ============================================================================
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const workflowDir = join(__dirname, "..");
+const DEFAULT_CLAUDE_INTERACTIVE_SETTINGS_PATH = join(workflowDir, "claude-hook-settings.json");
+const DEFAULT_CLAUDE_INTERACTIVE_DRIVER_PATH = join(workflowDir, "claude-interactive-driver.py");
+const DEFAULT_CLAUDE_INTERACTIVE_STOP_GRACE_MS = 3000;
+
 /**
  * Executes harness processes with file-based event streaming.
  */
@@ -356,6 +375,10 @@ export class HarnessExecutor {
    * Execute a harness job with file-based event streaming
    */
   execute(options: ExecuteOptions, callbacks: ExecutionCallbacks): ExecutionHandle {
+    if (options.harness === "claude" && this.config.claudeExecutionMode === "interactive") {
+      return this.executeClaudeInteractive(options, callbacks);
+    }
+
     const { jobId, harness, prompt, sessionId, forkSession, env } = options;
 
     // 1. Create job directory and ensure log file exists
@@ -607,6 +630,258 @@ export class HarnessExecutor {
   }
 
   /**
+   * Execute Claude through an interactive PTY wrapper.
+   *
+   * The wrapper receives the prompt on stdin, injects it into Claude's TUI, and
+   * keeps the PTY drained. Claude hook events append directly to the same
+   * per-job agent.log file that LogTailer already watches.
+   */
+  private executeClaudeInteractive(
+    options: ExecuteOptions,
+    callbacks: ExecutionCallbacks
+  ): ExecutionHandle {
+    const { jobId, prompt, sessionId, forkSession, env } = options;
+
+    const paths = ensureJobDir(jobId);
+    writeFileSync(paths.logPath, "");
+
+    const commandOptions: CommandOptions = {};
+    if (options.model) {
+      commandOptions.model = options.model;
+    }
+    if (sessionId) {
+      commandOptions.sessionId = sessionId;
+      if (forkSession) {
+        commandOptions.forkSession = true;
+      }
+    }
+
+    const settingsPath =
+      this.config.claudeInteractiveSettingsPath ?? DEFAULT_CLAUDE_INTERACTIVE_SETTINGS_PATH;
+    const claudeCommand = buildInteractiveClaudeCommand({
+      ...commandOptions,
+      settingsPath,
+      settingSources: this.config.claudeInteractiveSettingSources,
+    });
+
+    const driverPath =
+      this.config.claudeInteractiveDriverPath ?? DEFAULT_CLAUDE_INTERACTIVE_DRIVER_PATH;
+
+    const child = spawn(
+      "python3",
+      [driverPath, "--", claudeCommand.cmd, ...claudeCommand.args],
+      {
+        stdio: ["pipe", "ignore", "pipe"],
+        env: {
+          ...process.env,
+          ...env,
+          HOOK_EVENTS_FILE: paths.logPath,
+        },
+        cwd: this.config.cwd,
+      }
+    );
+
+    child.stdin?.end(prompt, "utf-8");
+
+    const pid = child.pid || 0;
+    const tracker = new JobTracker(jobId, "claude", pid);
+    const handler = createStreamHandler("claude");
+    const tailer = new LogTailer(paths.logPath, 0, {
+      pollIntervalMs: this.config.pollIntervalMs,
+      debounceMs: this.config.debounceMs,
+    });
+
+    const stopGraceMs =
+      this.config.claudeInteractiveStopGraceMs ?? DEFAULT_CLAUDE_INTERACTIVE_STOP_GRACE_MS;
+
+    let timedOut = false;
+    let idleTimedOut = false;
+    let spawnFailed = false;
+    let jobCompleted = false;
+    let hasSeenTerminal = false;
+    let terminalTimer: NodeJS.Timeout | null = null;
+    let idleTimeout: NodeJS.Timeout | null = null;
+
+    const completeFromHandler = async (exitForced: boolean): Promise<void> => {
+      if (jobCompleted) return;
+      jobCompleted = true;
+
+      clearTimeout(timeout);
+      if (idleTimeout) clearTimeout(idleTimeout);
+      if (terminalTimer) {
+        clearTimeout(terminalTimer);
+        terminalTimer = null;
+      }
+
+      await tailer.flush();
+      tailer.stop();
+
+      if (child.exitCode === null) {
+        child.kill("SIGTERM");
+        setTimeout(() => {
+          if (child.exitCode === null) child.kill("SIGKILL");
+        }, 5000);
+      }
+
+      this.activeJobs.delete(jobId);
+
+      const result = handler.getResult();
+      if (handler.isComplete()) {
+        tracker.complete(result);
+        callbacks.onComplete(result, handler.getSessionId() || undefined, exitForced);
+      } else {
+        const rateLimitInfo = handler.getRateLimitInfo();
+        if (rateLimitInfo && callbacks.onRateLimit) {
+          tracker.fail("rate_limited");
+          callbacks.onRateLimit(rateLimitInfo, result);
+        } else {
+          const failureReason = handler.getFailureReason();
+          const reason = failureReason || "terminal_error";
+          tracker.fail(reason);
+          callbacks.onFail(reason, result, exitForced, handler.getSessionId() || undefined);
+        }
+      }
+    };
+
+    const resetIdleTimeout = () => {
+      const idleTimeoutMs = this.config.idleTimeoutMs;
+      if (!idleTimeoutMs) return;
+      if (idleTimeout) clearTimeout(idleTimeout);
+      idleTimeout = setTimeout(() => {
+        idleTimedOut = true;
+        console.log(`[${jobId}] Idle timeout after ${idleTimeoutMs}ms (no hook events)`);
+        tracker.timeout();
+        child.kill("SIGTERM");
+        setTimeout(() => {
+          if (child.exitCode === null) child.kill("SIGKILL");
+        }, 5000);
+      }, idleTimeoutMs);
+    };
+
+    tailer.on("event", (event: Record<string, unknown>) => {
+      handler.onEvent(event);
+      const eventType =
+        (event.hook_event_name as string | undefined) ??
+        (event.type as string | undefined) ??
+        "event";
+      tracker.recordEvent(eventType);
+
+      if (!hasSeenTerminal) {
+        resetIdleTimeout();
+      }
+
+      callbacks.onEvent?.(event);
+
+      if (handler.isTerminal() && !jobCompleted && !terminalTimer) {
+        hasSeenTerminal = true;
+        if (idleTimeout) {
+          clearTimeout(idleTimeout);
+          idleTimeout = null;
+        }
+
+        console.log(`[${jobId}] Claude interactive terminal event detected, completing after ${stopGraceMs}ms grace`);
+        terminalTimer = setTimeout(() => {
+          void completeFromHandler(false);
+        }, stopGraceMs);
+      }
+    });
+
+    tailer.on("position", (pos: number) => {
+      tracker.setReadPosition(pos);
+    });
+
+    tailer.start();
+    resetIdleTimeout();
+
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      console.log(`[${jobId}] Timeout after ${this.config.timeoutMs}ms (max duration)`);
+      tracker.timeout();
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        if (child.exitCode === null) child.kill("SIGKILL");
+      }, 5000);
+    }, this.config.timeoutMs);
+
+    child.on("error", (err) => {
+      spawnFailed = true;
+      clearTimeout(timeout);
+      if (idleTimeout) clearTimeout(idleTimeout);
+      if (terminalTimer) {
+        clearTimeout(terminalTimer);
+        terminalTimer = null;
+      }
+      tailer.stop();
+      this.activeJobs.delete(jobId);
+
+      const reason = `spawn_error: ${err.message}`;
+      console.error(`[${jobId}] Interactive Claude spawn failed: ${err.message}`);
+      tracker.fail(reason);
+      callbacks.onFail(reason, undefined, undefined, handler.getSessionId() || undefined);
+    });
+
+    child.stderr?.on("data", (data: Buffer) => {
+      console.error(`[${jobId}] interactive stderr: ${data.toString()}`);
+    });
+
+    child.on("close", async (code) => {
+      if (spawnFailed || jobCompleted) return;
+
+      clearTimeout(timeout);
+      if (idleTimeout) clearTimeout(idleTimeout);
+      if (terminalTimer) {
+        clearTimeout(terminalTimer);
+        terminalTimer = null;
+      }
+
+      await tailer.flush();
+      tailer.stop();
+
+      if (jobCompleted) return;
+      jobCompleted = true;
+
+      this.activeJobs.delete(jobId);
+
+      const result = handler.getResult();
+      console.log(`[${jobId}] Interactive wrapper exited with code ${code}`);
+
+      if (timedOut || idleTimedOut) {
+        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined);
+      } else if (handler.isComplete()) {
+        tracker.complete(result);
+        callbacks.onComplete(result, handler.getSessionId() || undefined, false);
+      } else {
+        const rateLimitInfo = handler.getRateLimitInfo();
+        if (rateLimitInfo && callbacks.onRateLimit) {
+          tracker.fail("rate_limited");
+          callbacks.onRateLimit(rateLimitInfo, result);
+        } else {
+          const failureReason = handler.getFailureReason();
+          const reason = failureReason
+            ? `process_exit_${code} (${failureReason})`
+            : `process_exit_${code}`;
+          tracker.fail(reason);
+          callbacks.onFail(reason, result, false, handler.getSessionId() || undefined);
+        }
+      }
+    });
+
+    this.activeJobs.set(jobId, { child, tailer, tracker, handler, timeout });
+
+    return {
+      jobId,
+      pid,
+      kill: () => {
+        child.kill("SIGTERM");
+        setTimeout(() => {
+          if (child.exitCode === null) child.kill("SIGKILL");
+        }, 5000);
+      },
+      getTracker: () => tracker,
+    };
+  }
+
+  /**
    * Scan for orphaned jobs: status="running" in file tracker but not in activeJobs.
    * Returns both dead and live PIDs — caller decides how to handle each.
    */
@@ -732,6 +1007,7 @@ export class HarnessExecutor {
     // Set up state flags (same pattern as execute())
     let jobCompleted = false;
     let hasSeenResult = false;
+    let usesHookEvents = false;
 
     // We need to replay synchronously before starting the tailer.
     // Use a promise that we await internally via the returned handle pattern.
@@ -754,6 +1030,7 @@ export class HarnessExecutor {
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
+            if (event.hook_event_name) usesHookEvents = true;
             handler.onEvent(event);
             eventsProcessed++;
           } catch {
@@ -772,6 +1049,11 @@ export class HarnessExecutor {
 
     const SETTLING_MS = 120_000;
     let settlingTimer: NodeJS.Timeout | null = null;
+
+    const settlingMs = () =>
+      usesHookEvents
+        ? (this.config.claudeInteractiveStopGraceMs ?? DEFAULT_CLAUDE_INTERACTIVE_STOP_GRACE_MS)
+        : SETTLING_MS;
 
     const completeJob = (finalStatus: "complete" | "error" | "timeout", exitForced: boolean) => {
       if (jobCompleted) return;
@@ -813,6 +1095,7 @@ export class HarnessExecutor {
     // Wire up event handling (same settling logic as execute())
     tailer.on("event", (event: Record<string, unknown>) => {
       if (!replayDone) return; // Ignore events until replay is complete
+      if (event.hook_event_name) usesHookEvents = true;
       handler.onEvent(event);
       const eventType = (event.type as string) || "event";
       tracker.recordEvent(eventType);
@@ -827,11 +1110,12 @@ export class HarnessExecutor {
 
       if (handler.isTerminal() && !jobCompleted) {
         hasSeenResult = true;
+        const currentSettlingMs = settlingMs();
 
         settlingTimer = setTimeout(() => {
           if (jobCompleted) return;
 
-          console.log(`[Adopt] ${jobId}: settling complete (${SETTLING_MS / 1000}s silence)`);
+          console.log(`[Adopt] ${jobId}: settling complete (${currentSettlingMs / 1000}s silence)`);
 
           const exitForced = isPidAlive(pid);
           if (exitForced) {
@@ -841,8 +1125,8 @@ export class HarnessExecutor {
             }, 5000);
           }
 
-          completeJob(handler.isComplete() ? "complete" : "error", exitForced);
-        }, SETTLING_MS);
+          completeJob(handler.isComplete() ? "complete" : "error", usesHookEvents ? false : exitForced);
+        }, currentSettlingMs);
       }
     });
 
@@ -858,6 +1142,7 @@ export class HarnessExecutor {
       // If replay already found a terminal result, start settling immediately
       if (hasSeenResult && !settlingTimer && !jobCompleted) {
         console.log(`[Adopt] ${jobId}: terminal result found in replay, entering settling mode`);
+        const currentSettlingMs = settlingMs();
         settlingTimer = setTimeout(() => {
           if (jobCompleted) return;
           const exitForced = isPidAlive(pid);
@@ -867,8 +1152,8 @@ export class HarnessExecutor {
               try { if (isPidAlive(pid)) process.kill(pid, "SIGKILL"); } catch { /* ignore */ }
             }, 5000);
           }
-          completeJob(handler.isComplete() ? "complete" : "error", exitForced);
-        }, SETTLING_MS);
+          completeJob(handler.isComplete() ? "complete" : "error", usesHookEvents ? false : exitForced);
+        }, currentSettlingMs);
       }
     });
 

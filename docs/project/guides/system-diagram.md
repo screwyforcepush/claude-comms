@@ -113,11 +113,12 @@
   │  │ HARNESS EXECUTOR (file-based event streaming, crash-resilient)          │           │
   │  │                                                                         │           │
   │  │   Spawns AI processes per job:                                          │           │
-  │  │     claude  → claude --print --output-format stream-json               │           │
+  │  │     claude  → headless: claude --print --output-format stream-json     │           │
+  │  │             → interactive: PTY driver + explicit --settings hooks      │           │
   │  │     codex   → codex --json                                             │           │
   │  │     gemini  → gemini-cli                                               │           │
   │  │                                                                         │           │
-  │  │   Events → Metrics (toolCallCount, subagentCount, totalTokens)         │           │
+  │  │   Events → Metrics (toolCallCount, subagentCount, context pressure)    │           │
   │  │   File-based logging for orphan recovery on crash                       │           │
   │  │   Idle timeout + max duration timeout                                   │           │
   │  └─────────────────────────────────────────────────────────────────────────┘           │

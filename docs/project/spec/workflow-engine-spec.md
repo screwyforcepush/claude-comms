@@ -229,7 +229,7 @@ model, prompt, metrics, kill signal, session ID, and retry state.
 | `completedAt` | `number` | No | Terminal completion timestamp. |
 | `toolCallCount` | `number` | No | Runner-streamed tool-call metric. |
 | `subagentCount` | `number` | No | Runner-streamed subagent metric. |
-| `totalTokens` | `number` | No | Runner-streamed token metric. |
+| `totalTokens` | `number` | No | Runner-streamed context-pressure metric. For Claude this is input plus cache creation/read tokens, excluding output tokens. |
 | `lastEventAt` | `number` | No | Timestamp of most recent streamed event/activity. |
 | `model` | `string` | No | Exact model argument passed to the harness CLI; see [harness-model-config-spec.md](harness-model-config-spec.md). |
 | `sessionId` | `string` | No | Harness session/thread ID used for resume, debugging, and reflection. |
@@ -450,7 +450,7 @@ from assignment job groups.
 | `completedAt` | `number` | No | Terminal completion timestamp. |
 | `toolCallCount` | `number` | No | Runner-streamed tool-call metric. |
 | `subagentCount` | `number` | No | Runner-streamed subagent metric. |
-| `totalTokens` | `number` | No | Runner-streamed token metric. |
+| `totalTokens` | `number` | No | Runner-streamed context-pressure metric. For Claude this is input plus cache creation/read tokens, excluding output tokens. |
 | `lastEventAt` | `number` | No | Timestamp of most recent streamed event/activity. |
 | `exitForced` | `boolean` | No | Whether the runner had to force process exit. |
 | `killRequested` | `boolean` | No | UI/runner kill signal. Runner polls via `by_status_killRequested`. |
@@ -575,6 +575,22 @@ Default namespace config from the live parser is:
 
 This replaces the older hardcoded `AUTO_EXPAND_CONFIG` story. Fan-out is now
 data-driven through `namespaces.harnessDefaults`.
+
+## Harness Execution Modes
+
+The runner executes Codex and Gemini through their normal non-interactive CLI
+paths. Claude has a local runner feature flag:
+
+- `claudeExecutionMode: "headless"` (default) uses the existing
+  `claude -p --output-format stream-json` path.
+- `claudeExecutionMode: "interactive"` runs
+  `.agents/tools/workflow/claude-interactive-driver.py`, which starts Claude in
+  a PTY, injects the prompt into the TUI, and tails hook JSONL written through
+  `.agents/tools/workflow/claude-hook-settings.json`.
+
+Interactive hook settings are passed explicitly with `--settings`; they are not
+installed under project `.claude/`. With the feature flag off, the runner does
+not load the wrapper settings and the headless path remains unchanged.
 
 ---
 
@@ -718,7 +734,7 @@ Rules:
 | Security | UI, runner, and workflow CLI paths use password-protected Convex functions per [password-wall.md](password-wall.md). Password is function-level, not a document field. |
 | Rate limits | Assignment jobs can enter `awaiting_retry`; chat jobs fail normally and require a user follow-up. |
 | Kill requests | `killRequested` is stored on `jobs` and `chatJobs`; runner polls `scheduler.getHitList`. |
-| Metrics | Runner streams `toolCallCount`, `subagentCount`, `totalTokens`, and `lastEventAt` to assignment jobs and chat jobs. |
+| Metrics | Runner streams `toolCallCount`, `subagentCount`, context-pressure `totalTokens`, and `lastEventAt` to assignment jobs and chat jobs. |
 | Reflection coverage | `jobs.namespaceId` marks integration-era jobs included in reflection coverage; historical jobs without it are excluded. |
 | Subscription efficiency | Counts and recency fields are denormalized to avoid broad reactive reads; see [convex-bandwidth-optimization.md](convex-bandwidth-optimization.md). |
 | Filesystem truth | Execution records describe how work got here; the code on disk remains the source of truth for actual project state, per [mental-model.md#execution-records-vs-filesystem-state](mental-model.md#execution-records-vs-filesystem-state). |
@@ -743,3 +759,5 @@ Rules:
 | Workflow CLI | `.agents/tools/workflow/cli.ts` |
 | Runner | `.agents/tools/workflow/runner.ts` |
 | Workflow config | `.agents/tools/workflow/config.json` |
+| Claude interactive driver | `.agents/tools/workflow/claude-interactive-driver.py` |
+| Claude interactive hook settings | `.agents/tools/workflow/claude-hook-settings.json` |

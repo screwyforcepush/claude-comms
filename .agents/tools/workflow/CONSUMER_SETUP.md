@@ -10,6 +10,9 @@ This document describes how to set up the workflow engine in repos that consume 
 ├── cli.ts
 ├── runner.ts
 ├── config.json
+├── claude-interactive-driver.py
+├── claude-hook-settings.json
+├── claude-hook-post-event.sh
 └── templates/
 ```
 
@@ -76,21 +79,25 @@ Each consumer repo needs its own `config.json`:
 {
   "convexUrl": "https://your-project-123.convex.cloud",
   "namespace": "consumer-repo-name",
+  "password": "your-admin-password",
   "timeoutMs": 600000,
-  "harnessDefaults": {
-    "default": "claude",
-    "plan": "claude",
-    "implement": "claude",
-    "review": "claude",
-    "uat": "claude",
-    "document": "claude",
-    "pm": "claude",
-    "chat": "claude"
-  }
+  "idleTimeoutMs": 600000,
+  "reflectionTimeoutMs": 300000,
+  "claudeExecutionMode": "headless",
+  "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
+  "claudeInteractiveSettingSources": "user",
+  "claudeInteractiveStopGraceMs": 3000
 }
 ```
 
 The `namespace` field isolates assignments/jobs per repo in the shared Convex backend.
+Harness/model defaults are namespace data stored in Convex, not local
+`config.json` fields.
+
+`claudeExecutionMode` can be changed to `interactive` to use the Claude PTY
+wrapper. The wrapper uses explicit hook settings from `.agents/tools/workflow/`
+via `--settings` and does not require a project `.claude/settings.json` hook
+install, so headless mode remains isolated.
 
 ## Initialization
 

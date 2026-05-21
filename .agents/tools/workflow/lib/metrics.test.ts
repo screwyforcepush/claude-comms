@@ -6,6 +6,9 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   createMetricsState,
   formatContextPressure,
@@ -30,6 +33,75 @@ describe("recordMetricsEvent", () => {
 
     assert.strictEqual(metrics.toolCallCount, 2);
     assert.strictEqual(metrics.subagentCount, 1);
+  });
+
+  it("counts Claude hook Agent tool uses and ignores internal SubagentStop noise", () => {
+    const metrics = createMetricsState();
+
+    recordMetricsEvent("claude", {
+      hook_event_name: "PreToolUse",
+      tool_name: "Agent",
+      tool_use_id: "toolu_1",
+    }, metrics);
+    recordMetricsEvent("claude", {
+      hook_event_name: "SubagentStop",
+      agent_id: "internal",
+      agent_type: "",
+      last_assistant_message: "now spawn three",
+    }, metrics);
+    recordMetricsEvent("claude", {
+      hook_event_name: "PostToolUse",
+      tool_name: "Agent",
+      tool_use_id: "toolu_1",
+      tool_response: { totalTokens: 8827 },
+    }, metrics);
+
+    assert.strictEqual(metrics.toolCallCount, 1);
+    assert.strictEqual(metrics.subagentCount, 1);
+    assert.strictEqual(metrics.totalTokens, null);
+    assert.strictEqual(metrics.contextPressure, null);
+  });
+
+  it("extracts Claude hook Stop usage from transcript final assistant message", () => {
+    const metrics = createMetricsState();
+    const dir = mkdtempSync(join(tmpdir(), "claude-hook-metrics-"));
+    const transcriptPath = join(dir, "session.jsonl");
+
+    writeFileSync(transcriptPath, [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [{ type: "text", text: "old" }],
+          usage: {
+            input_tokens: 1,
+            cache_creation_input_tokens: 2,
+            cache_read_input_tokens: 3,
+            output_tokens: 4,
+          },
+        },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [{ type: "text", text: "final answer" }],
+          usage: {
+            input_tokens: 6,
+            cache_creation_input_tokens: 68,
+            cache_read_input_tokens: 41423,
+            output_tokens: 376,
+          },
+        },
+      }),
+    ].join("\n") + "\n");
+
+    recordMetricsEvent("claude", {
+      hook_event_name: "Stop",
+      transcript_path: transcriptPath,
+      last_assistant_message: "final answer",
+    }, metrics);
+
+    assert.strictEqual(metrics.totalTokens, 41497);
+    assert.strictEqual(metrics.contextPressure, 41497);
   });
 
   it("counts Codex completed spawn_agent collab tool calls by receiver thread id", () => {

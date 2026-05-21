@@ -11,6 +11,7 @@ import {
   CodexStreamHandler,
   GeminiStreamHandler,
   buildCommand,
+  buildInteractiveClaudeCommand,
 } from "./streams.js";
 
 // ============================================================================
@@ -102,6 +103,51 @@ describe("ClaudeStreamHandler", () => {
     });
 
     assert.strictEqual(handler.getRateLimitInfo(), null);
+  });
+
+  it("parses interactive Stop hook events as successful results", () => {
+    const handler = new ClaudeStreamHandler();
+
+    handler.onEvent({
+      hook_event_name: "SessionStart",
+      session_id: "parent-session",
+      source: "resume",
+    });
+    handler.onEvent({
+      hook_event_name: "UserPromptSubmit",
+      session_id: "fork-session",
+      prompt: "hello",
+    });
+    handler.onEvent({
+      hook_event_name: "Stop",
+      session_id: "fork-session",
+      last_assistant_message: "done",
+    });
+
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), true);
+    assert.strictEqual(handler.getResult(), "done");
+    assert.strictEqual(handler.getSessionId(), "fork-session");
+  });
+
+  it("parses interactive StopFailure hook events defensively", () => {
+    const handler = new ClaudeStreamHandler();
+
+    handler.onEvent({
+      hook_event_name: "SessionStart",
+      session_id: "s123",
+    });
+    handler.onEvent({
+      hook_event_name: "StopFailure",
+      session_id: "s123",
+      error: "invalid_request",
+      last_assistant_message: "bad model",
+    });
+
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), false);
+    assert.strictEqual(handler.getResult(), "bad model");
+    assert.strictEqual(handler.getFailureReason(), "claude_stop_failure_invalid_request");
   });
 });
 
@@ -279,5 +325,24 @@ describe("buildCommand", () => {
 
   it("throws for unknown harness", () => {
     assert.throws(() => buildCommand("unknown", "test"), /Unknown harness/);
+  });
+
+  it("builds interactive claude command without print or stream-json", () => {
+    const command = buildInteractiveClaudeCommand({
+      model: "sonnet",
+      sessionId: "s123",
+      forkSession: true,
+      settingsPath: "/tmp/hooks.json",
+    });
+
+    assert.strictEqual(command.cmd, "claude");
+    assert.ok(command.args.includes("--settings"));
+    assert.ok(command.args.includes("/tmp/hooks.json"));
+    assert.ok(command.args.includes("--resume"));
+    assert.ok(command.args.includes("s123"));
+    assert.ok(command.args.includes("--fork-session"));
+    assert.ok(!command.args.includes("-p"));
+    assert.ok(!command.args.includes("--output-format"));
+    assert.ok(!command.args.includes("stream-json"));
   });
 });

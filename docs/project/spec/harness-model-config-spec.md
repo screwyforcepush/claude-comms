@@ -149,7 +149,7 @@ Harness CLI process spawns with model flag
 
 6. **Namespace-scoped, not assignment-scoped** -- config applies to all assignments in the namespace.
 
-7. **Convex-only** -- no file-based fallback. Local `config.json` retains only connection params and timeouts.
+7. **Convex-only harness/model defaults** -- no file-based fallback for harness/model resolution. Local `config.json` retains connection params, timeouts, and runner-local execution flags such as `claudeExecutionMode`.
 
 ---
 
@@ -218,12 +218,12 @@ WP1: Schema + Shared Utilities (foundation)
          +---> WP5: UI Settings Modal (depends on WP2)
 
          After WP3 + WP4 both land:
-         +---> Cleanup: Remove harnessDefaults from config.json + config.example.json
+         +---> Cleanup: Remove harnessDefaults from config.json + config.example.json (complete)
 
 Parallelization opportunities:
   - WP3, WP4, WP5 can all run in parallel (each depends only on WP2)
   - WP3 and WP4 share config.json but neither modifies it -- they only stop reading from it
-  - config.json field removal is deferred to a cleanup step after both WP3 and WP4 land
+  - config.json field removal was deferred until both WP3 and WP4 landed, then completed
 ```
 
 ---
@@ -553,14 +553,14 @@ Existing namespaces have no `harnessDefaults` field. Two options:
 - One-time script queries all namespaces, writes `DEFAULT_HARNESS_DEFAULTS` to each
 - Unnecessary given the lazy approach works cleanly
 
-### Config.json Deprecation (Staged)
+### Config.json Deprecation (Complete)
 
-The `harnessDefaults` field in config.json is deprecated in stages to avoid a parallel-execution hazard between WP3 (CLI) and WP4 (runner), which both read from it independently:
+The `harnessDefaults` field in config.json was deprecated in stages to avoid a parallel-execution hazard between WP3 (CLI) and WP4 (runner), which both read from it independently:
 
-1. **WP3:** CLI stops reading `harnessDefaults` from config.json (reads from Convex instead). Field remains in config.json.
-2. **WP4:** Runner stops reading `harnessDefaults` from config.json (reads from Convex instead). Field remains in config.json.
-3. **Cleanup step (after WP3 + WP4 both land):** Remove `harnessDefaults` from `config.json`, `config.example.json`, and the shared `Config` TypeScript interface.
-4. Leave `convexUrl`, `namespace`, `password`, `timeoutMs`, `idleTimeoutMs` in config.json (connection params stay local)
+1. **WP3:** CLI stopped reading `harnessDefaults` from config.json (reads from Convex instead).
+2. **WP4:** Runner stopped reading `harnessDefaults` from config.json (reads from Convex instead).
+3. **Cleanup:** `harnessDefaults` was removed from `config.example.json` and local config examples.
+4. Local `config.json` retains connection params, timeouts, and runner-local execution flags.
 
 ### Existing Jobs
 
