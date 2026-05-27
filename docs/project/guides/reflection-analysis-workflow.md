@@ -128,3 +128,4 @@ Top-of-list is now the answer to *"what's loudest across this fleet right now?"*
 - RubricV2 framing: `docs/project/spec/mental-model.md` §RubricV2 — Greenfield, Evidence-Based, Framing-Led
 - Single-row postmortem: `docs/project/guides/cross-job-postmortem.md`
 - Periodic curiosity-driven dive output: `docs/project/spec/reflection-analysis-2026-05.md` (Phase 16, the first instance of the periodic dive described in mental-model.md §Steward Analysis Workflow)
+- Periodic curiosity-driven dive output: `docs/project/spec/reflection-analysis-2026-06.md` (second periodic dive, applying the causal-tracing guide; 14 ranked findings across 29 keywords)
