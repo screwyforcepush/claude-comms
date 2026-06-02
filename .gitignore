@@ -242,3 +242,12 @@ sa-gemini.json
 beads/
 _research/
 NEEDLE/
+
+# Cross-tenant reflection-analysis artifacts — contain other clients' namespaces,
+# job IDs, and verbatim pain-point quotes. Keep local only; never commit to this
+# public repo. (Scrubbed from history 2026-06-02.)
+docs/project/spec/reflection-analysis-2026-05.md
+docs/project/spec/reflection-analysis-2026-06.md
+docs/project/spec/rubric-v2-draft.json
+docs/project/phases/16-ReflectionAnalysis2026-05/spec.md
+docs/project/phases/16-ReflectionAnalysis2026-05/working-draft.md
