@@ -1,6 +1,6 @@
 # Phase 17 — Config-Driven `validate` CLI
 
-**Status:** Spec / Planning
+**Status:** COMPLETE (R1 — 2026-06-08)
 **Author:** Planning Architect
 **North Star:** Ship a config-driven `validate` CLI at `.agents/tools/validate/` that runs a repo's quality gates concurrently with single-flight dedup, replacing the hand-rolled `nohup`+pid-poll recipe agents reinvent every job to satisfy `AOP.VALIDATE`.
 **Scope surfaces (hard boundary — FOUR):** `.agents/tools/validate/` (new) · `.agents/repo.md` (rewire) · `.agents/AGENTS.md` (trim obsoleted `[VALIDATE]` recipe, lines 52-54 — see D7) · `packages/setup-installer/src/orchestrator/installer.js` (+ its test) — nothing else.
@@ -404,6 +404,79 @@ Add `.agents/tools/validate/config.json` to the `preserveIfExists` array in `src
 3. **uat** — exercise the §7 vertical slices: real concurrent double-invoke on this repo (latch), `--status`/`--gates`/`--help`, and the installer skip in a throwaway temp dir.
 
 Place UAT **after** review so the latch/reap edge cases are reasoned-about before manual concurrency testing.
+
+---
+
+## 12. Completion Record
+
+### R0 — Initial completion review (on `4a3d9f3e`)
+
+Three independent reviewers + UAT:
+- **Review A** — APPROVE-WITH-CHANGES: Med restore-collision, Low-Med yank-window, Low fallback/degradation.
+- **Review B** — Concern/AWC: HIGH reap-restore race, Med build-gate coverage, Low error-contract.
+- **Review C** — APPROVE.
+- **UAT** — PASS zero-defects: single-flight held under real 2-process race; run-dir delta = 1.
+
+Reviews A (Med) and B (HIGH) converged on the **same real defect** (D16): `validate.ts:318-322` restore catch tolerated only `EEXIST`, but on Linux `renameSync` onto a non-empty existing `lockDir` throws `ENOTEMPTY` → fatal coordination error + orphaned live lock in `claimDir`. **MUST-FIX inserted before completion.**
+
+### Fix round (D16 → `ee11593e`)
+
+| ID | Fix | Evidence |
+|---|---|---|
+| **D16** (restore-collision) | `isRestoreContentionError` (L677-679) tolerates `ENOTEMPTY`\|`EEXIST`\|`ENOENT` → `rmSync(claimDir)` + `{kind:"continue"}` re-contend. Never fatal, never orphan. | 3-contender restore-gap regression test (`validate.test.ts:427`): stale-reader + replacement-owner + third-in-restore-gap via `coordinationHooks`. |
+| **D18** (build-gate) | Recursively `node --check` ALL `workflow-engine/ui/js/**/*.js` + `sw.js` (was 3 of ~41 modules); required-file/JSON-parse/module-entry presence checks retained. | `--gates build` passes green on `ee11593e` (0.5 s). |
+| **D19** (owner-IO) | Owner publish/log-open failures wrapped in `ownerErrorResult` (L494); engine-returns seam intact (no throw). Spec note `EACCES` → `EACCES`/`EPERM`/`EROFS`. | Owner-IO-failure structured-error test (`validate.test.ts:310`). |
+| **D17** (yank-window residual) | Documented as accepted v1 residual in §3.4, README §Single-Flight. Self-limiting: idempotent gates, immutable `runId` artifacts, per-invocation exit-code rollup. D10 heartbeat = future close. | — |
+
+### R1 — Final completion review (on `ee11593e`)
+
+R0 MUST-FIX (D16) resolved and verified at source. D18/D19 hardening landed. Tree green and committed. UAT not re-inserted: concurrency contract exercised by deterministic regressions (T8 two-reaper race, stale-owner-release, 3-contender restore-gap) and R0 UAT already passed the live 2-process single-flight race zero-defects. **Phase 17 COMPLETE.**
+
+### Final TDD inventory (18 tests, all green)
+
+| # | Case | File ref |
+|---|---|---|
+| T1 | Exit-code → `ok` rollup | `validate.test.ts:152` |
+| T1b | Signal-kill → failed | `validate.test.ts:178` |
+| T2 | Latch dedup (concurrent → one run) | `validate.test.ts:189` |
+| T3 | `--gates` subset | `validate.test.ts:213` |
+| T4 | `--status` (no run) | `validate.test.ts:599` |
+| T5 | Stale-lock reap (dead PID) | `validate.test.ts:231` |
+| T6 | Stale-lock reap (age) | `validate.test.ts:253` |
+| T7 | Graceful degradation (no-git, lock-infra) | `validate.test.ts:275` |
+| T8 | Two-reaper race (atomic rename) | `validate.test.ts:331` |
+| T9 | Latcher abandons dead owner | `validate.test.ts:507` |
+| T10 | Gate-set mismatch no cross-latch | `validate.test.ts:536` |
+| T11 | Immutable per-run artifacts | `validate.test.ts:577` |
+| T12 | `--help` (no lock, no gates) | `validate.test.ts:636` |
+| T13 | All-gates concurrent + blocking | `validate.test.ts:654` |
+| — | Owner-IO-failure → structured error | `validate.test.ts:310` |
+| — | Stale-owner-release safety | `validate.test.ts:390` |
+| — | 3-contender restore-gap regression | `validate.test.ts:427` |
+| — | Empty `--gates` rejection | `validate.test.ts:695` |
+
+### Dogfood evidence (`ee11593e`)
+
+```
+npx tsx .agents/tools/validate/cli.ts → ok:true, exit 0
+  build  0.5s ✓
+  lint   0.5s ✓
+  ts:check 1.1s ✓
+  test   5.5s ✓
+```
+
+All 4 gates pass. Clean single JSON to stdout, per-gate progress to stderr, `head`/`dirty` stamped.
+
+### Scope ledger (FOUR surfaces — confirmed)
+
+| # | Surface | Commit | Change |
+|---|---|---|---|
+| 1 | `.agents/tools/validate/` (new) | `4a3d9f3e` + `ee11593e` | `cli.ts`, `validate.ts`, `config.json`, `config.example.json`, `validate.test.ts`, `README.md` |
+| 2 | `.agents/repo.md` (rewire) | `4a3d9f3e` | `[VALIDATE]` → one blocking CLI command + JSON verdict instructions |
+| 3 | `.agents/AGENTS.md` (trim) | `4a3d9f3e` | Lines 52-54 nohup/process-check → one-liner re: blocking/self-coordinating CLI; L47 delegation + L55 git-stash preserved |
+| 4 | `packages/setup-installer/src/orchestrator/installer.js` | `4a3d9f3e` | `preserveIfExists` + `validate/config.json`; test added (24/24) |
+
+**No 5th surface touched.** `github.js` raw-URL fallback gap is pre-existing (D11); `mental-model.md` is read-only WHY-layer (D19).
 
 ---
 
