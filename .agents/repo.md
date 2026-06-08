@@ -1,10 +1,9 @@
 
 # Repository Guidelines
-VALIDATE by Running required commands — all must pass without warnings or errors:
-   - `nohup pnpm lint > /tmp/lint.log 2>&1 &`
-   - `nohup pnpm ts:check > /tmp/typecheck.log 2>&1 &`
-   - `nohup pnpm test > /tmp/test.log 2>&1 &`
-   - `nohup pnpm build > /tmp/build.log 2>&1 &`
+VALIDATE by running the blocking validate CLI — all gates must pass without warnings or errors:
+   - `npx tsx .agents/tools/validate/cli.ts`
+
+Read the stdout JSON `ok` field for the verdict. If `ok` is `false`, open only the `log` paths for gates whose JSON `status` is `failed`; do not grep stdout or logs for the verdict.
 
 
 ## Dev server

@@ -1,0 +1,25 @@
+{
+  "logDir": "/tmp/claude-comms-validate",
+  "pollIntervalMs": 250,
+  "metaGraceMs": 2000,
+  "staleLockMs": 1800000,
+  "timeoutMs": 2400000,
+  "gates": [
+    {
+      "name": "lint",
+      "command": "npm --prefix packages/setup-installer run lint"
+    },
+    {
+      "name": "ts:check",
+      "command": "cd workflow-engine && npx tsc --noEmit -p convex/tsconfig.json"
+    },
+    {
+      "name": "test",
+      "command": "npx tsx --test .agents/tools/validate/*.test.ts"
+    },
+    {
+      "name": "build",
+      "command": "cd workflow-engine/ui && node --check js/main.js && node --check js/api.js && node --check sw.js && node -e \"const fs=require('fs'); const required=['index.html','styles.css','js/main.js','js/api.js','manifest.json','sw.js','vercel.json']; for (const file of required) { if (!fs.existsSync(file)) throw new Error('missing '+file); } JSON.parse(fs.readFileSync('vercel.json','utf8')); JSON.parse(fs.readFileSync('manifest.json','utf8')); const html=fs.readFileSync('index.html','utf8'); if (!html.includes('type=\\\"module\\\" src=\\\"./js/main.js\\\"')) throw new Error('index.html missing module entry');\""
+    }
+  ]
+}

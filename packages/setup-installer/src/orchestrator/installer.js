@@ -341,7 +341,8 @@ class Installer extends EventEmitter {
       const preserveIfExists = [
         { path: '.claude/settings.local.json', fullPath: path.join(this.options.targetDir, '.claude', 'settings.local.json') },
         { path: '.agents/repo.md', fullPath: path.join(this.options.targetDir, '.agents', 'repo.md') },
-        { path: '.agents/tools/chrome-devtools/config.json', fullPath: path.join(this.options.targetDir, '.agents', 'tools', 'chrome-devtools', 'config.json') }
+        { path: '.agents/tools/chrome-devtools/config.json', fullPath: path.join(this.options.targetDir, '.agents', 'tools', 'chrome-devtools', 'config.json') },
+        { path: '.agents/tools/validate/config.json', fullPath: path.join(this.options.targetDir, '.agents', 'tools', 'validate', 'config.json') }
       ];
 
       for (const file of preserveIfExists) {

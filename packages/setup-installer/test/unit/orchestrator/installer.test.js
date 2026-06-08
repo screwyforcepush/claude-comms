@@ -146,7 +146,7 @@ describe('Installer', () => {
       const result = await installer.install(validOptions);
 
       expect(result.success).toBe(true);
-      expect(result.filesInstalled).toHaveLength(3); // 2 from writeDirectory + 1 settings.local.json
+      expect(result.filesInstalled).toHaveLength(2); // files reported by writeDirectory
       expect(result.errors).toHaveLength(0);
       expect(installer.state).toBe(InstallationState.COMPLETED);
     });
@@ -194,7 +194,7 @@ describe('Installer', () => {
 
       // Verify writing was called
       expect(mockWriter.writeDirectory).toHaveBeenCalled();
-      expect(mockWriter.writeFile).toHaveBeenCalled(); // settings.local.json
+      expect(mockWriter.writeFile).not.toHaveBeenCalled(); // settings.local.json is user-owned
     });
 
     it('should skip Python check when skipPythonCheck is true', async () => {
@@ -247,7 +247,7 @@ describe('Installer', () => {
       expect(installer.state).toBe(InstallationState.FAILED);
     });
 
-    it('should rollback changes when installation fails', async () => {
+    it('should rollback changes when verification fails after writing files', async () => {
       // Setup partial success scenario
       mockFetcher.fetchDirectory.mockResolvedValue({
         path: '.claude',
@@ -267,7 +267,14 @@ describe('Installer', () => {
         errors: []
       });
 
-      mockWriter.writeFile.mockRejectedValue(new Error('Post-install failure'));
+      mockValidator.pathExists.mockImplementation((pathArg) => {
+        if (pathArg.includes('settings.local.json')) return Promise.resolve(false);
+        if (pathArg.includes('repo.md')) return Promise.resolve(false);
+        if (pathArg.includes('chrome-devtools/config.json')) return Promise.resolve(false);
+        if (pathArg.includes('validate/config.json')) return Promise.resolve(false);
+        if (pathArg.endsWith('/.agents')) return Promise.resolve(false);
+        return Promise.resolve(true);
+      });
 
       const result = await installer.install(validOptions);
 
@@ -366,6 +373,108 @@ describe('Installer', () => {
   });
 
   describe('file operations', () => {
+    describe('user-customizable file preservation', () => {
+      beforeEach(() => {
+        installer.options = {
+          targetDir: '/test/target',
+          dryRun: false
+        };
+
+        mockWriter.writeDirectory.mockResolvedValue({
+          written: [],
+          skipped: [],
+          backed_up: new Map(),
+          errors: []
+        });
+      });
+
+      it('should skip existing validate config while preserving user customizations', async () => {
+        mockValidator.pathExists.mockImplementation((pathArg) => {
+          if (pathArg.includes('repo.md')) return Promise.resolve(false);
+          if (pathArg.includes('chrome-devtools/config.json')) return Promise.resolve(false);
+          if (pathArg.includes('validate/config.json')) return Promise.resolve(true);
+          if (pathArg.includes('settings.local.json')) return Promise.resolve(false);
+          return Promise.resolve(true);
+        });
+
+        await installer._installFilesWithTransaction({
+          '.agents': {
+            path: '.agents',
+            type: 'dir',
+            children: [
+              {
+                path: 'tools',
+                type: 'dir',
+                children: [
+                  {
+                    path: 'validate',
+                    type: 'dir',
+                    children: [
+                      {
+                        path: 'config.json',
+                        type: 'file',
+                        content: '{"gates":[]}',
+                        encoding: 'utf-8'
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        });
+
+        const [filesToWrite] = mockWriter.writeDirectory.mock.calls[0];
+        expect(filesToWrite.find(f => f.path === '.agents/tools/validate/config.json')).toBeUndefined();
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          '.agents/tools/validate/config.json already exists, skipping (preserving user customizations)'
+        );
+      });
+
+      it('should write validate config when it is absent', async () => {
+        mockValidator.pathExists.mockImplementation((pathArg) => {
+          if (pathArg.includes('repo.md')) return Promise.resolve(false);
+          if (pathArg.includes('chrome-devtools/config.json')) return Promise.resolve(false);
+          if (pathArg.includes('validate/config.json')) return Promise.resolve(false);
+          if (pathArg.includes('settings.local.json')) return Promise.resolve(false);
+          return Promise.resolve(true);
+        });
+
+        await installer._installFilesWithTransaction({
+          '.agents': {
+            path: '.agents',
+            type: 'dir',
+            children: [
+              {
+                path: 'tools',
+                type: 'dir',
+                children: [
+                  {
+                    path: 'validate',
+                    type: 'dir',
+                    children: [
+                      {
+                        path: 'config.json',
+                        type: 'file',
+                        content: '{"gates":[]}',
+                        encoding: 'utf-8'
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        });
+
+        const [filesToWrite] = mockWriter.writeDirectory.mock.calls[0];
+        expect(filesToWrite.find(f => f.path === '.agents/tools/validate/config.json')).toBeDefined();
+        expect(mockLogger.info).not.toHaveBeenCalledWith(
+          '.agents/tools/validate/config.json already exists, skipping (preserving user customizations)'
+        );
+      });
+    });
+
     it('should correctly flatten file tree structure', () => {
       const fetchedFiles = {
         '.claude': {

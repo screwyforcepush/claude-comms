@@ -1,0 +1,25 @@
+{
+  "logDir": "/tmp/my-project-validate",
+  "pollIntervalMs": 250,
+  "metaGraceMs": 2000,
+  "staleLockMs": 1800000,
+  "timeoutMs": 2400000,
+  "gates": [
+    {
+      "name": "lint",
+      "command": "pnpm lint"
+    },
+    {
+      "name": "ts:check",
+      "command": "pnpm ts:check"
+    },
+    {
+      "name": "test",
+      "command": "pnpm test"
+    },
+    {
+      "name": "build",
+      "command": "pnpm build"
+    }
+  ]
+}
