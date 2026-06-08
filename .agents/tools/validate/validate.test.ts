@@ -8,6 +8,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -306,6 +307,27 @@ describe("runValidate", () => {
     }
   });
 
+  it("returns structured errors for owner run-directory failures instead of throwing", async () => {
+    const root = tempDir();
+    const logDir = join(root, "logs");
+    const runsDir = join(logDir, "runs");
+    mkdirSync(runsDir, { recursive: true });
+    chmodSync(runsDir, 0o555);
+
+    try {
+      const result = await runValidate(baseConfig(logDir, [
+        { name: "pass", command: passCommand() },
+      ]), { repoRoot: REPO_ROOT });
+
+      assert.strictEqual(result.ok, false);
+      assert.deepStrictEqual(result.gates, {});
+      assert.ok(result.errors?.some((message) => message.includes("unable to run validate owner")));
+      assert.ok(!existsSync(join(logDir, "lock")), "owner I/O failure should still release the lock");
+    } finally {
+      chmodSync(runsDir, 0o755);
+    }
+  });
+
   it("T8 serializes a two-reaper stale-lock race so only one contender runs", async () => {
     const root = tempDir();
     const logDir = join(root, "logs");
@@ -400,6 +422,86 @@ describe("runValidate", () => {
     assert.strictEqual(replacementResult.runId, replacementRunId);
     assert.notStrictEqual(staleResult.runId, replacementResult.runId);
     assert.ok(!existsSync(join(logDir, "lock")));
+  });
+
+  it("treats restore-gap replacement as contention without fatal errors or orphaned claims", async () => {
+    const root = tempDir();
+    const logDir = join(root, "logs");
+    const marker = join(root, "marker.txt");
+    const config = baseConfig(logDir, [
+      { name: "slow", command: appendOnceCommand(marker, "run", 160) },
+    ], {
+      pollIntervalMs: 10,
+      staleLockMs: 1_000,
+      timeoutMs: 3_000,
+    });
+    writeMeta(logDir, {
+      pid: 999_999_999,
+      runId: "stale-owner",
+      gateKey: "slow",
+      head: null,
+      dirty: null,
+      startedAt: Date.now() - 10_000,
+    });
+
+    let replacementOwner: Promise<ValidateResult> | undefined;
+    let thirdOwner: Promise<ValidateResult> | undefined;
+    let replacementRunId = "";
+    let thirdRunId = "";
+
+    const staleReader = runValidate(config, {
+      repoRoot: REPO_ROOT,
+      coordinationHooks: {
+        beforeClaimStaleLock: async ({ lockDir }) => {
+          if (replacementOwner) return;
+          rmSync(lockDir, { recursive: true, force: true });
+          replacementOwner = runValidate(config, { repoRoot: REPO_ROOT });
+          await waitFor(() => existsSync(join(lockDir, "meta.json")), 2_000);
+          replacementRunId = readJson<{ runId: string }>(join(lockDir, "meta.json")).runId;
+          assert.notStrictEqual(replacementRunId, "stale-owner");
+        },
+        beforeRestoreClaimedLock: async ({ claimDir, lockDir }) => {
+          if (thirdOwner) return;
+          assert.strictEqual(readJson<{ runId: string }>(join(claimDir, "meta.json")).runId, replacementRunId);
+          thirdOwner = runValidate(config, { repoRoot: REPO_ROOT });
+          await waitFor(() => {
+            const metaPath = join(lockDir, "meta.json");
+            return existsSync(metaPath) && readJson<{ runId: string }>(metaPath).runId !== replacementRunId;
+          }, 2_000);
+          thirdRunId = readJson<{ runId: string }>(join(lockDir, "meta.json")).runId;
+        },
+      },
+    });
+
+    await waitFor(() => replacementOwner !== undefined && thirdOwner !== undefined, 2_000);
+    const [staleReaderResult, replacementResult, thirdResult] = await Promise.all([
+      staleReader,
+      replacementOwner!,
+      thirdOwner!,
+    ]);
+
+    for (const result of [staleReaderResult, replacementResult, thirdResult]) {
+      assert.strictEqual(result.ok, true, JSON.stringify(result.errors));
+      assert.strictEqual(result.errors, undefined);
+    }
+
+    assert.strictEqual(replacementResult.runId, replacementRunId);
+    assert.strictEqual(thirdResult.runId, thirdRunId);
+    assert.notStrictEqual(replacementResult.runId, thirdResult.runId);
+    assert.strictEqual(staleReaderResult.runId, thirdResult.runId);
+    assert.strictEqual(staleReaderResult.latched, true);
+    assert.deepStrictEqual(readLines(marker), ["run", "run"]);
+    assert.ok(!existsSync(join(logDir, "lock")), "no live lock should remain after all contenders finish");
+    assert.deepStrictEqual(readdirSync(logDir).filter((name) => name.includes(".reaping.")), []);
+
+    for (const result of [replacementResult, thirdResult]) {
+      const runDir = join(logDir, "runs", result.runId);
+      const runResult = readJson<ValidateResult>(join(runDir, "result.json"));
+      assert.strictEqual(runResult.runId, result.runId);
+      for (const gateResult of Object.values(result.gates)) {
+        assert.strictEqual(dirname(gateResult.log), runDir);
+      }
+    }
   });
 
   it("T9 abandons a latch when the owner dies without publishing and then re-contends", async () => {

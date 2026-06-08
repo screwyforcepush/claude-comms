@@ -106,7 +106,7 @@ Latch is on the **whole suite**, not per-gate. Two roles emerge from one atomic 
 **Acquire** — `fs.mkdirSync(logDir/lock)` (NOT `recursive:true` — that hides `EEXIST`):
 - **Success ⇒ OWNER.** *Immediately* publish `meta.json` **atomically into the lock**: write `lock/meta.json.tmp.<pid>` then `fs.renameSync` → `lock/meta.json`. Contents `{pid, runId, gateKey, head, dirty, startedAt}`. (Atomic publish means a contender never observes a half-written meta — it sees either no meta or the complete object; see §3.4 grace for the no-meta window.)
 - **`EEXIST` ⇒ contend** → read `lock/meta.json` and branch to reap-or-latch (§3.4).
-- **`EACCES` / lock-dir uncreatable (TRUE lock-infrastructure failure ONLY)** ⇒ **graceful un-latched fallback**: warn to stderr, run gates un-coordinated (`latched:false`), never hard-fail (North Star graceful-degradation). **This fallback is reserved for lock-infra failure ONLY — never for ordinary contention** (D-fallback, §3.4). To guarantee it never clobbers a coordinated run's artifacts, the un-latched run writes to **pid-suffixed isolated paths**: `runs/unlatched-<pid>/result.json` and `runs/unlatched-<pid>/<gate>.log` (it publishes no shared `meta.json` and does not touch a coordinated `runs/<runId>/`).
+- **`EACCES` / `EPERM` / `EROFS` lock-dir failure (TRUE lock-infrastructure failure ONLY)** ⇒ **graceful un-latched fallback**: warn to stderr, run gates un-coordinated (`latched:false`), never hard-fail (North Star graceful-degradation). **This fallback is reserved for lock-infra failure ONLY — never for ordinary contention** (D-fallback, §3.4). To guarantee it never clobbers a coordinated run's artifacts, the un-latched run writes to **pid-suffixed isolated paths**: `runs/unlatched-<pid>/result.json` and `runs/unlatched-<pid>/<gate>.log` (it publishes no shared `meta.json` and does not touch a coordinated `runs/<runId>/`).
 
 **Owner run sequence (ordering is load-bearing):**
 1. Spawn all selected gates concurrently (§3.5), await all. Logs stream to `runs/<runId>/<gate>.log`.
@@ -119,7 +119,7 @@ Step 3-before-4 guarantees: when a latcher observes the lock gone, **its target 
 
 ### 3.4 Reap vs latch (contender path)
 
-On `EEXIST`, the whole contender path runs in a **bounded re-contention loop** (each iteration: read meta → classify → reap-and-reacquire OR latch; loop back on any "I lost the race" or "owner abandoned" signal), bounded by `config.timeoutMs`. **On timeout: exit with a clear coordination error (non-zero) — NEVER spawn a duplicate run** (North Star single-flight; D-fallback). The only path that runs un-latched is the §3.3 `EACCES` lock-infra fallback.
+On `EEXIST`, the whole contender path runs in a **bounded re-contention loop** (each iteration: read meta → classify → reap-and-reacquire OR latch; loop back on any "I lost the race" or "owner abandoned" signal), bounded by `config.timeoutMs`. **On timeout: exit with a clear coordination error (non-zero) — NEVER spawn a duplicate run** (North Star single-flight; D-fallback). The only path that runs un-latched is the §3.3 `EACCES`/`EPERM`/`EROFS` lock-infra fallback.
 
 Read `lock/meta.json` and classify:
 
@@ -149,6 +149,8 @@ Read `lock/meta.json` and classify:
   3. **Timeout terminal behavior:** if `config.timeoutMs` elapses with neither a target result nor a successful re-contention, exit with a coordination error (non-zero) — defined, never a hang/throw, never a duplicate run.
   - **No drift re-run in v1**: the latcher serves the stamped result *even if HEAD moved during the wait*. It does **not** compare its own HEAD to the result's.
 
+**D17 accepted yank-window residual (v1):** if a live owner's lock directory is externally yanked, or the owner is misclassified stale during the no-heartbeat window while its gate processes keep running, a contender can acquire a fresh lock and start a second run before the original owner publishes. This residual is accepted for v1 because gates are required to be idempotent, every run writes immutable `runs/<runId>/` artifacts, and each invocation's exit code is derived only from the result it returns. The residual is self-limiting: it cannot clobber another run's logs/result or change a failed gate into a successful exit. The D10 owner heartbeat (`lastHeartbeatAt` in `meta.json`) is the future close; it lets contenders distinguish a slow-but-live owner from a truly stale lock without relying only on `startedAt` age.
+
 ### 3.5 Concurrent gate execution
 
 Per gate, from `config.gates` (`{name, command}`):
@@ -172,7 +174,7 @@ Per gate, from `config.gates` (`{name, command}`):
 
 ### 3.7 Config shape
 
-`config.json` (committed, THIS repo — see §6 D2 for gate rationale):
+`config.json` (committed, THIS repo — see §6 D2/D13/D18 for gate rationale; build command abbreviated here, exact command lives in `.agents/tools/validate/config.json`):
 ```json
 {
   "logDir": "/tmp/claude-comms-validate",
@@ -184,7 +186,7 @@ Per gate, from `config.gates` (`{name, command}`):
     { "name": "lint",     "command": "npm --prefix packages/setup-installer run lint" },
     { "name": "ts:check", "command": "npx tsc --noEmit -p workflow-engine/convex/tsconfig.json" },
     { "name": "test",     "command": "npx tsx --test .agents/tools/validate/*.test.ts" },
-    { "name": "build",    "command": "cd workflow-engine/ui && npx vercel build --yes" }
+    { "name": "build",    "command": "cd workflow-engine/ui && node -e \"<static fallback: recursively node --check js/**/*.js plus sw.js; then required-file, JSON, and module-entry assertions>\"" }
   ]
 }
 ```
@@ -210,7 +212,8 @@ agent ──npx tsx cli.ts──▶ parse args ──▶ load config.json
                   read result.json                      capture head/dirty (git, graceful)
                   emit, exit 0                                      │
                                           mkdirSync(lock) ─EEXIST─▶ read meta (loop, ≤timeoutMs)
-                                              │success │EACCES         │
+                                              │success │EACCES/        │
+                                              │        │EPERM/EROFS    │
                                               ▼        ▼          ┌────┴───────────────┬──────────────┐
                                             OWNER   un-latched  bad-meta+old      dead-pid/aged    live&fresh
                                        publish meta  (pid-iso     /gate mismatch       │          + gate match
@@ -249,18 +252,20 @@ WP-A (validate tool core) ──── CLI contract ────▶ WP-B (repo.m
 
 **D1 — config.json is committed with defaults; client edits post-install.** Keeping client configs updated over time is OUT of scope. (North Star D1.)
 
-**D2 — EXACTLY ONE build gate: `vercel build` (UI deploy-parity), not `pnpm build`.**
+**D2 — EXACTLY ONE build gate targets the Vercel UI deploy surface, not `pnpm build`.**
 Investigation of THIS repo's real surface:
 - The `pnpm lint/ts:check/test/build` commands in `repo.md` **do not exist** here — root `package.json` has empty `scripts`, there is no `pnpm-workspace.yaml`. They are generic template boilerplate (`repo.md` is in the no-overwrite/client-customized set).
 - Real deploy surfaces: (a) npm-publish of `packages/setup-installer` — CI (`.github/workflows/publish-claude-comms.yml`) runs `eslint` + `node scripts/build.js`; (b) Convex backend `convex deploy` — typechecked; (c) **static UI → Vercel deploy**, gated by `vercel build --yes` per `repo.md` "PRE Deployment".
-- The documented divergence ("`pnpm build` passed but the Vercel deploy later failed") **is** the UI surface. `setup-installer`'s `build` is a file-copy (`scripts/build.js`) — it cannot catch a Vercel failure. Therefore the deploy-parity build gate is **`cd workflow-engine/ui && npx vercel build --yes`**; we do NOT also ship a `pnpm build`/installer-build gate.
+- The documented divergence ("`pnpm build` passed but the Vercel deploy later failed") **is** the UI surface. `setup-installer`'s `build` is a file-copy (`scripts/build.js`) — it cannot catch a Vercel failure. Therefore the deploy-parity target is **`cd workflow-engine/ui && npx vercel build --yes`**; we do NOT also ship a `pnpm build`/installer-build gate.
 - The other surfaces remain covered by *non-build* gates: `ts:check` = `tsc --noEmit` over the Convex tsconfig (deploy-parity for the backend); `lint` = the setup-installer eslint that CI enforces.
 
 **D3 — Test gate runs the tool's own `tsx --test` suite.** The repo's TS tests already run via `npx tsx --test` (see `.agents/tools/workflow/lib/*.test.ts`); jest in `setup-installer` is flaky and disabled in CI. The committed `test` gate = `npx tsx --test .agents/tools/validate/*.test.ts` (implementer may broaden to `.agents/tools/**/*.test.ts` if all pass green).
 
 **D4 — `--status` always exits 0.** It is a read operation; the verdict is carried in the payload's `ok`. Avoids conflating "the read succeeded" with "the last run passed."
 
-**D2-hardened — never commit an always-red gate; verify deploy-parity green in THIS container before commit.** `vercel build` stays the committed deploy-parity gate, BUT every committed `config.json` gate MUST be verified green-or-expected-pass in this container before commit (a default that can never go green poisons the tool's credibility and every downstream client). If `vercel build` cannot run headlessly, substitute the **closest runnable UI-build parity gate** (the static build step `vercel build` wraps for this `React.createElement` UI) as the committed default and **surface the trade-off to PM** — do NOT silently drop deploy-parity. The auth/link prerequisite is documented in `README.md` either way. (Resolution executed in WP-A step 6; see §10-Q1.)
+**D2-hardened — never commit an always-red gate; verify deploy-parity green in THIS container before commit.** Every committed `config.json` gate MUST be verified green-or-expected-pass in this container (a default that can never go green poisons the tool's credibility and every downstream client). If `vercel build` cannot run headlessly, substitute the **closest runnable UI-build parity gate** (the static build step `vercel build` wraps for this `React.createElement` UI) as the committed default and **surface the trade-off to PM** — do NOT silently drop deploy-parity. The auth/link prerequisite is documented in `README.md` either way. (Resolution executed in WP-A step 6; see §10-Q1 and D13/D18.)
+
+**D13/D18 — committed v1 `build` default is the strengthened static UI fallback.** In this container `vercel build --yes` fails before build because the token/linking state is unavailable, so the committed default must not be an always-red gate. The accepted fallback is a static deploy-shape check for this no-bundler UI: recursively run `node --check` on every `.js` file under `workflow-engine/ui/js/` plus `workflow-engine/ui/sw.js`, then preserve the required-file presence checks, `vercel.json`/`manifest.json` JSON parse, and `index.html` module-entry assertion. Swap the config back to `vercel build --yes` when the client environment is linked and authenticated.
 
 **D5 — Latch identity = `runId` + `gateKey` (supersedes "by `startedAt`").** `startedAt` alone is unsafe (same-ms reuse) and gives `--gates` no way to distinguish a subset run from an all-gates run. Identity is `runId` (`${startedAt}-${rand}`) plus a sorted `gateKey`, sampled ONCE at acquire and threaded verbatim into `meta.json` and the run's `result.json` (§3.1, §3.3). The latcher matches its target run's immutable `runs/<runId>/result.json`, never the global pointer (§3.4).
 
@@ -272,9 +277,11 @@ Investigation of THIS repo's real surface:
 
 **D9 — Latch ONLY on EXACT gate-set match.** A latcher latches only when `meta.gateKey` equals its own sorted `gateKey`. Any mismatch (all-gates vs subset, or two different subsets) is treated as non-matching → contend/queue for its own run. No projection, no superset-satisfies-subset, no cross-latch (§3.4d).
 
-**D-fallback — un-latched run is reserved for TRUE lock-infrastructure failure ONLY (`EACCES`/uncreatable lock dir).** Ordinary contention/races NEVER trigger a second run (that would violate the North Star: "a 2nd validator must not trigger a 2nd run"). On contention the contender keeps reaping/latching until `timeoutMs`, then exits with a coordination error. The `EACCES` un-latched run writes pid-isolated artifacts so it cannot clobber a coordinated run (§3.3).
+**D-fallback — un-latched run is reserved for TRUE lock-infrastructure failure ONLY (`EACCES`/`EPERM`/`EROFS` lock-dir failure).** Ordinary contention/races NEVER trigger a second run (that would violate the North Star: "a 2nd validator must not trigger a 2nd run"). On contention the contender keeps reaping/latching until `timeoutMs`, then exits with a coordination error. The un-latched run writes pid-isolated artifacts so it cannot clobber a coordinated run (§3.3).
 
-**D10 — `staleLockMs` must exceed worst-case suite duration; age is the authoritative reap backstop.** The previous `staleLockMs` (15 min) `<` `timeoutMs` (30 min) let a healthy slow owner be age-reaped mid-run. Reconciled: `staleLockMs`=30 min `>` worst-case suite, `timeoutMs`=40 min `≥` `staleLockMs` (§3.7 invariant). Dead-PID reap is best-effort (PID reuse); age is authoritative. Owner heartbeat is a documented future option, OUT of v1.
+**D10 — `staleLockMs` must exceed worst-case suite duration; age is the authoritative reap backstop.** The previous `staleLockMs` (15 min) `<` `timeoutMs` (30 min) let a healthy slow owner be age-reaped mid-run. Reconciled: `staleLockMs`=30 min `>` worst-case suite, `timeoutMs`=40 min `≥` `staleLockMs` (§3.7 invariant). Dead-PID reap is best-effort (PID reuse); age is authoritative. Owner heartbeat is the documented future close for D17's yank-window residual, OUT of v1.
+
+**D17 — accepted v1 yank-window double-run residual; D10 heartbeat is the future close.** The concurrency model is single-flight for ordinary contention and coordinated stale reaping, but v1 has no owner heartbeat. If an otherwise-live owner's lock is yanked or misclassified stale while its child gates continue, another contender may start a second run. This is accepted for v1 because configured gates are idempotent, artifacts are immutable per `runId`, and each CLI process exits from its own returned result's exit-code rollup. The failure mode is bounded to extra work/logs, not wrong verdicts or clobbered artifacts. D10's future heartbeat (`lastHeartbeatAt`) closes this by making liveness freshness explicit instead of inferred from lock age.
 
 ---
 
@@ -348,7 +355,7 @@ Add `.agents/tools/validate/config.json` to the `preserveIfExists` array in `src
 | T4 | **`--status`** | With a prior latest `result.json` → emits it, **no gate spawned**, exit 0. With none → `{status:"none"}`, exit 0. |
 | T5 | **Stale-lock reaping — dead PID** | Pre-create `lock/meta.json` with a dead PID → run reaps lock (atomic rename-to-claim), becomes owner, completes `latched:false`. |
 | T6 | **Stale-lock reaping — aged** | Pre-create `lock/meta.json` with `startedAt` older than `staleLockMs` (live-looking pid) → reaped, owner takes over. |
-| T7 | **Graceful degradation** | (a) run in a non-git tmp dir → `head===null`, `dirty===null`, gates still run, `ok` correct. (b) `EACCES`/lock dir un-creatable → warns + runs un-latched (`latched:false`) to **pid-isolated** paths. |
+| T7 | **Graceful degradation** | (a) run in a non-git tmp dir → `head===null`, `dirty===null`, gates still run, `ok` correct. (b) `EACCES`/`EPERM`/`EROFS` lock-dir failure → warns + runs un-latched (`latched:false`) to **pid-isolated** paths. |
 | T8 | **Two-reaper race → exactly one wins** | Two contenders both seeing one stale lock → atomic `renameSync` seize means exactly ONE reaps+re-acquires+runs (counter incremented once); the loser re-contends and latches. No double ownership. |
 | T9 | **Latcher recovers when owner dies without publishing** | Pre-create a live-looking `lock/meta.json` (target `runId`) but never publish `runs/<runId>/result.json`; then remove the lock mid-poll → latcher ABANDONS and re-contends (becomes owner / completes), **does NOT hang** to `timeoutMs`. |
 | T10 | **Gate-set mismatch does not cross-latch** | Owner in-flight with all gates; a `--gates lint` contender (different `gateKey`) does NOT latch the all-gates result — it contends and runs its own `lint`-only run once the owner releases. (And vice-versa: subset owner does not satisfy an all-gates request.) |
@@ -363,7 +370,7 @@ Add `.agents/tools/validate/config.json` to the `preserveIfExists` array in `src
 ## 9. Assignment-Level Success Criteria
 
 - [ ] `npx tsx .agents/tools/validate/cli.ts` runs all configured gates **concurrently**, **blocks** to completion, emits per-gate `{status,exitCode,log}` + top-level `ok`, exits non-zero iff any gate failed.
-- [ ] Second concurrent invocation **latches** (no second run), waits, receives the same stamped result with `latched:true`. Ordinary contention NEVER spawns a duplicate run; only a TRUE lock-infra failure (`EACCES`) runs un-latched (pid-isolated) (D-fallback).
+- [ ] Second concurrent invocation **latches** (no second run), waits, receives the same stamped result with `latched:true`. Ordinary contention NEVER spawns a duplicate run; only a TRUE lock-infra failure (`EACCES`/`EPERM`/`EROFS`) runs un-latched (pid-isolated) (D-fallback).
 - [ ] Latch identity is `runId`+`gateKey` (D5/D9); exact gate-set match only — no subset↔all-gates cross-latch.
 - [ ] Stale locks (dead PID **or** age > `staleLockMs`) are reaped via **atomic rename-to-claim** (exactly one reaper wins); `staleLockMs` > worst-case suite duration (D10).
 - [ ] Latcher does a **liveness re-check** and recovers (re-contends) if the owner dies without publishing or is replaced — never hangs; timeout → coordination error (D8).
@@ -372,7 +379,7 @@ Add `.agents/tools/validate/config.json` to the `preserveIfExists` array in `src
 - [ ] Gates are config-driven (`{name,command}`, order-independent); `config.json` committed with verified defaults.
 - [ ] Zero new npm deps; verdict from exit codes only; per-gate error-count out of scope.
 - [ ] Blocking only — never detaches/backgrounds; logs under `/tmp`, no repo-tree writes, no `.gitignore` change.
-- [ ] Exactly one build gate (`vercel build`, D2) — not duplicated; verified green-or-expected-pass in this container before commit (D2-hardened — never commit an always-red default).
+- [ ] Exactly one build gate targeting the Vercel UI deploy surface — committed as the D13/D18 static fallback in this headless container, not duplicated; verified green-or-expected-pass before commit (D2-hardened — never commit an always-red default).
 - [ ] `--gates` / `--status` / `--help` surface present; graceful no-git & no-lock degradation.
 - [ ] `.agents/repo.md` `[VALIDATE]` rewired to the CLI; `.agents/AGENTS.md` lines 52-54 (nohup/process-check recipe) trimmed, lines 47 & 55 preserved (D7).
 - [ ] `npx claude-comms` preserves an existing `.agents/tools/validate/config.json` (verified in temp dir).
@@ -383,7 +390,7 @@ Add `.agents/tools/validate/config.json` to the `preserveIfExists` array in `src
 
 ## 10. Ambiguities / Questions for the implementer
 
-- **Q1 — Headless `vercel build` (D2).** The deploy-parity build gate is `vercel build`, but the CLI may require auth/project-linking that is unavailable in a headless agent container. **Resolution path:** during WP-A step 6, run the gate; if it cannot exit cleanly headless, keep it as the committed gate (it *is* the deploy-parity gate) and document the auth prerequisite in `README.md`, OR — if the user prefers a guaranteed-green default — substitute the closest runnable parity gate and note the trade-off. *Surface the outcome to PM.* Do not silently drop the deploy-parity gate.
+- **Q1 — Headless `vercel build` (D2) resolved by D13/D18.** The deploy-parity target remains `vercel build`, but the CLI requires auth/project-linking that is unavailable in this headless container. The committed default is therefore the closest runnable parity gate: the strengthened static UI fallback that recursively syntax-checks all UI JS modules plus `sw.js` and validates the static deploy shape. `README.md` documents replacing it with `vercel build --yes` once the project is linked and authenticated.
 - **Q2 — `test` gate scope (D3).** Committed as the validate tool's own suite. Broaden to `.agents/tools/**/*.test.ts` only if every existing suite is green in this container (verify, don't assume).
 - **Q3 — `ts:check` resolution.** `npx tsc -p workflow-engine/convex/tsconfig.json` must resolve the `typescript` devDep (it lives under `workflow-engine/`). Implementer verifies `npx tsc` resolves from `repoRoot` cwd; if not, use `npm --prefix workflow-engine exec -- tsc --noEmit -p convex/tsconfig.json`.
 - **Q4 — Installer raw-URL fallback omits `.agents/tools/*` (FLAGGED to PM — possible 5th surface, NOT edited).** *Verified finding:* the installer's governing delivery paths **do** ship `.agents/tools/validate/`: the primary `fetchRepository` → `fetchAsTarball` filters `actualPath.startsWith('.agents/')` wholesale (`github.js:915,920`), and the Strategy-2 `fetchDirectory('.agents')` Trees API (`github.js:234`) and Contents API (recursive) likewise deliver the whole subtree. **Only the deepest fallback** `_fetchWithRawUrls` (`github.js:301-368`, reached *only* if tarball **and** Trees **and** Contents all fail) hardcodes a `knownFiles` list (`github.js:336-337`) containing just `.agents/AGENTS.md` + `.agents/repo.md` — it would omit `tools/validate/`. **Crucially this is a PRE-EXISTING gap**: that same hardcoded list already omits *every* existing `.agents/tools/*` dir (`chrome-devtools`, `workflow`, `agent-job`), so `validate/` introduces no new bug class and the phase is at parity with the current baseline. **Recommendation: do NOT edit `github.js` in this phase** (it is a 5th file, a pre-existing-bug fix, and out of the North Star's scope boundary). If PM wants the raw-URL last-resort hardened to enumerate the tools dirs, that is a separate, sign-off-gated work item. *Reported in the plan summary per VERIFY-AND-FLAG.*
@@ -393,7 +400,7 @@ Add `.agents/tools/validate/config.json` to the `preserveIfExists` array in `src
 ## 11. Recommended Job Sequence
 
 1. **implement** WP-A (TDD: tests red → engine/CLI green) and **implement** WP-C **in parallel** (independent surfaces). WP-B (repo.md + AGENTS.md trim) authored against §3.6 alongside.
-2. **review** (fan-out) — focus on the now-hardened concurrency core: atomic-meta acquire (§3.3) → immutable runId publish-before-release (§3.3) → atomic-rename-to-claim reap (§3.4) → liveness-checked latch with defined timeout (§3.4) → `EACCES`-only un-latched fallback (D-fallback); plus exit-code purity (no stdout parsing), `staleLockMs`>suite invariant (§3.7), and scope confined to the **four** surfaces.
+2. **review** (fan-out) — focus on the now-hardened concurrency core: atomic-meta acquire (§3.3) → immutable runId publish-before-release (§3.3) → atomic-rename-to-claim reap (§3.4) → liveness-checked latch with defined timeout (§3.4) → `EACCES`/`EPERM`/`EROFS`-only un-latched fallback (D-fallback); plus exit-code purity (no stdout parsing), `staleLockMs`>suite invariant (§3.7), and scope confined to the **four** surfaces.
 3. **uat** — exercise the §7 vertical slices: real concurrent double-invoke on this repo (latch), `--status`/`--gates`/`--help`, and the installer skip in a throwaway temp dir.
 
 Place UAT **after** review so the latch/reap edge cases are reasoned-about before manual concurrency testing.

@@ -58,6 +58,10 @@ Run artifacts are immutable under:
 
 The top-level `result.json` is only the latest-result pointer for `--status`.
 
+Accepted v1 residual: if a live owner's lock is externally yanked or misclassified stale before heartbeat support exists, another invocation may start a second run. This is self-limiting because gates are idempotent, each run writes immutable `runs/<runId>/` artifacts, and each CLI exits from the result it returned. D10 heartbeat support is the planned close.
+
+If lock infrastructure itself is unavailable because the lock directory cannot be created or written (`EACCES`, `EPERM`, or `EROFS`), the tool warns and runs un-latched in a pid-isolated run directory. Ordinary contention does not use this fallback.
+
 ## Default Gates
 
 This repo's committed config uses:
@@ -65,7 +69,7 @@ This repo's committed config uses:
 - `lint`: `npm --prefix packages/setup-installer run lint`
 - `ts:check`: `cd workflow-engine && npx tsc --noEmit -p convex/tsconfig.json`
 - `test`: `npx tsx --test .agents/tools/validate/*.test.ts`
-- `build`: static UI deploy-shape fallback: syntax-check `js/main.js`, `js/api.js`, and `sw.js`, parse `vercel.json` and `manifest.json`, and verify required static files and the module entry.
+- `build`: static UI deploy-shape fallback: recursively syntax-check every `.js` file under `workflow-engine/ui/js/` plus `workflow-engine/ui/sw.js`, parse `vercel.json` and `manifest.json`, and verify required static files and the module entry.
 
 The intended deploy-parity command is:
 

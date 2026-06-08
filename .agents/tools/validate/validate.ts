@@ -59,11 +59,29 @@ export interface GateProgress {
   log: string;
 }
 
+export interface ValidateReapHookInfo {
+  lockDir: string;
+  claimDir: string;
+  gateKey: string;
+  expected: {
+    pid: number;
+    runId: string;
+    gateKey: string;
+    startedAt: number;
+  } | null;
+}
+
+export interface ValidateCoordinationHooks {
+  beforeClaimStaleLock?: (info: ValidateReapHookInfo) => void | Promise<void>;
+  beforeRestoreClaimedLock?: (info: ValidateReapHookInfo) => void | Promise<void>;
+}
+
 export interface ValidateOptions {
   gates?: string[];
   repoRoot?: string;
   onProgress?: (progress: GateProgress) => void;
   onWarning?: (message: string) => void;
+  coordinationHooks?: ValidateCoordinationHooks;
 }
 
 interface TreeState {
@@ -252,16 +270,16 @@ async function handleContention(
   if (read.kind !== "valid") {
     const shouldReap = await badMetaIsReapable(config, paths.lockDir, paths.lockMetaPath, deadline);
     if (!shouldReap) return { kind: "continue" };
-    return tryReapAndAcquire(config, gateKey, repoRoot, deadline, null);
+    return await tryReapAndAcquire(config, gateKey, repoRoot, opts, deadline, null);
   }
 
   const meta = read.meta;
   if (!pidIsAlive(meta.pid)) {
-    return tryReapAndAcquire(config, gateKey, repoRoot, deadline, meta);
+    return await tryReapAndAcquire(config, gateKey, repoRoot, opts, deadline, meta);
   }
 
   if (Date.now() - meta.startedAt > config.staleLockMs) {
-    return tryReapAndAcquire(config, gateKey, repoRoot, deadline, meta);
+    return await tryReapAndAcquire(config, gateKey, repoRoot, opts, deadline, meta);
   }
 
   if (meta.gateKey === gateKey) {
@@ -290,19 +308,23 @@ async function badMetaIsReapable(
   }
 }
 
-function tryReapAndAcquire(
+async function tryReapAndAcquire(
   config: ValidateConfig,
   gateKey: string,
   repoRoot: string,
+  opts: ValidateOptions,
   deadline: number,
   expected: ReapExpectation | null,
-): ContentionAction {
+): Promise<ContentionAction> {
   if (Date.now() > deadline) {
     return { kind: "error", result: errorResult(gateKey, `timed out after ${config.timeoutMs}ms waiting for validate coordination`, Date.now()) };
   }
 
   const paths = pathsFor(config);
   const claimDir = `${paths.lockDir}.reaping.${process.pid}.${randomHex(3)}`;
+  const hookInfo = { lockDir: paths.lockDir, claimDir, gateKey, expected };
+
+  await opts.coordinationHooks?.beforeClaimStaleLock?.(hookInfo);
 
   try {
     renameSync(paths.lockDir, claimDir);
@@ -314,12 +336,15 @@ function tryReapAndAcquire(
 
   const claimed = readMeta(join(claimDir, "meta.json"));
   if (!claimedLockIsReapable(config, claimed, expected)) {
+    await opts.coordinationHooks?.beforeRestoreClaimedLock?.(hookInfo);
     try {
       renameSync(claimDir, paths.lockDir);
     } catch (error) {
-      if (errorCode(error) !== "EEXIST") {
-        return { kind: "error", result: errorResult(gateKey, `unable to restore live validate lock: ${errorMessage(error)}`, Date.now()) };
+      if (isRestoreContentionError(errorCode(error))) {
+        rmSync(claimDir, { recursive: true, force: true });
+        return { kind: "continue" };
       }
+      return { kind: "error", result: errorResult(gateKey, `unable to restore live validate lock: ${errorMessage(error)}`, Date.now()) };
     }
     return { kind: "continue" };
   }
@@ -436,7 +461,11 @@ async function runOwner(
 
   try {
     mkdirSync(context.runDir, { recursive: true });
-    const gateResults = await Promise.all(gates.map((gate) => runGate(gate, context.runDir, repoRoot, opts)));
+    const settledGateResults = await Promise.allSettled(gates.map((gate) => runGate(gate, context.runDir, repoRoot, opts)));
+    const gateResults = settledGateResults.map((settled) => {
+      if (settled.status === "rejected") throw settled.reason;
+      return settled.value;
+    });
     const gateMap: Record<string, GateResult> = {};
 
     for (const { name, result } of gateResults) {
@@ -461,6 +490,8 @@ async function runOwner(
     }
 
     return result;
+  } catch (error) {
+    return ownerErrorResult(context, `unable to run validate owner: ${errorMessage(error)}`);
   } finally {
     if (context.releaseLock) {
       releaseOwnedLock(paths.lockDir, paths.lockMetaPath, context);
@@ -641,6 +672,26 @@ function safeLogName(name: string): string {
 
 function isLockInfrastructureError(code: string | undefined): boolean {
   return code === "EACCES" || code === "EPERM" || code === "EROFS";
+}
+
+function isRestoreContentionError(code: string | undefined): boolean {
+  return code === "ENOTEMPTY" || code === "EEXIST" || code === "ENOENT";
+}
+
+function ownerErrorResult(context: OwnerContext, message: string): ValidateResult {
+  const finishedAt = Date.now();
+  return {
+    ok: false,
+    runId: context.runId,
+    gateKey: context.gateKey,
+    head: context.head,
+    dirty: context.dirty,
+    latched: false,
+    startedAt: context.startedAt,
+    finishedAt,
+    gates: {},
+    errors: [message],
+  };
 }
 
 function errorResult(gateKey: string, message: string, startedAt: number): ValidateResult {
