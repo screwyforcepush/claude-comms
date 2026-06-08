@@ -49,6 +49,8 @@ const MAPPING: Record<string, string> = {
   "todo-overhead": "todowrite-noise",
   "todo-reminder-spam": "todowrite-noise",
   "tooldeferral-todowrite": "todowrite-noise",
+  "TodoWrite-noise": "todowrite-noise",
+  "todo-write-noise": "todowrite-noise",
 
   // System reminder
   "system-reminder-bloat": "system-reminder-noise",
@@ -65,6 +67,7 @@ const MAPPING: Record<string, string> = {
   "system-reminder-pollution": "system-reminder-noise",
   "session-start-noise": "system-reminder-noise",
   "mcp-instructions-unsolicited": "system-reminder-noise",
+  "claude-md-injection": "system-reminder-noise",
 
   // Deferred tools
   "deferred-tools-noise": "deferred-tool-noise",
@@ -351,6 +354,7 @@ const MAPPING: Record<string, string> = {
   "skill-list-pollution": "skill-list-noise",
   "skill-list-unfiltered": "skill-list-noise",
   "irrelevant-skills-noise": "skill-list-noise",
+  "skills-list-noise": "skill-list-noise",
 
   // Decision record bloat
   "decision-log-bloat": "decision-record-bloat",
@@ -426,6 +430,43 @@ const MAPPING: Record<string, string> = {
   "serial-reads-avoidable": "parallel-dispatch",
   "serial-reads-could-parallelise": "parallel-dispatch",
   "sequential-when-parallel-possible": "parallel-dispatch",
+
+  // Dirty worktree — uncommitted state carrying between jobs/agents.
+  // Distinct from worktree-friction (which is git worktree feature friction).
+  "dirty-worktree-noise": "dirty-worktree",
+  "working-tree-noise": "dirty-worktree",
+  "dirty-working-tree-ignored": "dirty-worktree",
+  "uncommitted-handoff": "dirty-worktree",
+
+  // Spawn-agent API/schema mismatch
+  "spawn_agent-api-mismatch": "spawn-agent-api-mismatch",
+  "spawn-agent-schema-mismatch": "spawn-agent-api-mismatch",
+  "spawn_agent schema mismatch": "spawn-agent-api-mismatch",
+  "agent-api-mismatch": "spawn-agent-api-mismatch",
+  "agent-schema-mismatch": "spawn-agent-api-mismatch",
+
+  // Tool output noise — too much / wrong stuff dumped to stdout
+  "tool-noise": "tool-output-noise",
+  "grep-noise": "tool-output-noise",
+  "git-status-noise": "tool-output-noise",
+  "harness-output-noise": "tool-output-noise",
+  "snap-output-verbosity": "tool-output-noise",
+  "snapshot-noise": "tool-output-noise",
+  "ps-output-noise": "tool-output-noise",
+  "process-output-noise": "tool-output-noise",
+  "process-check-noise": "tool-output-noise",
+  "test-output-noise": "tool-output-noise",
+
+  // Tool output truncation — useful info cut off
+  "grep-truncation": "tool-output-truncation",
+  "git-status-truncation": "tool-output-truncation",
+
+  // Line citation friction — stale/imprecise file:line refs in handoffs
+  "line-citations": "line-citation-friction",
+  "line-reference-friction": "line-citation-friction",
+  "line-number-verification": "line-citation-friction",
+  "stale-line-refs": "line-citation-friction",
+  "file-citation-rigor": "line-citation-friction",
 };
 
 function help(): void {

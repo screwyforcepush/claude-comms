@@ -63,6 +63,7 @@ const CLAUDE_DISALLOWED_TOOLS = [
   "NotebookEdit",
   "PushNotification",
   "RemoteTrigger",
+  "Workflow",
   "mcp__claude_ai_Gmail__authenticate",
   "mcp__claude_ai_Gmail__complete_authentication",
   "mcp__claude_ai_Google_Calendar__authenticate",

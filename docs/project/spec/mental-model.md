@@ -269,6 +269,19 @@ The workflow engine has a fixed set of job types, each backed by a prompt templa
 
 Job types are referenced in the harness config (per-namespace) and stamped onto job records at insert time.
 
+## Agent Operating Environment — Harness Override & Tooling Levers
+
+### CLAUDE.md is the Harness-Misprompt Override Layer
+`CLAUDE.md` ships with every `npx claude-comms` client install. It is the **Claude-specific auto-injected context** — so its purpose is inherently Claude-scoped, and Claude Code's harness carries the worst default habits of the supported harnesses (sed/grep/cat bans, todo noise, context bloat). The file's job is therefore to **override bad harness prompting**, not to add project rules on top of good defaults.
+
+A concrete instance: the harness Bash guidance discourages `grep`/`sed`/`cat`/`awk` *"unless explicitly instructed."* That carve-out is the lever. CLAUDE.md **blesses read-side bash kludging wholesale** (inspection, `git show <sha>:path`, `jq`, multi-fact recon, word-diffs) — which *threads* the harness's own escape clause rather than fighting it. The seam: **read-side bash is blessed; write-side mutations still go through the dedicated Edit/Write tools** so the harness's file-state tracking and the user's review/diff affordances survive. Every captured friction in this class is read-side, so this costs nothing.
+
+### A Mandate Without a Tool Authors Friction
+When an AOP step *mandates* an action but ships no tool for it, agents faithfully hand-roll the mandated recipe — and that hand-rolling is the friction. The canonical case: `AOP.VALIDATE` mandated running lint/typecheck/test/build but shipped only a four-`nohup` recipe in `repo.md`, so every agent reinvented pid-poll loops. The fix is never to suppress the symptom downstream; it's to **ship the tool the mandate already assumes exists** and retarget the mandate at it.
+
+### Deploy-Parity Validation
+Validation should exercise the project **the same way a deployment would build it**, so "green locally" cannot diverge from "deploys clean." For claude-comms specifically (which is both the upstream toolkit *and* a client of itself), this surfaced as a real gap: `pnpm build` once passed while the Vercel deploy failed. The principle is one deploy-parity build gate per client — not duplicated gates — chosen per client's actual deploy path.
+
 ## Agent Reflection Feedback Loop
 
 A planned telemetry layer that captures **the agent's operating experience**, not its output. The premise: every job is also a usability test of its own tooling and workflow, and that signal is currently invisible.
@@ -306,6 +319,13 @@ Three choices in the capture shape are intentional, each protecting a different 
 **Reflection is critical-leaning by design.** There will never be a clean entry — the prompt asks for friction, so friction will be reported. The product question is therefore not "is there a problem?" but "what is the *loudest* problem?" Frequency-across-reflections is the severity signal the system already produces. No reflector needs to grade "how bad" anything is; aggregation does that honestly via volume.
 
 A consequence: the loudest signal can be one we choose not to act on (e.g. a harness-internal behaviour we can't remove). That's still useful — knowing what's being tolerated most loudly is decision-grade information even when the decision is "leave it."
+
+### Interpreting Reflection Data — Analyst Caveats
+
+Two biases are structural to friction-only capture and must be corrected for when reading aggregates:
+
+- **Blind to capability-as-strength.** The prompt asks for friction, so a *valued* capability never surfaces as a positive. A high count on a keyword like `kludged-bash` is **not** evidence the flexibility is bad — the system literally cannot emit "this was great." Flexibility being good and a friction keyword being loud are both true and not in tension; the friction is usually a *policy-environment conflict* (a rule bans the move while no alternative is shipped), not the capability itself.
+- **Citations over-claim mandate.** Reflectors routinely narrate self-imposed diligence and inherited *harness* rules as if they were repo-authored instructions (e.g. attributing the Bash sed-ban to "CLAUDE.md" when it lives in the harness; acting on "I must verify the committed blob" when no prompt says so). Always verify a painPoint's citation against the actual artifact before treating it as the originating layer — the real originator (and therefore the lever) is often a layer up or sideways from where the reflector pointed. This is the `reflection-causal-tracing` "confabulated citations" failure mode, generalized.
 
 ### Job Types That Reflect
 plan, implement, review, uat, pm, document. **Not chat** — chat reflection is on-demand by user request only.
@@ -372,6 +392,39 @@ V1 rubric was authored blind. Several questions are too broad to be answered wit
 ### Reflection Data Dump Utility
 
 `.agents/tools/workflow/introspection/dump-reflections.ts` writes all V1 reflection rows from all namespaces to a single JSON file. Feeds analysis assignments without making them invoke the introspection CLI.
+
+### Steward Analysis Workflow
+
+The Outcome Steward runs two distinct analysis flows against reflection data, at different cadences and depths:
+
+**Routine canonicalisation loop** (high frequency, narrow scope) — dump → inventory → cluster long-tail → edit MAPPING → apply normalize → re-inventory → read aggregates. Documented step-by-step in [`docs/project/guides/reflection-analysis-workflow.md`](../guides/reflection-analysis-workflow.md). Operates only on the keyword surface. Run when new variants accumulate (~50+ rows).
+
+**Periodic curiosity-driven dive** (low frequency, broad scope) — uses all dimensions the rows carry: keywords AND rubric responses (boolean kvp, the most structured signal) AND narrative prose AND items[].painPoint/suggestion. Cross-correlates across namespace, harness, jobtype, time. Aims to surface unknown-unknowns: stories the priors-list wouldn't predict. Outputs a diagnosis + ranked remedy list, not just an inventory. Procedure: [`docs/project/guides/reflection-causal-tracing.md`](../guides/reflection-causal-tracing.md). Runs as an assignment, not in-thread, because the work is hours-scale and benefits from PM-driven iteration discipline.
+
+**Principles for the periodic dive:**
+
+The dive's deliverable is a chain of causation from observed symptom to the in-repo authoring layer that produces it to a specific lever at that layer. A finding that stops at *"this happens often"* or *"this file has the symptom"* is a lead, not a finding.
+
+- **Originator-first.** Every promoted finding traces: **symptom** (what the data shows) → **mechanism** (the specific, named pattern producing the symptom — not a restatement of the symptom) → **originating authoring layer** (the in-repo artifact that instructs, permits, or fails-to-prevent the pattern, verified by reading the layer's actual text) → **lever** (the edit at the originating layer that would stop the friction being authored upstream). Completion test: *"if I edit the lever, does the friction stop being authored?"* — if it just suppresses the symptom while the upstream artifact still produces the broken pattern, the walk isn't done.
+
+- **Slice patterns are a navigation compass.** Cross-tab every candidate by harness, jobtype, and namespace *independently*. Where the signal concentrates points at the authoring scope to walk up to:
+  - one **harness** only → harness rules or harness-branched template sections
+  - one **jobtype** only → that jobtype's prompt template
+  - one **namespace** only → namespace config or project-specific files
+  - **intersection** (e.g. one harness × one jobtype) → where a higher-scope rule meets a narrower task; the in-repo lever usually lives in the narrower layer, often *threading* the higher-scope rule rather than overriding it
+  - **global** (across all slices) → AOP, CLAUDE.md, prompts.ts, or shared tooling
+
+  Slice patterns are signals pointing at where the originator lives, not constraints on what can be claimed.
+
+- **Priors are a vocabulary, not an analysis.** The known top-10 themes describe symptom-clusters — they name what we've seen before, not who authored it. A mechanism *within* a priors theme is still walkable to its originator. The priors floor prevents over-claiming novelty above the floor; it does not exempt within-floor patterns from causal tracing. *"Covered by priors"* is not a stopping condition.
+
+- **Curiosity-driven discovery; structured completion.** Analysts follow interesting signals where they lead — no pre-defined cross-tab list. But each promoted finding must complete the originator-first walk-up before it counts as done.
+
+- **Iteration-capped.** A hard cap (typical: 2–3 implement iterations) prevents analysis paralysis. Residual leads — symptoms surfaced but not yet walked up to an originator — go in a "known unanswered" section rather than triggering more iterations.
+
+- **Population variance** (namespace row counts, normalization-induced count drift) is a secondary data-hygiene check, not a headline discipline.
+
+For single-row upstream chain interrogation, neither flow applies — see [`cross-job-postmortem.md`](../guides/cross-job-postmortem.md).
 
 ### V2 Implementation Surface
 

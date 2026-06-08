@@ -88,6 +88,8 @@ npx tsx .agents/tools/workflow/cli.ts insert-job \
   --jobs '[{"jobType":"<type>","context":"WHAT: [deliverable]\nWHY: [reason]\nSUCCESS: [criteria]"}]'
 ```
 
+For multi-paragraph context, write the jobs JSON to a file and use `--jobs-file /tmp/jobs.json` instead of `--jobs '...'` (escapes heredoc/quoting).
+
 Types: `plan`, `implement`, `review`, `uat`, `document`.
 
 
