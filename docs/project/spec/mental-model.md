@@ -456,5 +456,6 @@ V1 ones; V1 introspection tooling preserved for the dual-life window.
 ## Open Questions
 
 - **Cross-namespace reflection access for the claude-comms Steward.** Per-namespace isolation is the default, but tooling friction signal lands in *every* namespace's reflections because tooling is upstream from here. Decide whether to amend the isolation principle for this Steward only, or keep it case-by-case.
+- **UI JavaScript is unlinted (parked backlog).** `workflow-engine/ui/js/` has no eslint config or type-check; the validate `build` gate's `node --check` is its *only* syntax guard (it exists precisely because a buildless static-deploy syntax error would white-screen prod uncaught). Giving the UI a real eslint pass would be strictly stronger and let the build gate shrink to file-presence + JSON-parse checks. Deferred deliberately — it's new coverage scope, not validate-CLI scope, and first-time-linting a legacy tree balloons. Revisit only if UI JS breakage recurs.
 - ~~**Rubric question rework.**~~ Resolved: greenfield rubricV2 via analysis assignment (see §RubricV2 — Greenfield, Evidence-Based). Will ship together with the items+narrative shape change.
 - ~~**Rollout timing for keyword-linked items.**~~ Resolved: new `reflectionsV2` table, client-by-client cutover at user's pace, V1 data preserved (see §V2 Rollout Strategy).
