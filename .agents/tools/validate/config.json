@@ -19,7 +19,7 @@
     },
     {
       "name": "build",
-      "command": "cd workflow-engine/ui && node -e \"const {spawnSync}=require('child_process'); const fs=require('fs'); const path=require('path'); const files=[]; const walk=(dir)=>{ for (const entry of fs.readdirSync(dir,{withFileTypes:true})) { const file=path.join(dir,entry.name); if (entry.isDirectory()) walk(file); else if (entry.isFile() && file.endsWith('.js')) files.push(file); } }; walk('js'); files.sort(); files.push('sw.js'); for (const file of files) { const result=spawnSync(process.execPath,['--check',file],{stdio:'inherit'}); if (result.error) throw result.error; if (result.status !== 0) process.exit(result.status === null ? 1 : result.status); } const required=['index.html','styles.css','js/main.js','js/api.js','manifest.json','sw.js','vercel.json']; for (const file of required) { if (!fs.existsSync(file)) throw new Error('missing '+file); } JSON.parse(fs.readFileSync('vercel.json','utf8')); JSON.parse(fs.readFileSync('manifest.json','utf8')); const html=fs.readFileSync('index.html','utf8'); if (!html.includes('type=\\\"module\\\" src=\\\"./js/main.js\\\"')) throw new Error('index.html missing module entry');\""
+      "command": "cd workflow-engine/ui && node check-deploy-shape.mjs"
     }
   ]
 }
