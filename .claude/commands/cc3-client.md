@@ -120,6 +120,27 @@ Check if `.agents/tools/workflow/config.json` exists. If not, create it from the
 - `password`: The `ADMIN_PASSWORD` set on the Convex server. All Convex calls require this. Must match exactly.
 
 
+## Step 2b: Configure validation gates
+
+`.agents/tools/validate/config.json` drives the `validate` CLI that agents run for AOP.VALIDATE. It ships carrying **claude-comms' own gate commands**, which will not match this project — you must replace them with THIS project's real validation commands.
+
+Inspect this repo's `package.json` scripts (and any CI config), then rewrite the `gates` array with one entry per check this project actually has — typically lint, typecheck, test, and a build/deploy check. Each gate is `{ "name": "<label>", "command": "<shell command>" }`; the command's **exit code** is the pass/fail verdict (non-zero = fail). Omit gates that don't apply — the array can be any length.
+
+```json
+{
+  "logDir": "/tmp/<project>-validate",
+  "gates": [
+    { "name": "lint",      "command": "npm run lint" },
+    { "name": "typecheck", "command": "npm run typecheck" },
+    { "name": "test",      "command": "npm test" },
+    { "name": "build",     "command": "npm run build" }
+  ]
+}
+```
+
+Leave the other keys (`pollIntervalMs`, `metaGraceMs`, `staleLockMs`, `timeoutMs`) at their defaults unless you have reason to change them.
+
+
 ## Step 3: Start the runner
 
 Check if a runner or its wrapper is already running first (we do NOT want duplicates):
