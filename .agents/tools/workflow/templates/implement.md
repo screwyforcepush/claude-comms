@@ -37,7 +37,7 @@ You must **launch batches of concurrent engineer agents** to execute independent
 - Coordinate to avoid conflicts and rework.
 - When Spawning Agents: CLAUDE do not background Agents, CODEX do not fork context.
 - Check the Agents periodically (every 5 mins or so) to see if they are still active/running.
-- After all implemntation tasks are complete, run lint/typecheck/test/build. Any red? Assign engineers to fix.
+- After all implementation tasks are complete, run lint/typecheck/test/build. Any red? Assign engineers to fix.
 
 Continue batching engineers until done!
 
@@ -51,7 +51,7 @@ The CRITICAL ORCHESTRATION PROTOCOLS below defines YOUR mandatory operating proc
 ## Tasking Agents
 ### Core Naming Protocol
 
-🚨 CRITICAL: Every agent MUST have a unique name (Unique human FirstName, Abstract obscure LastName) in Agent spanws:
+🚨 CRITICAL: Every agent MUST have a unique name (Unique human FirstName, Abstract obscure LastName) in Agent spawns:
 
 Format:
     - description: "<FirstNameLastName>: <3-5 word task description>"
