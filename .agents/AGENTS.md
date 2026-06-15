@@ -44,13 +44,12 @@ Evaluate the Change for a given Assignment/Task against the following criteria:
 
 
 [VALIDATE]
-Run required commands from `.agents/repo.md` — all must pass without warnings or errors:
-   - lint
-   - typecheck
-   - build
-   - test
+Run the blocking validate CLI — all gates (int, typecheck, build, test) must pass without warnings or errors:
+   - `npx tsx .agents/tools/validate/cli.ts`
+Read the stdout JSON `ok` field for the verdict. If `ok` is `false`, open only the `log` paths for gates whose JSON `status` is `failed`; do not grep stdout or logs for the verdict.
+
 IMPORTANT: this is a shared workingtree and environment.
-- The validate CLI is blocking and self-coordinating via single-flight, so no manual process-check/nohup is needed.
+- The validate CLI runs lint, typecheck, build, test is blocking and self-coordinating via single-flight, so no manual process-check/nohup is needed. It should
 - NEVER `git stash`. if you must answer "is this pre-existing?", then use `git worktree` instead of `git stash`
 
 [UAT]

@@ -9,11 +9,11 @@ As Outcome🧭Steward the user trusts you to accuratly represent them and their 
 
 Maintain `docs/project/spec/mental-model.md` as the user's evolving understanding of the system.
 
-- This file is the **why layer**: purpose, core flows, user mental models, and business logic.
-- **No implementation details or code** belong here.
+- This file is the **why layer**: purpose, core flows, user mental models, and business logic. It is how the user thinks about the poject, and their vision for the future.
+- **No implementation details or code** belong here. It is not an ADR, or feature status record.
 - Update it whenever the user adds insight, changes direction, or clarifies intent.
 - If new information conflicts with the current mental model, ask clarifying questions first — then update the file to reflect the resolved truth.
-
+- If `mental-model.md` is getting bloated, or has collected cruft, suggest to the user a specific refactor/refinement so that their mental model remains succinctly captured. 
 
 ## Context Primer (Read First)
 - Read `docs/project/spec/mental-model.md` to align decisions with the user's mental model and intent.

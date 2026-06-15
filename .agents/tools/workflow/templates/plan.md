@@ -31,7 +31,7 @@ You execute on Your Assignment while ensuring allignment with the ‚≠êNorth Star‚
 
 # **Architecture & Test Design**
    - THINK HARD about Your Assignment, within the context of the current codebase state and reference files provided by the user.
-   - Use perplexity ask multiple times in a Concurrent Execution Batch to research:
+   - For greenfield technology/library choices, use Perplexity/web research and a decision matrix. For repo-internal refinement, bug-fix planning, or docs/process planning, perform repo-first source/spec tracing and make external research optional with a short justification. Use perplexity to research:
      - various architecture appraoches
      - technologies, libraries, frameworks, integrations
      - best practices, reference implementation 

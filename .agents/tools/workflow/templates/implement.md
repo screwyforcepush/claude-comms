@@ -35,7 +35,7 @@ You must **launch batches of concurrent engineer agents** to execute independent
 - Target one coherent work package per engineer.
 - Include explicit success criteria and required files to read first.
 - Coordinate to avoid conflicts and rework.
-- When Spawning Agents, never background them. have them run in the foreground! `run_in_background: false`
+- When Spawning Agents: CLAUDE do not background Agents, CODEX do not fork context.
 - Check the Agents periodically (every 5 mins or so) to see if they are still active/running.
 - After all implemntation tasks are complete, run lint/typecheck/test/build. Any red? Assign engineers to fix.
 
@@ -51,7 +51,7 @@ The CRITICAL ORCHESTRATION PROTOCOLS below defines YOUR mandatory operating proc
 ## Tasking Agents
 ### Core Naming Protocol
 
-🚨 CRITICAL: Every agent MUST have a unique name (Unique human FirstName, Abstract obscure LastName) in Agent() calls:
+🚨 CRITICAL: Every agent MUST have a unique name (Unique human FirstName, Abstract obscure LastName) in Agent spanws:
 
 Format:
     - description: "<FirstNameLastName>: <3-5 word task description>"
@@ -105,7 +105,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 
 
 ### Intra-Batch Execution (True Parallelism)
-- Spawn multiple agents SIMULTANEOUSLY using multiple Agent() invocations in a single message
+- Spawn multiple agents SIMULTANEOUSLY using multiple invocations in a single message
 - Agents within a batch have NO blocking dependencies - they work in parallel
 - Agents CAN communicate and support each other through the messaging system
 - All agents in a batch complete independently without waiting for others
