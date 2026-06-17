@@ -67,10 +67,11 @@ export interface ChatJobContext {
   // Guardian mode context
   assignmentId?: string;
   isGuardianEvaluation?: boolean; // True when PO is evaluating PM response
+  isCompletionSummary?: boolean; // True when PO is summarizing a completed assignment
 }
 
 // Prompt types for differential prompting
-export type PromptType = "full" | "mode_activation" | "minimal" | "guardian_eval";
+export type PromptType = "full" | "mode_activation" | "minimal" | "guardian_eval" | "completion_summary";
 
 // Resolve templates directory relative to this module
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -313,6 +314,11 @@ export function determinePromptType(chatContext: ChatJobContext): PromptType {
   const isNewSession = !chatContext.claudeSessionId;
   const isGuardianEval = chatContext.isGuardianEvaluation === true;
 
+  // Completion summary always gets its special prompt (gate before new-session check)
+  if (chatContext.isCompletionSummary === true) {
+    return "completion_summary";
+  }
+
   // Guardian evaluation always gets its special prompt
   if (isGuardianEval) {
     return "guardian_eval";
@@ -381,6 +387,10 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
       parts.push(extractSection(template, "GUARDIAN_MODE"));
       break;
 
+    case "completion_summary":
+      parts.push(extractSection(template, "COMPLETION_SUMMARY"));
+      break;
+
     case "minimal":
       // No template content - just user message
       break;
@@ -388,8 +398,8 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
 
   let prompt = replaceVars(parts.join("\n\n---\n\n"));
 
-  // Append user message (not for guardian - PM report is already in LATEST_MESSAGE)
-  if (promptType !== "guardian_eval") {
+  // Append user message (not for guardian/completion - PM report is already in LATEST_MESSAGE)
+  if (promptType !== "guardian_eval" && promptType !== "completion_summary") {
     prompt += `\n\n---\n\n**User says:**\n${chatContext.latestUserMessage}`;
   }
 

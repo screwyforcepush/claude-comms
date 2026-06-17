@@ -264,4 +264,30 @@ describe('buildChatPrompt scenarios', () => {
     assert.ok(!jamPrompt.includes('{{#if'), 'Jam prompt should not have unprocessed conditionals');
     assert.ok(!cookPrompt.includes('{{#if'), 'Cook prompt should not have unprocessed conditionals');
   });
+
+  it('scenario: completion summary uses executive-assessment section', () => {
+    const pmReport = 'All 3 work packages landed. Build green, 42 tests passing. Deployed to prod.';
+    const context = mockChatContext({
+      mode: 'cook',
+      claudeSessionId: 'session_abc123', // resumes main thread session
+      assignmentId: 'asgn_abc123',
+      latestUserMessage: pmReport, // PM report carried as the trigger message
+      isCompletionSummary: true,
+    });
+
+    const prompt = buildChatPrompt(context, 'my-project');
+
+    // Uses the COMPLETION_SUMMARY section, not jam/cook mode prose
+    assert.ok(prompt.includes('ASSIGNMENT COMPLETE'), 'Should use the executive-assessment section');
+    assert.ok(prompt.includes('asgn_abc123'), 'Should inject the assignment id');
+
+    // PM report present exactly once (not re-appended as a "User says" block)
+    const occurrences = prompt.split(pmReport).length - 1;
+    assert.strictEqual(occurrences, 1, 'PM report should appear exactly once');
+    assert.ok(!prompt.includes('**User says:**'), 'Should not append a User says block');
+
+    // No unreplaced placeholders
+    assert.ok(!prompt.includes('{{LATEST_MESSAGE}}'), 'LATEST_MESSAGE should be replaced');
+    assert.ok(!prompt.includes('{{ASSIGNMENT_ID}}'), 'ASSIGNMENT_ID should be replaced');
+  });
 });

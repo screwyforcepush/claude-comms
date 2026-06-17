@@ -29,6 +29,8 @@ export const trigger = mutation({
     model: v.optional(v.string()),
     // Guardian mode: if true, this is a PO evaluation of PM report
     isGuardianEvaluation: v.optional(v.boolean()),
+    // Completion summary: if true, this is the executive summary of a completed assignment
+    isCompletionSummary: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -90,6 +92,7 @@ export const trigger = mutation({
       forkSession,
       assignmentId: thread.assignmentId,
       isGuardianEvaluation: args.isGuardianEvaluation ?? false,
+      isCompletionSummary: args.isCompletionSummary ?? false,
     };
 
     // 5. Create chat job (no assignment!)

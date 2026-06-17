@@ -275,6 +275,43 @@ async function triggerGuardianEvaluation(
   }
 }
 
+// Completion Summary: drop an executive assessment into the jam/cook thread that owns the assignment
+async function triggerCompletionSummary(
+  assignment: Assignment,
+  pmResult: string
+): Promise<void> {
+  try {
+    const thread: ChatThread | null = await client!.query(
+      api.chatThreads.getCompletionThread,
+      { password: config.password, assignmentId: assignment._id as any }
+    );
+
+    if (!thread) {
+      console.log(`[Completion] No jam/cook thread for assignment ${assignment._id}`);
+      return;
+    }
+
+    console.log(`[Completion] Found thread ${thread._id}, triggering executive summary`);
+
+    const pmMessageId: string = await client!.mutation(api.chatMessages.add, {
+      password: config.password,
+      threadId: thread._id as any,
+      role: "pm",
+      content: pmResult,
+    });
+
+    await client!.mutation(api.chatJobs.trigger, {
+      password: config.password,
+      threadId: thread._id as any,
+      triggerMessageId: pmMessageId as any,
+      isCompletionSummary: true,
+    });
+    console.log(`[Completion] Triggered executive summary chatJob for thread ${thread._id}`);
+  } catch (e) {
+    console.error(`[Completion] Summary failed for assignment ${assignment._id}:`, e);
+  }
+}
+
 // Job execution (uses HarnessExecutor for crash-resilient file-based streaming)
 async function executeJob(
   job: Job,
@@ -545,7 +582,7 @@ async function handleGroupCompletion(
     await triggerGuardianEvaluation(assignment, pmResult);
     // If PM didn't insert a next job, check if assignment is done
     if (!currentGroup.nextGroupId) {
-      await checkAndCompleteAssignment(assignment._id, group._id);
+      await checkAndCompleteAssignment(assignment._id, group._id, assignment, pmResult);
     }
     return;
   }
@@ -562,7 +599,12 @@ async function handleGroupCompletion(
 }
 
 // Check if all groups in assignment are done, if so mark complete
-async function checkAndCompleteAssignment(assignmentId: string, completedGroupId: string): Promise<void> {
+async function checkAndCompleteAssignment(
+  assignmentId: string,
+  completedGroupId: string,
+  assignment: Assignment,
+  pmResult: string
+): Promise<void> {
   const groups = await client!.query(api.jobs.listGroups, { password: config.password, assignmentId: assignmentId as any });
 
   const hasIncompleteGroups = groups.some(
@@ -579,6 +621,9 @@ async function checkAndCompleteAssignment(assignmentId: string, completedGroupId
     password: config.password,
     id: assignmentId,
   });
+
+  // Drop an executive summary of the completed assignment into its jam/cook thread
+  await triggerCompletionSummary(assignment, pmResult);
 }
 
 // PM group triggering
@@ -793,7 +838,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
               await saveSessionId(chatContext.threadId, sessionId);
             }
           }
-          if (!chatContext.isGuardianEvaluation) {
+          if (!chatContext.isGuardianEvaluation && !chatContext.isCompletionSummary) {
             await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);
           }
         } catch (e) {
