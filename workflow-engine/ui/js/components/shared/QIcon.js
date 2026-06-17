@@ -122,6 +122,16 @@ export const ICON_PATHS = {
     React.createElement('line', { x1: 4, y1: 16, x2: 20, y2: 16, stroke: 'currentColor', strokeWidth: sw * 0.6, opacity: 0.4 }),
     React.createElement('rect', { x: 10, y: 10, width: 4, height: 4, fill: 'currentColor', opacity: 0.6 })
   ),
+  pin: (sw) => React.createElement(React.Fragment, null,
+    React.createElement('path', {
+      d: 'M8 4 L16 4 L14 10 L18 14 L13 14 L12 21 L11 14 L6 14 L10 10Z',
+      stroke: 'currentColor',
+      strokeWidth: sw,
+      fill: 'none',
+      strokeLinejoin: 'miter'
+    }),
+    React.createElement('line', { x1: 10, y1: 10, x2: 14, y2: 10, stroke: 'currentColor', strokeWidth: sw * 0.7 })
+  ),
   add: (sw) => React.createElement(React.Fragment, null,
     React.createElement('line', { x1: 12, y1: 5, x2: 12, y2: 19, stroke: 'currentColor', strokeWidth: sw }),
     React.createElement('line', { x1: 5, y1: 12, x2: 19, y2: 12, stroke: 'currentColor', strokeWidth: sw })

@@ -2,7 +2,7 @@
 // WP-6: Transformed to Q palette brandkit styling
 // WP-7: Fullbright notification dot pattern for status and alignment indicators
 import React from 'react';
-import { useQuery } from '../../hooks/useConvex.js';
+import { useQuery, useMutation } from '../../hooks/useConvex.js';
 import { api } from '../../api.js';
 import { QIcon } from '../shared/index.js';
 
@@ -266,6 +266,7 @@ export function ThreadIcon({ thread, assignment, isSelected, onClick }) {
  * - Display font for mode labels
  * - WP-5: Namespace badge for cross-namespace identification
  * - WP-5: Unread Fullbright dot for threads with new messages
+ * - Pin control: always visible; toggles pinned state without selecting the row
  * @param {Object} props
  * @param {Object} props.thread - Thread object
  * @param {Object} props.assignment - Linked assignment (for guardian mode)
@@ -276,6 +277,7 @@ export function ThreadIcon({ thread, assignment, isSelected, onClick }) {
  */
 export function ThreadItem({ thread, assignment, isSelected, onClick, namespaceName, latestMessageAt }) {
   const modeConfig = getModeConfig(thread.mode);
+  const togglePin = useMutation(api.chatThreads.togglePin);
   // Note: Alignment is displayed via Fullbright dot in ThreadIcon (top-right position)
 
   // WP-5: Determine unread status
@@ -283,6 +285,25 @@ export function ThreadItem({ thread, assignment, isSelected, onClick, namespaceN
   const isUnread = latestMessageAt && (
     !thread.lastReadAt || latestMessageAt > thread.lastReadAt
   );
+  const isPinned = !!thread.pinned;
+  const pinLabel = isPinned ? 'Unpin thread' : 'Pin thread';
+
+  const handleTogglePin = async (event) => {
+    event.stopPropagation();
+    try {
+      await togglePin({ id: thread._id });
+    } catch (error) {
+      console.error('Failed to toggle thread pin:', error);
+    }
+  };
+
+  const handlePinKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleTogglePin(event);
+    }
+  };
 
   // Base styles for the button
   const baseStyle = {
@@ -307,6 +328,23 @@ export function ThreadItem({ thread, assignment, isSelected, onClick, namespaceN
 
   // Hover state is handled via CSS class with Q palette copper tint
   // We use a combination of inline styles and a custom class
+  const pinControlStyle = {
+    position: 'absolute',
+    top: 4,
+    right: isUnread ? 20 : 6,
+    zIndex: 2,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+    color: isPinned ? 'var(--q-torch)' : 'var(--q-iron0)',
+    backgroundColor: isPinned ? 'rgba(212, 160, 48, 0.12)' : 'transparent',
+    boxShadow: isPinned ? '0 0 8px rgba(212, 160, 48, 0.35)' : 'none',
+    opacity: isPinned ? 1 : 0.7,
+    cursor: 'pointer',
+    transition: 'color 0.15s, opacity 0.15s, box-shadow 0.15s, background-color 0.15s'
+  };
 
   return React.createElement('button', {
     type: 'button',
@@ -326,6 +364,25 @@ export function ThreadItem({ thread, assignment, isSelected, onClick, namespaceN
       }
     }),
 
+    React.createElement('span', {
+      role: 'button',
+      tabIndex: 0,
+      title: pinLabel,
+      'aria-label': `${pinLabel}: ${thread.title || 'New Chat'}`,
+      'aria-pressed': isPinned,
+      onClick: handleTogglePin,
+      onKeyDown: handlePinKeyDown,
+      style: pinControlStyle
+    },
+      React.createElement(QIcon, {
+        name: 'pin',
+        size: 14,
+        color: 'currentColor',
+        strokeWidth: 1.8,
+        glow: isPinned
+      })
+    ),
+
     React.createElement('div', { className: 'flex items-start gap-3' },
       // Icon
       React.createElement(ThreadIcon, {
@@ -336,7 +393,10 @@ export function ThreadItem({ thread, assignment, isSelected, onClick, namespaceN
       }),
 
       // Content
-      React.createElement('div', { className: 'flex-1 min-w-0' },
+      React.createElement('div', {
+        className: 'flex-1 min-w-0',
+        style: { paddingRight: isUnread ? 42 : 28 }
+      },
         // WP-5: Namespace badge — small tag above the title
         namespaceName && React.createElement('span', {
           style: {

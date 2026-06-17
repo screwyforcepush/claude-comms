@@ -199,6 +199,7 @@ export default defineSchema({
     lastReadAt: v.optional(v.number()), // B1: Unread tracking — timestamp of last read
     assignmentsCreated: v.optional(v.array(v.id("assignments"))), // U6: Multi-assignment history
     latestMessageAt: v.optional(v.number()), // Denormalized: timestamp of most recent message
+    pinned: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

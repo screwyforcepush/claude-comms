@@ -65,6 +65,8 @@ export const api = {
     remove: "chatThreads:remove",
     // Mark thread as read (unread tracking)
     markRead: "chatThreads:markRead",
+    // Toggle thread pinned state
+    togglePin: "chatThreads:togglePin",
     // Change focused assignment
     updateFocusAssignment: "chatThreads:updateFocusAssignment",
     // Backfill latestMessageAt for existing threads (run once)

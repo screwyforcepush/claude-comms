@@ -5,7 +5,7 @@ import { requirePassword } from "./auth";
 
 // Queries
 
-// List all threads cross-namespace, sorted by latestMessageAt desc (denormalized).
+// List all threads cross-namespace, sorted pinned-first then by latestMessageAt desc (denormalized).
 // No N+1 enrichment — latestMessageAt is written by chatMessages.add.
 // After backfill, can switch to pure index query: .withIndex("by_latest_message").order("desc").take(limit)
 export const listAll = query({
@@ -16,8 +16,12 @@ export const listAll = query({
 
     const threads = await ctx.db.query("chatThreads").collect();
 
-    // Sort by denormalized latestMessageAt, fallback to updatedAt for pre-backfill threads
-    threads.sort((a, b) => (b.latestMessageAt ?? b.updatedAt) - (a.latestMessageAt ?? a.updatedAt));
+    // Sort before slicing so pinned but quiet threads remain in the capped sidebar window.
+    threads.sort((a, b) => {
+      const pinnedDelta = Number(b.pinned ?? false) - Number(a.pinned ?? false);
+      if (pinnedDelta !== 0) return pinnedDelta;
+      return (b.latestMessageAt ?? b.updatedAt) - (a.latestMessageAt ?? a.updatedAt);
+    });
 
     return threads.slice(0, limit);
   },
@@ -138,6 +142,23 @@ export const markRead = mutation({
   },
 });
 
+export const togglePin = mutation({
+  args: { password: v.string(), id: v.id("chatThreads") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const thread = await ctx.db.get(args.id);
+    if (!thread) throw new Error("Thread not found");
+
+    const pinned = !(thread.pinned ?? false);
+    await ctx.db.patch(args.id, {
+      pinned,
+      updatedAt: Date.now(),
+    });
+
+    return { pinned };
+  },
+});
+
 export const updateFocusAssignment = mutation({
   args: {
     password: v.string(),
@@ -169,6 +190,24 @@ export const getGuardianThread = query({
       .query("chatThreads")
       .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
       .filter((q) => q.eq(q.field("mode"), "guardian"))
+      .first();
+
+    return thread ?? null;
+  },
+});
+
+// Query the jam/cook thread whose focus assignment is this one (completion summary).
+// Mirrors getGuardianThread's indexed lookup; only the mode filter differs.
+export const getCompletionThread = query({
+  args: { password: v.string(), assignmentId: v.id("assignments") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const thread = await ctx.db
+      .query("chatThreads")
+      .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
+      .filter((q) =>
+        q.or(q.eq(q.field("mode"), "jam"), q.eq(q.field("mode"), "cook"))
+      )
       .first();
 
     return thread ?? null;
