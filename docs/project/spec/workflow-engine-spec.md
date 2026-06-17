@@ -80,7 +80,7 @@ Primary capabilities:
 | `jobGroups` -> `jobs` | 1:N | Jobs in the same group run in parallel. |
 | `jobs` -> `reflections` | 1:N | Reflection rows join by `jobId`; duplicates are accepted by schema. |
 | `jobs` -> `reflectionsV2` | 1:N | V2 rows join by `jobId`; read-side tooling prefers V2 where available. |
-| `namespaces` -> `chatThreads` | 1:N | Threads can be listed by namespace or globally sorted by `latestMessageAt`. |
+| `namespaces` -> `chatThreads` | 1:N | Threads can be listed by namespace or globally sorted pinned-first then by `latestMessageAt`. |
 | `chatThreads` -> `chatMessages` | 1:N | Message history is indexed by thread and creation time. |
 | `chatThreads` -> `chatJobs` | 1:N | Chat jobs are async responses and are not tied to assignment groups. |
 | `chatThreads` -> `assignments` | 0:1 focus, 0:N history | `assignmentId` is the current focus; `assignmentsCreated` preserves all assignments linked from the thread. |
@@ -349,7 +349,10 @@ Indexes:
 ### `chatThreads`
 
 User/agent conversation containers. Threads are namespace-scoped, but the UI can
-also list all namespaces together using `latestMessageAt`.
+also list all namespaces together sorted pinned-first then by `latestMessageAt`.
+Pinned threads float above unpinned threads; within each tier, ordering is by
+latest activity descending. The pinned-first sort is applied before the row-cap
+slice so a quiet pinned thread never falls out of the sidebar window.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
@@ -363,6 +366,7 @@ also list all namespaces together using `latestMessageAt`.
 | `lastReadAt` | `number` | No | Unread tracking timestamp. |
 | `assignmentsCreated` | `Id<"assignments">[]` | No | All assignments ever created/linked from this thread. |
 | `latestMessageAt` | `number` | No | Denormalized timestamp of the latest message, used for cross-namespace sorting. |
+| `pinned` | `boolean` | No | When true, thread floats above unpinned threads in the sidebar. Global (cross-namespace, unaffected by namespace filter). |
 | `createdAt` | `number` | Yes | Creation timestamp. |
 | `updatedAt` | `number` | Yes | Last thread metadata update timestamp. |
 

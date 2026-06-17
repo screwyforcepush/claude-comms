@@ -36,6 +36,7 @@
   │  │  claudeSessionId: "abc..."  │   │  priority: 1-99                               │ │
   │  │  guardianSessions: {id:sid} │   │                                               │ │
   │  │  lastReadAt: (unread track) │   │  independent: bool (parallel vs sequential)   │ │
+  │  │  pinned: bool (float top)   │   │                                               │ │
   │  │  assignmentId ─ ─ ─ ─ ─ ─ ─┼──▶│  artifacts: accumulated output               │ │
   │  │  assignmentsCreated: [...]  │   │  decisions: PM decisions log                  │ │
   │  │  lastPromptMode: jam|cook   │   │  alignmentStatus: aligned|uncertain|misalign  │ │
