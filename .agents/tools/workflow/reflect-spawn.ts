@@ -5,6 +5,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import { buildAgyCommand } from "./lib/streams.js";
 
 const DEFAULT_REFLECTION_TIMEOUT_MS = 5 * 60_000;
 const KILL_GRACE_MS = 10_000;
@@ -19,6 +20,7 @@ interface Config {
   convexUrl: string;
   password: string;
   reflectionTimeoutMs?: number;
+  geminiExecutionMode?: "gemini" | "agy";
 }
 
 type ReflectableHarness = "claude" | "codex" | "gemini";
@@ -106,17 +108,29 @@ async function runGemini(prompt: string, sessionId: string, timeoutMs: number, m
   await runWithTimeout("gemini", args, timeoutMs);
 }
 
+async function runAgy(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
+  const command = buildAgyCommand(prompt, {
+    sessionId,
+    model,
+    printTimeoutMs: timeoutMs,
+  });
+  await runWithTimeout(command.cmd, command.args, timeoutMs);
+}
+
 async function runReflectionHarness(
   harness: ReflectableHarness,
   prompt: string,
   sessionId: string,
   timeoutMs: number,
-  model?: string
+  model?: string,
+  geminiExecutionMode: "gemini" | "agy" = "gemini"
 ): Promise<void> {
   if (harness === "claude") {
     await runClaude(prompt, sessionId, timeoutMs, model);
   } else if (harness === "codex") {
     await runCodex(prompt, sessionId, timeoutMs, model);
+  } else if (geminiExecutionMode === "agy") {
+    await runAgy(prompt, sessionId, timeoutMs, model);
   } else {
     await runGemini(prompt, sessionId, timeoutMs, model);
   }
@@ -162,7 +176,8 @@ async function main(): Promise<void> {
       prompt,
       jobData.sessionId,
       config.reflectionTimeoutMs ?? DEFAULT_REFLECTION_TIMEOUT_MS,
-      model
+      model,
+      config.geminiExecutionMode ?? "gemini"
     );
   } catch (err) {
     debug((err as Error).message);

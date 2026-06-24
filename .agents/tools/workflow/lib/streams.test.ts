@@ -6,10 +6,15 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
+  AgyStreamHandler,
   ClaudeStreamHandler,
   CodexStreamHandler,
   GeminiStreamHandler,
+  buildAgyCommand,
   buildCommand,
   buildInteractiveClaudeCommand,
 } from "./streams.js";
@@ -259,6 +264,84 @@ describe("GeminiStreamHandler", () => {
 });
 
 // ============================================================================
+// AgyStreamHandler tests
+// ============================================================================
+
+describe("AgyStreamHandler", () => {
+  it("captures root conversation id and final Stop result", () => {
+    const handler = new AgyStreamHandler();
+
+    handler.onEvent({
+      hook_event_name: "PreInvocation",
+      conversationId: "root-session",
+      invocationNum: 0,
+    });
+    handler.onEvent({
+      hook_event_name: "Stop",
+      conversationId: "root-session",
+      terminationReason: "NO_TOOL_CALL",
+      fullyIdle: true,
+      error: "",
+      result: "line one\nline two",
+    });
+
+    assert.strictEqual(handler.getSessionId(), "root-session");
+    assert.strictEqual(handler.getResult(), "line one\nline two");
+    assert.strictEqual(handler.isComplete(), true);
+  });
+
+  it("ignores non-idle root Stop events and subagent Stop events", () => {
+    const handler = new AgyStreamHandler();
+
+    handler.onEvent({
+      hook_event_name: "PreInvocation",
+      conversationId: "root-session",
+    });
+    handler.onEvent({
+      hook_event_name: "Stop",
+      conversationId: "root-session",
+      fullyIdle: false,
+      result: "not done",
+    });
+    handler.onEvent({
+      hook_event_name: "Stop",
+      conversationId: "subagent-session",
+      fullyIdle: true,
+      result: "subagent done",
+    });
+
+    assert.strictEqual(handler.isTerminal(), false);
+    assert.strictEqual(handler.getResult(), "");
+  });
+
+  it("falls back to transcript final planner response", () => {
+    const dir = mkdtempSync(join(tmpdir(), "agy-stream-"));
+    const transcriptPath = join(dir, "transcript_full.jsonl");
+    writeFileSync(transcriptPath, [
+      JSON.stringify({ type: "PLANNER_RESPONSE", source: "MODEL", content: "old" }),
+      JSON.stringify({ type: "PLANNER_RESPONSE", source: "MODEL", content: "final\nanswer" }),
+    ].join("\n") + "\n");
+
+    const handler = new AgyStreamHandler();
+    handler.onEvent({
+      hook_event_name: "PreInvocation",
+      conversationId: "root-session",
+    });
+    handler.onEvent({
+      hook_event_name: "Stop",
+      conversationId: "root-session",
+      fullyIdle: true,
+      terminationReason: "NO_TOOL_CALL",
+      error: "",
+      transcriptPath,
+    });
+
+    assert.strictEqual(handler.getResult(), "final\nanswer");
+    assert.strictEqual(handler.isComplete(), true);
+  });
+});
+
+// ============================================================================
 // buildCommand tests
 // ============================================================================
 
@@ -318,6 +401,26 @@ describe("buildCommand", () => {
       "auto-gemini-3",
       "--output-format",
       "stream-json",
+      "-p",
+      "test",
+    ]);
+  });
+
+  it("builds agy command with conversation resume and print timeout", () => {
+    const agy = buildAgyCommand("test", {
+      sessionId: "915d455b-c502-4f48-829e-a3858cd370f8",
+      model: "gemini-3.5-flash",
+      printTimeoutMs: 3600000,
+    });
+
+    assert.deepStrictEqual(agy.args, [
+      "--dangerously-skip-permissions",
+      "--conversation",
+      "915d455b-c502-4f48-829e-a3858cd370f8",
+      "--model",
+      "gemini-3.5-flash",
+      "--print-timeout",
+      "3600s",
       "-p",
       "test",
     ]);

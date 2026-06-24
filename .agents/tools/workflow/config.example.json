@@ -6,6 +6,7 @@
   "idleTimeoutMs": 600000,
   "reflectionTimeoutMs": 300000,
   "claudeExecutionMode": "headless",
+  "geminiExecutionMode": "gemini",
   "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
   "claudeInteractiveSettingSources": "user",
   "claudeInteractiveStopGraceMs": 3000

@@ -89,6 +89,18 @@ function extractToolCallInfo(
       return { ids, hadToolUse: true };
     }
     case "gemini": {
+      if (hookEventName === "PreToolUse") {
+        const toolCall = event.toolCall as {
+          name?: string;
+        } | undefined;
+        if (!toolCall?.name) return { ids: [], hadToolUse: false };
+        const conversationId = event.conversationId as string | undefined;
+        const stepIdx = event.stepIdx as number | string | undefined;
+        const id = conversationId && stepIdx !== undefined
+          ? `${conversationId}:${stepIdx}:${toolCall.name}`
+          : undefined;
+        return { ids: id ? [id] : [], hadToolUse: true };
+      }
       if (type !== "tool_use") return { ids: [], hadToolUse: false };
       const toolId =
         (event.tool_id as string | undefined) ??
@@ -155,6 +167,26 @@ function extractSubagentInfo(
       return { ids, hadSubagent: true };
     }
     case "gemini": {
+      if (hookEventName === "PreToolUse") {
+        const toolCall = event.toolCall as {
+          name?: string;
+          args?: {
+            Subagents?: unknown;
+          };
+        } | undefined;
+        if (toolCall?.name !== "invoke_subagent") return { ids: [], hadSubagent: false };
+        const conversationId = event.conversationId as string | undefined;
+        const stepIdx = event.stepIdx as number | string | undefined;
+        const subagents = Array.isArray(toolCall.args?.Subagents)
+          ? toolCall.args.Subagents
+          : [null];
+        const ids = subagents.map((_, index) =>
+          conversationId && stepIdx !== undefined
+            ? `${conversationId}:${stepIdx}:subagent:${index}`
+            : ""
+        ).filter(Boolean);
+        return { ids, hadSubagent: true };
+      }
       if (type !== "tool_use") return { ids: [], hadSubagent: false };
       const toolName = event.tool_name as string | undefined;
       if (toolName !== "delegate_to_agent") return { ids: [], hadSubagent: false };

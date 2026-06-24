@@ -40,6 +40,7 @@ Edit `config.json`:
   "idleTimeoutMs": 600000,
   "reflectionTimeoutMs": 300000,
   "claudeExecutionMode": "headless",
+  "geminiExecutionMode": "gemini",
   "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
   "claudeInteractiveSettingSources": "user",
   "claudeInteractiveStopGraceMs": 3000
@@ -58,6 +59,12 @@ installed under project `.claude/`, so the feature flag is benign when
 `claudeExecutionMode` is `headless`. `claudeInteractiveSettingSources` may be
 set to `user` to keep project/local Claude settings from being loaded alongside
 the explicit wrapper hook settings.
+
+`geminiExecutionMode` is optional and defaults to `gemini`, the deprecated
+`gemini --output-format stream-json` path. Set it to `agy` to keep Convex jobs
+using harness `gemini` while executing them through Antigravity headless mode.
+The runner installs one workflow-owned hook entry in `~/.gemini/config/hooks.json`;
+that hook is inert unless the runner sets `AGY_HOOK_EVENTS_FILE` for a job.
 
 ### 2. Start the Runner
 

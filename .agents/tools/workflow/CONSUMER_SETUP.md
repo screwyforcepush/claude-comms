@@ -84,6 +84,7 @@ Each consumer repo needs its own `config.json`:
   "idleTimeoutMs": 600000,
   "reflectionTimeoutMs": 300000,
   "claudeExecutionMode": "headless",
+  "geminiExecutionMode": "gemini",
   "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
   "claudeInteractiveSettingSources": "user",
   "claudeInteractiveStopGraceMs": 3000
@@ -98,6 +99,11 @@ Harness/model defaults are namespace data stored in Convex, not local
 wrapper. The wrapper uses explicit hook settings from `.agents/tools/workflow/`
 via `--settings` and does not require a project `.claude/settings.json` hook
 install, so headless mode remains isolated.
+
+`geminiExecutionMode` can be changed to `agy` to run jobs whose harness is
+`gemini` through Antigravity headless mode. The runner merges one workflow-owned
+entry into `~/.gemini/config/hooks.json`; the hook only records events when the
+runner provides `AGY_HOOK_EVENTS_FILE`.
 
 ## Initialization
 

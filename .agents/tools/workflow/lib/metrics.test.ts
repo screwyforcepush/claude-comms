@@ -209,6 +209,49 @@ describe("recordMetricsEvent", () => {
     assert.strictEqual(metrics.totalTokens, 10560);
     assert.strictEqual(metrics.contextPressure, 10560);
   });
+
+  it("counts Antigravity hook tool calls under the Gemini harness", () => {
+    const metrics = createMetricsState();
+    const event = {
+      hook_event_name: "PreToolUse",
+      conversationId: "agy-root",
+      stepIdx: 6,
+      toolCall: {
+        name: "run_command",
+        args: {
+          CommandLine: "npm test",
+        },
+      },
+    };
+
+    recordMetricsEvent("gemini", event, metrics);
+    recordMetricsEvent("gemini", event, metrics);
+
+    assert.strictEqual(metrics.toolCallCount, 1);
+    assert.strictEqual(metrics.subagentCount, 0);
+  });
+
+  it("counts Antigravity invoke_subagent specs as subagents", () => {
+    const metrics = createMetricsState();
+
+    recordMetricsEvent("gemini", {
+      hook_event_name: "PreToolUse",
+      conversationId: "agy-root",
+      stepIdx: 16,
+      toolCall: {
+        name: "invoke_subagent",
+        args: {
+          Subagents: [
+            { Role: "A", TypeName: "self", Prompt: "hello" },
+            { Role: "B", TypeName: "self", Prompt: "hello" },
+          ],
+        },
+      },
+    }, metrics);
+
+    assert.strictEqual(metrics.toolCallCount, 1);
+    assert.strictEqual(metrics.subagentCount, 2);
+  });
 });
 
 describe("formatContextPressure", () => {

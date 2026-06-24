@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "fs";
+
 /**
  * Stream Handlers for different AI harnesses
  *
@@ -38,6 +40,11 @@ export interface CommandOptions {
   forkSession?: boolean;
   /** Model to pass to harness CLI */
   model?: string;
+}
+
+export interface AgyCommandOptions extends CommandOptions {
+  /** Print-mode timeout passed to agy, in milliseconds */
+  printTimeoutMs?: number;
 }
 
 export interface CommandResult {
@@ -344,6 +351,120 @@ export class GeminiStreamHandler implements StreamHandler {
 }
 
 // ============================================================================
+// Agy Stream Handler
+// ============================================================================
+
+export class AgyStreamHandler implements StreamHandler {
+  private complete = false;
+  private success = false;
+  private sessionId: string | null = null;
+  private failureReason: string | null = null;
+  private finalResult: string | null = null;
+  private rootConversationId: string | null = null;
+
+  onEvent(event: Record<string, unknown>): void {
+    const hookEventName = event.hook_event_name as string | undefined;
+    const conversationId = event.conversationId as string | undefined;
+
+    if (conversationId && !this.rootConversationId) {
+      this.rootConversationId = conversationId;
+      this.sessionId = conversationId;
+    }
+
+    if (hookEventName !== "Stop") return;
+
+    // Subagents inherit the hook environment; only the root conversation Stop
+    // should terminate the parent workflow job.
+    if (
+      this.rootConversationId &&
+      conversationId &&
+      conversationId !== this.rootConversationId
+    ) {
+      return;
+    }
+
+    const fullyIdle = event.fullyIdle as boolean | undefined;
+    if (fullyIdle === false) return;
+
+    this.complete = true;
+
+    const error = event.error as string | undefined;
+    const terminationReason = event.terminationReason as string | undefined;
+    const normalizedReason = (terminationReason || "").toLowerCase();
+    this.success = !error && !normalizedReason.includes("error") && !normalizedReason.includes("max_steps");
+
+    if (typeof event.result === "string") {
+      this.finalResult = event.result;
+    } else {
+      const transcriptPath = event.transcriptPath as string | undefined;
+      const transcriptResult = transcriptPath ? readAgyFinalPlannerResponse(transcriptPath) : null;
+      if (transcriptResult) {
+        this.finalResult = transcriptResult;
+      }
+    }
+
+    if (!this.success) {
+      this.failureReason = `agy_stop_${terminationReason || error || "unknown"}`;
+    }
+  }
+
+  getResult(): string {
+    return this.finalResult || "";
+  }
+
+  isTerminal(): boolean {
+    return this.complete;
+  }
+
+  isComplete(): boolean {
+    return this.complete && this.success;
+  }
+
+  getSessionId(): string | null {
+    return this.sessionId;
+  }
+
+  getFailureReason(): string | null {
+    return this.failureReason;
+  }
+
+  getRateLimitInfo(): RateLimitInfo | null {
+    return null;
+  }
+}
+
+function readAgyFinalPlannerResponse(transcriptPath: string): string | null {
+  if (!existsSync(transcriptPath)) return null;
+
+  try {
+    const lines = readFileSync(transcriptPath, "utf-8")
+      .split("\n")
+      .filter((line) => line.trim());
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(lines[i]) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+
+      if (
+        parsed.type === "PLANNER_RESPONSE" &&
+        parsed.source === "MODEL" &&
+        typeof parsed.content === "string"
+      ) {
+        return parsed.content;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+// ============================================================================
 // Factory Function
 // ============================================================================
 
@@ -358,6 +479,8 @@ export function createStreamHandler(harness: string): StreamHandler {
       return new CodexStreamHandler();
     case "gemini":
       return new GeminiStreamHandler();
+    case "agy":
+      return new AgyStreamHandler();
     default:
       return new ClaudeStreamHandler();
   }
@@ -432,6 +555,31 @@ export function buildCommand(
     default:
       throw new Error(`Unknown harness: ${harness}`);
   }
+}
+
+export function buildAgyCommand(
+  prompt: string,
+  options: AgyCommandOptions = {}
+): CommandResult {
+  const args = ["--dangerously-skip-permissions"];
+
+  if (options.sessionId) {
+    args.push("--conversation", options.sessionId);
+  }
+  if (options.model) {
+    args.push("--model", options.model);
+  }
+  if (options.printTimeoutMs) {
+    args.push("--print-timeout", formatAgyDuration(options.printTimeoutMs));
+  }
+
+  args.push("-p", prompt);
+  return { cmd: "agy", args };
+}
+
+function formatAgyDuration(ms: number): string {
+  const seconds = Math.max(1, Math.ceil(ms / 1000));
+  return `${seconds}s`;
 }
 
 /**

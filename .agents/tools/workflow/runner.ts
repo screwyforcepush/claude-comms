@@ -81,6 +81,7 @@ interface Config {
   timeoutMs: number;
   idleTimeoutMs?: number;
   claudeExecutionMode?: "headless" | "interactive";
+  geminiExecutionMode?: "gemini" | "agy";
   claudeInteractiveSettingsPath?: string;
   claudeInteractiveSettingSources?: string;
   claudeInteractiveStopGraceMs?: number;
@@ -134,6 +135,7 @@ const executor = new HarnessExecutor({
   idleTimeoutMs: config.idleTimeoutMs,
   cwd: projectRoot,
   claudeExecutionMode: config.claudeExecutionMode ?? "headless",
+  geminiExecutionMode: config.geminiExecutionMode ?? "gemini",
   claudeInteractiveSettingsPath: resolveProjectPath(config.claudeInteractiveSettingsPath),
   claudeInteractiveSettingSources: config.claudeInteractiveSettingSources,
   claudeInteractiveStopGraceMs: config.claudeInteractiveStopGraceMs,
