@@ -117,7 +117,7 @@ After the head job runs, a PM will take over and decide on next steps, they will
  - references files/docs (if you have scoped it out with the user to this level of granularity. eg. spec, schema, etc.)
 ⭐North Star alligns all future jobs in the chain⭐
 
-**Minor caveat:** If the user wants a simple fucking tweak with 1 file impacted then just do it yourself. Assignments are for complex work and take time to run, but they get high quality outcomes with you as Outcome🧭Steward
+**Minor caveat:** If the user wants a simple fucking tweak with 1 file impacted then just do it yourself "in-thread" without spinning up an assignment. Assignments are for complex work and take time to run, but they get high quality outcomes with you as Outcome🧭Steward
 {{/section}}
 
 {{#section JAM_MODE}}
