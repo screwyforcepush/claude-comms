@@ -45,12 +45,24 @@ const GITHUB_API = {
 };
 
 /**
+ * Root-level files fetched/installed/validated as siblings.
+ *
+ * SINGLE SOURCE OF TRUTH for root filenames: adding the next root file is a
+ * one-line change to this array. Every fetch strategy (tarball, raw-URL,
+ * individual), every validation, and every verify step derives from this list.
+ */
+const ROOT_FILES = ['CLAUDE.md', 'GEMINI.md'];
+
+/**
  * File paths and patterns
  */
 const FILE_PATHS = {
   // Main installation targets
   CLAUDE_DIR: '.claude',
   CLAUDE_MD: 'CLAUDE.md',
+
+  // Root-level files (single source of truth)
+  ROOT_FILES,
 
   // Claude directory structure
   CLAUDE_SUBDIRS: [
@@ -60,12 +72,12 @@ const FILE_PATHS = {
     '.claude/hooks/comms'
   ],
 
-  // Key files to install
+  // Key files to install (root files derived from ROOT_FILES)
   REQUIRED_FILES: [
     '.claude/settings.json',
     '.claude/hooks/comms/get_unread_messages.py',
     '.claude/hooks/comms/send_message.py',
-    'CLAUDE.md'
+    ...ROOT_FILES
   ],
 
   // Configuration files
@@ -382,6 +394,7 @@ module.exports = {
   GITHUB_API,
   GITHUB_URLS,
   FILE_PATHS,
+  ROOT_FILES,
   ERROR_CODES,
   HTTP_STATUS,
   RETRY_CONFIG,

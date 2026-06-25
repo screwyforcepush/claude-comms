@@ -16,6 +16,7 @@ const ora = require('ora');
 // Import core modules (these will be implemented in WP02-06)
 const logger = require('./utils/logger');
 const { InstallationError } = require('./utils/errors');
+const { ROOT_FILES } = require('../utils/constants');
 const fetcher = require('./fetcher/github');
 const fileWriter = require('./installer/file-writer');
 const dependencyChecker = require('./installer/dependency-check');
@@ -104,11 +105,12 @@ async function validateEnvironment(targetDir, checkPython) {
  */
 async function handleExistingFiles(targetDir, force, verify, dryRun) {
   const claudeDir = path.join(targetDir, '.claude');
-  const claudeMd = path.join(targetDir, 'CLAUDE.md');
 
   const existingFiles = [];
   if (await fs.pathExists(claudeDir)) existingFiles.push('.claude/');
-  if (await fs.pathExists(claudeMd)) existingFiles.push('CLAUDE.md');
+  for (const rootFile of ROOT_FILES) {
+    if (await fs.pathExists(path.join(targetDir, rootFile))) existingFiles.push(rootFile);
+  }
 
   if (existingFiles.length === 0) {
     logger.info('No existing files found - proceeding with fresh installation');
@@ -232,13 +234,12 @@ async function verifyInstallation(targetDir) {
 
   try {
     const claudeDir = path.join(targetDir, '.claude');
-    const claudeMd = path.join(targetDir, 'CLAUDE.md');
     const settingsPath = path.join(claudeDir, 'settings.local.json');
 
     // Check required files exist
     const checks = [
       { path: claudeDir, name: '.claude directory' },
-      { path: claudeMd, name: 'CLAUDE.md' },
+      ...ROOT_FILES.map(name => ({ path: path.join(targetDir, name), name })),
       { path: settingsPath, name: 'settings.local.json' }
     ];
 

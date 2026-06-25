@@ -191,6 +191,8 @@ describe('Installer', () => {
       // Verify fetching was called
       expect(mockFetcher.fetchDirectory).toHaveBeenCalledWith('.claude', expect.any(Object));
       expect(mockFetcher.fetchFile).toHaveBeenCalledWith('CLAUDE.md', expect.any(Object));
+      // Root files are data-driven (ROOT_FILES): GEMINI.md is fetched as a sibling.
+      expect(mockFetcher.fetchFile).toHaveBeenCalledWith('GEMINI.md', expect.any(Object));
 
       // Verify writing was called
       expect(mockWriter.writeDirectory).toHaveBeenCalled();

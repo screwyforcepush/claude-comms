@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT_FILES } = require('../src/utils/constants');
 
 console.log('🔨 Building claude-comms...');
 
@@ -65,15 +66,17 @@ if (fs.existsSync(agentsSrc)) {
   console.warn('⚠️  .agents directory not found in project root');
 }
 
-// Copy CLAUDE.md
-const claudeMdSrc = path.join(projectRoot, 'CLAUDE.md');
-const claudeMdDest = path.join(packageRoot, 'CLAUDE.md');
+// Copy root files (single source of truth: ROOT_FILES)
+for (const rootFile of ROOT_FILES) {
+  const rootFileSrc = path.join(projectRoot, rootFile);
+  const rootFileDest = path.join(packageRoot, rootFile);
 
-if (fs.existsSync(claudeMdSrc)) {
-  fs.copyFileSync(claudeMdSrc, claudeMdDest);
-  console.log('✅ Synced CLAUDE.md');
-} else {
-  console.warn('⚠️  CLAUDE.md not found in project root');
+  if (fs.existsSync(rootFileSrc)) {
+    fs.copyFileSync(rootFileSrc, rootFileDest);
+    console.log(`✅ Synced ${rootFile}`);
+  } else {
+    console.warn(`⚠️  ${rootFile} not found in project root`);
+  }
 }
 
 console.log('✅ Build complete - directories created and files synced');

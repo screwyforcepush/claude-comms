@@ -12,6 +12,7 @@ const prompts = require('prompts');
 const path = require('path');
 const fs = require('fs').promises;
 const chalk = require('chalk');
+const { ROOT_FILES } = require('../utils/constants');
 
 /**
  * Main prompt orchestrator for installation flow
@@ -124,7 +125,7 @@ async function checkExistingFiles(targetDir) {
   const conflictFiles = [];
   const checkFiles = [
     '.claude',
-    'CLAUDE.md',
+    ...ROOT_FILES,
     '.claude/settings.json',
     '.claude/hooks',
     '.claude/agents'

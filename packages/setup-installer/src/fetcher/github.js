@@ -7,6 +7,7 @@ const fetch = require('node-fetch');
 const tar = require('tar');
 const { EventEmitter } = require('events');
 const { GitHubAPIError } = require('../utils/errors');
+const { ROOT_FILES } = require('../utils/constants');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -336,8 +337,8 @@ class GitHubFetcher extends EventEmitter {
       '.agents/AGENTS.md',
       '.agents/repo.md',
 
-      // Root CLAUDE.md
-      'CLAUDE.md'
+      // Root files (single source of truth: ROOT_FILES)
+      ...ROOT_FILES
     ];
 
     const files = [];
@@ -346,7 +347,7 @@ class GitHubFetcher extends EventEmitter {
       if (filePath.startsWith(path) ||
           (path === '.claude' && filePath.startsWith('.claude')) ||
           (path === '.agents' && filePath.startsWith('.agents')) ||
-          (path === 'CLAUDE.md' && filePath === 'CLAUDE.md')) {
+          (ROOT_FILES.includes(path) && filePath === path)) {
         try {
           const content = await this._fetchSingleFileRaw(filePath, options);
           files.push(content);
@@ -913,11 +914,11 @@ class GitHubFetcher extends EventEmitter {
           // Only extract files we care about
           const isClaudeFile = actualPath.startsWith('.claude/') || actualPath === '.claude';
           const isAgentsFile = actualPath.startsWith('.agents/') || actualPath === '.agents';
-          const isClaudeMd = actualPath === 'CLAUDE.md';
+          const isRootFile = ROOT_FILES.includes(actualPath);
 
-          console.log(`DEBUG: ${actualPath} -> claude: ${isClaudeFile}, agents: ${isAgentsFile}, md: ${isClaudeMd}, type: ${entry.type}`);
+          console.log(`DEBUG: ${actualPath} -> claude: ${isClaudeFile}, agents: ${isAgentsFile}, root: ${isRootFile}, type: ${entry.type}`);
 
-          if ((isClaudeFile || isAgentsFile || isClaudeMd) && entry.type === 'File') {
+          if ((isClaudeFile || isAgentsFile || isRootFile) && entry.type === 'File') {
             wantedFiles.set(filePath, actualPath);
             console.log(`DEBUG: Will extract: ${filePath} -> ${actualPath}`);
             return true;
@@ -954,15 +955,15 @@ class GitHubFetcher extends EventEmitter {
                 const content = await fs.promises.readFile(fullPath, 'utf-8');
                 console.log(`DEBUG: Read ${actualPath} (${content.length} bytes)`);
 
-                if (actualPath === 'CLAUDE.md') {
-                  const claudeMdFileObj = {
-                    path: 'CLAUDE.md',
+                if (ROOT_FILES.includes(actualPath)) {
+                  const rootFileObj = {
+                    path: actualPath,
                     content: content,
                     encoding: 'utf-8',
                     type: 'file'
                   };
-                  extractedFiles['CLAUDE.md'] = claudeMdFileObj;
-                  console.log('DEBUG: Added CLAUDE.md to result');
+                  extractedFiles[actualPath] = rootFileObj;
+                  console.log(`DEBUG: Added ${actualPath} to result`);
                 } else if (actualPath.startsWith('.claude/')) {
                   // Add to .claude files
                   const fileObj = {
@@ -1001,7 +1002,10 @@ class GitHubFetcher extends EventEmitter {
             }
           }
 
-          console.log(`DEBUG: Final result - .claude has ${extractedFiles['.claude'].files.length} files, .agents has ${extractedFiles['.agents'].files.length} files, CLAUDE.md: ${extractedFiles['CLAUDE.md'] ? 'present' : 'missing'}`);
+          const rootFilesSummary = ROOT_FILES
+            .map(name => `${name}: ${extractedFiles[name] ? 'present' : 'missing'}`)
+            .join(', ');
+          console.log(`DEBUG: Final result - .claude has ${extractedFiles['.claude'].files.length} files, .agents has ${extractedFiles['.agents'].files.length} files, ${rootFilesSummary}`);
 
           // Clean up temp directory
           try {
@@ -1086,14 +1090,18 @@ async function fetchRepository(gitRef = 'main', options = {}) {
     console.log('Attempting tarball fetch strategy...');
     const tarballFiles = await fetcher.fetchAsTarball({ version: gitRef });
 
+    const rootFiles = ROOT_FILES.map(name => tarballFiles[name]);
+
     return {
       claudeDirectory: tarballFiles['.claude'],
       agentsDirectory: tarballFiles['.agents'],
+      // Per-filename root file keys remain top-level siblings on the result.
       claudeFile: tarballFiles['CLAUDE.md'],
+      ...Object.fromEntries(ROOT_FILES.map(name => [name, tarballFiles[name]])),
       files: [
         ...(tarballFiles['.claude'].files || []),
         ...(tarballFiles['.agents'].files || []),
-        tarballFiles['CLAUDE.md']
+        ...rootFiles
       ]
     };
 
@@ -1103,17 +1111,19 @@ async function fetchRepository(gitRef = 'main', options = {}) {
 
     try {
       // Strategy 2: Individual file fetch (fallback)
-      const [claudeDir, agentsDir, claudeMd] = await Promise.all([
+      const [claudeDir, agentsDir, ...rootFiles] = await Promise.all([
         fetcher.fetchDirectory('.claude', { version: gitRef }),
         fetcher.fetchDirectory('.agents', { version: gitRef }),
-        fetcher.fetchFile('CLAUDE.md', { version: gitRef })
+        ...ROOT_FILES.map(name => fetcher.fetchFile(name, { version: gitRef }))
       ]);
 
       return {
         claudeDirectory: claudeDir,
         agentsDirectory: agentsDir,
-        claudeFile: claudeMd,
-        files: [...(claudeDir.files || []), ...(agentsDir.files || []), claudeMd]
+        // Per-filename root file keys remain top-level siblings on the result.
+        claudeFile: rootFiles[ROOT_FILES.indexOf('CLAUDE.md')],
+        ...Object.fromEntries(ROOT_FILES.map((name, i) => [name, rootFiles[i]])),
+        files: [...(claudeDir.files || []), ...(agentsDir.files || []), ...rootFiles]
       };
 
     } catch (fallbackError) {

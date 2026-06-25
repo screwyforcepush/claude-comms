@@ -15,6 +15,7 @@
 const EventEmitter = require('events');
 const path = require('path');
 const { InstallerError } = require('../utils/errors');
+const { ROOT_FILES } = require('../utils/constants');
 
 // Error codes enum - matches interface contracts
 const ErrorCode = {
@@ -281,17 +282,18 @@ class Installer extends EventEmitter {
         retryCount: 3
       });
 
-      // Fetch CLAUDE.md file
-      const claudeMd = await this.fetcher.fetchFile('CLAUDE.md', {
-        version: this.options.version,
-        useCache: this.options.cache
-      });
-
+      // Fetch root files (single source of truth: ROOT_FILES) as sibling keys
       const fetchedFiles = {
         '.claude': claudeFiles,
-        '.agents': agentsFiles,
-        'CLAUDE.md': claudeMd
+        '.agents': agentsFiles
       };
+
+      for (const rootFile of ROOT_FILES) {
+        fetchedFiles[rootFile] = await this.fetcher.fetchFile(rootFile, {
+          version: this.options.version,
+          useCache: this.options.cache
+        });
+      }
 
       // Calculate total files for progress tracking
       this.progress.total = this._countFiles(fetchedFiles);
@@ -419,7 +421,7 @@ class Installer extends EventEmitter {
     const requiredPaths = [
       path.join(this.options.targetDir, '.claude'),
       path.join(this.options.targetDir, '.agents'),
-      path.join(this.options.targetDir, 'CLAUDE.md')
+      ...ROOT_FILES.map(name => path.join(this.options.targetDir, name))
     ];
 
     const missingPaths = [];
@@ -434,7 +436,7 @@ class Installer extends EventEmitter {
     if (this.writer.validateInstallationCompleteness) {
       const completenessResult = await this.writer.validateInstallationCompleteness(
         this.options.targetDir,
-        ['CLAUDE.md']
+        [...ROOT_FILES]
       );
 
       if (!completenessResult.complete) {
@@ -677,7 +679,6 @@ class Installer extends EventEmitter {
     // Check for existing directories and files that will be overwritten
     const claudeDir = path.join(this.options.targetDir, '.claude');
     const agentsDir = path.join(this.options.targetDir, '.agents');
-    const claudeMd = path.join(this.options.targetDir, 'CLAUDE.md');
 
     const existingPaths = [];
     if (await this.validator.pathExists(claudeDir)) {
@@ -686,8 +687,10 @@ class Installer extends EventEmitter {
     if (await this.validator.pathExists(agentsDir)) {
       existingPaths.push('.agents/');
     }
-    if (await this.validator.pathExists(claudeMd)) {
-      existingPaths.push('CLAUDE.md');
+    for (const rootFile of ROOT_FILES) {
+      if (await this.validator.pathExists(path.join(this.options.targetDir, rootFile))) {
+        existingPaths.push(rootFile);
+      }
     }
 
     if (existingPaths.length > 0) {
@@ -718,12 +721,16 @@ class Installer extends EventEmitter {
       });
     }
 
-    if (!fetchedFiles['CLAUDE.md']) {
-      issues.push({
-        type: 'missing_component',
-        component: 'CLAUDE.md',
-        message: 'Missing CLAUDE.md file'
-      });
+    // Root files are required (same semantics as CLAUDE.md): if any ROOT_FILES
+    // entry is missing after fetch, validation reports it incomplete.
+    for (const rootFile of ROOT_FILES) {
+      if (!fetchedFiles[rootFile]) {
+        issues.push({
+          type: 'missing_component',
+          component: rootFile,
+          message: `Missing ${rootFile} file`
+        });
+      }
     }
 
     // Check .claude structure if present

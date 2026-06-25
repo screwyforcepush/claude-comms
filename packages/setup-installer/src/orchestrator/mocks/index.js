@@ -133,6 +133,12 @@ class MockFetcher {
           content: '# Claude Code Multi-Agent Setup\n\nThis project is configured for Claude multi-agent orchestration.\n\n## Features\n- Multi-agent team coordination\n- Observability and monitoring\n- Hook-based extensibility\n\n## Getting Started\nReview .claude/settings.local.json for configuration.',
           encoding: 'utf-8',
           sha: 'mock-claude-md-sha'
+        },
+        'GEMINI.md': {
+          path: 'GEMINI.md',
+          content: '# Gemini Multi-Agent Setup\n\nThis project is configured for Gemini multi-agent orchestration.\n\n## Features\n- Multi-agent team coordination\n- Observability and monitoring\n- Hook-based extensibility\n\n## Getting Started\nReview .claude/settings.local.json for configuration.',
+          encoding: 'utf-8',
+          sha: 'mock-gemini-md-sha'
         }
       }
     };

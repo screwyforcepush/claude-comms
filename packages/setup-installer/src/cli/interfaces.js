@@ -9,6 +9,8 @@
  * These interfaces serve as the integration points between CLI and core modules.
  */
 
+const { ROOT_FILES } = require('../utils/constants');
+
 /**
  * GitHub Fetcher Interface
  * Will be implemented in WP03 - GitHub API Integration
@@ -279,14 +281,14 @@ class MockGitHubFetcher extends GitHubFetcherInterface {
           encoding: 'utf-8',
           sha: 'mock-sha-1'
         },
-        {
-          path: 'CLAUDE.md',
-          content: '# Claude Setup\n\nProject configured for Claude.',
+        ...ROOT_FILES.map((name, i) => ({
+          path: name,
+          content: `# ${name}\n\nProject configured for Claude.`,
           mode: 0o644,
           size: 45,
           encoding: 'utf-8',
-          sha: 'mock-sha-2'
-        }
+          sha: `mock-sha-${i + 2}`
+        }))
       ],
       directories: ['.claude', '.claude/hooks', '.claude/agents'],
       metadata: {

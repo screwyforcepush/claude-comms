@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { ErrorFactory } = require('./errors');
 const platform = require('./platform');
+const { ROOT_FILES } = require('./constants');
 
 /**
  * Configuration manager with defaults, validation, and persistence
@@ -55,7 +56,7 @@ class Config {
       // File operations
       files: {
         excludePatterns: ['.git', 'node_modules', '.DS_Store'],
-        includePatterns: ['.claude/**/*', 'CLAUDE.md'],
+        includePatterns: ['.claude/**/*', ...ROOT_FILES],
         encoding: 'utf8',
         lineEnding: 'auto', // auto, lf, crlf
         maxFileSize: 10 * 1024 * 1024 // 10MB

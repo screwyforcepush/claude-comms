@@ -390,6 +390,8 @@ describe('fetchRepository', () => {
     mockApi.mockTreesAPI();
     mockApi.mockFileContent('.claude/settings.json', JSON.stringify({ version: '1.0.0' }));
     mockApi.mockFileContent('CLAUDE.md', '# Claude Setup');
+    // Root files are data-driven (ROOT_FILES): GEMINI.md is a required sibling.
+    mockApi.mockFileContent('GEMINI.md', '# Gemini Setup');
 
     const result = await fetchRepository();
 
@@ -398,6 +400,9 @@ describe('fetchRepository', () => {
     expect(result.files).toBeDefined();
     expect(result.claudeDirectory.path).toBe('.claude');
     expect(result.claudeFile.path).toBe('CLAUDE.md');
+    // GEMINI.md surfaces as a sibling top-level key on the result.
+    expect(result['GEMINI.md']).toBeDefined();
+    expect(result['GEMINI.md'].path).toBe('GEMINI.md');
     expect(result.files.length).toBeGreaterThan(0);
   });
 
@@ -405,6 +410,7 @@ describe('fetchRepository', () => {
     mockApi.mockTreesAPI('v2.0.0');
     mockApi.mockFileContent('.claude/settings.json', JSON.stringify({ version: '2.0.0' }));
     mockApi.mockFileContent('CLAUDE.md', '# Claude Setup v2');
+    mockApi.mockFileContent('GEMINI.md', '# Gemini Setup v2');
 
     const result = await fetchRepository('v2.0.0');
 
@@ -416,6 +422,7 @@ describe('fetchRepository', () => {
     mockApi.mockTreesAPI();
     mockApi.mockFileContent('.claude/settings.json', '{}');
     mockApi.mockFileContent('CLAUDE.md', '# Test');
+    mockApi.mockFileContent('GEMINI.md', '# Test Gemini');
 
     const result = await fetchRepository('main', {
       timeout: 5000,

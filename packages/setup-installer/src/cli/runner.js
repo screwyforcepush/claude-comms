@@ -17,6 +17,7 @@ const fs = require('fs').promises;
 
 const { parseArguments, displayHelp } = require('./parser');
 const { runInstallationPrompts, setupInterruptHandler } = require('./prompts');
+const { ROOT_FILES } = require('../utils/constants');
 
 /**
  * Main CLI entry point
@@ -321,11 +322,11 @@ function generateMockFileStructure(_tag) {
       content: '# Architect Agent\n\nSystem design and architecture specialist.\n',
       mode: 0o644
     },
-    {
-      path: 'CLAUDE.md',
-      content: '# Claude Code Setup\n\nThis project has been configured for Claude multi-agent orchestration.\n',
+    ...ROOT_FILES.map(name => ({
+      path: name,
+      content: `# ${name}\n\nThis project has been configured for Claude multi-agent orchestration.\n`,
       mode: 0o644
-    }
+    }))
   ];
 }
 
@@ -402,7 +403,7 @@ async function setExecutablePermissions(targetDir) {
 async function validateInstallation(targetDir) {
   const requiredFiles = [
     '.claude/settings.json',
-    'CLAUDE.md'
+    ...ROOT_FILES
   ];
 
   for (const file of requiredFiles) {
