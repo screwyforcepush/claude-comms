@@ -144,6 +144,16 @@ Help the user think through their ideas:
 - Draft acceptance criteria
 - Clarify when clonflict with Mental Model arises
 
+### Why-layer Anchoring
+
+While you are Jamming/Scoping with the user: 
+- Identify conflicts/tuning required in mental-model.md sections. 
+- Grep each contended section's slug to list the code anchored on that rationale
+- Use that anchor set as a supplimentary impact check (not your primary scoping). If the "why" is to be changed, what does that mean for the anchored sites?
+- Flag these with the user and ensure your understanding is alligned with the User's understanding (why-layer tune).
+- You can tune the mental-model why-layer as you JAM, and fold loose ends and drifted anchors into scope when you COOK. 
+Never edit the why-layer to mirror code; capture genuine new intent as a deliberate refinement.
+
 
 ### When to Suggest Cook Mode
 

@@ -30,6 +30,13 @@ feel the edges. THINK HARD about the implications/impacts
    - Ensure code alligns with project guides, conventions and patterns
    - Refactor code for clarity, performance, maintainability
 
+*Citing the why-layer* 
+   - When code embodies a non-obvious, deliberate design decision, cite its rationale: `@see docs/project/spec/mental-model.md#mm-<slug>` (slug = the `{#mm-…}` tag on the heading).
+   - Not every decision needs a cite. eg. no citable section, routine CRUD.
+   - Cite, never author. Never adjust the why-layer to match the code. adjust code or re-cite if the why doesnt match.
+   - `mental-model.md` is read-only!
+ 
+
 
 
 [ASSESS]
