@@ -133,7 +133,17 @@ jobs:
         run: |
           cd ${{ env.WORKING_DIR }}
           BUMP_TYPE="${{ steps.version_bump.outputs.bump_type }}"
-          NEW_VERSION=$(npm version $BUMP_TYPE --no-git-tag-version)
+          # Base the bump on the HIGHER of the in-repo package.json and the version
+          # already published to npm. If a prior run published a version but failed to
+          # commit its bump back to main, package.json is stale; bumping off it would
+          # recompute an already-published version and wedge every future publish on a
+          # "cannot publish over X" collision. Deriving from the registry self-heals.
+          PUBLISHED_VERSION=$(npm view "${{ env.PACKAGE_NAME }}" version 2>/dev/null || echo "0.0.0")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          BASE_VERSION=$(printf '%s\n%s\n' "$LOCAL_VERSION" "$PUBLISHED_VERSION" | sort -V | tail -n1)
+          echo "Base version: $BASE_VERSION (local=$LOCAL_VERSION, published=$PUBLISHED_VERSION)"
+          npm version "$BASE_VERSION" --no-git-tag-version --allow-same-version >/dev/null
+          NEW_VERSION=$(npm version "$BUMP_TYPE" --no-git-tag-version)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version to: $NEW_VERSION"
 
@@ -199,8 +209,18 @@ jobs:
       - name: Push changes and tags
         if: steps.dry_run_check.outputs.is_dry_run == 'false'
         run: |
-          git push origin main --follow-tags
-          echo "Version bump and tags pushed to main"
+          VERSION="${{ steps.version_info.outputs.version }}"
+          # The release tag is the durable record — push it first and reliably.
+          git push origin "v$VERSION"
+          # The version-bump commit on main is best-effort: the next version is now
+          # derived from the npm registry, so a stale package.json on main cannot wedge
+          # future publishes. Don't fail the job (after a successful publish) if main
+          # can't fast-forward due to a concurrent push.
+          if git pull --rebase origin main && git push origin main; then
+            echo "Version bump pushed to main"
+          else
+            echo "::warning::Could not push version bump to main; version is npm-derived so publishes are unaffected"
+          fi
 
       - name: Set publish status
         id: publish_check
