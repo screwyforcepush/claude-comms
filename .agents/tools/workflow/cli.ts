@@ -59,6 +59,7 @@ import { existsSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { HarnessDefaults, HarnessModelEntry, parseHarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
+import { collapseFanOutDuplicates } from "./lib/collapse-fanout.js";
 
 // Use anyApi for portability (same as runner.ts)
 const api = anyApi;
@@ -414,7 +415,13 @@ async function insertJobs(
 
   // Resolve jobs from namespace config (replaces expandJobs + AUTO_EXPAND_CONFIG)
   const harnessDefaults = await getHarnessDefaults();
-  const expandedJobs = resolveJobs(harnessDefaults, jobs);
+
+  // Repair PM self-fanned fan-out jobs before expansion: duplicate fan-out
+  // entries (e.g. a hand-rolled review triple) collapse to one canonical entry.
+  const { jobs: guardedJobs, notices: collapseNotices } =
+    collapseFanOutDuplicates(harnessDefaults, jobs);
+
+  const expandedJobs = resolveJobs(harnessDefaults, guardedJobs);
 
   const validHarnesses = ["claude", "codex", "gemini"];
   for (const job of expandedJobs) {
@@ -428,10 +435,14 @@ async function insertJobs(
     password: config.password,
     id: assignmentId as Id<"assignments">,
   });
-  let warning: string | undefined;
+  const warnings: string[] = [];
   if (assignment && assignment.status !== "active" && assignment.status !== "pending") {
-    warning = `Warning: Assignment ${assignmentId.slice(-8)} has status "${assignment.status}". Jobs will not run until assignment status is set to active.`;
+    warnings.push(`Warning: Assignment ${assignmentId.slice(-8)} has status "${assignment.status}". Jobs will not run until assignment status is set to active.`);
   }
+  for (const n of collapseNotices) {
+    warnings.push(`Collapsed ${n.from} self-fanned "${n.jobType}" jobs into 1 canonical fan-out (expands to ${n.to}). Hand the fan-out job the full brief; let namespace config fan it across harnesses.`);
+  }
+  const warning = warnings.length > 0 ? warnings.join("\n") : undefined;
 
   // Determine effective afterGroupId:
   // 1. Explicit --after flag
