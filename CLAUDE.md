@@ -16,6 +16,10 @@ The auto-memory store is SHARED across past, concurrent and future sessions, and
 - **Preserve discoverability.** Keep a capability map — "X exists → Phase N / `path`" — so "does this already exist?" is fast. The pointer says WHERE to look; it never says you are done.
 - **Why:** status in memory is a lossy, unanchored copy of what the phase dir + git already own authoritatively. Because memory is shared and re-injected, a worker's in-flight "done" becomes indistinguishable from established history — which has repeatedly caused agents to treat work delivered *this same session* as pre-existing and redundant. The fix is to remove the category, not to decorate it.
 
+[Ordering ≠ membership]
+- "It was in my starting context" is membership, NOT chronology. Injected snapshots/memory/summaries/prior-state are captured at a wall-clock time that may be AFTER your own actions — they are timestamped, not time-zero. Never read "A predates B" off "A was already in my context." An order claim needs both events on ONE clock (creation stamps, reflog) — go get it before asserting.
+- Generalises: a story that fits all the data is not proof — the inverse causality usually fits the SAME data. Price confidence at the weakest UNVERIFIED link, not the volume of corroborating detail hanging off it. For any causal/temporal claim, name the one datum that would flip it and fetch it first.
+
 # Your Claude Code operating environment
 You have been invoked headless and any Backround Bashes get terminated when you idle. ALWAYS `run_in_background: false`
 - You will not be re-invoked when `Bash` with `run_in_background: true` exits. Keep your Bashes foregrounded or periodically poll.
