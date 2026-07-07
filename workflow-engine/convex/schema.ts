@@ -206,7 +206,10 @@ export default defineSchema({
     .index("by_namespace", ["namespaceId"])
     .index("by_namespace_updated", ["namespaceId", "updatedAt"])
     .index("by_assignment", ["assignmentId"])
-    .index("by_latest_message", ["latestMessageAt"]),
+    .index("by_latest_message", ["latestMessageAt"])
+    // Pinned-first sidebar: eq("pinned", true) then recency, so listAll can fetch
+    // the (tiny) pinned set with an index instead of scanning the whole table.
+    .index("by_pinned_latest", ["pinned", "latestMessageAt"]),
 
   chatMessages: defineTable({
     threadId: v.id("chatThreads"),

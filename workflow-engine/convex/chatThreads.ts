@@ -7,23 +7,39 @@ import { requirePassword } from "./auth";
 
 // List all threads cross-namespace, sorted pinned-first then by latestMessageAt desc (denormalized).
 // No N+1 enrichment — latestMessageAt is written by chatMessages.add.
-// After backfill, can switch to pure index query: .withIndex("by_latest_message").order("desc").take(limit)
+//
+// Indexed read (~pinnedCount + limit docs), NOT a full-table scan: the old .collect()
+// read every thread on a reactive query that re-fires on every message in every namespace.
+// We can't do a single .take() on by_pinned_latest because pinned is a tri-state in prod
+// (true / explicit false from un-pinning / absent); the index would group false and absent
+// into separate blocks instead of interleaving them by recency. So: fetch the tiny pinned
+// set via index, fetch the recency window via index, then merge pinned-first with dedup.
 export const listAll = query({
   args: { password: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     requirePassword(args);
     const limit = args.limit || 50;
 
-    const threads = await ctx.db.query("chatThreads").collect();
+    // Pinned threads float to the top regardless of how quiet they are. Tiny set,
+    // indexed on eq("pinned", true) — ordered by latestMessageAt desc among themselves.
+    const pinned = await ctx.db
+      .query("chatThreads")
+      .withIndex("by_pinned_latest", (q) => q.eq("pinned", true))
+      .order("desc")
+      .collect();
 
-    // Sort before slicing so pinned but quiet threads remain in the capped sidebar window.
-    threads.sort((a, b) => {
-      const pinnedDelta = Number(b.pinned ?? false) - Number(a.pinned ?? false);
-      if (pinnedDelta !== 0) return pinnedDelta;
-      return (b.latestMessageAt ?? b.updatedAt) - (a.latestMessageAt ?? a.updatedAt);
-    });
+    // Recency window: only ~limit docs read, ordered by the denormalized latestMessageAt.
+    const recent = await ctx.db
+      .query("chatThreads")
+      .withIndex("by_latest_message")
+      .order("desc")
+      .take(limit);
 
-    return threads.slice(0, limit);
+    // Merge pinned-first, dropping any pinned thread that also surfaced in the window.
+    const pinnedIds = new Set(pinned.map((t) => t._id));
+    const merged = [...pinned, ...recent.filter((t) => !pinnedIds.has(t._id))];
+
+    return merged.slice(0, limit);
   },
 });
 
