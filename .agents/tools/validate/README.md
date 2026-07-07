@@ -62,6 +62,36 @@ Accepted v1 residual: if a live owner's lock is externally yanked or misclassifi
 
 If lock infrastructure itself is unavailable because the lock directory cannot be created or written (`EACCES`, `EPERM`, or `EROFS`), the tool warns and runs un-latched in a pid-isolated run directory. Ordinary contention does not use this fallback.
 
+## Gate Sequencing
+
+By default every gate runs in one concurrent batch. A gate that mutates shared
+build artifacts can corrupt a peer that reads them — e.g. `next build`
+regenerates `.next/types/**` while `ts:check` (`tsc`) is reading those same
+files, producing spurious `TS6053: File ... not found` errors.
+
+Give such a gate a `sequence` field to pull it out of the concurrent batch into
+its own serial phase:
+
+```json
+{ "name": "build", "command": "pnpm build", "sequence": "before" }
+```
+
+- `"before"` — runs serially before the concurrent batch (gives later gates a fresh build)
+- `"after"`  — runs serially after the concurrent batch
+- omitted    — runs in the concurrent batch (default)
+
+Phases execute in order `before → concurrent → after`; gates within a serial
+phase run one at a time. Wall-clock is unchanged versus all-concurrent when a
+single heavy gate is sequenced (it would have been the long pole either way),
+but the artifact race is eliminated.
+
+**This repo's gates are intentionally left unsequenced.** Our `build` gate
+(`check-deploy-shape.mjs`) and `ts:check` (`tsc -p convex/tsconfig.json`) share
+no generated artifacts, so there is no race to isolate. If you add or change a
+gate such that one mutates build output another reads (e.g. a Next.js `build`
+regenerating `.next/types/**` while `tsc` reads it), give the mutating gate a
+`sequence` to pull it out of the concurrent batch.
+
 ## Default Gates
 
 This repo's committed config uses:

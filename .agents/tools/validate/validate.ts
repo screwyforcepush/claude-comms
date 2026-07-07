@@ -19,6 +19,16 @@ import { fileURLToPath } from "node:url";
 export interface ValidateGateConfig {
   name: string;
   command: string;
+  /**
+   * Controls whether the gate joins the concurrent batch (default) or runs
+   * isolated in its own serial phase. Use this for gates that mutate shared
+   * build artifacts and would race other gates — e.g. `next build` regenerating
+   * `.next/types/**` while `ts:check` reads it.
+   * - `"before"`: run serially before the concurrent batch
+   * - `"after"`:  run serially after the concurrent batch
+   * - omitted:    run in the concurrent batch
+   */
+  sequence?: "before" | "after";
 }
 
 export interface ValidateConfig {
@@ -461,11 +471,7 @@ async function runOwner(
 
   try {
     mkdirSync(context.runDir, { recursive: true });
-    const settledGateResults = await Promise.allSettled(gates.map((gate) => runGate(gate, context.runDir, repoRoot, opts)));
-    const gateResults = settledGateResults.map((settled) => {
-      if (settled.status === "rejected") throw settled.reason;
-      return settled.value;
-    });
+    const gateResults = await runGatesInPhases(gates, context.runDir, repoRoot, opts);
     const gateMap: Record<string, GateResult> = {};
 
     for (const { name, result } of gateResults) {
@@ -497,6 +503,37 @@ async function runOwner(
       releaseOwnedLock(paths.lockDir, paths.lockMetaPath, context);
     }
   }
+}
+
+async function runGatesInPhases(
+  gates: ValidateGateConfig[],
+  runDir: string,
+  repoRoot: string,
+  opts: ValidateOptions,
+): Promise<{ name: string; result: GateResult }[]> {
+  const before = gates.filter((gate) => gate.sequence === "before");
+  const concurrent = gates.filter((gate) => gate.sequence !== "before" && gate.sequence !== "after");
+  const after = gates.filter((gate) => gate.sequence === "after");
+
+  const results: { name: string; result: GateResult }[] = [];
+
+  // Serial phases run one gate at a time so they are isolated from each other
+  // and from the concurrent batch. runGate never rejects, so awaiting is safe.
+  for (const gate of before) {
+    results.push(await runGate(gate, runDir, repoRoot, opts));
+  }
+
+  const settled = await Promise.allSettled(concurrent.map((gate) => runGate(gate, runDir, repoRoot, opts)));
+  for (const outcome of settled) {
+    if (outcome.status === "rejected") throw outcome.reason;
+    results.push(outcome.value);
+  }
+
+  for (const gate of after) {
+    results.push(await runGate(gate, runDir, repoRoot, opts));
+  }
+
+  return results;
 }
 
 function runGate(

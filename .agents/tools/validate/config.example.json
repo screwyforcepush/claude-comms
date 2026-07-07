@@ -19,7 +19,8 @@
     },
     {
       "name": "build",
-      "command": "pnpm build"
+      "command": "pnpm build",
+      "sequence": "before"
     }
   ]
 }

@@ -692,6 +692,60 @@ describe("cli.ts", () => {
     assert.strictEqual(failedJson.gates.fail.exitCode, 9);
   });
 
+  it("T14 runs a sequence:before gate to completion before the concurrent batch starts", () => {
+    const root = tempDir();
+    const logDir = join(root, "logs");
+    const marker = join(root, "marker.txt");
+    const { cliPath } = makeCliFixture(baseConfig(logDir, [
+      { name: "build", command: markerCommand(marker, "build", 200), sequence: "before" },
+      { name: "lint", command: markerCommand(marker, "lint", 200) },
+      { name: "ts:check", command: markerCommand(marker, "ts:check", 200) },
+    ]));
+
+    const result = spawnCli(cliPath);
+    const parsed = JSON.parse(result.stdout) as ValidateResult;
+    const lines = readLines(marker);
+    const stamp = (label: string, edge: "start" | "end") =>
+      Number(lines.find((line) => line.startsWith(`${label}:${edge} `))?.split(" ")[1]);
+
+    const buildEnd = stamp("build", "end");
+    const lintStart = stamp("lint", "start");
+    const tsStart = stamp("ts:check", "start");
+
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.strictEqual(parsed.ok, true);
+    assert.ok(buildEnd <= lintStart, "build must finish before the concurrent batch starts");
+    assert.ok(buildEnd <= tsStart, "build must finish before the concurrent batch starts");
+    // The non-sequenced gates still run concurrently with each other.
+    assert.ok(Math.abs(lintStart - tsStart) < 150, "lint and ts:check should start together");
+  });
+
+  it("T15 runs a sequence:after gate only once the concurrent batch has finished", () => {
+    const root = tempDir();
+    const logDir = join(root, "logs");
+    const marker = join(root, "marker.txt");
+    const { cliPath } = makeCliFixture(baseConfig(logDir, [
+      { name: "lint", command: markerCommand(marker, "lint", 200) },
+      { name: "ts:check", command: markerCommand(marker, "ts:check", 200) },
+      { name: "build", command: markerCommand(marker, "build", 200), sequence: "after" },
+    ]));
+
+    const result = spawnCli(cliPath);
+    const parsed = JSON.parse(result.stdout) as ValidateResult;
+    const lines = readLines(marker);
+    const stamp = (label: string, edge: "start" | "end") =>
+      Number(lines.find((line) => line.startsWith(`${label}:${edge} `))?.split(" ")[1]);
+
+    const lintEnd = stamp("lint", "end");
+    const tsEnd = stamp("ts:check", "end");
+    const buildStart = stamp("build", "start");
+
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.strictEqual(parsed.ok, true);
+    assert.ok(buildStart >= lintEnd, "build must start after the concurrent batch finishes");
+    assert.ok(buildStart >= tsEnd, "build must start after the concurrent batch finishes");
+  });
+
   it("rejects an empty --gates list instead of falling back to all gates", () => {
     const logDir = join(tempDir(), "logs");
     const { cliPath } = makeCliFixture(baseConfig(logDir, [
