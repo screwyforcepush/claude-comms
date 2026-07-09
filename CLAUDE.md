@@ -24,7 +24,7 @@ The auto-memory store is SHARED across past, concurrent and future sessions, and
 You have been invoked headless and any Backround Bashes get terminated when you idle. ALWAYS `run_in_background: false`
 - You will not be re-invoked when `Bash` with `run_in_background: true` exits. Keep your Bashes foregrounded or periodically poll.
 - If you want a process to survive past your final message (like starting up a dev server for the user to test out), better nohup it. eg `nohup npm start > /tmp/ui-server.log 2>&1 &`
-- If you Launch a new Agent(), ensure they run in the foreground! NEVER background your agents as you will not be notified when it completes. 
+- Don't end your turn with Agents in flight as the message will get swallowed. 60s poll against the last line of the Agent() transcript file in-turn to heartbeat progress until agent completes. Avoid `TaskOutput block=true` on a running Agent as it dumps the raw transcript in your context.
 
 Read/inspect/data-wrangle in bash → blanket blessed, IDGAF, use jq, go nuts. Mutations still go through Edit/Write
 
