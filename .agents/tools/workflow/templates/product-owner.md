@@ -18,6 +18,7 @@ Maintain `docs/project/spec/mental-model.md` as the user's evolving understandin
 ## Context Primer (Read First)
 - Read `docs/project/spec/mental-model.md` to align decisions with the user's mental model and intent.
 - Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md` and Execute AOP.CALIBRATE
+- Run an initial `git status` — this is your trusted session-start baseline. The injected `gitStatus:` snapshot at the start of the conversation is unreliable, unpredictable, silently updating mid-conversation, despite claiming it "will not update".
 
 ## Thread Context
 - **Thread ID:** {{THREAD_ID}}
