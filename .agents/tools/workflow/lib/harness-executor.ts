@@ -93,8 +93,6 @@ export interface ExecutorConfig {
   debounceMs?: number;
   /** Claude execution mode. Defaults to headless, the existing -p stream-json path. */
   claudeExecutionMode?: "headless" | "interactive";
-  /** Gemini harness backend. Defaults to gemini CLI stream-json; agy uses Antigravity hooks. */
-  geminiExecutionMode?: "gemini" | "agy";
   /** Explicit settings file for interactive Claude hooks. Defaults to workflow/claude-hook-settings.json. */
   claudeInteractiveSettingsPath?: string;
   /** Optional setting source override passed to Claude interactive mode. */
@@ -437,7 +435,8 @@ export class HarnessExecutor {
     if (options.harness === "claude" && this.config.claudeExecutionMode === "interactive") {
       return this.executeClaudeInteractive(options, callbacks);
     }
-    if (options.harness === "gemini" && this.config.geminiExecutionMode === "agy") {
+    if (options.harness === "gemini") {
+      // The gemini CLI backend is gone; harness "gemini" now always means agy.
       return this.executeAgy(options, callbacks);
     }
 
@@ -455,23 +454,30 @@ export class HarnessExecutor {
     if (options.model) {
       commandOptions.model = options.model;
     }
-    if (sessionId && (harness === "claude" || harness === "codex" || harness === "gemini")) {
+    if (sessionId) {
       commandOptions.sessionId = sessionId;
       if (forkSession) {
         commandOptions.forkSession = true;
       }
     }
-    const { cmd, args } = buildCommand(harness, prompt, commandOptions);
+    const { cmd, args } = buildCommand(harness, commandOptions);
 
-    // 4. Spawn child with stdout going directly to file
+    // 4. Spawn child with stdout going directly to file, prompt piped to stdin
     const child = spawn(cmd, args, {
-      stdio: ["ignore", logFd, "pipe"], // stdout to file, stderr to pipe
+      stdio: ["pipe", logFd, "pipe"], // stdin from pipe, stdout to file, stderr to pipe
       env: { ...process.env, ...env },
       cwd: this.config.cwd,
     });
 
     // Close our copy of the fd (child inherited it)
     closeSync(logFd);
+
+    // Error handler must be attached before end(): a child that dies without
+    // draining stdin emits EPIPE here, which would otherwise crash the runner.
+    child.stdin?.on("error", (err) => {
+      console.error(`[${jobId}] stdin write failed: ${err.message}`);
+    });
+    child.stdin?.end(prompt, "utf-8");
 
     const pid = child.pid || 0;
 
@@ -722,14 +728,14 @@ export class HarnessExecutor {
       };
     }
 
-    const command = buildAgyCommand(prompt, {
+    const command = buildAgyCommand({
       model: options.model,
       sessionId,
       printTimeoutMs: this.config.timeoutMs,
     });
 
     const child = spawn(command.cmd, command.args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       env: {
         ...process.env,
         ...env,
@@ -737,6 +743,13 @@ export class HarnessExecutor {
       },
       cwd: this.config.cwd,
     });
+
+    // Error handler must be attached before end(): a child that dies without
+    // draining stdin emits EPIPE here, which would otherwise crash the runner.
+    child.stdin?.on("error", (err) => {
+      console.error(`[${jobId}] agy stdin write failed: ${err.message}`);
+    });
+    child.stdin?.end(prompt, "utf-8");
 
     const pid = child.pid || 0;
     const tracker = new JobTracker(jobId, "gemini", pid);
@@ -926,6 +939,11 @@ export class HarnessExecutor {
       }
     );
 
+    // Error handler must be attached before end(): a wrapper that dies without
+    // draining stdin emits EPIPE here, which would otherwise crash the runner.
+    child.stdin?.on("error", (err) => {
+      console.error(`[${jobId}] interactive stdin write failed: ${err.message}`);
+    });
     child.stdin?.end(prompt, "utf-8");
 
     const pid = child.pid || 0;

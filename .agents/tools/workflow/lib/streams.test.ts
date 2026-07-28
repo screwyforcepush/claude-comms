@@ -346,31 +346,30 @@ describe("AgyStreamHandler", () => {
 // ============================================================================
 
 describe("buildCommand", () => {
-  it("builds claude command with optional session resume", () => {
-    const basic = buildCommand("claude", "test");
+  it("builds claude command with bare -p for stdin prompt delivery", () => {
+    const basic = buildCommand("claude");
     assert.strictEqual(basic.cmd, "claude");
     assert.ok(basic.args.includes("--output-format"));
     assert.ok(!basic.args.includes("--resume"));
+    // Prompt is piped to stdin; bare -p must be the final arg
+    assert.strictEqual(basic.args[basic.args.length - 1], "-p");
 
-    const withSession = buildCommand("claude", "test", { sessionId: "s123" });
+    const withSession = buildCommand("claude", { sessionId: "s123" });
     assert.ok(withSession.args.includes("--resume"));
     assert.ok(withSession.args.includes("s123"));
+    assert.strictEqual(withSession.args[withSession.args.length - 1], "-p");
   });
 
-  it("builds codex and gemini commands", () => {
-    const codex = buildCommand("codex", "test");
+  it("builds codex command with stdin sentinel", () => {
+    const codex = buildCommand("codex");
     assert.strictEqual(codex.cmd, "codex");
     assert.ok(codex.args.includes("--json"));
+    assert.ok(codex.args.includes("-"));
     assert.ok(!codex.args.includes("resume"));
-
-    const gemini = buildCommand("gemini", "test");
-    assert.strictEqual(gemini.cmd, "gemini");
-    assert.ok(gemini.args.includes("stream-json"));
-    assert.ok(!gemini.args.includes("--resume"));
   });
 
   it("builds codex resume command when sessionId is provided", () => {
-    const codex = buildCommand("codex", "test", {
+    const codex = buildCommand("codex", {
       sessionId: "019e1662-7864-7d91-b3f7-663ced63e87d",
       model: "gpt-5.5",
     });
@@ -382,37 +381,19 @@ describe("buildCommand", () => {
       "-m",
       "gpt-5.5",
       "019e1662-7864-7d91-b3f7-663ced63e87d",
-      "test",
+      "-",
       "--json",
     ]);
   });
 
-  it("builds gemini resume command when sessionId is provided", () => {
-    const gemini = buildCommand("gemini", "test", {
-      sessionId: "915d455b-c502-4f48-829e-a3858cd370f8",
-      model: "auto-gemini-3",
-    });
-
-    assert.deepStrictEqual(gemini.args, [
-      "--yolo",
-      "--resume",
-      "915d455b-c502-4f48-829e-a3858cd370f8",
-      "-m",
-      "auto-gemini-3",
-      "--output-format",
-      "stream-json",
-      "-p",
-      "test",
-    ]);
-  });
-
   it("builds agy command with conversation resume and print timeout", () => {
-    const agy = buildAgyCommand("test", {
+    const agy = buildAgyCommand({
       sessionId: "915d455b-c502-4f48-829e-a3858cd370f8",
       model: "gemini-3.5-flash",
       printTimeoutMs: 3600000,
     });
 
+    // No -p: agy reads the prompt from stdin when it is not a TTY
     assert.deepStrictEqual(agy.args, [
       "--dangerously-skip-permissions",
       "--conversation",
@@ -421,13 +402,12 @@ describe("buildCommand", () => {
       "gemini-3.5-flash",
       "--print-timeout",
       "3600s",
-      "-p",
-      "test",
     ]);
   });
 
-  it("throws for unknown harness", () => {
-    assert.throws(() => buildCommand("unknown", "test"), /Unknown harness/);
+  it("throws for unknown harness, including removed gemini CLI", () => {
+    assert.throws(() => buildCommand("unknown"), /Unknown harness/);
+    assert.throws(() => buildCommand("gemini"), /Unknown harness/);
   });
 
   it("builds interactive claude command without print or stream-json", () => {

@@ -20,7 +20,6 @@ interface Config {
   convexUrl: string;
   password: string;
   reflectionTimeoutMs?: number;
-  geminiExecutionMode?: "gemini" | "agy";
 }
 
 type ReflectableHarness = "claude" | "codex" | "gemini";
@@ -49,13 +48,25 @@ function terminate(child: ChildProcess): void {
   }, KILL_GRACE_MS).unref();
 }
 
-async function runWithTimeout(command: string, args: string[], timeoutMs: number): Promise<void> {
+async function runWithTimeout(
+  command: string,
+  args: string[],
+  timeoutMs: number,
+  promptStdin: string
+): Promise<void> {
   await new Promise<void>((resolve) => {
     const child = spawn(command, args, {
       cwd: projectRoot,
       env: process.env,
-      stdio: "ignore",
+      stdio: ["pipe", "ignore", "ignore"],
     });
+
+    // Prompt goes via stdin, not argv. Error handler must be attached before
+    // end(): a child that dies without draining stdin emits EPIPE here.
+    child.stdin?.on("error", (err) => {
+      debug(`stdin write failed: ${err.message}`);
+    });
+    child.stdin?.end(promptStdin, "utf-8");
 
     const timeout = setTimeout(() => {
       debug(`timeout after ${timeoutMs}ms`);
@@ -86,8 +97,8 @@ async function runClaude(prompt: string, sessionId: string, timeoutMs: number, m
   if (model) {
     args.push("--model", model);
   }
-  args.push("--resume", sessionId, "--fork-session", "-p", prompt);
-  await runWithTimeout("claude", args, timeoutMs);
+  args.push("--resume", sessionId, "--fork-session", "-p");
+  await runWithTimeout("claude", args, timeoutMs, prompt);
 }
 
 async function runCodex(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
@@ -95,26 +106,17 @@ async function runCodex(prompt: string, sessionId: string, timeoutMs: number, mo
   if (model) {
     args.push("-m", model);
   }
-  args.push(sessionId, prompt, "--json");
-  await runWithTimeout("codex", args, timeoutMs);
-}
-
-async function runGemini(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
-  const args = ["--yolo", "--resume", sessionId];
-  if (model) {
-    args.push("-m", model);
-  }
-  args.push("--output-format", "stream-json", "-p", prompt);
-  await runWithTimeout("gemini", args, timeoutMs);
+  args.push(sessionId, "-", "--json");
+  await runWithTimeout("codex", args, timeoutMs, prompt);
 }
 
 async function runAgy(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
-  const command = buildAgyCommand(prompt, {
+  const command = buildAgyCommand({
     sessionId,
     model,
     printTimeoutMs: timeoutMs,
   });
-  await runWithTimeout(command.cmd, command.args, timeoutMs);
+  await runWithTimeout(command.cmd, command.args, timeoutMs, prompt);
 }
 
 async function runReflectionHarness(
@@ -122,17 +124,15 @@ async function runReflectionHarness(
   prompt: string,
   sessionId: string,
   timeoutMs: number,
-  model?: string,
-  geminiExecutionMode: "gemini" | "agy" = "gemini"
+  model?: string
 ): Promise<void> {
   if (harness === "claude") {
     await runClaude(prompt, sessionId, timeoutMs, model);
   } else if (harness === "codex") {
     await runCodex(prompt, sessionId, timeoutMs, model);
-  } else if (geminiExecutionMode === "agy") {
-    await runAgy(prompt, sessionId, timeoutMs, model);
   } else {
-    await runGemini(prompt, sessionId, timeoutMs, model);
+    // The gemini CLI backend is gone; harness "gemini" now always means agy.
+    await runAgy(prompt, sessionId, timeoutMs, model);
   }
 }
 
@@ -176,8 +176,7 @@ async function main(): Promise<void> {
       prompt,
       jobData.sessionId,
       config.reflectionTimeoutMs ?? DEFAULT_REFLECTION_TIMEOUT_MS,
-      model,
-      config.geminiExecutionMode ?? "gemini"
+      model
     );
   } catch (err) {
     debug((err as Error).message);

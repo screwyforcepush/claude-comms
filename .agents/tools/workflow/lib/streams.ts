@@ -492,11 +492,14 @@ export function createStreamHandler(harness: string): StreamHandler {
 // ============================================================================
 
 /**
- * Build command and arguments for spawning a harness process
+ * Build command and arguments for spawning a harness process.
+ *
+ * The prompt is intentionally NOT part of argv — callers must pipe it to the
+ * child's stdin (claude: bare `-p`, codex: the `-` sentinel). Argv prompts
+ * are visible in `ps` and capped at ~128KiB per argument by the kernel.
  */
 export function buildCommand(
   harness: string,
-  prompt: string,
   options: CommandOptions = {}
 ): CommandResult {
   switch (harness) {
@@ -523,7 +526,7 @@ export function buildCommand(
         }
       }
 
-      args.push("-p", prompt);
+      args.push("-p");
       return { cmd: "claude", args };
     }
     case "codex": {
@@ -533,35 +536,21 @@ export function buildCommand(
         if (options.model) {
           args.push("-m", options.model);
         }
-        args.push(options.sessionId, prompt, "--json");
+        args.push(options.sessionId, "-", "--json");
       } else {
         if (options.model) {
           args.push("-m", options.model);
         }
-        args.push(prompt, "--json");
+        args.push("-", "--json");
       }
       return { cmd: "codex", args };
-    }
-    case "gemini": {
-      const args = ["--yolo"];
-      if (options.sessionId) {
-        args.push("--resume", options.sessionId);
-      }
-      if (options.model) {
-        args.push("-m", options.model);
-      }
-      args.push("--output-format", "stream-json", "-p", prompt);
-      return { cmd: "gemini", args };
     }
     default:
       throw new Error(`Unknown harness: ${harness}`);
   }
 }
 
-export function buildAgyCommand(
-  prompt: string,
-  options: AgyCommandOptions = {}
-): CommandResult {
+export function buildAgyCommand(options: AgyCommandOptions = {}): CommandResult {
   const args = ["--dangerously-skip-permissions"];
 
   if (options.sessionId) {
@@ -574,7 +563,9 @@ export function buildAgyCommand(
     args.push("--print-timeout", formatAgyDuration(options.printTimeoutMs));
   }
 
-  args.push("-p", prompt);
+  // No prompt flag: agy enters print mode by detecting a non-TTY stdin and
+  // reads the prompt from it. `-p` requires an inline argument and `-p -`
+  // sends a literal hyphen, so bare piping is the only stdin form agy supports.
   return { cmd: "agy", args };
 }
 
