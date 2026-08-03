@@ -208,6 +208,17 @@ Real-time Convex subscriptions should only be maintained for **mutable data** �
 ### Execution Records vs. Filesystem State
 Job execution records (groups, jobs, results, aggregated decisions, artifacts, PM messages) are a **log of how the system got here** — not the source of truth about what exists. The real state is the code on disk. This matters most for **retry semantics**: when a job group is retried, downstream execution records are cascade-deleted, but stale decisions, artifacts, and PM chat messages from earlier groups are preserved. They still accurately describe what happened and what the filesystem now reflects. The execution record is history; the code is state.
 
+### Assignment Memory — Artifacts and Decisions
+
+Artifacts and Decisions are the assignment's only cross-job shared memory — injected into every future PM and every crew member's context. That reach is exactly why they carry a high signal bar: noise here is a tax on every remaining job.
+
+- **Artifacts are a curated map, not a log.** Durable pointers — "the truth about X lives at path" — that let a future PM or crew member skip a cold-start explore, then verify at HEAD. No status, no validate results, no commit narratives: git owns history.
+- **Decisions are the crew's ADR log, with the PM as scribe.** The settled choices future jobs must honor or knowingly overturn — "X over Y, because Z": the design pattern an implementer chose, the approach a reviewer recommended and the PM ratified, a scope ruling (descoped/deferred + why). The PM curates and distills but is mostly not the author. PM routing choices (which job comes next, and why) never belong here — that reasoning lives in the inserted job's context field.
+- **The turn-by-turn story is never duplicated into shared memory.** It already has authoritative homes: git, the job chain, and the job contexts the PM writes. A PM's bearings, verification receipts, and adjudication of a job run evaporate with the turn — the durable residue is harvested into the map/ADR, not transcribed.
+- **Append-only is deliberate.** A wayward PM cannot delete established constraints or pointers; corrections happen by appending a superseding entry, which keeps pushback visible instead of silent.
+
+The admission test for any entry: would a future PM or crew member act differently for knowing this? If not, it doesn't belong.
+
 ### Rate-Limit Resilience
 External provider rate limits (Anthropic's 5-hour and 7-day usage windows) are an operational reality that the workflow engine must handle gracefully. The core principle: **a rate limit is not a failure — it's a pause.**
 

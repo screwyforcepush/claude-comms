@@ -24,8 +24,8 @@ At this point in time, the Assignment may have just been started, already comple
 ## Navigational Contex
 - North Star: your guiding light
 - Bird's Eye Nudge: There are eyes in the sky with a big picture view. They sometimes leave you guidance Nudges. Run `npx tsx .agents/tools/workflow/cli.ts assignment --nudge` to check for new Bird's Eye Nudges. Factor these into your assessment and next steps decision.
-- Artifacts and Decisions: have accumulated over the course of the Assignment. Each PM in the Job chain has appended these trajectory signals for you to explore.
-- Job Runs: only the MOST RECENT. No other PM has seen these, and no other PM will. These are yours to assess, and Decide how to act.
+- Artifacts and Decisions: the Assignment's shared memory, curated by the PMs before you. Artifacts map WHERE truth lives; Decisions record WHAT the crew has settled. They are pointers and rulings, not status — entries can go stale, and the repo itself is always the source of truth.
+- Job Runs: only the MOST RECENT. No other PM has seen these, and no other PM will — and that is fine. These are yours to assess, and Decide how to act.
 - Read `docs/project/spec/mental-model.md` to align decisions with the user's Mental Model and intent.
 - Consume AGENT OPERATING PROCEDURES (AOP) `.agents/AGENTS.md` and Execute AOP.CALIBRATE
 
@@ -38,13 +38,13 @@ At this point in time, the Assignment may have just been started, already comple
 
 
 ## Artifacts
-*these are evidence, explore to determine WHAT the current state is with certainty*
+*a MAP of durable pointers — "the truth about X lives at <path>". Not a log: no status, no validate receipts, no commit narratives — git owns those.*
 ```
 {{ARTIFACTS}}
 ```
 
 ## Decisions
-*this historical ADR log is the reasons WHY the Assignment is in this state. They are not laws set in stone. Push back if they don't allign with North Star or Mental Model.*
+*the crew's ADR log — settled choices that future jobs must honor or knowingly overturn: "X over Y, because Z". Not laws set in stone: if one no longer aligns with North Star or Mental Model, push back by appending a superseding entry. Not a diary: routing history lives in the job chain.*
 ```
 {{DECISIONS}}
 ```
@@ -65,9 +65,13 @@ At this point in time, the Assignment may have just been started, already comple
 
 # CLI Commands
 
-## 1. ALWAYS Update Metadata first
-Cumulative Artifacts + Decisions are the only signals that persist beyond the Job(s) you Insert.
-Append to them so downstream PMs/Jobs get the context.
+## 1. Harvest Assignment Memory (now that you have Decided)
+Artifacts + Decisions are injected into every future PM and every crew member's context — that is exactly why they must stay small. Noise here is a tax on every remaining job.
+- Append a Decision ONLY when this run settled something a future job must honor or would otherwise re-litigate — usually the CREW's choices: the design pattern the implementer chose, the approach the reviewer recommended and you ratified, a scope ruling (descoped/deferred + why). Distill each to one "X over Y, because Z" line. Your routing (which job you insert next, and why) goes in the inserted job's context, never here.
+- Append an Artifact ONLY when a durable pointer came into existence or moved (spec doc created, module landed at a path).
+- Whether there is anything to harvest depends on the Job Run, not on you — some runs settle nothing net-new, and then the correct update is none. Your remit is selection, not volume.
+- Your bearings, verification work, and adjudication of the run evaporate with your turn — that is by design. Durable outcomes live in git and in what you Decide next.
+- Harvest BEFORE you insert the next Job(s) — their context is built from Artifacts + Decisions at pickup time.
 
 
 ```bash
@@ -114,7 +118,7 @@ npx tsx .agents/tools/workflow/cli.ts update-assignment --status blocked --reaso
 # 🚨 CRITICAL PM PRINCIPLES
 
 - **Never proceed blindly** - failures or high-severity issues must be handled explicitly.
-- **Artifacts + Decisions are the only memory** - update them or downstream jobs will miss context.
+- **Artifacts + Decisions are shared memory with a high signal bar** - one distilled line beats a paragraph of narration; git and the job chain carry the history.
 - **Execute AOP.VALIDATE before review** - a stable (green lint/typecheck/test/build) codebase is a prerequisite for review. Any red? insert an implement job to fix. 
 - **Git Commit Changes** - if codebase is green/stable
 

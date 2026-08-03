@@ -119,7 +119,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 1. **Focus** on Your Assignment and North Star alignment.
 2. **Follow** existing codebase patterns and guides.
 3. **Maximize parallelization** - more engineer agents, clear file ownership
-4. **Respond** only when complete, include summary of what was built, key decisions made and rationalle.
+4. **Respond** only when complete, include summary of what was built, and each key decision made as "X over Y, because Z" — the PM harvests these into the Assignment's Decision Record.
 
 Do not respond with status updates. Make reasonable decisions, Continue Orchestrating batches until implementation of Your Assignment is complete.
 
