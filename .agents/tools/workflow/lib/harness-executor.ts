@@ -33,6 +33,7 @@ import {
   JobTracker,
   FileJobStatus,
   JobPaths,
+  TimeoutReason,
   ensureJobDir,
   listJobDirs,
   readJobStatus,
@@ -64,7 +65,7 @@ export interface ExecutionCallbacks {
   /** Called when job fails */
   onFail: (reason: string, partialResult?: string, exitForced?: boolean, sessionId?: string) => void;
   /** Called when job times out (max duration or idle timeout before terminal event) */
-  onTimeout: (partialResult: string, sessionId?: string) => void;
+  onTimeout: (partialResult: string, sessionId: string | undefined, reason: TimeoutReason) => void;
   /** Called when job hits a provider rate limit (Claude only). If not provided, falls through to onFail. */
   onRateLimit?: (rateLimitInfo: RateLimitInfo, partialResult?: string) => void;
   /** Optional: called for each event (for custom handling) */
@@ -496,6 +497,7 @@ export class HarnessExecutor {
     // 8. Set up state flags
     let timedOut = false;
     let idleTimedOut = false;
+    let timeoutReason: TimeoutReason | null = null;
     let spawnFailed = false;
     let jobCompleted = false;
     let hasSeenResult = false;
@@ -590,8 +592,9 @@ export class HarnessExecutor {
     // Max duration timeout
     const timeout = setTimeout(() => {
       timedOut = true;
+      timeoutReason ??= "max_duration";
       console.log(`[${jobId}] Timeout after ${this.config.timeoutMs}ms (max duration)`);
-      tracker.timeout();
+      tracker.timeout(timeoutReason);
       child.kill("SIGTERM");
       setTimeout(() => child.kill("SIGKILL"), 5000);
     }, this.config.timeoutMs);
@@ -605,8 +608,9 @@ export class HarnessExecutor {
       if (idleTimeout) clearTimeout(idleTimeout);
       idleTimeout = setTimeout(() => {
         idleTimedOut = true;
+        timeoutReason ??= "idle_timeout";
         console.log(`[${jobId}] Idle timeout after ${idleTimeoutMs}ms (no events)`);
-        tracker.timeout();
+        tracker.timeout(timeoutReason);
         child.kill("SIGTERM");
         setTimeout(() => child.kill("SIGKILL"), 5000);
       }, idleTimeoutMs);
@@ -660,7 +664,7 @@ export class HarnessExecutor {
       console.log(`[${jobId}] Exited with code ${code}`);
 
       if (timedOut || idleTimedOut) {
-        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined);
+        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined, timeoutReason ?? "max_duration");
       } else if (code === 0 && handler.isComplete()) {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, false);
@@ -761,6 +765,7 @@ export class HarnessExecutor {
 
     let timedOut = false;
     let idleTimedOut = false;
+    let timeoutReason: TimeoutReason | null = null;
     let spawnFailed = false;
     let jobCompleted = false;
     let stdoutFallback = "";
@@ -784,7 +789,7 @@ export class HarnessExecutor {
       console.log(`[${jobId}] agy exited with code ${code}`);
 
       if (timedOutStatus) {
-        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined);
+        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined, timeoutReason ?? "max_duration");
       } else if (code === 0 && (handler.isComplete() || result)) {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, false);
@@ -805,8 +810,9 @@ export class HarnessExecutor {
       if (idleTimeout) clearTimeout(idleTimeout);
       idleTimeout = setTimeout(() => {
         idleTimedOut = true;
+        timeoutReason ??= "idle_timeout";
         console.log(`[${jobId}] Idle timeout after ${idleTimeoutMs}ms (no agy hook events)`);
-        tracker.timeout();
+        tracker.timeout(timeoutReason);
         child.kill("SIGTERM");
         setTimeout(() => {
           if (child.exitCode === null) child.kill("SIGKILL");
@@ -834,8 +840,9 @@ export class HarnessExecutor {
 
     const timeout = setTimeout(() => {
       timedOut = true;
+      timeoutReason ??= "max_duration";
       console.log(`[${jobId}] Timeout after ${this.config.timeoutMs}ms (max duration)`);
-      tracker.timeout();
+      tracker.timeout(timeoutReason);
       child.kill("SIGTERM");
       setTimeout(() => {
         if (child.exitCode === null) child.kill("SIGKILL");
@@ -959,6 +966,7 @@ export class HarnessExecutor {
 
     let timedOut = false;
     let idleTimedOut = false;
+    let timeoutReason: TimeoutReason | null = null;
     let spawnFailed = false;
     let jobCompleted = false;
     let hasSeenTerminal = false;
@@ -1012,8 +1020,9 @@ export class HarnessExecutor {
       if (idleTimeout) clearTimeout(idleTimeout);
       idleTimeout = setTimeout(() => {
         idleTimedOut = true;
+        timeoutReason ??= "idle_timeout";
         console.log(`[${jobId}] Idle timeout after ${idleTimeoutMs}ms (no hook events)`);
-        tracker.timeout();
+        tracker.timeout(timeoutReason);
         child.kill("SIGTERM");
         setTimeout(() => {
           if (child.exitCode === null) child.kill("SIGKILL");
@@ -1058,8 +1067,9 @@ export class HarnessExecutor {
 
     const timeout = setTimeout(() => {
       timedOut = true;
+      timeoutReason ??= "max_duration";
       console.log(`[${jobId}] Timeout after ${this.config.timeoutMs}ms (max duration)`);
-      tracker.timeout();
+      tracker.timeout(timeoutReason);
       child.kill("SIGTERM");
       setTimeout(() => {
         if (child.exitCode === null) child.kill("SIGKILL");
@@ -1109,7 +1119,7 @@ export class HarnessExecutor {
       console.log(`[${jobId}] Interactive wrapper exited with code ${code}`);
 
       if (timedOut || idleTimedOut) {
-        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined);
+        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined, timeoutReason ?? "max_duration");
       } else if (handler.isComplete()) {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, false);
@@ -1330,7 +1340,7 @@ export class HarnessExecutor {
 
       const result = handler.getResult();
       if (finalStatus === "timeout") {
-        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined);
+        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined, "max_duration");
       } else if (handler.isComplete()) {
         tracker.complete(result);
         callbacks.onComplete(result, handler.getSessionId() || undefined, exitForced);
@@ -1423,7 +1433,7 @@ export class HarnessExecutor {
     // Max duration timeout
     const timeout = setTimeout(() => {
       console.log(`[Adopt] ${jobId}: timeout after ${this.config.timeoutMs}ms`);
-      tracker.timeout();
+      tracker.timeout("max_duration");
       try { process.kill(pid, "SIGTERM"); } catch { /* ignore */ }
       setTimeout(() => {
         try { if (isPidAlive(pid)) process.kill(pid, "SIGKILL"); } catch { /* ignore */ }

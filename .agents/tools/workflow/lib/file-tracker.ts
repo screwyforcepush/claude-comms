@@ -30,6 +30,8 @@ import { tmpdir } from "os";
 // Types
 // ============================================================================
 
+export type TimeoutReason = "idle_timeout" | "max_duration";
+
 export interface FileJobStatus {
   job_id: string;
   harness: string;
@@ -323,9 +325,9 @@ export class JobTracker {
   }
 
   /** Mark job as timed out */
-  timeout(): void {
+  timeout(reason: TimeoutReason): void {
     this.status.status = "timeout";
-    this.status.status_reason = "idle_timeout";
+    this.status.status_reason = reason;
     this.status.end_time = utcNowIso();
     this.writeStatus();
   }

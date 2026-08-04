@@ -75,7 +75,13 @@ describe("JobTracker", () => {
     assert.strictEqual(t2.getStatus().status_reason, "exit_1");
 
     const t3 = new JobTracker("timeout-test", "claude", 3);
-    t3.timeout();
+    t3.timeout("idle_timeout");
     assert.strictEqual(t3.getStatus().status, "timeout");
+    assert.strictEqual(t3.getStatus().status_reason, "idle_timeout");
+
+    const t4 = new JobTracker("timeout-test-max", "claude", 4);
+    t4.timeout("max_duration");
+    assert.strictEqual(t4.getStatus().status, "timeout");
+    assert.strictEqual(t4.getStatus().status_reason, "max_duration");
   });
 });

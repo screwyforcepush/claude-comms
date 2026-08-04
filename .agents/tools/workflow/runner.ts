@@ -44,7 +44,7 @@ import { HarnessExecutor, Harness, OrphanInfo } from "./lib/harness-executor.js"
 import { HarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
 
 // File tracker utilities for orphan reconciliation
-import { writeJobStatus, utcNowIso } from "./lib/file-tracker.js";
+import { writeJobStatus, utcNowIso, TimeoutReason } from "./lib/file-tracker.js";
 
 // Stream metrics extraction
 import {
@@ -89,6 +89,19 @@ interface Config {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "config.json");
 const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
+
+// Human/PM-facing descriptions of the two distinct timeout causes
+function describeTimeout(reason: TimeoutReason): string {
+  return reason === "idle_timeout"
+    ? `Idle timeout after ${config.idleTimeoutMs}ms with no events (agent stalled)`
+    : `Max-duration timeout after ${config.timeoutMs}ms`;
+}
+
+function describeTimeoutForChat(reason: TimeoutReason): string {
+  return reason === "idle_timeout"
+    ? `Agent stalled — no events for ${Math.round((config.idleTimeoutMs ?? 0) / 1000)}s. Partial response shown above.`
+    : `Agent hit the ${Math.round(config.timeoutMs / 1000)}s max duration. Partial response shown above.`;
+}
 
 // Project root is 3 levels up from .agents/tools/workflow
 const projectRoot = join(__dirname, "..", "..", "..");
@@ -517,13 +530,13 @@ async function executeJob(
           console.error(`[${jobId}] Error in onRateLimit:`, e);
         }
       },
-      onTimeout: async (partialResult, sessionId) => {
+      onTimeout: async (partialResult, sessionId, reason) => {
         stopHeartbeat();
         try {
           await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
-            result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
+            result: `${describeTimeout(reason)}. Partial result:\n${partialResult}`,
             toolCallCount: metrics.toolCallCount,
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
@@ -534,7 +547,7 @@ async function executeJob(
             await saveChatResponse(
               chatContext.threadId,
               partialResult || "",
-              `Agent timed out after ${Math.round(config.timeoutMs / 1000)}s. Partial response shown above.`
+              describeTimeoutForChat(reason)
             );
           } else {
             await handleGroupCompletion(group, assignment, true);
@@ -876,13 +889,13 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           console.error(`[${jobId}] Error in onFail:`, e);
         }
       },
-      onTimeout: async (partialResult) => {
+      onTimeout: async (partialResult, _sessionId, reason) => {
         stopHeartbeat();
         try {
           await client!.mutation(api.chatJobs.fail, {
             password: config.password,
             id: jobId,
-            result: `Timeout after ${config.timeoutMs}ms. Partial result:\n${partialResult}`,
+            result: `${describeTimeout(reason)}. Partial result:\n${partialResult}`,
             toolCallCount: metrics.toolCallCount,
             subagentCount: metrics.subagentCount,
             totalTokens: metrics.totalTokens ?? undefined,
@@ -891,7 +904,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           await saveChatResponse(
             chatContext.threadId,
             partialResult || "",
-            `Agent timed out after ${Math.round(config.timeoutMs / 1000)}s. Partial response shown above.`
+            describeTimeoutForChat(reason)
           );
         } catch (e) {
           console.error(`[${jobId}] Error in onTimeout:`, e);
@@ -1029,12 +1042,12 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
           console.error(`[Reconcile] ${jobId}: error in onRateLimit:`, e);
         }
       },
-      onTimeout: async (partialResult, sessionId) => {
+      onTimeout: async (partialResult, sessionId, reason) => {
         try {
           await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
-            result: `Timeout. Partial result:\n${partialResult}`,
+            result: `${describeTimeout(reason)}. Partial result:\n${partialResult}`,
             sessionId: sessionId || undefined,
           });
           await handleGroupCompletion(group, assignment, true);
