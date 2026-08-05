@@ -27,7 +27,7 @@ feel the edges. THINK HARD about the implications/impacts
 
 *Implementation (Green Phase)*:
    - Write minimal code to meet acceptance criteria.
-   - Ensure code alligns with project guides, conventions and patterns
+   - Ensure code alligns with project guides, conventions, patterns and Design Bar
    - Refactor code for clarity, performance, maintainability
 
 *Citing the why-layer* 

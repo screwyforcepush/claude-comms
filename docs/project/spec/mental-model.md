@@ -95,6 +95,9 @@ Job cards in the chain visualization should feel like Quake HUD status bars:
 - **Status Rune** = Job state mapped to brandkit StatusRune patterns.
 - **Subagents** = Mini provider icons in the subhead area.
 
+### Job Telemetry Is a Live Progress Signal
+Job metrics (tool calls, subagents, tokens, idle time) earn their keep while a job is **in flight** — they are how the user reads progress and health at a glance. Once a job is terminal, their value collapses; the result and artifacts are what matter then. Consequence: engineering effort to backfill or repair metrics retroactively (e.g., reconstructing counts from harness session logs after completion) is not worth it. When an upstream harness under-reports live telemetry, prefer accepting degraded metrics until the upstream fix over building terminal-time reconstruction.
+
 ## Security Model
 
 ### Single-User Philosophy

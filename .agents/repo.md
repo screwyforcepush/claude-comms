@@ -14,7 +14,7 @@ if you are experiencing issues with the workflow engine ui server. kill the old 
 ## Documentation Protocol
 Guard the doc hierarchy: specs in `docs/project/spec/` remain the source of truth (Businesslogic, data dictionary, data flows, tech guide, industry references); guides in `docs/project/guides/` capture evolving process; phase folders (`docs/project/phases/XX-Name/`) store live work packages and notes. Update whichever doc you rely on as soon as the code diverges.
 
-## Design
+## Design Bar
 Applies to any change that renders UI. Design serves the task. The bar is earned familiarity:
 a user fluent in Linear/Notion/Stripe trusts it instantly. The failure mode is strangeness
 without purpose — not plainness. Consistency > surprise.
