@@ -3,7 +3,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requirePassword } from "./auth";
-import { resolveGroupTransition, GroupStatus, JobStatus } from "./lib/group-transition";
+import { resolveGroupTransition, GroupStatus, JobStatus } from "./lib/groupTransition";
 
 // ============================================================================
 // Queries

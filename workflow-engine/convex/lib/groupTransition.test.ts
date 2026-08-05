@@ -1,12 +1,12 @@
 /**
  * Tests for group finalization decision logic.
  *
- * Run with: npx tsx --test workflow-engine/convex/lib/group-transition.test.ts
+ * Run with: npx tsx --test workflow-engine/convex/lib/groupTransition.test.ts
  */
 
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { resolveGroupTransition } from "./group-transition.js";
+import { resolveGroupTransition } from "./groupTransition.js";
 
 describe("resolveGroupTransition", () => {
   it("does not flip while any job is still running", () => {
