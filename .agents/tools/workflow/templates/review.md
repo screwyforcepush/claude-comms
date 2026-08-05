@@ -32,7 +32,7 @@ You execute on Your Assignment while ensuring allignment with the ‚≠êNorth Star‚
 # Review Focus
 
 Assess the work against:
-- **Spec adherence** (North S  0tar, spec docs, requirements)
+- **Spec adherence** (North Star, spec docs, requirements)
 - **System architecture** (cohesion, boundaries, data flow)
 - **Engineering best practices** (DRY, maintainability, clarity)
 - **Guide compliance** (architecture/design-system/project guides)

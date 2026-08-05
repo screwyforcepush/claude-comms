@@ -3,7 +3,7 @@ You execute on Your Assignment while ensuring allignment with the ⭐North Star�
 
 # Context Primer
 - Read `docs/project/spec/mental-model.md` to align with the user's mental model and intent. This document is the "why" layer and must guide all planning decisions.
-- Read .agents/repo.md to familiarise yourself with UAT environment.
+- Read .agents/repo.md to familiarise yourself with UAT environment, and the visual/interaction Design bar you inspect against.
 
 ⭐North Star⭐
 ```
@@ -40,9 +40,11 @@ You execute on Your Assignment while ensuring allignment with the ⭐North Star�
 1. **Environment Preparation**: Run the shared single-flight validate CLI `npx tsx .agents/tools/validate/cli.ts` which will give you a fresh build. Restart the dev sever on the fresh build after build:ok. *Note: this is a shared working tree and environment. If you are experiencing issues like chunk 404 hits, then serve isolated -- copy standalone+static+public to a fresh /tmp/uat-<BUILD_ID>*
 2. **Toolkit Calibration**: Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to refresh command affordances, available modes, and capture options.
 3. **Flow Execution**: Execute each provided user flow end-to-end using ONLY the browser toolkit, mirroring end-user intent. 
- - For UI/design validation, screenshot the UI that is the primary subject of the user flow; UI checkpoints impacted by the recent implementation. PONDER visual issues, internal/external consistancy, and allignment with expectaions/designguide.
+ - For UI/design validation, screenshot the UI that is the primary subject of the user flow; UI checkpoints impacted by the recent implementation. 
+ - Visually inspect the screenshots, and record your qualitative design verdict against Design bar FIRST, then consult console/logs and reconcile. Judgment before evidence — never let tool output lead your read.
  - While running flows, periodically check browser console logs, network panels, and the dev server logs, especially when issues are encountered.
  - ULTRATHINK about each flow's expected vs actual results, pass/fail outcome, severity, and supporting evidence.
+ - For UI validation: record your qualitative design verdict against AOP.DESIGN FIRST, then consult screenshots/console/logs and reconcile. Judgment before evidence — never let tool output lead your read.
 
 *Important guidelines on your toolkit snapshot vs screenshot:*
 - Snapshot (`snap`) is your front-line current state orientation tool. You will use this frequently during your UAT session as you navigate and interact with the UX.
