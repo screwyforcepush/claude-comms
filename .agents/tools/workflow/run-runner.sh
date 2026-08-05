@@ -9,9 +9,9 @@ cd "$(dirname "$0")"
 unset CLAUDECODE                                                                                                                                                                                                                  
     
 while true; do
-  echo "[$(date)] Runner starting..." >> /tmp/runner.log
+  echo "[$(date -u -Iseconds)] Runner starting..." >> /tmp/runner.log
   npx tsx runner.ts >> /tmp/runner.log 2>&1
   EXIT_CODE=$?
-  echo "[$(date)] Runner exited with code $EXIT_CODE, restarting in 5s..." >> /tmp/runner.log
+  echo "[$(date -u -Iseconds)] Runner exited with code $EXIT_CODE, restarting in 5s..." >> /tmp/runner.log
   sleep 5
 done

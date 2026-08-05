@@ -54,6 +54,13 @@ import {
   recordMetricsEvent,
 } from "./lib/metrics.js";
 
+// Prefix all console output with a UTC timestamp — runner.log is append-only
+// (via run-runner.sh) and untimestamped lines are impossible to correlate.
+for (const level of ["log", "warn", "error"] as const) {
+  const original = console[level].bind(console);
+  console[level] = (...args: unknown[]) => original(`[${utcNowIso()}]`, ...args);
+}
+
 // Use anyApi for dynamic function references (works with ConvexClient)
 const api = anyApi;
 
