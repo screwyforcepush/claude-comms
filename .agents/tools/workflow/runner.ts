@@ -461,7 +461,7 @@ async function executeJob(
       onComplete: async (result, sessionId, exitForced) => {
         stopHeartbeat();
         try {
-          await client!.mutation(api.jobs.complete, {
+          const res = await client!.mutation(api.jobs.complete, {
             password: config.password,
             id: jobId,
             result,
@@ -485,7 +485,13 @@ async function executeJob(
               await saveSessionId(chatContext.threadId, sessionId);
             }
           } else {
-            await handleGroupCompletion(group, assignment, false);
+            // groupCompleted is the exactly-once token: only the mutation that
+            // flipped the group terminal runs group-completion side effects.
+            // ?? true tolerates an older Convex deploy (no return value) by
+            // degrading to legacy always-call behavior instead of stalling.
+            if (res?.groupCompleted ?? true) {
+              await handleGroupCompletion(group, assignment);
+            }
             spawnReflection(jobId);
           }
         } catch (e) {
@@ -497,7 +503,7 @@ async function executeJob(
         const wasKilled = killedJobIds.delete(jobId);
         const effectiveReason = wasKilled ? "Killed by user" : reason;
         try {
-          await client!.mutation(api.jobs.fail, {
+          const res = await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
             result: partialResult || effectiveReason,
@@ -515,7 +521,9 @@ async function executeJob(
               wasKilled ? "Killed by user." : `Agent failed (${reason}). Partial response shown above.`
             );
           } else {
-            await handleGroupCompletion(group, assignment, true);
+            if (res?.groupCompleted ?? true) {
+              await handleGroupCompletion(group, assignment);
+            }
             spawnReflection(jobId);
           }
         } catch (e) {
@@ -540,7 +548,7 @@ async function executeJob(
       onTimeout: async (partialResult, sessionId, reason) => {
         stopHeartbeat();
         try {
-          await client!.mutation(api.jobs.fail, {
+          const res = await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
             result: `${describeTimeout(reason)}. Partial result:\n${partialResult}`,
@@ -557,7 +565,9 @@ async function executeJob(
               describeTimeoutForChat(reason)
             );
           } else {
-            await handleGroupCompletion(group, assignment, true);
+            if (res?.groupCompleted ?? true) {
+              await handleGroupCompletion(group, assignment);
+            }
             spawnReflection(jobId);
           }
         } catch (e) {
@@ -568,11 +578,13 @@ async function executeJob(
   );
 }
 
-// Handle group completion - check if all jobs done, trigger PM if needed
+// Handle group completion - check if all jobs done, trigger PM if needed.
+// Callers gate this on the groupCompleted token from jobs.complete/fail, so
+// under a current Convex deploy it runs exactly once per group finalization;
+// the terminal re-check below is a sanity guard for the legacy fallback path.
 async function handleGroupCompletion(
   group: JobGroup,
-  assignment: Assignment,
-  anyFailed: boolean
+  assignment: Assignment
 ): Promise<void> {
   // Re-fetch group with jobs to get current status
   const currentGroup = await client!.query(api.jobs.getGroupWithJobs, { password: config.password, id: group._id });
@@ -1008,14 +1020,16 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
     executor.adoptOrphan(orphan, {
       onComplete: async (result, sessionId, exitForced) => {
         try {
-          await client!.mutation(api.jobs.complete, {
+          const res = await client!.mutation(api.jobs.complete, {
             password: config.password,
             id: jobId,
             result,
             sessionId: sessionId || undefined,
             exitForced: exitForced || undefined,
           });
-          await handleGroupCompletion(group, assignment, false);
+          if (res?.groupCompleted ?? true) {
+            await handleGroupCompletion(group, assignment);
+          }
           spawnReflection(jobId);
         } catch (e) {
           console.error(`[Reconcile] ${jobId}: error in onComplete:`, e);
@@ -1023,14 +1037,16 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
       },
       onFail: async (reason, partialResult, exitForced, sessionId) => {
         try {
-          await client!.mutation(api.jobs.fail, {
+          const res = await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
             result: partialResult || reason,
             sessionId: sessionId || undefined,
             exitForced: exitForced || undefined,
           });
-          await handleGroupCompletion(group, assignment, true);
+          if (res?.groupCompleted ?? true) {
+            await handleGroupCompletion(group, assignment);
+          }
           spawnReflection(jobId);
         } catch (e) {
           console.error(`[Reconcile] ${jobId}: error in onFail:`, e);
@@ -1051,13 +1067,15 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
       },
       onTimeout: async (partialResult, sessionId, reason) => {
         try {
-          await client!.mutation(api.jobs.fail, {
+          const res = await client!.mutation(api.jobs.fail, {
             password: config.password,
             id: jobId,
             result: `${describeTimeout(reason)}. Partial result:\n${partialResult}`,
             sessionId: sessionId || undefined,
           });
-          await handleGroupCompletion(group, assignment, true);
+          if (res?.groupCompleted ?? true) {
+            await handleGroupCompletion(group, assignment);
+          }
           spawnReflection(jobId);
         } catch (e) {
           console.error(`[Reconcile] ${jobId}: error in onTimeout:`, e);
@@ -1072,13 +1090,15 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
     console.log(`[Reconcile] ${jobId}: ${result.finalStatus}${result.isComplete ? " (complete)" : ""}`);
 
     if (result.isComplete) {
-      await client!.mutation(api.jobs.complete, {
+      const res = await client!.mutation(api.jobs.complete, {
         password: config.password,
         id: jobId,
         result: result.result || "",
         sessionId: result.sessionId || undefined,
       });
-      await handleGroupCompletion(group, assignment, false);
+      if (res?.groupCompleted ?? true) {
+        await handleGroupCompletion(group, assignment);
+      }
       spawnReflection(jobId);
     } else if (result.rateLimitInfo) {
       // Dead orphan was rate-limited — schedule retry instead of failing
@@ -1091,13 +1111,15 @@ async function reconcileOneOrphan(orphan: OrphanInfo): Promise<void> {
       console.log(`[Reconcile] ${jobId}: rate limited, retry scheduled`);
       // Do NOT call handleGroupCompletion — group stays in progress
     } else {
-      await client!.mutation(api.jobs.fail, {
+      const res = await client!.mutation(api.jobs.fail, {
         password: config.password,
         id: jobId,
         result: result.result || "Job orphaned without completion",
         sessionId: result.sessionId || undefined,
       });
-      await handleGroupCompletion(group, assignment, true);
+      if (res?.groupCompleted ?? true) {
+        await handleGroupCompletion(group, assignment);
+      }
       spawnReflection(jobId);
     }
   }

@@ -3,6 +3,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requirePassword } from "./auth";
+import { resolveGroupTransition, GroupStatus, JobStatus } from "./lib/group-transition";
 
 // ============================================================================
 // Queries
@@ -352,6 +353,14 @@ export const complete = mutation({
   },
   handler: async (ctx, args) => {
     requirePassword(args);
+    const job = await ctx.db.get(args.id);
+    if (!job) return { groupCompleted: false };
+    // First terminal status wins — a late duplicate delivery (e.g. live
+    // callback racing reconcile) must not overwrite the result or re-mint
+    // the group-completion token.
+    if (job.status === "complete" || job.status === "failed") {
+      return { groupCompleted: false };
+    }
     const now = Date.now();
     const update: Record<string, any> = {
       status: "complete",
@@ -366,11 +375,10 @@ export const complete = mutation({
     if (args.exitForced !== undefined) update.exitForced = args.exitForced;
     await ctx.db.patch(args.id, update);
 
-    // Check if group is done and update status
-    const job = await ctx.db.get(args.id);
-    if (job) {
-      await updateGroupStatus(ctx, job.groupId);
-    }
+    // groupCompleted is true only for the mutation that flipped the group
+    // terminal — the caller holding it owns group-completion side effects
+    const groupCompleted = await updateGroupStatus(ctx, job.groupId);
+    return { groupCompleted };
   },
 });
 
@@ -388,6 +396,12 @@ export const fail = mutation({
   },
   handler: async (ctx, args) => {
     requirePassword(args);
+    const job = await ctx.db.get(args.id);
+    if (!job) return { groupCompleted: false };
+    // First terminal status wins (see complete above)
+    if (job.status === "complete" || job.status === "failed") {
+      return { groupCompleted: false };
+    }
     const now = Date.now();
     const update: Record<string, any> = {
       status: "failed",
@@ -402,11 +416,8 @@ export const fail = mutation({
     if (args.exitForced !== undefined) update.exitForced = args.exitForced;
     await ctx.db.patch(args.id, update);
 
-    // Check if group is done and update status
-    const job = await ctx.db.get(args.id);
-    if (job) {
-      await updateGroupStatus(ctx, job.groupId);
-    }
+    const groupCompleted = await updateGroupStatus(ctx, job.groupId);
+    return { groupCompleted };
   },
 });
 
@@ -603,28 +614,29 @@ export const retryGroup = mutation({
 
 // Update group status based on member job statuses
 // Returns true if group just completed (for triggering next steps)
+// Returns true only when THIS call performed the non-terminal → terminal
+// flip. Serializable transactions guarantee at most one caller per group
+// lifecycle gets true — that caller owns group-completion side effects.
 async function updateGroupStatus(
   ctx: { db: any },
   groupId: Id<"jobGroups">
 ): Promise<boolean> {
+  const group = await ctx.db.get(groupId);
+  if (!group) return false;
+
   const jobs = await ctx.db
     .query("jobs")
     .withIndex("by_group", (q: any) => q.eq("groupId", groupId))
     .collect();
 
-  const statuses = jobs.map((j: any) => j.status);
-  const allTerminal = statuses.every(
-    (s: string) => s === "complete" || s === "failed"
+  const transition = resolveGroupTransition(
+    group.status as GroupStatus,
+    jobs.map((j: any) => j.status as JobStatus)
   );
-
-  if (!allTerminal) {
-    // Group still in progress
+  if (!transition.shouldFlip) {
     return false;
   }
-
-  // All jobs are terminal - determine group status
-  const anySucceeded = statuses.some((s: string) => s === "complete");
-  const newStatus = anySucceeded ? "complete" : "failed";
+  const newStatus = transition.newStatus!;
 
   // Aggregate results with minimal jobType labels
   // Format: "review A", "review B", "review C", "uat" etc.
