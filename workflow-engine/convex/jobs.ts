@@ -468,8 +468,8 @@ export const rateLimited = mutation({
   args: {
     password: v.string(),
     id: v.id("jobs"),
-    resetsAt: v.number(),       // Unix seconds from rate_limit_event
-    rateLimitType: v.string(),  // "five_hour" or "seven_day"
+    resetsAt: v.number(),       // Unix seconds, from the harness's limit event/message
+    rateLimitType: v.string(),  // "five_hour" | "seven_day" (claude), "codex_usage" (codex)
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -482,7 +482,7 @@ export const rateLimited = mutation({
     // Compute delay
     let delayMs: number;
     if (currentRetryCount === 0) {
-      // First retry: trust Anthropic's resetsAt + 30s grace, min 60s
+      // First retry: trust the provider's resetsAt + 30s grace, min 60s
       delayMs = Math.max(args.resetsAt * 1000 - now + 30_000, 60_000);
     } else {
       // Subsequent retries: backoff schedule (capped at last entry)

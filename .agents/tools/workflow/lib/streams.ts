@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from "fs";
 
 export interface RateLimitInfo {
   resetsAt: number;       // Unix seconds
-  rateLimitType: string;  // "five_hour" or "seven_day"
+  rateLimitType: string;  // "five_hour" | "seven_day" (claude), "codex_usage" (codex)
 }
 
 export interface StreamHandler {
@@ -29,7 +29,7 @@ export interface StreamHandler {
   getSessionId(): string | null;
   /** Get a failure reason if a terminal error was observed */
   getFailureReason(): string | null;
-  /** Get rate-limit info if a rate_limit_event was detected (Claude only) */
+  /** Get rate-limit info if a provider usage limit was detected (Claude and Codex) */
   getRateLimitInfo(): RateLimitInfo | null;
 }
 
@@ -229,12 +229,32 @@ export class ClaudeStreamHandler implements StreamHandler {
 // Codex Stream Handler
 // ============================================================================
 
+/**
+ * Parse the reset time out of a Codex usage-limit message, e.g.
+ * "You've hit your usage limit. Visit ... or try again at Aug 8th, 2026 5:04 AM."
+ * Codex renders the timestamp in the machine's local timezone and the runner
+ * shares that machine, so local-time Date parsing is correct.
+ * Returns Unix seconds, or null when there is no parseable timestamp
+ * (e.g. purely purchase-gated credit exhaustion).
+ */
+export function parseCodexUsageLimitReset(message: string): number | null {
+  const match = message.match(/try again at\s+(.+?)\.?\s*$/i);
+  if (!match) return null;
+  const cleaned = match[1].replace(/(\d+)(st|nd|rd|th)\b/gi, "$1");
+  const parsed = new Date(cleaned).getTime();
+  if (Number.isNaN(parsed)) return null;
+  return Math.floor(parsed / 1000);
+}
+
 export class CodexStreamHandler implements StreamHandler {
   private messages: string[] = [];
   private lastMessage: string | null = null;
   private complete = false;
+  private failed = false;
   private finalResult: string | null = null;
   private threadId: string | null = null;
+  private failureReason: string | null = null;
+  private rateLimitInfo: RateLimitInfo | null = null;
 
   onEvent(event: Record<string, unknown>): void {
     const type = event.type as string;
@@ -251,6 +271,22 @@ export class CodexStreamHandler implements StreamHandler {
       }
     }
 
+    // A usage-limit wall surfaces as both a bare error event and the
+    // turn.failed error payload; sniff both so orphan replay catches
+    // whichever made it into the log.
+    if (type === "error" && typeof event.message === "string") {
+      this.detectUsageLimit(event.message);
+    }
+
+    if (type === "turn.failed") {
+      const err = event.error as { message?: string } | undefined;
+      const message = err?.message ?? "unknown";
+      this.detectUsageLimit(message);
+      this.failed = true;
+      this.failureReason = `codex_turn_failed: ${message.slice(0, 200)}`;
+      this.finalResult = this.lastMessage;
+    }
+
     if (type === "turn.completed") {
       this.complete = true;
       // Snapshot the last agent_message as the final result at the terminal
@@ -260,12 +296,23 @@ export class CodexStreamHandler implements StreamHandler {
     }
   }
 
+  private detectUsageLimit(message: string): void {
+    if (this.rateLimitInfo) return;
+    if (!/usage limit/i.test(message)) return;
+    // No parseable reset time → resetsAt = now; jobs.rateLimited clamps the
+    // first retry to 60s and its backoff schedule takes over from there.
+    this.rateLimitInfo = {
+      resetsAt: parseCodexUsageLimitReset(message) ?? Math.floor(Date.now() / 1000),
+      rateLimitType: "codex_usage",
+    };
+  }
+
   getResult(): string {
     return this.finalResult || truncateFallback(this.messages.join("\n\n"));
   }
 
   isTerminal(): boolean {
-    return this.complete;
+    return this.complete || this.failed;
   }
 
   isComplete(): boolean {
@@ -277,11 +324,11 @@ export class CodexStreamHandler implements StreamHandler {
   }
 
   getFailureReason(): string | null {
-    return null;
+    return this.failureReason;
   }
 
   getRateLimitInfo(): RateLimitInfo | null {
-    return null;
+    return this.rateLimitInfo;
   }
 }
 

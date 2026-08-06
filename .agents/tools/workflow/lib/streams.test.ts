@@ -17,6 +17,7 @@ import {
   buildAgyCommand,
   buildCommand,
   buildInteractiveClaudeCommand,
+  parseCodexUsageLimitReset,
 } from "./streams.js";
 
 // ============================================================================
@@ -222,6 +223,108 @@ describe("CodexStreamHandler", () => {
     assert.strictEqual(
       handler.getResult(),
       "Spawning two subagents in parallel.\n\nBoth subagents are started; waiting.\n\nOhm: hello world\nMill: hello world"
+    );
+  });
+
+  it("captures rate-limit info from a usage-limit error/turn.failed sequence", () => {
+    const handler = new CodexStreamHandler();
+
+    // Exact sequence from a codex --json run that hit the usage limit
+    const limitMessage =
+      "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 8th, 2026 5:04 AM.";
+    handler.onEvent({
+      type: "thread.started",
+      thread_id: "019fd356-59aa-7681-8606-c28ca627521d",
+    });
+    handler.onEvent({ type: "turn.started" });
+    handler.onEvent({ type: "error", message: limitMessage });
+    handler.onEvent({ type: "turn.failed", error: { message: limitMessage } });
+
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), false);
+
+    const info = handler.getRateLimitInfo();
+    assert.ok(info, "getRateLimitInfo should return non-null");
+    assert.strictEqual(info!.rateLimitType, "codex_usage");
+    // Same local-timezone parse the handler performs
+    assert.strictEqual(
+      info!.resetsAt,
+      Math.floor(new Date("Aug 8, 2026 5:04 AM").getTime() / 1000)
+    );
+  });
+
+  it("falls back to a now-based reset when the limit message has no timestamp", () => {
+    const handler = new CodexStreamHandler();
+    const before = Math.floor(Date.now() / 1000);
+
+    handler.onEvent({
+      type: "turn.failed",
+      error: {
+        message:
+          "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits.",
+      },
+    });
+
+    const info = handler.getRateLimitInfo();
+    assert.ok(info, "getRateLimitInfo should return non-null");
+    assert.strictEqual(info!.rateLimitType, "codex_usage");
+    assert.ok(info!.resetsAt >= before);
+  });
+
+  it("marks turn.failed terminal with a failure reason for non-limit errors", () => {
+    const handler = new CodexStreamHandler();
+
+    handler.onEvent({
+      type: "item.completed",
+      item: { type: "agent_message", text: "partial work" },
+    });
+    handler.onEvent({
+      type: "turn.failed",
+      error: { message: "stream disconnected" },
+    });
+
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), false);
+    assert.strictEqual(handler.getRateLimitInfo(), null);
+    assert.strictEqual(handler.getFailureReason(), "codex_turn_failed: stream disconnected");
+    assert.strictEqual(handler.getResult(), "partial work");
+  });
+});
+
+// ============================================================================
+// parseCodexUsageLimitReset tests
+// ============================================================================
+
+describe("parseCodexUsageLimitReset", () => {
+  it("parses ordinal dates from the try-again clause", () => {
+    const cases: Array<[string, string]> = [
+      ["try again at Aug 8th, 2026 5:04 AM.", "Aug 8, 2026 5:04 AM"],
+      ["try again at Dec 1st, 2026 11:30 PM.", "Dec 1, 2026 11:30 PM"],
+      ["try again at Jan 22nd, 2027 12:00 PM.", "Jan 22, 2027 12:00 PM"],
+      ["try again at Mar 23rd, 2027 9:15 AM.", "Mar 23, 2027 9:15 AM"],
+    ];
+    for (const [suffix, expected] of cases) {
+      assert.strictEqual(
+        parseCodexUsageLimitReset(`You've hit your usage limit. ${suffix}`),
+        Math.floor(new Date(expected).getTime() / 1000),
+        suffix
+      );
+    }
+  });
+
+  it("returns null when there is no try-again clause", () => {
+    assert.strictEqual(
+      parseCodexUsageLimitReset(
+        "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits."
+      ),
+      null
+    );
+  });
+
+  it("returns null for unparseable timestamps", () => {
+    assert.strictEqual(
+      parseCodexUsageLimitReset("You've hit your usage limit. Please try again at half past never."),
+      null
     );
   });
 });

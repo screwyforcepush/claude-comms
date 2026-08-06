@@ -223,9 +223,9 @@ Artifacts and Decisions are the assignment's only cross-job shared memory — in
 The admission test for any entry: would a future PM or crew member act differently for knowing this? If not, it doesn't belong.
 
 ### Rate-Limit Resilience
-External provider rate limits (Anthropic's 5-hour and 7-day usage windows) are an operational reality that the workflow engine must handle gracefully. The core principle: **a rate limit is not a failure — it's a pause.**
+External provider usage limits (Anthropic's 5-hour and 7-day windows, Codex/OpenAI usage credits) are an operational reality that the workflow engine must handle gracefully, whichever harness a job runs on. The core principle: **a rate limit is not a failure — it's a pause.**
 
-When a Claude job hits a rate limit:
+When a job hits a provider rate limit:
 - The job enters `awaiting_retry` status — a non-terminal state that freezes the group in place
 - No PM auto-spawns (the group never completes, so the cascade never starts)
 - A server-side timer retries the job when the rate-limit window resets
@@ -236,7 +236,7 @@ This design keeps retry coordination state minimal — just `retryCount` on the 
 
 **Emergency brake:** Setting the assignment to `blocked` prevents the runner from picking up retried jobs. The Convex timer still fires and flips the job to `pending`, but the runner skips blocked assignments.
 
-**Scope:** Claude harness only. Assignment jobs only (chat jobs fail normally — the user can re-send). No cap on total retries — keeps going at 30m intervals until the window clears.
+**Scope:** Claude and Codex harnesses (a limit wall must pause the job, not insta-fail it; detection is per-harness, the pause machinery is shared). Assignment jobs only (chat jobs fail normally — the user can re-send). No cap on total retries — keeps going at 30m intervals until the window clears.
 
 ### Harness Model Configuration
 

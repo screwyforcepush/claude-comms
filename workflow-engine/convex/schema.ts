@@ -103,7 +103,7 @@ export default defineSchema({
     // Rate-limit auto-retry fields
     retryCount: v.optional(v.number()),      // Increments each retry cycle
     retryAfter: v.optional(v.number()),      // Absolute timestamp (ms) of next retry
-    rateLimitType: v.optional(v.string()),   // "five_hour" or "seven_day"
+    rateLimitType: v.optional(v.string()),   // "five_hour" | "seven_day" (claude), "codex_usage" (codex)
     // Phase 10: Operations Center Upgrade
     killRequested: v.optional(v.boolean()), // R1: Agent kill signal from UI
     createdAt: v.number(),

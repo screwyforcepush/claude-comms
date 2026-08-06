@@ -66,7 +66,7 @@ export interface ExecutionCallbacks {
   onFail: (reason: string, partialResult?: string, exitForced?: boolean, sessionId?: string) => void;
   /** Called when job times out (max duration or idle timeout before terminal event) */
   onTimeout: (partialResult: string, sessionId: string | undefined, reason: TimeoutReason) => void;
-  /** Called when job hits a provider rate limit (Claude only). If not provided, falls through to onFail. */
+  /** Called when job hits a provider rate limit (Claude and Codex). If not provided, falls through to onFail. */
   onRateLimit?: (rateLimitInfo: RateLimitInfo, partialResult?: string) => void;
   /** Optional: called for each event (for custom handling) */
   onEvent?: (event: Record<string, unknown>) => void;
