@@ -387,6 +387,521 @@ const MAPPING: Record<string, string> = {
   // silent-reconciliation — additional variants. silent-empty-output kept
   // distinct (tool returning empty is a different complaint).
   "silent-skip": "silent-reconciliation",
+
+  // ===========================================================================
+  // Pass 3 additions (2026-08-07) — ~10 weeks of accumulation since Pass 2.
+  // ===========================================================================
+
+  // memory-injection — NEW canonical, Steward-directed split: memory is
+  // something WE manage (index pruning, relevance gating), while
+  // system-reminder-noise is harness behaviour we can only compensate for.
+  // Injection-flavoured keywords land here even when they mention the index.
+  "unsolicited-memory-injection": "memory-injection",
+  "irrelevant-memory-injection": "memory-injection",
+  "memory-injection-bloat": "memory-injection",
+  "memory-injection-noise": "memory-injection",
+  "memory-injection-irrelevant": "memory-injection",
+  "memory-injection-scope": "memory-injection",
+  "memory-reinjection": "memory-injection",
+  "ambient-memory-injection": "memory-injection",
+  "ambient-memory-bloat": "memory-injection",
+  "memory-index-injection": "memory-injection",
+  "memory-index-reinjection": "memory-injection",
+  "unsolicited-memory-index": "memory-injection",
+  "unused-memory-index": "memory-injection",
+  "unused-memory-injection": "memory-injection",
+  "memory-bloat": "memory-injection",
+  "memory-context-bloat": "memory-injection",
+
+  // memory-index-bloat — sibling canonical: the MEMORY.md index file itself
+  // has outgrown its budget. Remedy is pruning the index, not gating
+  // injection — kept distinct from memory-injection on remedy framing.
+  "oversized-memory-index": "memory-index-bloat",
+  "memory-index-oversize": "memory-index-bloat",
+  "memory-index-oversized": "memory-index-bloat",
+  "memory-index-overflow": "memory-index-bloat",
+  "memory-index-truncation": "memory-index-bloat",
+  "memory-truncation": "memory-index-bloat",
+
+  // system-reminder-noise — CLAUDE.md auto-injection variants (spot-checked:
+  // painPoints describe harness-side directory-CLAUDE.md dumps) plus the
+  // generic ambient/unsolicited family. Memory-flavoured ones went above.
+  "claudemd-injection": "system-reminder-noise",
+  "claudemd-bloat": "system-reminder-noise",
+  "claudemd-dump": "system-reminder-noise",
+  "claudemd-auto-inject": "system-reminder-noise",
+  "claude-md-auto-injection": "system-reminder-noise",
+  "auto-injected-claudemd": "system-reminder-noise",
+  "irrelevant-claudemd": "system-reminder-noise",
+  "irrelevant-claudemd-injection": "system-reminder-noise",
+  "directory-claudemd-injection": "system-reminder-noise",
+  "unsolicited-injection": "system-reminder-noise",
+  "unsolicited-context-bloat": "system-reminder-noise",
+  "unsolicited-doc-injection": "system-reminder-noise",
+  "ambient-context-bloat": "system-reminder-noise",
+  "ambient-context-churn": "system-reminder-noise",
+  "ambient-context-noise": "system-reminder-noise",
+  "ambient-reminder-noise": "system-reminder-noise",
+  "ambient-noise": "system-reminder-noise",
+  "ambient-injection": "system-reminder-noise",
+  "ambient-injection-noise": "system-reminder-noise",
+  "ambient-injection-churn": "system-reminder-noise",
+  "irrelevant-ambient-context": "system-reminder-noise",
+  "irrelevant-context": "system-reminder-noise",
+  "irrelevant-reminders": "system-reminder-noise",
+  "irrelevant-tool-nudge": "system-reminder-noise",
+  "context-injection-noise": "system-reminder-noise",
+  "context-injection-bloat": "system-reminder-noise",
+  "unused-context": "system-reminder-noise",
+  "unused-injection": "system-reminder-noise",
+  "reminder-noise": "system-reminder-noise",
+  "system-reminder-repetition": "system-reminder-noise",
+  "system-reminder-spam": "system-reminder-noise",
+  "system-reminder-churn": "system-reminder-noise",
+
+  // context-bloat — additional variants.
+  "prompt-context-bloat": "context-bloat",
+  "prompt-redundancy": "context-bloat",
+  "redundant-context": "context-bloat",
+  "redundant-restatement": "context-bloat",
+  "context-waste": "context-bloat",
+  "context-pollution": "context-bloat",
+  "duplicated-context": "context-bloat",
+
+  // prompt-duplication — NEW canonical: restating the same context into
+  // subagent prompts. Distinct from context-bloat (received vs re-sent).
+  "subagent-prompt-duplication": "prompt-duplication",
+  "subagent-context-duplication": "prompt-duplication",
+
+  // oversized-docs — the big Pass 3 fold. Spot-checked read-cap-truncation:
+  // painPoints are "mental-model.md exceeds the 25k Read cap", i.e. the doc
+  // is too big — cause-side fold per the Pass 1 read-cap precedent.
+  "oversized-single-doc": "oversized-docs",
+  "oversized-single-line-doc": "oversized-docs",
+  "oversized-doc-line": "oversized-docs",
+  "giant-line-doc": "oversized-docs",
+  "giant-single-line-docs": "oversized-docs",
+  "oversized-source-of-truth": "oversized-docs",
+  "oversized-source-docs": "oversized-docs",
+  "oversized-source-file": "oversized-docs",
+  "oversized-files": "oversized-docs",
+  "oversized-sot": "oversized-docs",
+  "oversized-doc-truncation": "oversized-docs",
+  "oversized-doc-read": "oversized-docs",
+  "oversized-doc-navigation": "oversized-docs",
+  "oversized-doc-pagination": "oversized-docs",
+  "forced-paging": "oversized-docs",
+  "context-paging": "oversized-docs",
+  "context-paging-friction": "oversized-docs",
+  "oversized-file-paging": "oversized-docs",
+  "large-file-paging": "oversized-docs",
+  "large-doc-truncation": "oversized-docs",
+  "large-doc-navigation": "oversized-docs",
+  "document-pagination": "oversized-docs",
+  "documentation-paging": "oversized-docs",
+  "mandatory-doc-paging": "oversized-docs",
+  "file-paging-overhead": "oversized-docs",
+  "doc-truncation": "oversized-docs",
+  "mental-model-truncation": "oversized-docs",
+  "read-cap-truncation": "oversized-docs",
+  "read-truncation": "oversized-docs",
+  "read-token-cap": "oversized-docs",
+  "read-cap-vs-read-in-full": "oversized-docs",
+  "full-read-forced": "oversized-docs",
+  "full-read-required": "oversized-docs",
+  "full-file-read": "oversized-docs",
+  "read-file-truncation": "oversized-docs",
+  "view-file-limits": "oversized-docs",
+  "view-file-truncation": "oversized-docs",
+  "file-viewing-limits": "oversized-docs",
+  "godfile-navigation": "oversized-docs",
+  "doc-section-extraction": "oversized-docs",
+  "no-section-addressable-read": "oversized-docs",
+  "no-section-index": "oversized-docs",
+  "section-addressability": "oversized-docs",
+
+  // tool-output-truncation — kept distinct from tool-output-noise in Pass 2
+  // (cut off vs noisy); now a canonical target for output-side truncation.
+  "output-truncation": "tool-output-truncation",
+  "read-output-truncation": "tool-output-truncation",
+  "search-result-truncation": "tool-output-truncation",
+  "timeout-partial-result": "tool-output-truncation",
+
+  // tool-output-noise — additional variants.
+  "search-noise": "tool-output-noise",
+  "grep-output-overflow": "tool-output-noise",
+  "process-list-noise": "tool-output-noise",
+  "process-check-noise": "tool-output-noise",
+  "process-inspection": "tool-output-noise",
+  "snapshot-verbosity": "tool-output-noise",
+  "tool-output-volume": "tool-output-noise",
+  "tool-output-bloat": "tool-output-noise",
+
+  // write-guard-friction — NEW canonical: Edit/Write preconditions (read-
+  // before-write, overwrite guard) firing on legitimately fresh files.
+  "write-requires-prior-read": "write-guard-friction",
+  "write-overwrite-guard": "write-guard-friction",
+  "write-guard-false-positive": "write-guard-friction",
+  "write-tool-precondition": "write-guard-friction",
+  "edit-requires-read": "write-guard-friction",
+  "read-before-edit-gate": "write-guard-friction",
+  "stale-file-state": "write-guard-friction",
+
+  // temp-file-friction — NEW canonical: /tmp scratch-file lifecycle pain
+  // (stale survivors, collisions, blocked writes).
+  "scratch-file-friction": "temp-file-friction",
+  "temp-file-workaround": "temp-file-friction",
+  "temp-file-creation": "temp-file-friction",
+  "temp-file-collision": "temp-file-friction",
+  "temp-file-write-blocked": "temp-file-friction",
+  "stale-temp-file": "temp-file-friction",
+  "stale-tmp-file": "temp-file-friction",
+  "jobs-file-workaround": "temp-file-friction",
+
+  // uninformative-error — NEW canonical: error/exit signals that don't say
+  // what actually went wrong.
+  "error-message-uninformative": "uninformative-error",
+  "errorMessageUninformative": "uninformative-error",
+  "uninformative-exit-code": "uninformative-error",
+  "uninformative-failure": "uninformative-error",
+  "misleading-error": "uninformative-error",
+  "opaque-failure-signal": "uninformative-error",
+
+  // tool-failed-recovered — canonical for the rubric-style "a tool failed and
+  // I recovered in-turn" report. Spot-checked: 25/43 are NOT the write-guard
+  // story (cwd persistence, escaping, grep misses), so it stays generic
+  // rather than folding into write-guard-friction.
+  "tool-recovered-same-turn": "tool-failed-recovered",
+  "tool-failed-recovered-same-turn": "tool-failed-recovered",
+  "recovered-same-turn": "tool-failed-recovered",
+
+  // intent-conflict — additional variants incl. the authority/precedence
+  // family (which instruction wins). Sub-topic markers
+  // (intent-conflict-commit-policy, intent-conflict-workflow-keyword,
+  // status-update-policy) stay distinct.
+  "intent-conflict-framework-vs-northstar": "intent-conflict",
+  "intent-conflict-framework-vs-adr": "intent-conflict",
+  "intent-conflict-harness-vs-role": "intent-conflict",
+  "intent-conflict-template-vs-northstar": "intent-conflict",
+  "intent-conflict-template-vs-task": "intent-conflict",
+  "intent-conflict-role-vs-assignment": "intent-conflict",
+  "intent-conflict-injected-steer": "intent-conflict",
+  "instruction-precedence": "intent-conflict",
+  "instruction-precedence-conflict": "intent-conflict",
+  "instruction-priority-conflict": "intent-conflict",
+  "authority-conflict": "intent-conflict",
+  "authority-precedence": "intent-conflict",
+  "authority-ambiguity": "intent-conflict",
+
+  // status-update-policy — sub-topic canonical retained; fold its variant.
+  "status-update-conflict": "status-update-policy",
+
+  // commentary-policy — NEW sub-topic canonical (sibling of
+  // status-update-policy).
+  "commentary-policy-conflict": "commentary-policy",
+  "commentary-cadence": "commentary-policy",
+
+  // decision-framework-gap — additional variants (incl. camelCase stray).
+  // decision-framework-rigidity kept distinct (opposite complaint direction).
+  "decisionframework-ambiguous": "decision-framework-gap",
+  "decision-framework-absent": "decision-framework-gap",
+
+  // input-shape-mismatch — contract-side additions (schema/api mismatch,
+  // schema lookup mid-task). Generic marshaling follows the Pass 2
+  // cli-argv-marshalling precedent.
+  "inputShapeMismatch": "input-shape-mismatch",
+  "subagent-api-mismatch": "input-shape-mismatch",
+  "agent-tool-contract-mismatch": "input-shape-mismatch",
+  "multi-agent-schema-mismatch": "input-shape-mismatch",
+  "orchestration-schema-mismatch": "input-shape-mismatch",
+  "orchestration-api-mismatch": "input-shape-mismatch",
+  "tool-schema-discovery": "input-shape-mismatch",
+  "tool-schema-lookup-required": "input-shape-mismatch",
+  "schema-lookup-mid-task": "input-shape-mismatch",
+  "cli-argv-marshaling": "input-shape-mismatch",
+  "cli-input-marshalling": "input-shape-mismatch",
+  "argv-marshaling": "input-shape-mismatch",
+  "argv-marshalling": "input-shape-mismatch",
+  "browsertools-eval-shape": "input-shape-mismatch",
+
+  // cli-shell-escaping — shell-mechanics additions (json/string/prose/
+  // escaping-flavoured marshaling).
+  "cli-json-marshaling": "cli-shell-escaping",
+  "cli-json-marshalling": "cli-shell-escaping",
+  "cli-argv-json-marshalling": "cli-shell-escaping",
+  "cli-json-argv-marshalling": "cli-shell-escaping",
+  "argv-json-escaping": "cli-shell-escaping",
+  "argv-json-marshalling": "cli-shell-escaping",
+  "argv-json": "cli-shell-escaping",
+  "argv-string-marshaling": "cli-shell-escaping",
+  "cli-flat-string-marshaling": "cli-shell-escaping",
+  "cli-flat-string-args": "cli-shell-escaping",
+  "cli-string-marshalling": "cli-shell-escaping",
+  "cli-stringified-json": "cli-shell-escaping",
+  "json-argv-marshaling": "cli-shell-escaping",
+  "json-argv-escaping": "cli-shell-escaping",
+  "stringified-json": "cli-shell-escaping",
+  "prose-in-argv": "cli-shell-escaping",
+  "cli-argv-blob": "cli-shell-escaping",
+  "manual-newline-escaping": "cli-shell-escaping",
+  "heredoc-workaround": "cli-shell-escaping",
+  "escaping-workaround": "cli-shell-escaping",
+  "shell-quoting-friction": "cli-shell-escaping",
+  "cli-argv-prose-marshaling": "cli-shell-escaping",
+  "argv-prose-marshalling": "cli-shell-escaping",
+  "multiline-context-marshalling": "cli-shell-escaping",
+  "cli-context-marshaling": "cli-shell-escaping",
+  "cli-context-marshalling": "cli-shell-escaping",
+  "context-marshaling": "cli-shell-escaping",
+  "tool-input-marshalling": "cli-shell-escaping",
+
+  // mcp-churn — additional variants.
+  "mcp-connect-disconnect-churn": "mcp-churn",
+  "mcp-connect-disconnect-noise": "mcp-churn",
+  "mcp-churn-noise": "mcp-churn",
+  "mcp-flapping": "mcp-churn",
+  "mcp-lifecycle-chatter": "mcp-churn",
+  "mcp-availability-churn": "mcp-churn",
+  "mcp-tool-churn": "mcp-churn",
+  "ambient-mcp-churn": "mcp-churn",
+
+  // deferred-tool-noise — additional variants (roundtrip/discovery framing).
+  "tool-discovery-friction": "deferred-tool-noise",
+  "tool-discovery": "deferred-tool-noise",
+  "tool-roundtrip-overhead": "deferred-tool-noise",
+  "deferred-tool-injection": "deferred-tool-noise",
+
+  // subagent-verification-overhead — additional variants.
+  "subagent-report-verification": "subagent-verification-overhead",
+  "subagent-verification": "subagent-verification-overhead",
+  "subagent-report-trust": "subagent-verification-overhead",
+  "report-trust-gap": "subagent-verification-overhead",
+  "report-verification": "subagent-verification-overhead",
+  "unverifiable-claims": "subagent-verification-overhead",
+  "claim-verification-cost": "subagent-verification-overhead",
+  "claim-verification-overhead": "subagent-verification-overhead",
+  "claim-verification-manual": "subagent-verification-overhead",
+  "manual-claim-verification": "subagent-verification-overhead",
+  "redundant-verification": "subagent-verification-overhead",
+
+  // verification-overhead — generic canonical, still distinct from the
+  // subagent flavour per Pass 2 (spot-check confirms mixed non-subagent uses).
+  "verification-burden": "verification-overhead",
+  "verification-cost": "verification-overhead",
+
+  // verify-dont-inherit — NEW canonical: the cost of the repo-mandated
+  // "verify, don't inherit" diligence. Kept visible as its own theme.
+  "verify-dont-inherit-cost": "verify-dont-inherit",
+  "verify-dont-inherit-tax": "verify-dont-inherit",
+  "verify-not-inherit": "verify-dont-inherit",
+  "verify-dont-trust": "verify-dont-inherit",
+  "trust-but-verify": "verify-dont-inherit",
+  "trust-but-verify-cost": "verify-dont-inherit",
+
+  // subagent-opacity — NEW canonical: can't see what subagents are doing
+  // in-flight. Cause-side complement of subagent-verification-overhead.
+  "subagent-progress-opacity": "subagent-opacity",
+  "agent-progress-opacity": "subagent-opacity",
+  "subagent-observability": "subagent-opacity",
+  "agent-lifecycle-opacity": "subagent-opacity",
+  "subagent-lifecycle": "subagent-opacity",
+  "agent-lifecycle": "subagent-opacity",
+
+  // shared-worktree-race — additional variants.
+  "shared-worktree-races": "shared-worktree-race",
+  "shared-workspace-race": "shared-worktree-race",
+  "shared-worktree-risk": "shared-worktree-race",
+  "shared-worktree-contention": "shared-worktree-race",
+  "shared-worktree-coordination": "shared-worktree-race",
+  "shared-worktree-drift": "shared-worktree-race",
+  "concurrent-worktree-drift": "shared-worktree-race",
+  "shared-worktree-provenance": "shared-worktree-race",
+  "shared-worktree-noise": "shared-worktree-race",
+  "change-attribution": "shared-worktree-race",
+  "working-tree-drift": "shared-worktree-race",
+
+  // dirty-worktree — additional variants.
+  "dirty-worktree-provenance": "dirty-worktree",
+  "git-status-noise": "dirty-worktree",
+  "dirty-state-ambiguity": "dirty-worktree",
+
+  // parallel-dispatch — additional variants.
+  "parallel-reads-missed": "parallel-dispatch",
+  "parallel-dispatch-friction": "parallel-dispatch",
+  "parallel-dispatch-blocked": "parallel-dispatch",
+  "sequential-file-reads": "parallel-dispatch",
+  "batched-read-ergonomics": "parallel-dispatch",
+
+  // redundant-reads — NEW canonical: re-reading files already in context.
+  "repeat-reads": "redundant-reads",
+  "duplicate-file-reads": "redundant-reads",
+  "redundant-read": "redundant-reads",
+
+  // polling-overhead — NEW canonical: manual polling of background/long
+  // commands. nested-session flavour folded under nested-session-friction.
+  "background-task-polling": "polling-overhead",
+  "background-process-polling": "polling-overhead",
+  "long-running-command-polling": "polling-overhead",
+  "background-wait-ergonomics": "polling-overhead",
+  "long-running-command-ergonomics": "polling-overhead",
+
+  // nested-session-friction — NEW canonical: driving nested/async workflow
+  // sessions (polling them, indirection).
+  "nested-session-polling": "nested-session-friction",
+  "nested-session-ergonomics": "nested-session-friction",
+  "async-session-indirection": "nested-session-friction",
+
+  // validation-* — additions to the Pass 2 canonicals.
+  "validation-polling": "validation-ergonomics",
+  "validation-progress-opacity": "validation-ergonomics",
+  "validation-policy": "validation-policy-ambiguity",
+  "validation-gate-ambiguity": "validation-policy-ambiguity",
+  "test-output-noise": "validation-output-noise",
+  "test-log-noise": "validation-output-noise",
+  "warning-noise": "validation-output-noise",
+
+  // validation-duplication — NEW canonical: the same validation run twice
+  // across gates/agents.
+  "redundant-validation": "validation-duplication",
+  "duplicate-validation": "validation-duplication",
+  "validation-redundancy": "validation-duplication",
+  "redundant-revalidation": "validation-duplication",
+
+  // validation-trust — named distinct in Pass 2; now a canonical target for
+  // the "can I believe the green" family.
+  "validation-trust-gap": "validation-trust",
+  "false-green-risk": "validation-trust",
+  "false-green": "validation-trust",
+  "validation-flakiness": "validation-trust",
+
+  // kludged-bash — additional variants. missing-dedicated-tool stays the
+  // distinct cause-side canonical; fold its synonym.
+  "bash-kludge": "kludged-bash",
+  "kludged-bash-parsing": "kludged-bash",
+  "kludged-bash-grep": "kludged-bash",
+  "shell-pipeline-overhead": "kludged-bash",
+  "no-dedicated-tool": "missing-dedicated-tool",
+
+  // bash-cwd-persistence — canonical for the harness cwd-carryover surprise.
+  "shell-cwd-persistence": "bash-cwd-persistence",
+  "cwd-persistence": "bash-cwd-persistence",
+
+  // calibration-overhead — NEW canonical: cost of AOP.CALIBRATE at session
+  // start. aop-overbreadth (doc too broad) kept distinct; fold its variant.
+  "aop-calibrate-overhead": "calibration-overhead",
+  "calibration-cost": "calibration-overhead",
+  "repeated-calibration": "calibration-overhead",
+  "calibration-overbreadth": "aop-overbreadth",
+
+  // artifact-readback — additional variants (readback/scan/keyed-access
+  // framing).
+  "artifact-blob-readback": "artifact-readback",
+  "flat-blob-readback": "artifact-readback",
+  "flat-prose-readback": "artifact-readback",
+  "flat-decision-blob-readback": "artifact-readback",
+  "flat-prose-artifact-readback": "artifact-readback",
+  "no-key-based-readback": "artifact-readback",
+  "key-based-readback-missing": "artifact-readback",
+  "artifact-readback-no-keys": "artifact-readback",
+  "no-key-access": "artifact-readback",
+  "no-key-index": "artifact-readback",
+  "artifact-scan": "artifact-readback",
+  "artifact-discoverability": "artifact-readback",
+  "artifact-discovery": "artifact-readback",
+  "decision-record-scan": "artifact-readback",
+  "decision-record-scanning": "artifact-readback",
+  "decision-log-scan": "artifact-readback",
+  "linear-scan": "artifact-readback",
+  "prose-blob-parsing": "artifact-readback",
+
+  // flat-prose-blob — additional variants (shape-side framing).
+  "decision-record-flat-blob": "flat-prose-blob",
+  "flat-decisions-blob": "flat-prose-blob",
+  "flat-prose-artifact-blob": "flat-prose-blob",
+  "flat-context-blob": "flat-prose-blob",
+  "artifacts-decisions-flat-blob": "flat-prose-blob",
+  "flat-artifacts-blob": "flat-prose-blob",
+  "prose-blob": "flat-prose-blob",
+  "flat-prose-blobs": "flat-prose-blob",
+  "flat-prose-decision-blob": "flat-prose-blob",
+  "flat-decision-ledger": "flat-prose-blob",
+  "flat-prose-ledger": "flat-prose-blob",
+  "flat-prose-state": "flat-prose-blob",
+  "flat-artifact-prose": "flat-prose-blob",
+  "structured-data-flattening": "flat-prose-blob",
+  "decision-record-bloat": "flat-prose-blob",
+  "artifact-bloat": "flat-prose-blob",
+
+  // line-reference-friction — additional variants.
+  "stale-line-anchors": "line-reference-friction",
+  "stale-line-references": "line-reference-friction",
+  "line-anchor-drift": "line-reference-friction",
+  "line-evidence-friction": "line-reference-friction",
+
+  // path-discovery-friction — NEW canonical: figuring out where things live
+  // (workspace roots, paths, repo shape).
+  "workspace-discovery-friction": "path-discovery-friction",
+  "path-discovery": "path-discovery-friction",
+  "workspace-path-discovery": "path-discovery-friction",
+  "path-resolution-friction": "path-discovery-friction",
+  "workspace-path-mismatch": "path-discovery-friction",
+  "workspace-detection-failure": "path-discovery-friction",
+  "repo-shape-discovery": "path-discovery-friction",
+
+  // code-navigation-friction — NEW canonical: navigating source without
+  // goto-def-grade tooling.
+  "source-navigation-friction": "code-navigation-friction",
+  "source-navigation": "code-navigation-friction",
+
+  // source-of-truth-duplication — NEW canonical: the same truth maintained in
+  // multiple places (and disagreeing).
+  "duplicate-source-of-truth": "source-of-truth-duplication",
+  "duplicated-source-of-truth": "source-of-truth-duplication",
+  "source-of-truth-sprawl": "source-of-truth-duplication",
+  "source-of-truth-fragmentation": "source-of-truth-duplication",
+  "duplicated-authority": "source-of-truth-duplication",
+
+  // dev-server-corruption — canonical for unreliable dev-server state.
+  "stale-dev-server": "dev-server-corruption",
+  "dev-server-brittleness": "dev-server-corruption",
+
+  // uid-churn — canonical for browsertools snapshot UIDs churning between
+  // snapshots.
+  "browsertools-uid-churn": "uid-churn",
+  "snapshot-uid-churn": "uid-churn",
+
+  // workflow-keyword-misfire — NEW canonical: workflow keyword triggers
+  // firing on false positives.
+  "workflow-keyword-false-positive": "workflow-keyword-misfire",
+  "workflow-keyword-false-trigger": "workflow-keyword-misfire",
+  "false-keyword-trigger": "workflow-keyword-misfire",
+  "keyword-trigger-false-positive": "workflow-keyword-misfire",
+  "workflow-keyword-nudge": "workflow-keyword-misfire",
+
+  // task-tool-reminder-noise / silent-reconciliation — stragglers.
+  "task-tool-nudge": "task-tool-reminder-noise",
+  "silent-override": "silent-reconciliation",
+
+  // hidden-fanout — canonical for fan-out happening without being asked.
+  "implicit-fanout": "hidden-fanout",
+
+  // review-split-verdict — NEW canonical: reviewers disagreeing / split
+  // verdicts needing adjudication.
+  "split-verdict-mapping": "review-split-verdict",
+  "reviewer-split": "review-split-verdict",
+  "split-review-verdict": "review-split-verdict",
+  "reviewer-disagreement": "review-split-verdict",
+
+  // review-vs-implement-mapping — NEW canonical: mapping review-stage
+  // feedback onto implementation scope.
+  "review-vs-implement": "review-vs-implement-mapping",
+  "plan-review-vs-code-review": "review-vs-implement-mapping",
+
+  // append-only-growth — canonical for files that only ever grow.
+  "unbounded-append": "append-only-growth",
+
+  // orchestration-friction — additional variant.
+  "orchestration-overhead": "orchestration-friction",
 };
 
 function help(): void {
@@ -422,11 +937,32 @@ async function main() {
 
   if (dryRun) return;
 
-  const result = await client.mutation(api.reflectionsV2.normalizeKeywords, {
-    password: config.password,
-    mapping: MAPPING,
-  });
-  console.log("Result:", result);
+  // Cursor-batched loop — the table exceeds the 8 MiB per-transaction read
+  // limit, so the mutation processes one page per call.
+  let cursor: string | null = null;
+  let scanned = 0;
+  let updated = 0;
+  for (;;) {
+    const result: {
+      scanned: number;
+      updated: number;
+      isDone: boolean;
+      continueCursor: string | null;
+    } = await client.mutation(api.reflectionsV2.normalizeKeywords, {
+      password: config.password,
+      mapping: MAPPING,
+      cursor,
+      batchSize: 200,
+    });
+    scanned += result.scanned;
+    updated += result.updated;
+    console.log(
+      `batch: scanned=${result.scanned} updated=${result.updated} (total ${scanned}/${updated})`
+    );
+    if (result.isDone) break;
+    cursor = result.continueCursor;
+  }
+  console.log(`Done. Scanned ${scanned}, updated ${updated}.`);
 }
 
 main().catch((err) => {
