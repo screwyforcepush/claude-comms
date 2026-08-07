@@ -16,6 +16,9 @@ const EventEmitter = require('events');
 const path = require('path');
 const { InstallerError } = require('../utils/errors');
 const { ROOT_FILES } = require('../utils/constants');
+const { version: ENGINE_VERSION } = require('../../package.json');
+
+const ENGINE_MANIFEST_PATH = '.agents/engine-manifest.json';
 
 // Error codes enum - matches interface contracts
 const ErrorCode = {
@@ -317,9 +320,12 @@ class Installer extends EventEmitter {
     this.state = InstallationState.WRITING;
     this._emitProgress('Installing files...', 50);
 
+    const flattenedFiles = this._flattenFiles(fetchedFiles);
+    const filesWithManifest = await this._appendEngineManifest(flattenedFiles);
+
     if (this.options.dryRun) {
       this.logger.info('DRY RUN: Would install files to:', this.options.targetDir);
-      this._simulateInstallation(fetchedFiles);
+      this._simulateInstallation(filesWithManifest);
       return;
     }
 
@@ -337,7 +343,7 @@ class Installer extends EventEmitter {
       await this._createBackupsIfNeeded(fetchedFiles);
 
       // Flatten files and filter out user-customizable files if they already exist
-      let filesToWrite = this._flattenFiles(fetchedFiles);
+      let filesToWrite = filesWithManifest;
 
       // Files that should not be overwritten if they exist (user customizations)
       const preserveIfExists = [
@@ -658,12 +664,75 @@ class Installer extends EventEmitter {
   }
 
   /**
+   * Append the synthetic engine manifest to the normal write set.
+   */
+  async _appendEngineManifest(filesToWrite) {
+    const engineGitSha = await this._resolveEngineGitSha(this.options.version);
+    const withoutManifest = filesToWrite.filter(file => file.path !== ENGINE_MANIFEST_PATH);
+
+    return [
+      ...withoutManifest,
+      this._createEngineManifestFile(engineGitSha)
+    ];
+  }
+
+  /**
+   * Resolve the fetched ref to a commit SHA without blocking installation.
+   */
+  async _resolveEngineGitSha(ref) {
+    if (!this.fetcher || typeof this.fetcher.resolveCommitSha !== 'function') {
+      return null;
+    }
+
+    try {
+      return await this.fetcher.resolveCommitSha(ref);
+    } catch (error) {
+      this.logger.warn(`Unable to resolve engine commit SHA: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Create the manifest file stamped into installed .agents copies.
+   */
+  _createEngineManifestFile(engineGitSha) {
+    const ref = this.options.version;
+    const manifest = {
+      engineVersion: ENGINE_VERSION,
+      engineGitSha: typeof engineGitSha === 'string' ? engineGitSha : null,
+      installedFrom: `${this._getRepositorySlug()}#${ref}`,
+      installedAt: new Date().toISOString()
+    };
+
+    return {
+      path: ENGINE_MANIFEST_PATH,
+      content: JSON.stringify(manifest, null, 2),
+      encoding: 'utf-8'
+    };
+  }
+
+  /**
+   * Repository identity used in the install manifest.
+   */
+  _getRepositorySlug() {
+    const repository = this.fetcher && this.fetcher.repository;
+    const owner = repository && repository.owner;
+    const repo = repository && (repository.repo || repository.name);
+
+    if (owner && repo) {
+      return `${owner}/${repo}`;
+    }
+
+    return 'unknown/unknown';
+  }
+
+  /**
    * Simulate installation for dry-run mode
    */
-  _simulateInstallation(fetchedFiles) {
+  _simulateInstallation(filesToWrite) {
     this.logger.info('DRY RUN: Files that would be installed:');
 
-    const flattened = this._flattenFiles(fetchedFiles);
+    const flattened = Array.isArray(filesToWrite) ? filesToWrite : this._flattenFiles(filesToWrite);
     flattened.forEach(file => {
       const targetPath = path.join(this.options.targetDir, file.path);
       this.logger.info(`  • ${targetPath}`);

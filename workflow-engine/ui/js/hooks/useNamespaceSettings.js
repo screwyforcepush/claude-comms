@@ -11,13 +11,20 @@ import { api } from '../api.js';
 export function useNamespaceSettings(namespaceId) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [reflectionsSaving, setReflectionsSaving] = useState(false);
+  const [reflectionsError, setReflectionsError] = useState(null);
 
   const { data: defaults, loading, error } = useQuery(
     namespaceId ? api.namespaces.getHarnessDefaults : null,
     namespaceId ? { namespaceId } : {}
   );
+  const { data: namespace, loading: namespaceLoading, error: namespaceError } = useQuery(
+    namespaceId ? api.namespaces.get : null,
+    namespaceId ? { id: namespaceId } : {}
+  );
 
   const updateMutation = useMutation(api.namespaces.updateHarnessDefaults);
+  const setReflectionsMutation = useMutation(api.namespaces.setReflectionsEnabled);
 
   const save = useCallback(async (harnessDefaults) => {
     if (!namespaceId) return;
@@ -43,5 +50,35 @@ export function useNamespaceSettings(namespaceId) {
     });
   }, [updateMutation]);
 
-  return { defaults, loading, error, saving, saveError, save, saveToNamespace };
+  const setReflectionsEnabled = useCallback(async (enabled) => {
+    if (!namespaceId) return;
+    setReflectionsSaving(true);
+    setReflectionsError(null);
+    try {
+      await setReflectionsMutation({
+        namespaceId,
+        enabled,
+      });
+    } catch (err) {
+      setReflectionsError(err.message || 'Failed to update reflections');
+      throw err;
+    } finally {
+      setReflectionsSaving(false);
+    }
+  }, [namespaceId, setReflectionsMutation]);
+
+  return {
+    defaults,
+    namespace,
+    reflectionsEnabled: namespace?.reflectionsEnabled !== false,
+    loading: loading || namespaceLoading,
+    error: error || namespaceError,
+    saving,
+    saveError,
+    save,
+    saveToNamespace,
+    reflectionsSaving,
+    reflectionsError,
+    setReflectionsEnabled,
+  };
 }

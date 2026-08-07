@@ -62,6 +62,20 @@ function durationMs(job: Doc<"jobs">): number | undefined {
   return Math.max(0, job.completedAt - job.startedAt);
 }
 
+async function countReflectionsForEngineVersion(
+  ctx: { db: any },
+  namespaceId: Id<"namespaces">,
+  engineVersion?: string
+): Promise<number> {
+  const rows = await ctx.db
+    .query("reflectionsV2")
+    .withIndex("by_namespace_engineVersion", (q: any) =>
+      q.eq("namespaceId", namespaceId).eq("engineVersion", engineVersion)
+    )
+    .take(111);
+  return rows.length;
+}
+
 async function getReflectedJobIds(
   ctx: { db: any },
   jobs: Array<Doc<"jobs">>
@@ -140,6 +154,53 @@ async function selectTerminalJobs(
 // Exported functions
 // ---------------------------------------------------------------------------
 
+export const shouldReflect = mutation({
+  args: {
+    password: v.string(),
+    jobId: v.id("jobs"),
+    engineVersion: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+
+    const job = await ctx.db.get(args.jobId);
+    if (!job) throw new Error("Job not found");
+    if (!isTerminal(job.status)) throw new Error("Job must be terminal");
+    if (!job.namespaceId) throw new Error("Job is not reflection-integrated");
+
+    const namespace = await ctx.db.get(job.namespaceId);
+    if (!namespace) throw new Error("Namespace not found");
+
+    const count = await countReflectionsForEngineVersion(
+      ctx,
+      job.namespaceId,
+      args.engineVersion
+    );
+    let reflectionsEnabled = namespace.reflectionsEnabled ?? true;
+
+    // The band is deliberately broad enough to absorb concurrent terminal jobs.
+    // @see docs/project/spec/mental-model.md#sampling-budget--engine-versioning
+    if (count === 0) {
+      reflectionsEnabled = true;
+      await ctx.db.patch(job.namespaceId, { reflectionsEnabled: true });
+    }
+    if (count > 100 && count < 110) {
+      reflectionsEnabled = false;
+      await ctx.db.patch(job.namespaceId, { reflectionsEnabled: false });
+    }
+
+    if (!reflectionsEnabled) {
+      await ctx.db.patch(args.jobId, { reflectionSkipped: "disabled" });
+    }
+
+    return {
+      shouldReflect: reflectionsEnabled,
+      count,
+      reflectionsEnabled,
+    };
+  },
+});
+
 export const insert = mutation({
   args: {
     password: v.string(),
@@ -161,6 +222,7 @@ export const insert = mutation({
     reflectionCliVersion: v.string(),
     clientGitSha: v.optional(v.string()),
     engineGitSha: v.optional(v.string()),
+    engineVersion: v.optional(v.string()),
     createdAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -218,6 +280,7 @@ export const insert = mutation({
       reflectionCliVersion: args.reflectionCliVersion,
       clientGitSha: args.clientGitSha,
       engineGitSha: args.engineGitSha,
+      engineVersion: args.engineVersion,
       createdAt: args.createdAt ?? Date.now(),
     });
   },
@@ -232,6 +295,23 @@ export const byJob = query({
       .withIndex("by_job", (q) => q.eq("jobId", args.jobId))
       .order("desc")
       .first();
+  },
+});
+
+export const countForEngineVersion = query({
+  args: {
+    password: v.string(),
+    namespaceId: v.id("namespaces"),
+    engineVersion: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const count = await countReflectionsForEngineVersion(
+      ctx,
+      args.namespaceId,
+      args.engineVersion
+    );
+    return { count };
   },
 });
 
@@ -339,13 +419,19 @@ export const normalizeKeywords = mutation({
   args: {
     password: v.string(),
     mapping: v.record(v.string(), v.string()),
+    // Cursor-batched: the table outgrew the 8 MiB per-transaction read limit,
+    // so callers loop until isDone, passing continueCursor back in.
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
-    const all = await ctx.db.query("reflectionsV2").collect();
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("reflectionsV2")
+      .paginate({ numItems: args.batchSize ?? 200, cursor: args.cursor ?? null });
     let scanned = 0;
     let updated = 0;
-    for (const row of all) {
+    for (const row of page) {
       scanned += 1;
       const newItems = row.items.map((item: { keywords: string[]; painPoint: string; suggestion: string }) => ({
         ...item,
@@ -365,7 +451,7 @@ export const normalizeKeywords = mutation({
         updated += 1;
       }
     }
-    return { scanned, updated };
+    return { scanned, updated, isDone, continueCursor };
   },
 });
 
@@ -390,6 +476,8 @@ export const gaps = query({
           skipReason = "unsupported_harness";
         } else if (!job.sessionId) {
           skipReason = "missing_session_id";
+        } else if (job.reflectionSkipped) {
+          skipReason = "reflection_disabled";
         } else {
           skipReason = "reflection_missing";
         }

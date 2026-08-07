@@ -12,6 +12,7 @@ export default defineSchema({
       complete: v.number(),
     })),
     harnessDefaults: v.optional(v.string()), // JSON-encoded HarnessDefaults
+    reflectionsEnabled: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -100,6 +101,7 @@ export default defineSchema({
     model: v.optional(v.string()), // Model string passed to harness CLI
     sessionId: v.optional(v.string()), // Harness session/thread ID for resume/debugging
     exitForced: v.optional(v.boolean()),
+    reflectionSkipped: v.optional(v.literal("disabled")),
     // Rate-limit auto-retry fields
     retryCount: v.optional(v.number()),      // Increments each retry cycle
     retryAfter: v.optional(v.number()),      // Absolute timestamp (ms) of next retry
@@ -175,12 +177,14 @@ export default defineSchema({
     reflectionCliVersion: v.string(),
     clientGitSha: v.optional(v.string()),
     engineGitSha: v.optional(v.string()),
+    engineVersion: v.optional(v.string()),
 
     createdAt: v.number(),
   })
     .index("by_job", ["jobId"])
     .index("by_namespace_created", ["namespaceId", "createdAt"])
     .index("by_namespace_harness_created", ["namespaceId", "harness", "createdAt"])
+    .index("by_namespace_engineVersion", ["namespaceId", "engineVersion"])
     .index("by_created", ["createdAt"]),
 
   chatThreads: defineTable({

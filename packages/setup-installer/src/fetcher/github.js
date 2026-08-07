@@ -212,6 +212,32 @@ class GitHubFetcher extends EventEmitter {
   }
 
   /**
+   * Resolve a Git ref to the full commit SHA, best-effort.
+   * @param {string} ref - Branch, tag, or commit ref
+   * @returns {Promise<string|null>} Full commit SHA or null when unavailable
+   */
+  async resolveCommitSha(ref) {
+    const commitRef = ref || this.repository.branch;
+    const encodedRef = encodeURIComponent(commitRef);
+    const url = `${this.config.baseUrl}/repos/${this.repository.owner}/${this.repository.repo}/commits/${encodedRef}`;
+
+    try {
+      const response = await this._makeRequest(url);
+      const data = await response.json();
+
+      if (data && typeof data.sha === 'string' && data.sha.length > 0) {
+        return data.sha;
+      }
+
+      console.warn(`Unable to resolve commit SHA for ${commitRef}: response did not include sha`);
+      return null;
+    } catch (error) {
+      console.warn(`Unable to resolve commit SHA for ${commitRef}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Strategy 1: GitHub Trees API for recursive directory fetch
    * @private
    */

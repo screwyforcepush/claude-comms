@@ -25,6 +25,7 @@
  *   jobs [--status <status>] [--group <groupId>] [--assignment <assignmentId>]   List jobs
  *   job <id>                            Get job details
  *   queue                               Show queue status
+ *   reflections [status|on|off]         Show or set per-namespace reflection capture
  *
  *   create <northStar> [--priority N] [--independent] [--thread <threadId>]   Create assignment
  *   insert-job [assignmentId] [--type <type>] [--jobs <json>] [--jobs-file <path>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
@@ -60,6 +61,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { HarnessDefaults, HarnessModelEntry, parseHarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
 import { collapseFanOutDuplicates } from "./lib/collapse-fanout.js";
+import { getEngineIdentity } from "./lib/engine-version.js";
 
 // Use anyApi for portability (same as runner.ts)
 const api = anyApi;
@@ -155,6 +157,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   jobs: ["status", "group", "assignment"],
   job: [],
   queue: [],
+  reflections: [],
   create: ["priority", "independent", "thread"],
   "insert-job": ["type", "jobs", "jobs-file", "harness", "model", "context", "after"],
   "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason", "nudge", "clear-nudge", "append-northstar"],
@@ -289,6 +292,58 @@ async function getQueueStatus() {
     blockedAssignments: counts.blocked,
     completeAssignments: counts.complete,
   });
+}
+
+async function reflections(action: string = "status") {
+  if (action !== "status" && action !== "on" && action !== "off") {
+    error("Reflections command must be one of: status, on, off");
+  }
+
+  const nsId = await getNamespaceId();
+  const ns = await client.query(api.namespaces.get, {
+    password: config.password,
+    id: nsId,
+  });
+  if (!ns) error("Namespace not found");
+
+  if (action === "on" || action === "off") {
+    const enabled = action === "on";
+    await client.mutation(api.namespaces.setReflectionsEnabled, {
+      password: config.password,
+      namespaceId: nsId,
+      enabled,
+    });
+    output({
+      namespace: ns.name,
+      reflectionsEnabled: enabled,
+      message: `Reflections ${enabled ? "enabled" : "disabled"}. The sampler band overrides manual state while inside it.`,
+    });
+    return;
+  }
+
+  const identity = getEngineIdentity();
+  const result: Record<string, unknown> = {
+    namespace: ns.name,
+    reflectionsEnabled: ns.reflectionsEnabled !== false,
+    engineVersion: identity.engineVersion ?? null,
+    engineVersionSource: identity.source,
+    countForVersion: null,
+  };
+
+  try {
+    const countResult = await client.query(api.reflectionsV2.countForEngineVersion, {
+      password: config.password,
+      namespaceId: nsId,
+      engineVersion: identity.engineVersion,
+    });
+    const count = typeof countResult?.count === "number" ? countResult.count : 0;
+    result.countForVersion = count >= 111 ? "111+" : count;
+  } catch (err) {
+    result.countForVersion = null;
+    result.note = `Could not read current-version count: ${(err as Error).message}`;
+  }
+
+  output(result);
 }
 
 async function createAssignment(
@@ -704,6 +759,7 @@ Commands:
                                       List jobs (filterable by status, group, or assignment)
   job <id>                            Get job details
   queue                               Show queue status
+  reflections [status|on|off]         Show or set per-namespace reflection capture
 
   create <northStar> [--priority N] [--independent] [--thread <threadId>]
                                       Create assignment
@@ -804,6 +860,10 @@ async function main() {
 
       case "queue":
         await getQueueStatus();
+        break;
+
+      case "reflections":
+        await reflections(positional[0] || "status");
         break;
 
       case "create":

@@ -336,6 +336,14 @@ Three choices in the capture shape are intentional, each protecting a different 
 
 A consequence: the loudest signal can be one we choose not to act on (e.g. a harness-internal behaviour we can't remove). That's still useful — knowing what's being tolerated most loudly is decision-grade information even when the decision is "leave it."
 
+### Sampling Budget & Engine Versioning
+
+Reflection is a **sampling instrument, not an exhaust pipe**. Frequency-is-severity needs volume to rank honestly, but the ranking stabilises well before exhaustive capture — ~100 reflections per namespace per engine version is the signal budget; beyond that, every additional reflection taxes a job (tokens, latency) for no marginal insight.
+
+The sampler is **self-arming so no human has to remember a toggle**: when a new engine version's first job completes in a namespace, reflection flicks on automatically; once the namespace's count for that version drifts into the 100–110 band, it flicks off automatically. The band (not a hard cap) absorbs in-flight races from concurrent jobs — a deliberately crude edge, accepted. Manual per-namespace on/off is honored everywhere *except* inside the band, and a brand-new version always starts armed. Jobs that complete while the sampler is off are stamped as skipped-disabled so the coverage self-diagnostic can distinguish "sampler off" (fine) from "pipeline broken" (alarm).
+
+The unit of comparison is the **engine release version**, not the raw commit SHA: releases track feature pushes closely, versions are human-consumable for A/B-ing a change across namespaces, and SHA-keying would re-arm the sampler on every dev commit. SHAs stay recorded per-row for fine-grained tracing. Known capture defect this direction fixes: in consumer repos the installed `.agents` copy has no git identity of its own, so `engineGitSha` silently reported the *consumer's* HEAD — the engine version must be stamped at install time (the installer knows exactly what it fetched), not inferred at reflection time.
+
 ### Interpreting Reflection Data — Analyst Caveats
 
 Two biases are structural to friction-only capture and must be corrected for when reading aggregates:

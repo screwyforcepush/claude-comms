@@ -364,6 +364,180 @@ function AddJobTypeRow({ onAdd }) {
   );
 }
 
+function ReflectionToggleRow({ enabled, saving, error, onToggle }) {
+  const accent = enabled ? 'var(--q-slime1)' : 'var(--q-bone0)';
+  return React.createElement('div', {
+    style: {
+      padding: '12px 0',
+      borderBottom: '1px solid var(--q-stone3)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '16px',
+    }
+  },
+    React.createElement('div', {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        minWidth: 0,
+      }
+    },
+      React.createElement('span', {
+        style: {
+          width: '7px',
+          height: '7px',
+          flex: '0 0 auto',
+          backgroundColor: accent,
+          boxShadow: enabled ? '0 0 8px var(--q-slime1), 0 0 16px var(--q-slime0)' : 'none',
+        }
+      }),
+      React.createElement('div', { style: { minWidth: 0 } },
+        React.createElement('div', {
+          style: {
+            fontFamily: 'var(--font-display)',
+            fontSize: '11px',
+            color: 'var(--q-bone3)',
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+          }
+        }, 'Reflections'),
+        React.createElement('div', {
+          style: {
+            fontFamily: 'var(--font-console)',
+            fontSize: '10px',
+            color: error ? 'var(--q-lava1)' : 'var(--q-bone0)',
+            marginTop: '3px',
+          }
+        }, error || 'self-arming per engine version')
+      )
+    ),
+    React.createElement('button', {
+      type: 'button',
+      role: 'switch',
+      'aria-checked': enabled,
+      disabled: saving,
+      onClick: () => onToggle(!enabled),
+      style: {
+        width: '58px',
+        height: '26px',
+        flex: '0 0 auto',
+        background: enabled
+          ? 'linear-gradient(180deg, var(--q-slime1) 0%, var(--q-slime0) 100%)'
+          : 'var(--q-stone2)',
+        border: `1px solid ${enabled ? 'var(--q-slime1)' : 'var(--q-stone3)'}`,
+        borderBottom: '2px solid var(--q-void0)',
+        borderRadius: 0,
+        color: enabled ? 'var(--q-void0)' : 'var(--q-bone0)',
+        cursor: saving ? 'default' : 'pointer',
+        opacity: saving ? 0.6 : 1,
+        fontFamily: 'var(--font-display)',
+        fontSize: '9px',
+        letterSpacing: '1px',
+        textTransform: 'uppercase',
+        transition: 'all 0.1s',
+      }
+    }, saving ? '...' : (enabled ? 'On' : 'Off'))
+  );
+}
+
+function NamespaceLabelPicker({ namespaceId, namespaceName, namespaces, pickerOpen, onToggle, onPick }) {
+  const canPick = namespaces && namespaces.length > 1 && onPick;
+  if (!namespaceName) return null;
+
+  if (!canPick) {
+    return React.createElement('span', {
+      style: {
+        fontFamily: 'var(--font-console)',
+        fontSize: '11px',
+        color: 'var(--q-bone0)',
+        marginLeft: '4px',
+      }
+    }, namespaceName);
+  }
+
+  return React.createElement('div', {
+    style: { position: 'relative', marginLeft: '4px' }
+  },
+    React.createElement('button', {
+      type: 'button',
+      onClick: onToggle,
+      title: 'Switch namespace',
+      style: {
+        background: 'none',
+        border: '1px solid var(--q-stone3)',
+        borderRadius: 0,
+        color: 'var(--q-bone1)',
+        cursor: 'pointer',
+        padding: '3px 7px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '5px',
+        fontFamily: 'var(--font-console)',
+        fontSize: '11px',
+        transition: 'all 0.1s',
+      },
+      onMouseEnter: (e) => {
+        e.currentTarget.style.color = 'var(--q-torch)';
+        e.currentTarget.style.borderColor = 'var(--q-copper1)';
+      },
+      onMouseLeave: (e) => {
+        e.currentTarget.style.color = 'var(--q-bone1)';
+        e.currentTarget.style.borderColor = 'var(--q-stone3)';
+      },
+    },
+      namespaceName,
+      React.createElement(QIcon, { name: 'slipgate', size: 12, color: 'currentColor' })
+    ),
+    pickerOpen && React.createElement('div', {
+      role: 'menu',
+      style: {
+        position: 'absolute',
+        top: 'calc(100% + 5px)',
+        left: 0,
+        minWidth: '180px',
+        maxHeight: '220px',
+        overflowY: 'auto',
+        background: 'var(--q-stone1)',
+        border: '1px solid var(--q-copper1)',
+        borderBottom: '2px solid var(--q-void0)',
+        borderRadius: 0,
+        boxShadow: '0 12px 24px var(--q-void0)',
+        zIndex: 4,
+        padding: '4px',
+      }
+    },
+      namespaces.map((ns) => React.createElement('button', {
+        key: ns._id,
+        type: 'button',
+        role: 'menuitem',
+        onClick: () => onPick(ns._id),
+        style: {
+          width: '100%',
+          background: ns._id === namespaceId ? 'var(--q-stone3)' : 'transparent',
+          border: '1px solid transparent',
+          borderRadius: 0,
+          color: ns._id === namespaceId ? 'var(--q-torch)' : 'var(--q-bone2)',
+          cursor: 'pointer',
+          padding: '7px 8px',
+          textAlign: 'left',
+          fontFamily: 'var(--font-console)',
+          fontSize: '11px',
+        },
+        onMouseEnter: (e) => {
+          e.currentTarget.style.borderColor = 'var(--q-copper1)';
+          e.currentTarget.style.color = 'var(--q-bone4)';
+        },
+        onMouseLeave: (e) => {
+          e.currentTarget.style.borderColor = 'transparent';
+          e.currentTarget.style.color = ns._id === namespaceId ? 'var(--q-torch)' : 'var(--q-bone2)';
+        },
+      }, ns.name))
+    )
+  );
+}
+
 // ============================================================================
 // Main modal component
 // ============================================================================
@@ -376,11 +550,31 @@ function AddJobTypeRow({ onAdd }) {
  * @param {string} namespaceId - The namespace to configure
  * @param {string} namespaceName - Display name for the namespace
  */
-export function NamespaceSettings({ isOpen, onClose, namespaceId, namespaceName, allNamespaceIds }) {
-  const { defaults, loading, saving, saveError, save, saveToNamespace } = useNamespaceSettings(namespaceId);
+export function NamespaceSettings({
+  isOpen,
+  onClose,
+  namespaceId,
+  namespaceName,
+  allNamespaceIds,
+  namespaces,
+  onSwitchNamespace,
+}) {
+  const {
+    defaults,
+    loading,
+    saving,
+    saveError,
+    save,
+    saveToNamespace,
+    reflectionsEnabled,
+    reflectionsSaving,
+    reflectionsError,
+    setReflectionsEnabled,
+  } = useNamespaceSettings(namespaceId);
   const [localConfig, setLocalConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Sync from server when defaults load or change
   useEffect(() => {
@@ -395,6 +589,12 @@ export function NamespaceSettings({ isOpen, onClose, namespaceId, namespaceName,
       setDirty(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    setDirty(false);
+    setLocalConfig(null);
+    setPickerOpen(false);
+  }, [namespaceId]);
 
   // Escape key handler
   useEffect(() => {
@@ -475,6 +675,22 @@ export function NamespaceSettings({ isOpen, onClose, namespaceId, namespaceName,
     onClose();
   }, [defaults, onClose]);
 
+  const handleReflectionToggle = useCallback(async (enabled) => {
+    try {
+      await setReflectionsEnabled(enabled);
+    } catch {
+      // reflectionsError is set by the hook
+    }
+  }, [setReflectionsEnabled]);
+
+  const handlePickNamespace = useCallback((nextNamespaceId) => {
+    if (!onSwitchNamespace) return;
+    setPickerOpen(false);
+    setDirty(false);
+    setLocalConfig(null);
+    onSwitchNamespace(nextNamespaceId);
+  }, [onSwitchNamespace]);
+
   if (!isOpen) return null;
 
   // Ordered job types: "default" first, then alphabetical
@@ -545,14 +761,14 @@ export function NamespaceSettings({ isOpen, onClose, namespaceId, namespaceName,
               textTransform: 'uppercase',
             }
           }, 'Harness Config'),
-          namespaceName && React.createElement('span', {
-            style: {
-              fontFamily: 'var(--font-console)',
-              fontSize: '11px',
-              color: 'var(--q-bone0)',
-              marginLeft: '4px',
-            }
-          }, namespaceName),
+          React.createElement(NamespaceLabelPicker, {
+            namespaceId: namespaceId,
+            namespaceName: namespaceName,
+            namespaces: namespaces,
+            pickerOpen: pickerOpen,
+            onToggle: () => setPickerOpen(open => !open),
+            onPick: handlePickNamespace,
+          }),
         ),
         React.createElement('button', {
           type: 'button',
@@ -574,48 +790,6 @@ export function NamespaceSettings({ isOpen, onClose, namespaceId, namespaceName,
         ),
       ),
 
-      // Column headers
-      React.createElement('div', {
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          borderBottom: '1px solid var(--q-stone2)',
-        }
-      },
-        React.createElement('span', {
-          style: {
-            fontFamily: 'var(--font-display)',
-            fontSize: '9px',
-            color: 'var(--q-bone0)',
-            letterSpacing: '1.5px',
-            textTransform: 'uppercase',
-            minWidth: '80px',
-          }
-        }, 'Job Type'),
-        React.createElement('span', {
-          style: {
-            fontFamily: 'var(--font-display)',
-            fontSize: '9px',
-            color: 'var(--q-bone0)',
-            letterSpacing: '1.5px',
-            textTransform: 'uppercase',
-            minWidth: '90px',
-          }
-        }, 'Harness'),
-        React.createElement('span', {
-          style: {
-            fontFamily: 'var(--font-display)',
-            fontSize: '9px',
-            color: 'var(--q-bone0)',
-            letterSpacing: '1.5px',
-            textTransform: 'uppercase',
-            flex: 1,
-          }
-        }, 'Model'),
-      ),
-
       // Body — scrollable
       React.createElement('div', {
         style: {
@@ -624,6 +798,55 @@ export function NamespaceSettings({ isOpen, onClose, namespaceId, namespaceName,
           padding: '0 16px',
         }
       },
+        React.createElement(ReflectionToggleRow, {
+          enabled: reflectionsEnabled,
+          saving: reflectionsSaving,
+          error: reflectionsError,
+          onToggle: handleReflectionToggle,
+        }),
+
+        // Column headers
+        React.createElement('div', {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 0',
+            borderBottom: '1px solid var(--q-stone2)',
+          }
+        },
+          React.createElement('span', {
+            style: {
+              fontFamily: 'var(--font-display)',
+              fontSize: '9px',
+              color: 'var(--q-bone0)',
+              letterSpacing: '1.5px',
+              textTransform: 'uppercase',
+              minWidth: '80px',
+            }
+          }, 'Job Type'),
+          React.createElement('span', {
+            style: {
+              fontFamily: 'var(--font-display)',
+              fontSize: '9px',
+              color: 'var(--q-bone0)',
+              letterSpacing: '1.5px',
+              textTransform: 'uppercase',
+              minWidth: '90px',
+            }
+          }, 'Harness'),
+          React.createElement('span', {
+            style: {
+              fontFamily: 'var(--font-display)',
+              fontSize: '9px',
+              color: 'var(--q-bone0)',
+              letterSpacing: '1.5px',
+              textTransform: 'uppercase',
+              flex: 1,
+            }
+          }, 'Model'),
+        ),
+
         loading && React.createElement('div', {
           style: {
             padding: '24px',

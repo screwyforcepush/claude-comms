@@ -14,8 +14,10 @@ export const api = {
   // Namespaces API
   namespaces: {
     list: "namespaces:list",
+    get: "namespaces:get",
     getHarnessDefaults: "namespaces:getHarnessDefaults",
     updateHarnessDefaults: "namespaces:updateHarnessDefaults",
+    setReflectionsEnabled: "namespaces:setReflectionsEnabled",
   },
 
   // Assignments API
@@ -45,6 +47,7 @@ export const api = {
     coverageRate: "reflectionsV2:coverageRate",
     recent: "reflectionsV2:recent",
     gaps: "reflectionsV2:gaps",
+    countForEngineVersion: "reflectionsV2:countForEngineVersion",
   },
 
   // Chat threads API

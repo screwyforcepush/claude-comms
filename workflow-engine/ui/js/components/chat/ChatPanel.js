@@ -994,6 +994,8 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       namespaceId: settingsNamespaceId,
       namespaceName: settingsNamespaceId ? (namespaceMap[settingsNamespaceId] || '') : '',
       allNamespaceIds: namespaces ? namespaces.map(ns => ns._id) : [],
+      namespaces: namespaces,
+      onSwitchNamespace: setSettingsNamespaceId,
     })
   );
 }

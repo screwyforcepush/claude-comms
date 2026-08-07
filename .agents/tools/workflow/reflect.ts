@@ -5,8 +5,9 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import { getEngineIdentity } from "./lib/engine-version.js";
 
-const REFLECTION_CLI_VERSION = "0.2.0";
+const REFLECTION_CLI_VERSION = "0.3.0";
 
 const api = anyApi;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -317,6 +318,8 @@ async function main(): Promise<void> {
   if (!job.namespaceId) fail("job is missing namespaceId; historical jobs cannot reflect");
   if (!job.sessionId) fail("job is missing sessionId");
 
+  const engineIdentity = getEngineIdentity();
+
   await client.mutation(api.reflectionsV2.insert, {
     password: config.password,
     jobId: args.jobId as any,
@@ -332,7 +335,8 @@ async function main(): Promise<void> {
     rubric: input.rubric,
     reflectionCliVersion: REFLECTION_CLI_VERSION,
     clientGitSha: gitSha(process.cwd()),
-    engineGitSha: gitSha(__dirname),
+    engineVersion: engineIdentity.engineVersion,
+    engineGitSha: engineIdentity.engineGitSha,
     createdAt: Date.now(),
   });
 

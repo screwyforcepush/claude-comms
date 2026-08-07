@@ -5,6 +5,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import { getEngineIdentity } from "./lib/engine-version.js";
 import { buildAgyCommand } from "./lib/streams.js";
 
 const DEFAULT_REFLECTION_TIMEOUT_MS = 5 * 60_000;
@@ -158,6 +159,21 @@ async function main(): Promise<void> {
     ) return;
     if (!jobData.sessionId) return;
     if (!jobData.namespaceId) return;
+
+    const engineIdentity = getEngineIdentity();
+    try {
+      const decision = await client.mutation(api.reflectionsV2.shouldReflect, {
+        password: config.password,
+        jobId: jobId as any,
+        engineVersion: engineIdentity.engineVersion,
+      });
+      if (decision?.shouldReflect === false) {
+        debug(`reflection disabled for job ${jobId}`);
+        return;
+      }
+    } catch (err) {
+      debug(`shouldReflect failed open: ${(err as Error).message}`);
+    }
 
     const northStar = typeof jobData.assignment?.northStar === "string"
       ? jobData.assignment.northStar
