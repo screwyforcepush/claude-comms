@@ -55,4 +55,10 @@ nohup bash .agents/tools/workflow/run-runner.sh > /dev/null 2>&1 &
 
 Verify it started: `tail -20 /tmp/runner.log`
 
+## Step 6: Commit the client update
+
+The update has likely changed files in the working tree — typically `.agents/` (including the regenerated Codex agent TOMLs from Step 3), `.claude/commands/`, and `CLAUDE.md`. Review `git status` and commit everything the update touched.
+
+For the commit message, read `engineVersion` from `.agents/engine-manifest.json` and reference it, e.g. `chore: update claude-comms client to <engineVersion>`.
+
 Tell the user the client has been updated and the runner is back online.
