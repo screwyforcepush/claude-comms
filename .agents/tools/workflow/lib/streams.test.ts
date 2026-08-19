@@ -96,6 +96,94 @@ describe("ClaudeStreamHandler", () => {
     assert.strictEqual(info!.rateLimitType, "five_hour");
   });
 
+  it("captures rate-limit info from a 529 Overloaded terminal result", () => {
+    const handler = new ClaudeStreamHandler();
+
+    // Verbatim shape captured from a client repo's 529 death (2026-08-13):
+    // synthetic assistant message followed by the terminal result event.
+    handler.onEvent({
+      type: "assistant",
+      message: {
+        id: "eb26451b-dfdd-4e44-ab23-b7855f264871",
+        model: "<synthetic>",
+        role: "assistant",
+        stop_reason: "stop_sequence",
+        content: [
+          {
+            type: "text",
+            text: "API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com.",
+          },
+        ],
+      },
+      error: "server_error",
+      session_id: "3f49273e-f23f-4cf6-87cb-dc829d217115",
+    });
+    const before = Math.floor(Date.now() / 1000);
+    handler.onEvent({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      api_error_status: 529,
+      duration_ms: 205813,
+      num_turns: 1,
+      result: "API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com.",
+      stop_reason: "stop_sequence",
+      session_id: "3f49273e-f23f-4cf6-87cb-dc829d217115",
+      terminal_reason: "completed",
+    });
+
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), false);
+
+    const info = handler.getRateLimitInfo();
+    assert.ok(info, "getRateLimitInfo should return non-null");
+    assert.strictEqual(info!.rateLimitType, "api_error_529");
+    // No reset time on server errors: resetsAt = now, so jobs.rateLimited's
+    // 60s clamp + backoff schedule drive the retry cadence.
+    assert.ok(info!.resetsAt >= before);
+    assert.ok(info!.resetsAt <= Math.floor(Date.now() / 1000));
+  });
+
+  it("does not retry deterministic 4xx request errors", () => {
+    const handler = new ClaudeStreamHandler();
+
+    handler.onEvent({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      api_error_status: 400,
+      result: "API Error: 400 prompt is too long",
+    });
+
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.getRateLimitInfo(), null);
+  });
+
+  it("keeps rate_limit_event reset time over the terminal result's status code", () => {
+    const handler = new ClaudeStreamHandler();
+
+    handler.onEvent({
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "rejected",
+        resetsAt: 1776243600,
+        rateLimitType: "five_hour",
+      },
+    });
+    handler.onEvent({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      api_error_status: 429,
+      result: "You've hit your limit",
+    });
+
+    const info = handler.getRateLimitInfo();
+    assert.ok(info, "getRateLimitInfo should return non-null");
+    assert.strictEqual(info!.rateLimitType, "five_hour");
+    assert.strictEqual(info!.resetsAt, 1776243600);
+  });
+
   it("does not capture rate_limit_event when status is not rejected", () => {
     const handler = new ClaudeStreamHandler();
 

@@ -671,7 +671,9 @@ export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
             textTransform: 'uppercase',
             letterSpacing: '2px'
           }
-        }, rateLimitType ? `Rate Limited (${rateLimitType})` : 'Rate Limited'),
+        }, rateLimitType && rateLimitType.startsWith('api_error_')
+          ? `Overloaded (${rateLimitType.slice('api_error_'.length)})`
+          : rateLimitType ? `Rate Limited (${rateLimitType})` : 'Rate Limited'),
         React.createElement('span', {
           style: {
             fontFamily: 'var(--font-console)',

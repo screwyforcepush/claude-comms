@@ -152,6 +152,25 @@ export class ClaudeStreamHandler implements StreamHandler {
         const reason = subtype || "error";
         this.failureReason = `claude_result_${reason}`;
       }
+      // Transient provider errors (429/5xx, e.g. 529 Overloaded) retry via
+      // the rate-limit pause machinery. Key on the structured status — the
+      // error message text drifts across CLI versions. Deterministic 4xx
+      // request errors must still fail fast. A rate_limit_event (fires
+      // before the synthetic result, carries the true reset time) wins;
+      // with no reset time given, resetsAt = now and jobs.rateLimited's
+      // 60s clamp + backoff schedule take over.
+      const apiErrorStatus = event.api_error_status;
+      if (
+        isError &&
+        !this.rateLimitInfo &&
+        typeof apiErrorStatus === "number" &&
+        (apiErrorStatus === 429 || apiErrorStatus >= 500)
+      ) {
+        this.rateLimitInfo = {
+          resetsAt: Math.floor(Date.now() / 1000),
+          rateLimitType: `api_error_${apiErrorStatus}`,
+        };
+      }
     }
   }
 
