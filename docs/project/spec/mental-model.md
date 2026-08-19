@@ -238,6 +238,10 @@ This design keeps retry coordination state minimal — just `retryCount` on the 
 
 **Scope:** Claude and Codex harnesses (a limit wall must pause the job, not insta-fail it; detection is per-harness, the pause machinery is shared). Assignment jobs only (chat jobs fail normally — the user can re-send). No cap on total retries — keeps going at 30m intervals until the window clears.
 
+**Transient provider errors are pauses too.** The same principle extends beyond usage limits: a provider-side overload (Anthropic's 529) or other transient server error is not a verdict on the job — it's the provider having a moment. These differ from rate limits in one respect: no reset time is given. So the retry starts on a short synthetic delay and the same escalating backoff takes over; everything else (pause semantics, no PM cascade, countdown, emergency brake, uncapped retries) is inherited from the rate-limit design. Two deliberate calls:
+- **Detection keys on the structured error status the harness reports, never on error-message text** — the message wording drifts across CLI versions (observed in the wild); the status code is the invariant. Retry only statuses that are plausibly transient (rate-limit and server-side classes); deterministic request errors must still fail fast.
+- **The retry restarts from scratch.** Session-resume retry (preserving partial work from an interrupted attempt) was considered and rejected: most overload deaths happen before meaningful work exists, and the resume machinery (continuation prompting, unresumable-session fallbacks) isn't worth buying back the occasional interrupted session. Simplicity over token thrift.
+
 ### Harness Model Configuration
 
 The workflow engine supports three AI harnesses: Claude, Codex, and Gemini. Each harness is a different CLI binary with its own stream format, but they all accept a `--model` flag to select which model to use.
@@ -291,6 +295,9 @@ Job types are referenced in the harness config (per-namespace) and stamped onto 
 `CLAUDE.md` ships with every `npx claude-comms` client install. It is the **Claude-specific auto-injected context** — so its purpose is inherently Claude-scoped, and Claude Code's harness carries the worst default habits of the supported harnesses (sed/grep/cat bans, todo noise, context bloat). The file's job is therefore to **override bad harness prompting**, not to add project rules on top of good defaults.
 
 A concrete instance: the harness Bash guidance discourages `grep`/`sed`/`cat`/`awk` *"unless explicitly instructed."* That carve-out is the lever. CLAUDE.md **blesses read-side bash kludging wholesale** (inspection, `git show <sha>:path`, `jq`, multi-fact recon, word-diffs) — which *threads* the harness's own escape clause rather than fighting it. The seam: **read-side bash is blessed; write-side mutations still go through the dedicated Edit/Write tools** so the harness's file-state tracking and the user's review/diff affordances survive. Every captured friction in this class is read-side, so this costs nothing.
+
+### Context Curation — Self-Discovery Over a Librarian
+An earlier design used a "librarian" agent to curate the context injected into each agent. It was retired in favor of the current model: **minimal injected why-layer + mandated self-discovery** (read the mental model, tree the repo, search from there). The reason mirrors the hindsight-relevance bias: which 5% of the repo matters for a task is only knowable by traversing it — an ex-ante curator guesses no better than the agent, but a curator's misses are silent while a self-discovering agent can keep digging. The calibration mandate is the load-bearing replacement for the librarian; that's why post-hoc "most of it wasn't relevant" signal never trims it.
 
 ### A Mandate Without a Tool Authors Friction
 When an AOP step *mandates* an action but ships no tool for it, agents faithfully hand-roll the mandated recipe — and that hand-rolling is the friction. The canonical case: `AOP.VALIDATE` mandated running lint/typecheck/test/build but shipped only a four-`nohup` recipe in `repo.md`, so every agent reinvented pid-poll loops. The fix is never to suppress the symptom downstream; it's to **ship the tool the mandate already assumes exists** and retarget the mandate at it.
@@ -350,6 +357,17 @@ Two biases are structural to friction-only capture and must be corrected for whe
 
 - **Blind to capability-as-strength.** The prompt asks for friction, so a *valued* capability never surfaces as a positive. A high count on a keyword like `kludged-bash` is **not** evidence the flexibility is bad — the system literally cannot emit "this was great." Flexibility being good and a friction keyword being loud are both true and not in tension; the friction is usually a *policy-environment conflict* (a rule bans the move while no alternative is shipped), not the capability itself.
 - **Citations over-claim mandate.** Reflectors routinely narrate self-imposed diligence and inherited *harness* rules as if they were repo-authored instructions (e.g. attributing the Bash sed-ban to "CLAUDE.md" when it lives in the harness; acting on "I must verify the committed blob" when no prompt says so). Always verify a painPoint's citation against the actual artifact before treating it as the originating layer — the real originator (and therefore the lever) is often a layer up or sideways from where the reflector pointed. This is the `reflection-causal-tracing` "confabulated citations" failure mode, generalized.
+- **Hindsight-relevance bias on mandated context.** Reflectors reliably report that mandated calibration reads (mental model, `tree`, guides) were "mostly irrelevant" — *after* delivering successfully with that context on board. Relevance is only knowable post-hoc: before reading, the agent doesn't know which 5% will matter, and the mandate's value includes everything it silently ruled out. Treat "this mandated read was waste" as expected exhaust, not as a vote to trim the mandate. Calibration mandates are priced ex-ante; they are never adjusted by post-hoc relevance audits.
+
+### Refinement Is Jam-Gated — No Autonomous Loop
+
+Reflection output never closes its own loop. Turning aggregated friction into edits at an originating layer (templates, AOP, CLAUDE.md, prompts) happens in a **jam between the user and the Steward** — reasoning over the reflections together — never as an autonomous refine step, and not even as machine-drafted diffs handed to the user for rubber-stamping. Structural reasons:
+
+- **Agents are poor harness authors from inside the harness.** Ironically, being an agent operating within the harness doesn't confer the perspective needed to prompt for one — a reflector reasons from a single trajectory and misattributes even the rules governing it (see confabulated citations, above).
+- **Additive bias compounds into a context tax.** A self-refining loop skews additive: each agent persists what "would have helped in their scenario," and every future agent eats the accumulated prompt. The one-scenario benefit is visible to the author; the fleet-wide tax is not.
+- **Hindsight-relevance whinges are not trim votes** (see analyst caveat above) — an auto-refiner would act on exactly this class of signal.
+
+The dive's deliverable therefore stops at diagnosis + ranked remedies with identified levers. Authoring the actual edit is jam-time work.
 
 ### Job Types That Reflect
 plan, implement, review, uat, pm, document. **Not chat** — chat reflection is on-demand by user request only.
