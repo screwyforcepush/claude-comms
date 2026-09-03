@@ -53,8 +53,9 @@ to `~/.android-toolchain` and does **not** touch your machine's default Node/JDK
 
 ## 2. First-run configuration
 
-On first launch the app opens a config screen with **three fields**. All three are stored in
-app-private storage and are entered once.
+On first launch the app opens its config screen (the `ConfigActivity` first-run flow) with
+**three fields**. All three are stored in app-private storage (`SharedPreferences`, and the
+app has `allowBackup=false` so these never leave the device) and are entered once.
 
 | Field | What it does | Value |
 |---|---|---|
@@ -122,7 +123,11 @@ not a shell change.
 
 - Dictating an inline reply from a notification posts your text to that thread as a normal
   user chat message (same `chatMessages:add` → `chatJobs:trigger` path a typed web-UI message
-  uses), which triggers the usual assistant response.
+  uses), which triggers the usual assistant response. A sent reply appears back in the same
+  MessagingStyle conversation as your own line.
+- **If a reply can't be delivered** (no network, or config missing), the notification appends
+  a **"Reply failed - open the app"** line instead of silently dropping it — re-open the app
+  and try again from there.
 - **Hearing** a rendition and **dictating a reply** leave the thread **unread** — you can come
   back later and read the real message with its tables/code/links intact.
 - **Tapping** a notification opens that thread in the wrapped web UI, which marks it read
