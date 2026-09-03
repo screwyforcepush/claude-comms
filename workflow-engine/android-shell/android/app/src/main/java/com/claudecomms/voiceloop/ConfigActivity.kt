@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputType
+import android.util.Log
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -37,6 +38,11 @@ class ConfigActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatusText()
+        val prefs = AppPrefs(this)
+        if (notificationsAvailable() && prefs.areNotificationsBlocked()) {
+            prefs.setNotificationsBlocked(blocked = false)
+            nudgeFeedListenerAfterPermissionUpdate()
+        }
     }
 
     private fun buildContentView() {
@@ -114,8 +120,13 @@ class ConfigActivity : AppCompatActivity() {
                 password = passwordInput.text.toString(),
                 uiUrl = uiUrlInput.text.toString(),
             )
-            AppPrefs(this).setNotificationsBlocked(blocked = false)
             ConvexHolder.configure(config)
+            if (notificationsAvailable()) {
+                AppPrefs(this).setNotificationsBlocked(blocked = false)
+                nudgeFeedListenerAfterPermissionUpdate()
+            } else {
+                AppPrefs(this).setNotificationsBlocked(blocked = true)
+            }
             startActivity(Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             })
@@ -167,7 +178,7 @@ class ConfigActivity : AppCompatActivity() {
     }
 
     private fun updateStatusText() {
-        val notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
+        val notificationsEnabled = notificationsAvailable()
         notificationStatus.text = if (notificationsEnabled) {
             "Notifications enabled"
         } else {
@@ -183,6 +194,34 @@ class ConfigActivity : AppCompatActivity() {
         }
     }
 
+    private fun notificationsAvailable(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) return false
+        }
+
+        return NotificationManagerCompat.from(this).areNotificationsEnabled()
+    }
+
+    private fun nudgeFeedListenerAfterPermissionUpdate() {
+        val config = AppPrefs.getConfig(this) ?: return
+        ConvexHolder.configure(config)
+        startFeedListenerService(FeedListenerService.ACTION_PERMISSION_UPDATED)
+    }
+
+    private fun startFeedListenerService(action: String) {
+        val serviceIntent = Intent(this, FeedListenerService::class.java).setAction(action)
+
+        try {
+            ContextCompat.startForegroundService(this, serviceIntent)
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Feed listener service could not be nudged", error)
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -191,10 +230,16 @@ class ConfigActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_POST_NOTIFICATIONS) {
             updateStatusText()
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            if (granted && notificationsAvailable()) {
+                AppPrefs(this).setNotificationsBlocked(blocked = false)
+                nudgeFeedListenerAfterPermissionUpdate()
+            }
         }
     }
 
     private companion object {
+        private const val TAG = "VoiceLoopConfig"
         const val REQUEST_POST_NOTIFICATIONS = 20_001
     }
 }

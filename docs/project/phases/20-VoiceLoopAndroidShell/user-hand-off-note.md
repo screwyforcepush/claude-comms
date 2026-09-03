@@ -62,7 +62,10 @@ app-private storage and are entered once.
 | **Admin password** | The single-user password that gates all Convex access (same one the web PWA login wall uses). | your admin password |
 | **Web UI URL** | The deployed Workflow Engine web UI the shell wraps in its WebView; a notification tap deep-links here with `?thread=<id>`. | your deployed UI URL |
 
-Tap **Save** to store them and enter the app.
+Tap **Save** to store them. If notifications are already enabled, the shell nudges the
+listener immediately and enters the app. If notifications are still denied, the shell keeps
+you on the config/permission screen so pending feed rows can be recovered as soon as you
+grant access.
 
 **Auto-seeded web login:** the shell injects the Convex URL and password into the wrapped
 WebView's `localStorage` under the keys `convexUrl` and `adminPassword` (the exact keys the
@@ -76,7 +79,8 @@ do not log in a second time.
 When prompted, allow notifications (or use the **Enable notifications** button on the config
 screen). If notification permission is denied, incoming feed rows are held **pending** — the
 shell will not acknowledge them or advance its feed cursor, so nothing is lost; it resumes
-posting once permission is granted.
+posting once permission is granted. Granting permission from the config screen immediately
+nudges the listener to re-drain those pending rows.
 
 ---
 

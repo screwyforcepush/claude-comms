@@ -73,6 +73,32 @@ class AppPrefs(context: Context) {
         prefs.edit().remove(KEY_FEED_CURSOR_BITS).apply()
     }
 
+    fun isFeedInitialized(): Boolean =
+        prefs.getBoolean(KEY_FEED_INITIALIZED, false)
+
+    fun setFeedInitialized(initialized: Boolean) {
+        prefs.edit().putBoolean(KEY_FEED_INITIALIZED, initialized).commit()
+    }
+
+    fun postedButUnackedIds(): Set<String> =
+        prefs.getStringSet(KEY_POSTED_BUT_UNACKED_IDS, emptySet()).orEmpty().toSet()
+
+    fun rememberPostedButUnacked(ids: List<String>) {
+        if (ids.isEmpty()) return
+        val updated = postedButUnackedIds() + ids
+        prefs.edit()
+            .putStringSet(KEY_POSTED_BUT_UNACKED_IDS, updated)
+            .commit()
+    }
+
+    fun clearPostedButUnacked(ids: List<String>) {
+        if (ids.isEmpty()) return
+        val updated = postedButUnackedIds() - ids.toSet()
+        prefs.edit()
+            .putStringSet(KEY_POSTED_BUT_UNACKED_IDS, updated)
+            .commit()
+    }
+
     fun setNotificationsBlocked(blocked: Boolean, reason: String? = null) {
         prefs.edit()
             .putBoolean(KEY_NOTIFICATIONS_BLOCKED, blocked)
@@ -92,6 +118,8 @@ class AppPrefs(context: Context) {
         const val KEY_ADMIN_PASSWORD = "adminPassword"
         const val KEY_UI_URL = "uiUrl"
         const val KEY_FEED_CURSOR_BITS = "feedCursorBits"
+        const val KEY_FEED_INITIALIZED = "feedInitialized"
+        const val KEY_POSTED_BUT_UNACKED_IDS = "postedButUnackedIds"
         const val KEY_NOTIFICATIONS_BLOCKED = "notificationsBlocked"
         const val KEY_NOTIFICATIONS_BLOCKED_REASON = "notificationsBlockedReason"
         const val DEFAULT_CONVEX_URL = "https://utmost-vulture-618.convex.cloud"

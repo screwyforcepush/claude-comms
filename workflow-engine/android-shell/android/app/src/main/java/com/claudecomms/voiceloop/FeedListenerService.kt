@@ -24,6 +24,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 
@@ -33,7 +34,6 @@ class FeedListenerService : Service() {
     private lateinit var poster: NotificationPoster
     private lateinit var connectivityManager: ConnectivityManager
     private var listenerJob: Job? = null
-    private var initialDrainAttempted = false
     private var networkCallbackRegistered = false
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -58,7 +58,12 @@ class FeedListenerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (listenerJob?.isActive != true) {
+        val shouldRestart = listenerJob?.isActive == true &&
+            (intent?.action == ACTION_PERMISSION_UPDATED || prefs.areNotificationsBlocked())
+
+        if (shouldRestart) {
+            restartListener(intent?.action ?: "service start while blocked")
+        } else if (listenerJob?.isActive != true) {
             listenerJob = serviceScope.launch {
                 runListener()
             }
@@ -94,14 +99,12 @@ class FeedListenerService : Service() {
         }
 
         val client = convexClient(config)
-        if (!initialDrainAttempted && prefs.getFeedCursor() == null) {
-            drainFreshInstall(client, config.password)
-            initialDrainAttempted = true
-        }
-
         var retryDelayMs = INITIAL_RETRY_DELAY_MS
         while (serviceScope.isActive) {
             try {
+                if (!prefs.isFeedInitialized()) {
+                    drainFreshInstall(client, config.password)
+                }
                 collectFeed(client, config.password)
                 retryDelayMs = INITIAL_RETRY_DELAY_MS
             } catch (advanced: CursorAdvanced) {
@@ -117,31 +120,18 @@ class FeedListenerService : Service() {
     }
 
     private suspend fun drainFreshInstall(client: ConvexClient, password: String) {
-        var cursor: Double? = null
-        var latestCursor: Double? = null
-
-        while (serviceScope.isActive) {
-            val page = client
-                .subscribe<FeedPage>(
-                    "notifications:feed",
-                    FeedProtocol.feedArgs(
-                        password = password,
-                        cursor = cursor,
-                        limit = FeedProtocol.FRESH_INSTALL_DRAIN_LIMIT,
-                    ),
-                )
-                .first()
-                .getOrThrow()
-
-            val nextCursor = page.nextCursor
-            if (nextCursor == null) {
-                break
-            }
-            latestCursor = nextCursor
-            cursor = nextCursor
-        }
-
-        latestCursor?.let { prefs.setFeedCursor(it) }
+        FeedProtocol.drainFreshInstall(
+            password = password,
+            feedInitialized = prefs.isFeedInitialized(),
+            fetchPage = { args ->
+                client
+                    .subscribe<FeedPage>("notifications:feed", args)
+                    .first()
+                    .getOrThrow()
+            },
+            persistCursor = { cursor -> prefs.setFeedCursor(cursor) },
+            markFeedInitialized = { prefs.setFeedInitialized(true) },
+        )
     }
 
     private suspend fun collectFeed(client: ConvexClient, password: String) {
@@ -158,7 +148,8 @@ class FeedListenerService : Service() {
             .collect { result ->
                 result
                     .onSuccess { page ->
-                        if (processLivePage(client, password, page)) {
+                        val result = processLivePage(client, password, page)
+                        if (result.advancedCursor != null) {
                             throw CursorAdvanced()
                         }
                     }
@@ -172,48 +163,48 @@ class FeedListenerService : Service() {
         client: ConvexClient,
         password: String,
         page: FeedPage,
-    ): Boolean {
+    ): com.claudecomms.voiceloop.core.LivePageResult {
         if (page.rows.isEmpty()) {
-            return false
+            return FeedProtocol.processLivePage(page, effects = liveEffects(client, password))
         }
 
         if (!poster.canPostMessages()) {
             updateBlockedState(blocked = true)
-            return false
+            return FeedProtocol.processLivePage(
+                page = FeedPage(rows = emptyList(), nextCursor = null),
+                effects = liveEffects(client, password),
+            )
         }
         updateBlockedState(blocked = false)
 
-        val ackIds = mutableListOf<String>()
-        var hadPostFailure = false
-
-        for (row in page.rows) {
-            if (row.deliveredAt != null) {
-                ackIds += row.id
-                continue
-            }
-
-            if (poster.post(row)) {
-                ackIds += row.id
-            } else {
-                hadPostFailure = true
-            }
-        }
-
-        if (ackIds.isNotEmpty()) {
-            val acked = markDelivered(client, password, ackIds)
-            if (!acked) {
-                return false
-            }
-        }
-
-        if (hadPostFailure) {
-            return false
-        }
-
-        val nextCursor = page.nextCursor ?: return false
-        prefs.setFeedCursor(nextCursor)
-        return true
+        return FeedProtocol.processLivePage(
+            page = page,
+            effects = liveEffects(client, password),
+        )
     }
+
+    private fun liveEffects(client: ConvexClient, password: String): FeedProtocol.LiveEffects =
+        object : FeedProtocol.LiveEffects {
+            override fun postedButUnackedIds(): Set<String> = prefs.postedButUnackedIds()
+
+            override fun post(row: com.claudecomms.voiceloop.core.FeedRow): Boolean =
+                poster.post(row)
+
+            override fun rememberPostedButUnacked(ids: List<String>) {
+                prefs.rememberPostedButUnacked(ids)
+            }
+
+            override fun markDelivered(ids: List<String>): Boolean =
+                runBlocking { this@FeedListenerService.markDelivered(client, password, ids) }
+
+            override fun clearPostedButUnacked(ids: List<String>) {
+                prefs.clearPostedButUnacked(ids)
+            }
+
+            override fun persistCursor(cursor: Double) {
+                prefs.setFeedCursor(cursor)
+            }
+        }
 
     private suspend fun markDelivered(
         client: ConvexClient,
@@ -246,8 +237,12 @@ class FeedListenerService : Service() {
             "Feed listener active"
         }
 
-        val tapIntent = packageManager.getLaunchIntentForPackage(packageName)
-            ?: Intent(this, MainActivity::class.java)
+        val tapIntent = if (blocked) {
+            Intent(this, ConfigActivity::class.java)
+        } else {
+            packageManager.getLaunchIntentForPackage(packageName)
+                ?: Intent(this, MainActivity::class.java)
+        }
         val pendingIntent = android.app.PendingIntent.getActivity(
             this,
             SERVICE_NOTIFICATION_ID,
@@ -287,9 +282,12 @@ class FeedListenerService : Service() {
         return app.convexHolder.clientFor(config.convexUrl)
     }
 
+    // Thrown only inside collection and caught before CancellationException to force a clean resubscribe.
     private class CursorAdvanced : CancellationException()
 
-    private companion object {
+    companion object {
+        const val ACTION_PERMISSION_UPDATED = "com.claudecomms.voiceloop.PERMISSION_UPDATED"
+
         private const val TAG = "FeedListenerService"
         private const val SERVICE_CHANNEL_ID = "voice_loop_feed_service"
         private const val SERVICE_NOTIFICATION_ID = 9001

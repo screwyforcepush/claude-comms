@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
 class FeedProtocolTest {
@@ -107,7 +108,7 @@ class FeedProtocolTest {
     }
 
     @Test
-    fun freshInstallDrainKeepsLastNonNullCursorAndPostsNothing() {
+    fun freshInstallDrainKeepsLastNonNullCursorAndPostsNothing() = runBlocking {
         val pages = ArrayDeque(
             listOf(
                 FeedPage(
@@ -123,18 +124,23 @@ class FeedProtocolTest {
         )
         val fetchArgs = mutableListOf<Map<String, Any?>>()
         val persisted = mutableListOf<Double>()
+        var feedInitialized = false
 
         val result = FeedProtocol.drainFreshInstall(
             password = "pw",
+            feedInitialized = feedInitialized,
             fetchPage = { args ->
                 fetchArgs += args
                 pages.removeFirst()
             },
             persistCursor = { persisted += it },
+            markFeedInitialized = { feedInitialized = true },
         )
 
         assertEquals(20.5, result.cursorToPersist)
         assertEquals(3, result.pagesRead)
+        assertTrue(result.drainRan)
+        assertTrue(feedInitialized)
         assertEquals(listOf(20.5), persisted)
         assertNull(fetchArgs[0]["cursor"])
         assertEquals(10.25, fetchArgs[1]["cursor"])
@@ -143,20 +149,104 @@ class FeedProtocolTest {
     }
 
     @Test
-    fun emptyTableFreshInstallLeavesCursorNull() {
+    fun emptyTableFreshInstallLeavesCursorNull() = runBlocking {
         var persistCalled = false
+        var feedInitialized = false
 
         val result = FeedProtocol.drainFreshInstall(
             password = "pw",
+            feedInitialized = feedInitialized,
             fetchPage = { FeedPage(rows = emptyList(), nextCursor = null) },
             persistCursor = {
                 persistCalled = true
             },
+            markFeedInitialized = { feedInitialized = true },
         )
 
         assertNull(result.cursorToPersist)
         assertEquals(1, result.pagesRead)
+        assertTrue(result.drainRan)
         assertFalse(persistCalled)
+        assertTrue(feedInitialized)
+    }
+
+    @Test
+    fun restartAfterEmptyFreshInstallDrainDoesNotTreatLaterRowsAsBacklog() = runBlocking {
+        var cursor: Double? = null
+        var feedInitialized = false
+
+        val firstStart = FeedProtocol.drainFreshInstall(
+            password = "pw",
+            feedInitialized = feedInitialized,
+            fetchPage = { FeedPage(rows = emptyList(), nextCursor = null) },
+            persistCursor = { cursor = it },
+            markFeedInitialized = { feedInitialized = true },
+        )
+
+        assertTrue(firstStart.drainRan)
+        assertNull(cursor)
+        assertTrue(feedInitialized)
+
+        var restartFetchedBacklog = false
+        val restart = FeedProtocol.drainFreshInstall(
+            password = "pw",
+            feedInitialized = feedInitialized,
+            fetchPage = {
+                restartFetchedBacklog = true
+                FeedPage(
+                    rows = listOf(row(id = "new-live-row", creationTime = 77.25)),
+                    nextCursor = 77.25,
+                )
+            },
+            persistCursor = { cursor = it },
+            markFeedInitialized = { feedInitialized = true },
+        )
+
+        assertFalse(restart.drainRan)
+        assertEquals(0, restart.pagesRead)
+        assertFalse(restartFetchedBacklog)
+        assertNull(cursor)
+
+        val effects = RecordingLiveEffects()
+        val liveResult = FeedProtocol.processLivePage(
+            FeedPage(
+                rows = listOf(row(id = "new-live-row", creationTime = 77.25)),
+                nextCursor = 77.25,
+            ),
+            effects = effects,
+        )
+
+        assertEquals(77.25, liveResult.advancedCursor)
+        assertEquals(listOf("new-live-row"), liveResult.postedIds)
+        assertEquals(listOf("new-live-row"), liveResult.acknowledgedIds)
+    }
+
+    @Test
+    fun postedButUnackedRowsAreReAckedWithoutRePostingAfterMarkDeliveredFailure() {
+        val effects = RecordingLiveEffects(markDeliveredSucceeds = false, recordDurableEvents = true)
+        val page = FeedPage(
+            rows = listOf(row(id = "note-1", creationTime = 101.25)),
+            nextCursor = 101.25,
+        )
+
+        val firstAttempt = FeedProtocol.processLivePage(page, effects = effects)
+
+        assertTrue(firstAttempt.blocked)
+        assertEquals(FeedProtocol.BlockedReason.MARK_DELIVERED_FAILED, firstAttempt.blockedReason)
+        assertEquals(setOf("note-1"), effects.postedButUnackedIds())
+        assertEquals(listOf("post:note-1", "remember:note-1", "ack:note-1"), effects.events)
+
+        effects.markDeliveredSucceeds = true
+        effects.events.clear()
+
+        val retry = FeedProtocol.processLivePage(page, effects = effects)
+
+        assertFalse(retry.blocked)
+        assertEquals(101.25, retry.advancedCursor)
+        assertEquals(emptyList<String>(), retry.postedIds)
+        assertEquals(listOf("note-1"), retry.acknowledgedIds)
+        assertEquals(emptySet<String>(), effects.postedButUnackedIds())
+        assertEquals(listOf("ack:note-1", "clear:note-1", "persist:101.25"), effects.events)
     }
 
     @Test
@@ -276,9 +366,11 @@ class FeedProtocolTest {
 
     private class RecordingLiveEffects(
         private val postResults: Map<String, Boolean> = emptyMap(),
-        private val markDeliveredSucceeds: Boolean = true,
+        var markDeliveredSucceeds: Boolean = true,
+        private val recordDurableEvents: Boolean = false,
     ) : FeedProtocol.LiveEffects {
         val events = mutableListOf<String>()
+        private val postedButUnacked = linkedSetOf<String>()
 
         override fun post(row: FeedRow): Boolean {
             events += "post:${row.id}"
@@ -292,6 +384,22 @@ class FeedProtocolTest {
 
         override fun persistCursor(cursor: Double) {
             events += "persist:$cursor"
+        }
+
+        override fun postedButUnackedIds(): Set<String> = postedButUnacked.toSet()
+
+        override fun rememberPostedButUnacked(ids: List<String>) {
+            postedButUnacked += ids
+            if (recordDurableEvents && ids.isNotEmpty()) {
+                events += "remember:${ids.joinToString(",")}"
+            }
+        }
+
+        override fun clearPostedButUnacked(ids: List<String>) {
+            postedButUnacked -= ids.toSet()
+            if (recordDurableEvents && ids.isNotEmpty()) {
+                events += "clear:${ids.joinToString(",")}"
+            }
         }
     }
 }

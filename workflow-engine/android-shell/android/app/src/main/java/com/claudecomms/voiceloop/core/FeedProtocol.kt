@@ -55,11 +55,17 @@ object FeedProtocol {
         )
 
         val postedIds = mutableListOf<String>()
-        val idsToAck = mutableListOf<String>()
+        val idsToAck = linkedSetOf<String>()
+        val postedButUnackedIds = effects.postedButUnackedIds().toMutableSet()
         var hadPostFailure = false
 
         for (row in page.rows) {
             if (row.deliveredAt != null) {
+                idsToAck += row.id
+                continue
+            }
+
+            if (row.id in postedButUnackedIds) {
                 idsToAck += row.id
                 continue
             }
@@ -69,11 +75,14 @@ object FeedProtocol {
                 continue
             }
 
+            effects.rememberPostedButUnacked(listOf(row.id))
+            postedButUnackedIds += row.id
             postedIds += row.id
             idsToAck += row.id
         }
 
-        if (idsToAck.isNotEmpty() && !effects.markDelivered(idsToAck)) {
+        val idsToAckList = idsToAck.toList()
+        if (idsToAckList.isNotEmpty() && !effects.markDelivered(idsToAckList)) {
             return LivePageResult(
                 advancedCursor = null,
                 postedIds = postedIds.toList(),
@@ -83,11 +92,15 @@ object FeedProtocol {
             )
         }
 
+        if (idsToAckList.isNotEmpty()) {
+            effects.clearPostedButUnacked(idsToAckList)
+        }
+
         if (hadPostFailure) {
             return LivePageResult(
                 advancedCursor = null,
                 postedIds = postedIds.toList(),
-                acknowledgedIds = idsToAck.toList(),
+                acknowledgedIds = idsToAckList,
                 shouldResubscribe = false,
                 blockedReason = BlockedReason.POST_FAILED,
             )
@@ -98,17 +111,27 @@ object FeedProtocol {
         return LivePageResult(
             advancedCursor = nextCursor,
             postedIds = postedIds.toList(),
-            acknowledgedIds = idsToAck.toList(),
+            acknowledgedIds = idsToAckList,
             shouldResubscribe = page.rows.size.toDouble() >= limit,
             blockedReason = null,
         )
     }
 
-    fun drainFreshInstall(
+    suspend fun drainFreshInstall(
         password: String,
-        fetchPage: (Map<String, Any?>) -> FeedPage,
+        feedInitialized: Boolean = false,
+        fetchPage: suspend (Map<String, Any?>) -> FeedPage,
         persistCursor: (Double) -> Unit,
+        markFeedInitialized: () -> Unit = {},
     ): FreshInstallDrainResult {
+        if (feedInitialized) {
+            return FreshInstallDrainResult(
+                cursorToPersist = null,
+                pagesRead = 0,
+                drainRan = false,
+            )
+        }
+
         var cursor: Double? = null
         var lastNonNullCursor: Double? = null
         var pagesRead = 0
@@ -124,10 +147,12 @@ object FeedProtocol {
         if (lastNonNullCursor != null) {
             persistCursor(lastNonNullCursor)
         }
+        markFeedInitialized()
 
         return FreshInstallDrainResult(
             cursorToPersist = lastNonNullCursor,
             pagesRead = pagesRead,
+            drainRan = true,
         )
     }
 
@@ -137,9 +162,15 @@ object FeedProtocol {
     }
 
     interface LiveEffects {
+        fun postedButUnackedIds(): Set<String> = emptySet()
+
         fun post(row: FeedRow): Boolean
 
+        fun rememberPostedButUnacked(ids: List<String>) {}
+
         fun markDelivered(ids: List<String>): Boolean
+
+        fun clearPostedButUnacked(ids: List<String>) {}
 
         fun persistCursor(cursor: Double)
     }
@@ -159,4 +190,5 @@ data class LivePageResult(
 data class FreshInstallDrainResult(
     val cursorToPersist: Double?,
     val pagesRead: Int,
+    val drainRan: Boolean,
 )

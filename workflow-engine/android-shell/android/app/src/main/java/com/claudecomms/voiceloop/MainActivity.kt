@@ -1,10 +1,13 @@
 package com.claudecomms.voiceloop
 
-import android.content.ComponentName
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
@@ -30,13 +33,21 @@ class MainActivity : BridgeActivity() {
 
         runtimeConfig = config
         ConvexHolder.configure(config)
+
+        if (!notificationsAvailable()) {
+            startFeedListenerService()
+            startConfigActivity()
+            finish()
+            return
+        }
+
         pendingThreadId = extractThreadId(intent)
         needsRuntimeLoad = true
 
         super.onCreate(savedInstanceState)
 
         installCredentialInjection(config)
-        startFeedListenerService()
+        startFeedListenerService(permissionRecoveryActionIfBlocked())
     }
 
     override fun onStart() {
@@ -58,11 +69,23 @@ class MainActivity : BridgeActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        if (AppPrefs.getConfig(this) == null) {
-            startActivity(Intent(this, ConfigActivity::class.java))
+        val config = AppPrefs.getConfig(this)
+        if (config == null) {
+            startConfigActivity()
+            finish()
             return
         }
 
+        runtimeConfig = config
+        ConvexHolder.configure(config)
+        if (!notificationsAvailable()) {
+            startFeedListenerService()
+            startConfigActivity()
+            finish()
+            return
+        }
+
+        startFeedListenerService(permissionRecoveryActionIfBlocked())
         pendingThreadId = extractThreadId(intent)
         needsRuntimeLoad = true
         if (started) {
@@ -115,15 +138,39 @@ class MainActivity : BridgeActivity() {
         webView.loadUrl(targetUrl)
     }
 
-    private fun startFeedListenerService() {
-        val component = ComponentName(packageName, "$packageName.FeedListenerService")
-        val serviceIntent = Intent().setComponent(component)
+    private fun startConfigActivity() {
+        startActivity(Intent(this, ConfigActivity::class.java))
+    }
+
+    private fun startFeedListenerService(action: String? = null) {
+        val serviceIntent = Intent(this, FeedListenerService::class.java).apply {
+            action?.let { setAction(it) }
+        }
 
         try {
             ContextCompat.startForegroundService(this, serviceIntent)
         } catch (error: RuntimeException) {
             Log.w(TAG, "Feed listener service could not be started", error)
         }
+    }
+
+    private fun permissionRecoveryActionIfBlocked(): String? =
+        if (AppPrefs(this).areNotificationsBlocked()) {
+            FeedListenerService.ACTION_PERMISSION_UPDATED
+        } else {
+            null
+        }
+
+    private fun notificationsAvailable(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) return false
+        }
+
+        return NotificationManagerCompat.from(this).areNotificationsEnabled()
     }
 
     private fun extractThreadId(intent: Intent?): String? =
