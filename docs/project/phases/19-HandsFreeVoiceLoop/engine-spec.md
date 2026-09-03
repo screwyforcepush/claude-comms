@@ -1,7 +1,7 @@
 # Hands-Free Voice Loop — Engine Side (Spec)
 
 Phase: `19-HandsFreeVoiceLoop`
-Status: PLANNED
+Status: PLANNED — refined post-review (unique body temp path, collision-safe feed cursor, M1 fire-and-forget structural isolation, --disallowedTools fork hardening, empty-body server reject, global-toggle UI placement, fresh sessionId, non-claude hand-off caveat)
 Why-layer: `docs/project/spec/mental-model.md` § "Hands-Free Voice Loop (Mobile)" — read in full before implementing. All settled decisions (global toggle trigger, full-message rendition, reflection-pattern fork, Convex-as-only-pipe, no FCM) live there and are **not** relitigated here.
 
 ## Purpose
@@ -44,9 +44,14 @@ notify-spawn.ts (throwaway process, swallows ALL errors — debug log only):
 
 forked agent (already holds the full response in its session context):
   → npx tsx notify.ts --help          (learns interface)
-  → writes rendition body to /tmp/notify-<threadId>.txt
-  → npx tsx notify.ts --thread-id <id> --input /tmp/notify-<threadId>.txt
+  → writes rendition body to a UNIQUE per-invocation temp path (see below)
+  → npx tsx notify.ts --thread-id <id> --input <that path>
   → exits after "ok"
+
+  Body temp path is per-invocation unique — NOT /tmp/notify-<threadId>.txt.
+  notify-spawn.ts mints the path (e.g. /tmp/notify-<threadId>-<pid>-<rand>.txt)
+  and renders it into the template as {{BODY_PATH}}, so overlapping forks on the
+  same thread can never clobber each other's body file.
 
 notify.ts:
   → validates body (non-empty; >5000 chars ⇒ truncate with warning, still post)
@@ -59,7 +64,11 @@ notifications.post (server):
   → insert row
 ```
 
-Toggle OFF, guardian mode, or assignment (non-chat) jobs: the gate short-circuits — no fork, no row, chat flow untouched. Any failure anywhere downstream of the runner hook is invisible to the thread: the spawn is detached, notify-spawn swallows everything, fork output is captured nowhere.
+Two distinct gates, deliberately at different layers (do not conflate them):
+- **Runner-side gate** (`shouldNotify`, synchronous, no Convex I/O): guardian mode, missing sessionId, non-claude harness, and non-chat/assignment jobs are refused here — no `notify-spawn` process is even spawned. The runner never queries the toggle (keeps Convex I/O off the onComplete hot path).
+- **Child-side toggle check** (inside the already-detached `notify-spawn.ts`): when the toggle is OFF, the throwaway child exits *before* `claude --fork-session` — no claude fork, no row. A `node` process starts and immediately exits; that is the accepted cost of keeping the toggle query off the runner hot path, and still satisfies "toggle OFF ⇒ no fork spawned" (the *claude fork* is what the cucumber means).
+
+Any failure anywhere downstream of the runner hook is invisible to the thread: the spawn is detached, notify-spawn swallows everything, fork output is captured nowhere.
 
 ### Key components
 
@@ -78,10 +87,12 @@ notifications: defineTable({
   title: v.string(),                  // "<namespace> · <thread topic>", composed server-side
   body: v.string(),                   // listenable rendition, ≤5000 chars
   deliveredAt: v.optional(v.number()),// shell ack marker (survives device reinstall)
-  createdAt: v.number(),
+  createdAt: v.number(),               // display timestamp; NOT the feed cursor
 })
-  .index("by_created", ["createdAt"])
   .index("by_thread", ["threadId"]),
+  // Feed pagination uses Convex's built-in `by_creation_time` index (`_creationTime`,
+  // unique + monotonic) as the collision-safe cursor — no explicit createdAt index needed
+  // for the feed. Add `by_created` only if a createdAt-ordered view is separately required.
 ```
 
 **2. `convex/settings.ts`** (new module; all functions password-gated per existing auth pattern)
@@ -90,17 +101,19 @@ notifications: defineTable({
 - Single-user, cross-namespace global by design (mental-model: toggle is the "I'm stepping away" gesture, not per-namespace state).
 
 **3. `convex/notifications.ts`** (new module)
-- `post` mutation `{ password, threadId, body }` → composes title from thread+namespace, truncates body at 5000, inserts. Throws only on bad threadId/auth (CLI surfaces error; fork dies silently — acceptable, fire-and-forget).
-- `feed` query `{ password, since?: number, limit?: number (default 50, capped) }` → rows with `createdAt > since` ascending via `by_created`. This is the shell's live-subscription shape: subscribe with the last local cursor, receive "new rows since X" on every invalidation.
+- `post` mutation `{ password, threadId, body }` → composes title from thread+namespace, truncates body at 5000, inserts. **Trims the body and rejects empty/whitespace-only** (defense in depth — the CLI validates too, but a public password-gated mutation must not accept an empty row). Truncate-not-reject applies only to oversized *non-empty* bodies. Throws only on bad threadId/auth/empty-body (CLI surfaces error; fork dies silently — acceptable, fire-and-forget).
+- `feed` query `{ password, cursor?: <opaque>, limit?: number (default 50, capped) }` → the shell's live-subscription shape: subscribe with the last local cursor, receive "new rows since X" on every invalidation. **Cursor MUST be collision-safe** — a bare `createdAt > since` millisecond cursor can silently drop rows that share a millisecond across a `limit` page boundary, and the LATER Android-shell assignment builds directly on this contract (AC5), so a lossy cursor is expensive to walk back. Use a strictly-monotonic, unique cursor: prefer the row's Convex-native `_creationTime` (unique + monotonic per deployment) as the cursor value, queried over the built-in `by_creation_time` index with `.gt(cursor)`; return an opaque `nextCursor` (last row's cursor value) alongside the rows. (Composite `(createdAt, _id)` with boundary dedup is an acceptable alternative, but `_creationTime` is simpler and eliminates the collision class outright.) Extract the cursor encode/decode + "rows after cursor" boundary logic into a **pure, unit-tested helper** in `lib/notify-lib.ts`; the module documents the consumer contract inline (what the shell stores, what it sends back).
 - `markDelivered` mutation `{ password, ids: v.array(v.id("notifications")) }` → stamps `deliveredAt`. The shell acks after posting local notifications; `feed` + cursor stays the primary protocol, `deliveredAt` is the reinstall-safe backstop.
 
-**4. Web UI toggle** — `ChatSidebar` header row (next to the thread-list header, same register as the existing `config` QIcon button): one icon-button, no ceremony.
+**4. Web UI toggle** — one icon-button, no ceremony. **Exact placement:** the audio toggle is a **global** gesture (single cross-namespace setting), so it does NOT belong in the per-namespace accordion where the existing `config` QIcon lives (`ChatSidebar.js:135`). Place it in the **Conversations thread-list header** (`ChatSidebar.js:461`, currently title + count only) so it is always visible regardless of which namespace is expanded. Implementer confirms the exact line during trace; the invariant is "globally reachable without expanding a namespace."
 - New QIcon glyph (suggest `horn` — angular Quake-style sound horn; stroke-based, 24×24, miter joins, zero rounded corners, per QIcon.js conventions; no existing glyph fits).
 - State: `useQuery(api.settings.getAudioNotifications)` / `useMutation(api.settings.setAudioNotifications)`. ON = Fullbright torch color (torchFlicker acceptable), OFF = faint bone/stone — mirroring the pin-icon faint/highlighted affordance. `title`/`aria-label` ("Audio notifications on/off"), visible keyboard focus per Design Bar.
 - `api.js`: add `settings: { getAudioNotifications: "settings:getAudioNotifications", setAudioNotifications: "settings:setAudioNotifications" }`.
 
 **5. Runner hook** — `runner.ts`, mirroring `spawnReflection` (runner.ts:121-140):
 - New `maybeSpawnNotification(threadId, sessionId, mode, harness)`-shaped helper: gate via pure predicate `shouldNotify(...)` (lives in `lib/notify-lib.ts` so it's unit-testable), then detached/unref'd spawn of `notify-spawn.ts <threadId> <sessionId>`. Entire body in try/catch; silent on error.
+- **HARD INVARIANT (M1 — fire-and-forget cannot pollute the thread):** the `executeChatJob.onComplete` body is wrapped in an outer `try` whose `catch` posts a *system-error message into the thread* (`saveChatResponse("...system error...")`, runner.ts:876-884). `maybeSpawnNotification` MUST be structurally incapable of tripping that catch. Mirror `spawnReflection` exactly: internal `try/catch` **and** `child.on('error', …)` swallow, `detached:true` + `stdio:"ignore"` + `.unref()`, so even a synchronous `spawn` throw is absorbed inside the helper and never reaches the outer catch. A notify failure reaching runner.ts:876 would violate the "fork failure ⇒ thread untouched" cucumber — this is the single most important structural invariant in the WP.
+- **Session ID (C-Low):** pass the **fresh `sessionId` argument returned by `onComplete`**, not `chatContext.claudeSessionId` — the latter is `undefined` on the first turn of a new thread. `shouldNotify` treats missing sessionId ⇒ false.
 - Call sites, **after** `saveChatResponse`/`saveSessionId` so the chat flow is already committed:
   - `executeChatJob.onComplete` (runner.ts ~865-875) — the primary path (chatJobs table).
   - `executeJob`'s `isChat` branch `onComplete` (runner.ts ~475-486) — the jobs-table chat path (`jobType === "chat" | "product-owner"`, see `prompts.ts:425`). It also saves assistant responses into threads; hooking it is one extra call of the same helper and harmless if the path is dormant. (Implementer: confirm liveness; keep the hook regardless.)
@@ -108,6 +121,8 @@ notifications: defineTable({
 - **HARD GUARDRAIL:** code lands in git only. The live runner process is never restarted, killed, or signaled by any job. The user restarts it themselves post-assignment (mental-model § Self-Modification Awareness).
 
 **6. `notify-spawn.ts`** — mirrors reflect-spawn structure (debug-gated logging via `NOTIFY_DEBUG`, `terminate()` SIGTERM→SIGKILL, `runWithTimeout` with stdin prompt + EPIPE guard, `config.notifyTimeoutMs ?? 5min`). Differences from reflect-spawn: argv is `<threadId> <sessionId>` (no Convex job lookup needed — the runner already vetted mode/harness/session); the only Convex call is the toggle check (fail **closed**, unlike shouldReflect's fail-open — a lost notification is acceptable, a spurious fork is waste). Claude-only fork per the north star's named invocation; extension to codex/agy can copy reflect-spawn's dispatch later if chat ever runs non-claude.
+- Mints the **unique body temp path** (`/tmp/notify-<threadId>-<pid>-<rand>.txt`) and renders it into the template as `{{BODY_PATH}}` (see data-flow note above) — no shared per-thread path.
+- **Structural fork hardening (A Low-Med):** pass `--disallowedTools` (Edit/Write/etc.) to the notify fork so "output captured nowhere / never a thread message" is enforced structurally, not by prompt prose alone. The fork's only legitimate action is `Bash → npx tsx notify.ts`. Note: this is where notify-spawn *deliberately diverges* from `reflect-spawn` (which omits `--disallowedTools`); keep the divergence — the notify fork is more constrained than the reflect fork.
 
 **7. `notify.ts` CLI** — mirrors reflect.ts interaction pattern exactly: `--help` teaches everything, single invocation, validates input, one Convex write, prints `ok`, no retry/parsing machinery. Flags: `--thread-id <id> --input <path>` (+ `--help`). Input is a **plain UTF-8 text file** holding the body — deliberate deviation from reflect's JSON: the payload is one prose string, and JSON-escaping a 5k prose blob is exactly the `cli-shell-escaping` friction reflection data keeps flagging. Validation: file exists; non-empty after trim; >5000 chars ⇒ truncate + stderr warning + still post (delivery over perfection — the punchline is front-loaded by contract, so truncation degrades gracefully). Shared `MAX_BODY_CHARS = 5000` constant in `lib/notify-lib.ts`.
 
@@ -115,8 +130,8 @@ notifications: defineTable({
 - Framing: "You just posted a response in a conversation. The user is away from their screen and will *hear* this as a notification. Render **your previous response** (your most recent assistant message — it is in your context) into a listenable notification body." No thread/namespace names needed in the template — the title is composed server-side, and the forked session already contains the message.
 - Rendition contract, baked in verbatim from the north star: full substance, same voice, NOT a summary; strip code blocks, tables, URLs, markdown syntax noise; reference artifacts/files by name, never quote code; hard cap ~5000 chars; front-load the punchline — first ~200 chars are the collapsed preview and must carry the headline.
 - Prohibitions: do not post to the thread, do not modify project files, output is captured nowhere.
-- Submission steps (mirroring reflect.md): run `notify.ts --help` → write body to `/tmp/notify-{{THREAD_ID}}.txt` → invoke once → exit after `ok`.
-- Template var: `{{THREAD_ID}}` only.
+- Submission steps (mirroring reflect.md): run `notify.ts --help` → write body to `{{BODY_PATH}}` (the unique path minted by notify-spawn) → `npx tsx notify.ts --thread-id {{THREAD_ID}} --input {{BODY_PATH}}` → exit after `ok`.
+- Template vars: `{{THREAD_ID}}` and `{{BODY_PATH}}`.
 
 **9. Config** — `config.json`/`config.example.json`: optional `notifyTimeoutMs` (mirrors `reflectionTimeoutMs`).
 
@@ -151,6 +166,8 @@ Deliverables: everything under Architecture Design §1–9, plus unit tests (bel
 - `lib/notify-lib.test.ts` —
   - `shouldNotify`: jam ⇒ true; cook ⇒ true; guardian ⇒ false; missing sessionId ⇒ false; non-claude harness ⇒ false; completion-summary in jam/cook ⇒ true.
   - `prepareBody`: trims whitespace; empty/whitespace-only ⇒ error result; exactly 5000 ⇒ untouched; 5001 ⇒ truncated to 5000 + truncated flag.
+  - **feed cursor helper** (the collision-safe encode/decode + "rows after cursor" boundary logic): two rows sharing a `createdAt` millisecond straddling a page boundary are BOTH returned across consecutive cursor calls (no silent drop); empty/undefined cursor ⇒ from the beginning; round-trips `nextCursor`.
+- `lib/fork-args.test.ts` additionally: a one-line comment in `fork-args.ts` notes the deliberate divergence from `buildCommand`/reflect-spawn (fork-args intentionally omits `--disallowedTools`; the notify fork adds its own) so a future reader doesn't "fix" it into a regression (A-Low DRY note).
 - NO integration tests, NO E2E, NO uat jobs (hard guardrail — live verification is user-owned).
 
 **Success criteria:**
@@ -169,8 +186,9 @@ Concise note in the assignment's document output:
 3. Send a message in any jam/cook thread; wait for the assistant response.
 4. Watch the `notifications` table (Convex dashboard, prod `utmost-vulture-618`) for a row within ~1 minute: title `<namespace> · <thread topic>`, listenable body.
 5. Flip toggle OFF; confirm the next response produces no row.
+6. **Caveat to state explicitly (A-Low):** the audio loop is **claude-harness-only in v1**. Threads running on codex/agy harnesses produce no notification even with the toggle ON, silently — so verify in a claude-backed jam/cook thread.
 
-**Success criteria:** note contains the exact five steps above with real paths/URLs; states explicitly that no crew job performed live verification.
+**Success criteria:** note contains the exact steps above with real paths/URLs; states the claude-only caveat; states explicitly that no crew job performed live verification.
 
 ## Assignment-Level Success Criteria
 1. All seven north-star acceptance criteria satisfied (verified by review + unit tests, never live).
