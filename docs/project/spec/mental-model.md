@@ -199,6 +199,17 @@ The system routes based on thread mode:
 
 Switching between modes is instant and non-destructive. Nothing is lost.
 
+## Hands-Free Voice Loop (Mobile)
+
+The user increasingly drives jams by voice — dictating into the phone's chat input while away from a screen. The missing half is hearing responses. The phone assistant reads *notifications* aloud but cannot read in-app messages — so **push notifications are the audio surface for this system**, not merely an alert channel.
+
+- **A global audio toggle is the trigger — not read receipts.** When the user steps away, they flip the channel on: every subsequent assistant response in a jam/cook thread forks into a notification immediately. At the desk, toggle off, no pushes. Guardian traffic never triggers. Unread state stays fully decoupled: hearing a rendition does not mark the thread read, and neither does a dictated reply — the user may return later to read the real message with its tables, code, and links intact.
+- **The rendition is the full message made listenable — not a summary.** Same substance, same voice, with only the unlistenable forms stripped: no code blocks, tables, or URLs; artifacts referenced by name, never quoted. The platform's ~5k-character notification ceiling is the only hard cap; listenability is the target. Front-load the punchline — the collapsed notification preview surfaces only the first couple hundred characters of the body.
+- **The fork follows the reflection pattern, not the guardian pattern.** A throwaway fork of the thread session is handed a notification-posting tool (mirroring the reflect CLI shape), posts, and exits. Its output is captured nowhere — it never becomes a message in the thread, and the OG session never sees the traffic.
+- **The notification is navigable.** The title carries namespace + thread topic; tapping opens that thread; an inline reply field posts the dictated reply back as a normal user message.
+- **A thin native shell exists only because the web platform can't deliver this.** Reliable assistant read-aloud and inline reply require native notifications; a browser-posted web push can't provide them. The shell wraps the existing web UI (weakly-held preference — headless would also do); its entire job is native notifications. No fallback channel: if the runner is down, the audio channel is down along with everything else, which is acceptable.
+- **No third-party push infrastructure — Convex is the only pipe.** The shell does not use FCM/Firebase; it keeps its own live subscription to a notification feed in Convex (the same pipe the whole system already trusts) and posts local native notifications from it. Deliberate trade: a sideloaded personal app on a well-behaved device can just be allowed to keep running (battery-optimization exemption), and "app got killed = reopen it" is the same acceptable-failure posture as "runner down = bigger problems." The background subscription is scoped to the notification feed *only* — the UI's chatty telemetry subscriptions must never run in the background, or the battery cost stops being negligible. Replies ride the same pipe: a dictated reply is a direct Convex mutation from the shell.
+
 ## Non-Goals / Out of Scope
 
 - OAuth, BetterAuth, or complex authentication (single-user system)
@@ -497,6 +508,7 @@ V1 ones; V1 introspection tooling preserved for the dual-life window.
 
 ## Open Questions
 
+- **Assistant read-aloud depth.** The ~5k-char body fits the platform, but whether the phone assistant *speaks* the whole body or truncates its reading is undocumented — only real-device UAT will tell. If it truncates, the rendition target shrinks to match what actually gets voiced.
 - **Cross-namespace reflection access for the claude-comms Steward.** Per-namespace isolation is the default, but tooling friction signal lands in *every* namespace's reflections because tooling is upstream from here. Decide whether to amend the isolation principle for this Steward only, or keep it case-by-case.
 - **UI JavaScript is unlinted (parked backlog).** `workflow-engine/ui/js/` has no eslint config or type-check; the validate `build` gate's `node --check` is its *only* syntax guard (it exists precisely because a buildless static-deploy syntax error would white-screen prod uncaught). Giving the UI a real eslint pass would be strictly stronger and let the build gate shrink to file-presence + JSON-parse checks. Deferred deliberately — it's new coverage scope, not validate-CLI scope, and first-time-linting a legacy tree balloons. Revisit only if UI JS breakage recurs.
 - ~~**Rubric question rework.**~~ Resolved: greenfield rubricV2 via analysis assignment (see §RubricV2 — Greenfield, Evidence-Based). Will ship together with the items+narrative shape change.
