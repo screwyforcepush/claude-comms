@@ -335,7 +335,9 @@ function MobileChatHeader({
  */
 export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenIntrospection }) {
   const confirm = useConfirm();
-  const [selectedThreadId, setSelectedThreadId] = useState(null);
+  const [selectedThreadId, setSelectedThreadId] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('thread'); } catch { return null; }
+  });
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
 

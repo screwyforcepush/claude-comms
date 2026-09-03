@@ -1,0 +1,20 @@
+{
+  "name": "claude-comms-android-shell",
+  "version": "0.1.0",
+  "description": "Capacitor Android shell for Claude Comms mobile notifications.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cap": "cap",
+    "sync": "cap sync android",
+    "android:assembleDebug": "cd android && ./gradlew :app:assembleDebug"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.1",
+    "@capacitor/cli": "8.5.1",
+    "@capacitor/core": "8.5.1"
+  }
+}

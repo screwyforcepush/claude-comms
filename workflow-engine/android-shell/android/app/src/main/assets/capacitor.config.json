@@ -1,0 +1,8 @@
+{
+	"appId": "com.claudecomms.voiceloop",
+	"appName": "Claude Comms Voice Loop",
+	"webDir": "dist",
+	"android": {
+		"keepRunning": false
+	}
+}
