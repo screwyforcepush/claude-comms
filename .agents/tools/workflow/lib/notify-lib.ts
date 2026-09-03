@@ -51,7 +51,7 @@ export function prepareBody(rawBody: string): PreparedBody {
   if (body.length > MAX_BODY_CHARS) {
     return {
       ok: false,
-      error: `body is ${body.length} chars of max ${MAX_BODY_CHARS}. Nothing was posted. Shorten the rendition and re-invoke.`,
+      error: `body is ${body.length} chars of max ${MAX_BODY_CHARS}. Nothing was posted. Compress the rendition keeping the substance, rewrite the input file, and re-invoke — wc -c under ${MAX_BODY_CHARS} on the file is a safe pre-check.`,
     };
   }
   return { ok: true, body };

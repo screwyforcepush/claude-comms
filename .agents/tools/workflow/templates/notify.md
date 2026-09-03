@@ -25,7 +25,4 @@ nowhere; the only durable output is the notification row submitted by the CLI.
    ```
 3. Invoke:
    `npx tsx .agents/tools/workflow/notify.ts --thread-id {{THREAD_ID}} --input {{BODY_PATH}}`
-4. If the CLI rejects the body as over 5000 characters, nothing was posted:
-   shorten the rendition (compress, keep the substance), rewrite the file, and
-   re-invoke. `wc -c` under 5000 on the file is a safe pre-check.
-5. Exit after the CLI prints `ok`.
+4. Exit after the CLI prints `ok`.
