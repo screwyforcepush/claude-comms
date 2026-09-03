@@ -18,9 +18,11 @@ import type * as jobs from "../jobs.js";
 import type * as lib_groupTransition from "../lib/groupTransition.js";
 import type * as lib_harnessDefaults from "../lib/harnessDefaults.js";
 import type * as namespaces from "../namespaces.js";
+import type * as notifications from "../notifications.js";
 import type * as reflections from "../reflections.js";
 import type * as reflectionsV2 from "../reflectionsV2.js";
 import type * as scheduler from "../scheduler.js";
+import type * as settings from "../settings.js";
 
 import type {
   ApiFromModules,
@@ -39,9 +41,11 @@ declare const fullApi: ApiFromModules<{
   "lib/groupTransition": typeof lib_groupTransition;
   "lib/harnessDefaults": typeof lib_harnessDefaults;
   namespaces: typeof namespaces;
+  notifications: typeof notifications;
   reflections: typeof reflections;
   reflectionsV2: typeof reflectionsV2;
   scheduler: typeof scheduler;
+  settings: typeof settings;
 }>;
 
 /**

@@ -1,5 +1,5 @@
 // QIcon - Quake-themed iconography system
-// Ported from brandkit.jsx - All 27 icons with React.createElement syntax
+// Ported from brandkit.jsx, with UI-local glyphs added as needed.
 import React from 'react';
 
 // =============================================================
@@ -121,6 +121,24 @@ export const ICON_PATHS = {
     React.createElement('line', { x1: 4, y1: 8, x2: 20, y2: 8, stroke: 'currentColor', strokeWidth: sw * 0.6, opacity: 0.4 }),
     React.createElement('line', { x1: 4, y1: 16, x2: 20, y2: 16, stroke: 'currentColor', strokeWidth: sw * 0.6, opacity: 0.4 }),
     React.createElement('rect', { x: 10, y: 10, width: 4, height: 4, fill: 'currentColor', opacity: 0.6 })
+  ),
+  horn: (sw) => React.createElement(React.Fragment, null,
+    React.createElement('path', {
+      d: 'M4 10 L8 10 L15 5 L15 19 L8 14 L4 14Z',
+      stroke: 'currentColor',
+      strokeWidth: sw,
+      fill: 'none',
+      strokeLinejoin: 'miter'
+    }),
+    React.createElement('path', {
+      d: 'M15 8 L20 6 L20 18 L15 16',
+      stroke: 'currentColor',
+      strokeWidth: sw,
+      fill: 'none',
+      strokeLinejoin: 'miter'
+    }),
+    React.createElement('line', { x1: 20, y1: 9, x2: 23, y2: 7, stroke: 'currentColor', strokeWidth: sw * 0.7 }),
+    React.createElement('line', { x1: 20, y1: 15, x2: 23, y2: 17, stroke: 'currentColor', strokeWidth: sw * 0.7 })
   ),
   pin: (sw) => React.createElement(React.Fragment, null,
     React.createElement('path', {

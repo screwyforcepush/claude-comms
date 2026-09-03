@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
 import { getEngineIdentity } from "./lib/engine-version.js";
+import { buildClaudeForkArgs } from "./lib/fork-args.js";
 import { buildAgyCommand } from "./lib/streams.js";
 
 const DEFAULT_REFLECTION_TIMEOUT_MS = 5 * 60_000;
@@ -88,18 +89,7 @@ async function runWithTimeout(
 }
 
 async function runClaude(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
-  const args = [
-    "--dangerously-skip-permissions",
-    "--verbose",
-    "--output-format",
-    "stream-json",
-    "--disable-slash-commands",
-  ];
-  if (model) {
-    args.push("--model", model);
-  }
-  args.push("--resume", sessionId, "--fork-session", "-p");
-  await runWithTimeout("claude", args, timeoutMs, prompt);
+  await runWithTimeout("claude", buildClaudeForkArgs({ sessionId, model }), timeoutMs, prompt);
 }
 
 async function runCodex(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {

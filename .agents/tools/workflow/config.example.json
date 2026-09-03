@@ -5,6 +5,7 @@
   "timeoutMs": 3600000,
   "idleTimeoutMs": 600000,
   "reflectionTimeoutMs": 300000,
+  "notifyTimeoutMs": 300000,
   "claudeExecutionMode": "headless",
   "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
   "claudeInteractiveSettingSources": "user",

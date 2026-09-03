@@ -53,6 +53,7 @@ import {
   formatContextPressure,
   recordMetricsEvent,
 } from "./lib/metrics.js";
+import { shouldNotify } from "./lib/notify-lib.js";
 
 // Prefix all console output with a UTC timestamp — runner.log is append-only
 // (via run-runner.sh) and untimestamped lines are impossible to correlate.
@@ -136,6 +137,41 @@ function spawnReflection(jobId: string): void {
     child.unref();
   } catch {
     // Silent: reflection coverage is the alarm.
+  }
+}
+
+function maybeSpawnNotification(
+  chatContext: ChatJobContext,
+  sessionId: string | null | undefined,
+  harness: string
+): void {
+  try {
+    const notificationSessionId = typeof sessionId === "string" ? sessionId : "";
+    if (!shouldNotify({
+      sessionId: notificationSessionId,
+      harness,
+      mode: chatContext.mode,
+      isCompletionSummary: chatContext.isCompletionSummary,
+    })) {
+      return;
+    }
+
+    const child = spawn(
+      "npx",
+      ["tsx", join(__dirname, "notify-spawn.ts"), chatContext.threadId, notificationSessionId],
+      {
+        detached: true,
+        stdio: "ignore",
+        cwd: __dirname,
+        env: process.env,
+      }
+    );
+    child.on("error", () => {
+      // Silent: notification delivery is best-effort and must not affect chat.
+    });
+    child.unref();
+  } catch {
+    // Silent: notification delivery is best-effort and must not affect chat.
   }
 }
 
@@ -484,6 +520,7 @@ async function executeJob(
             if (sessionId) {
               await saveSessionId(chatContext.threadId, sessionId);
             }
+            maybeSpawnNotification(chatContext, sessionId, job.harness);
           } else {
             // groupCompleted is the exactly-once token: only the mutation that
             // flipped the group terminal runs group-completion side effects.
@@ -873,6 +910,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           if (!chatContext.isGuardianEvaluation && !chatContext.isCompletionSummary) {
             await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);
           }
+          maybeSpawnNotification(chatContext, sessionId, chatJob.harness);
         } catch (e) {
           console.error(`[${jobId}] Error in onComplete:`, e);
           try {

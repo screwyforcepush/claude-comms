@@ -1,6 +1,8 @@
 // ChatSidebar - Thread list sidebar with new chat button
 // WP-5: Added namespace filter accordion above thread list
 import React, { useCallback, useState } from 'react';
+import { useQuery, useMutation } from '../../hooks/useConvex.js';
+import { api } from '../../api.js';
 import { ThreadList } from './ThreadList.js';
 import { LoadingSpinner, QIcon } from '../shared/index.js';
 
@@ -384,6 +386,120 @@ function DeleteChatButton({ onClick }) {
 }
 
 /**
+ * Global audio notification toggle for hands-free voice loop.
+ * Stored as one cross-namespace Convex setting; undefined/loading renders as OFF.
+ */
+function AudioNotificationsToggle() {
+  const { data: audioNotificationsEnabled, loading, error: queryError } = useQuery(api.settings.getAudioNotifications);
+  const setAudioNotifications = useMutation(api.settings.setAudioNotifications);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [mutationError, setMutationError] = useState(null);
+
+  const enabled = !loading && audioNotificationsEnabled === true;
+  const disabled = loading || saving;
+  const hasError = !!queryError || !!mutationError;
+  const stateLabel = enabled ? 'Audio notifications on' : 'Audio notifications off';
+  const ariaLabel = loading
+    ? `${stateLabel} (loading)`
+    : saving
+      ? `${stateLabel} (saving)`
+      : hasError
+        ? `${stateLabel} (setting error)`
+        : stateLabel;
+  const title = loading
+    ? 'Loading audio notification setting'
+    : saving
+      ? 'Saving audio notification setting'
+      : hasError
+        ? 'Audio notification setting failed. Click to retry.'
+        : enabled
+          ? 'Turn audio notifications off'
+          : 'Turn audio notifications on';
+
+  const handleToggle = useCallback(async () => {
+    if (disabled) return;
+    setSaving(true);
+    setMutationError(null);
+    try {
+      await setAudioNotifications({ enabled: !enabled });
+    } catch (error) {
+      console.error('Failed to toggle audio notifications:', error);
+      setMutationError(error?.message || 'Failed to toggle audio notifications');
+    } finally {
+      setSaving(false);
+      setIsPressed(false);
+    }
+  }, [disabled, enabled, setAudioNotifications]);
+
+  const activeGlow = enabled
+    ? '0 0 8px var(--q-torch-33), inset 0 0 12px var(--q-torch-08)'
+    : 'none';
+  const focusGlow = isFocused
+    ? '0 0 0 1px var(--q-torch-hot), 0 0 10px var(--q-torch-22)'
+    : activeGlow;
+
+  const buttonStyle = {
+    width: 28,
+    height: 28,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+    borderRadius: 0,
+    border: `1px solid ${enabled ? 'var(--q-torch)' : hasError ? 'var(--q-lava0)' : isHovered || isFocused ? 'var(--q-copper2)' : 'var(--q-stone3)'}`,
+    borderBottom: `2px solid ${enabled ? 'var(--q-void0)' : 'var(--q-stone3)'}`,
+    backgroundColor: enabled
+      ? 'rgba(212, 160, 48, 0.14)'
+      : hasError
+        ? 'rgba(140, 40, 20, 0.08)'
+        : isHovered || isFocused
+          ? 'var(--q-stone2)'
+          : 'transparent',
+    color: enabled
+      ? 'var(--q-torch)'
+      : hasError
+        ? 'var(--q-lava1)'
+        : 'var(--q-bone0)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.48 : enabled ? 1 : 0.72,
+    outline: 'none',
+    boxShadow: focusGlow,
+    transform: isPressed && !disabled ? 'translateY(1px)' : 'none',
+    transition: 'color 0.15s, opacity 0.15s, border-color 0.15s, background-color 0.15s, box-shadow 0.15s, transform 0.1s',
+    animation: enabled && !disabled ? 'torchFlicker 6s ease-in-out infinite' : 'none',
+    flexShrink: 0
+  };
+
+  return React.createElement('button', {
+    type: 'button',
+    onClick: handleToggle,
+    onMouseEnter: () => setIsHovered(true),
+    onMouseLeave: () => { setIsHovered(false); setIsPressed(false); },
+    onMouseDown: () => setIsPressed(true),
+    onMouseUp: () => setIsPressed(false),
+    onFocus: () => setIsFocused(true),
+    onBlur: () => { setIsFocused(false); setIsPressed(false); },
+    disabled: disabled,
+    title: title,
+    'aria-label': ariaLabel,
+    'aria-pressed': enabled,
+    'aria-busy': disabled,
+    style: buttonStyle
+  },
+    React.createElement(QIcon, {
+      name: 'horn',
+      size: 16,
+      color: 'currentColor',
+      strokeWidth: 1.8,
+      glow: enabled && !disabled
+    })
+  );
+}
+
+/**
  * ChatSidebar component - Sidebar with thread list and new chat button
  * WP-5: Added namespace filter accordion and namespaceMap pass-through
  * @param {Object} props
@@ -466,22 +582,30 @@ export function ChatSidebar({
       }
     },
       React.createElement('div', {
-        className: 'flex items-center justify-between'
+        className: 'flex items-center justify-between gap-2'
       },
         React.createElement('span', {
-          className: 'text-xs font-semibold uppercase tracking-wide',
+          className: 'text-xs font-semibold uppercase tracking-wide truncate',
           style: {
             color: 'var(--q-bone0)',
             fontFamily: 'var(--font-display)',
-            letterSpacing: '2px'
+            letterSpacing: '2px',
+            minWidth: 0
           }
         }, 'Conversations'),
-        threads.length > 0 && React.createElement('span', {
-          className: 'text-xs',
-          style: {
-            color: 'var(--q-bone0)'
-          }
-        }, threads.length)
+        React.createElement('div', {
+          className: 'flex items-center gap-2 flex-shrink-0'
+        },
+          React.createElement('span', {
+            className: 'text-xs',
+            style: {
+              color: 'var(--q-bone0)',
+              minWidth: '2ch',
+              textAlign: 'right'
+            }
+          }, threads.length),
+          React.createElement(AudioNotificationsToggle, null)
+        )
       )
     ),
 

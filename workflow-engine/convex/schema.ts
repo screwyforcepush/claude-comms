@@ -187,6 +187,23 @@ export default defineSchema({
     .index("by_namespace_engineVersion", ["namespaceId", "engineVersion"])
     .index("by_created", ["createdAt"]),
 
+  settings: defineTable({
+    key: v.string(),
+    value: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"]),
+
+  notifications: defineTable({
+    namespaceId: v.id("namespaces"),
+    threadId: v.id("chatThreads"),
+    title: v.string(),
+    body: v.string(),
+    deliveredAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId"]),
+
   chatThreads: defineTable({
     namespaceId: v.id("namespaces"),
     title: v.string(),

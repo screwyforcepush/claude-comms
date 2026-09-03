@@ -11,6 +11,12 @@ export const api = {
     getReadyJobs: "scheduler:getReadyJobs"
   },
 
+  // Global settings API
+  settings: {
+    getAudioNotifications: "settings:getAudioNotifications",
+    setAudioNotifications: "settings:setAudioNotifications",
+  },
+
   // Namespaces API
   namespaces: {
     list: "namespaces:list",
