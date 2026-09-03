@@ -496,7 +496,30 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
   }, [allThreads, selectedNamespaceIds]);
 
   // Get selected thread object (must be defined before useMemos that reference it)
-  const selectedThread = threads?.find(t => t._id === selectedThreadId) || null;
+  const listedSelectedThread = threads?.find(t => t._id === selectedThreadId) || null;
+  const unfilteredSelectedThread = allThreads?.find(t => t._id === selectedThreadId) || null;
+  const selectedThreadNeedsLookup = !!selectedThreadId && !!allThreads && !loadingThreads && !unfilteredSelectedThread;
+  const {
+    data: lookedUpSelectedThread,
+    loading: loadingSelectedThreadLookup,
+    error: selectedThreadLookupError
+  } = useQuery(
+    selectedThreadNeedsLookup ? api.chatThreads.get : null,
+    selectedThreadNeedsLookup ? { id: selectedThreadId } : {}
+  );
+  const [requestedSelectedThreadLookupId, setRequestedSelectedThreadLookupId] = useState(null);
+  useEffect(() => {
+    setRequestedSelectedThreadLookupId(selectedThreadNeedsLookup ? selectedThreadId : null);
+  }, [selectedThreadNeedsLookup, selectedThreadId]);
+  const selectedThreadLookupRequested = requestedSelectedThreadLookupId === selectedThreadId;
+  const selectedThreadFromLookup = lookedUpSelectedThread?._id === selectedThreadId ? lookedUpSelectedThread : null;
+  const selectedThreadFromLookupVisible = !!selectedThreadFromLookup && (
+    selectedNamespaceIds.size === 0 || selectedNamespaceIds.has(selectedThreadFromLookup.namespaceId)
+  );
+  const selectedThreadHiddenByFilter = !!unfilteredSelectedThread && !listedSelectedThread;
+  const selectedThreadFromLookupHiddenByFilter = !!selectedThreadFromLookup && !selectedThreadFromLookupVisible;
+  const selectedThread = listedSelectedThread || (selectedThreadFromLookupVisible ? selectedThreadFromLookup : null);
+  const renderedThreadId = selectedThread?._id || null;
 
   // Per-assignment subscription for the selected thread's assignment
   const { data: selectedAssignment } = useQuery(
@@ -506,14 +529,14 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
 
   // Fetch messages for selected thread
   const { data: messages, loading: loadingMessages } = useQuery(
-    selectedThreadId ? api.chatMessages.list : null,
-    selectedThreadId ? { threadId: selectedThreadId } : {}
+    renderedThreadId ? api.chatMessages.list : null,
+    renderedThreadId ? { threadId: renderedThreadId } : {}
   );
 
   // Query for active chatJob to show typing indicator
   const { data: activeChatJob } = useQuery(
-    selectedThreadId ? api.chatJobs.getActiveForThread : null,
-    selectedThreadId ? { threadId: selectedThreadId } : {}
+    renderedThreadId ? api.chatJobs.getActiveForThread : null,
+    renderedThreadId ? { threadId: renderedThreadId } : {}
   );
 
   // Show typing indicator when there's an active job (pending or running)
@@ -544,37 +567,54 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
 
   // FIX-5: Auto-reselect when namespace filter hides the currently selected thread
   useEffect(() => {
-    if (!threads || !selectedThreadId) return;
-    const stillVisible = threads.some(t => t._id === selectedThreadId);
-    if (!stillVisible) {
+    if (!threads || !selectedThreadId || loadingThreads) return;
+    if (listedSelectedThread) return;
+    if (selectedThreadHiddenByFilter) {
+      setSelectedThreadId(threads.length > 0 ? threads[0]._id : null);
+      return;
+    }
+    if (!selectedThreadNeedsLookup || !selectedThreadLookupRequested || loadingSelectedThreadLookup) return;
+    if (selectedThreadLookupError || !selectedThreadFromLookup || selectedThreadFromLookupHiddenByFilter) {
       setSelectedThreadId(threads.length > 0 ? threads[0]._id : null);
     }
-  }, [threads, selectedThreadId]);
+  }, [
+    threads,
+    selectedThreadId,
+    loadingThreads,
+    listedSelectedThread,
+    selectedThreadHiddenByFilter,
+    selectedThreadNeedsLookup,
+    selectedThreadLookupRequested,
+    loadingSelectedThreadLookup,
+    selectedThreadLookupError,
+    selectedThreadFromLookup,
+    selectedThreadFromLookupHiddenByFilter
+  ]);
 
   // WP-6: Load draft when selected thread changes
   useEffect(() => {
-    setCurrentDraft(getDraft(selectedThreadId));
-  }, [selectedThreadId, getDraft]);
+    setCurrentDraft(getDraft(renderedThreadId));
+  }, [renderedThreadId, getDraft]);
 
   // WP-6: Handle draft text change from ChatInput
   const handleDraftChange = useCallback((text) => {
     setCurrentDraft(text);
-    saveDraft(selectedThreadId, text);
-  }, [selectedThreadId, saveDraft]);
+    saveDraft(renderedThreadId, text);
+  }, [renderedThreadId, saveDraft]);
 
   // WP-6: markRead callback for MessageList — fires when messages render
   const handleMarkRead = useCallback(() => {
-    if (selectedThreadId) {
-      markRead({ id: selectedThreadId }).catch(() => {});
+    if (renderedThreadId) {
+      markRead({ id: renderedThreadId }).catch(() => {});
     }
-  }, [selectedThreadId, markRead]);
+  }, [renderedThreadId, markRead]);
 
   // WP-6: Also call markRead when thread is first selected
   useEffect(() => {
-    if (selectedThreadId) {
-      markRead({ id: selectedThreadId }).catch(() => {});
+    if (renderedThreadId) {
+      markRead({ id: renderedThreadId }).catch(() => {});
     }
-  }, [selectedThreadId, markRead]);
+  }, [renderedThreadId, markRead]);
 
   // WP-5: Handle creating a new thread
   // Accepts optional namespaceId; falls back to first filtered or first available
@@ -631,13 +671,13 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
 
   // Handle sending a message
   const handleSendMessage = useCallback(async (content) => {
-    if (!selectedThreadId || sending) return;
+    if (!renderedThreadId || sending) return;
 
     setSending(true);
     try {
       // 1. Add user message immediately for instant feedback
       const messageId = await addMessage({
-        threadId: selectedThreadId,
+        threadId: renderedThreadId,
         role: 'user',
         content: content
       });
@@ -646,41 +686,41 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       //    Response is saved to chatMessages by the runner
       //    UI updates via Convex real-time subscription
       await triggerChatJob({
-        threadId: selectedThreadId,
+        threadId: renderedThreadId,
         triggerMessageId: messageId
       });
 
       // WP-6: Clear draft on successful send
-      clearDraft(selectedThreadId);
+      clearDraft(renderedThreadId);
       setCurrentDraft('');
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {
       setSending(false);
     }
-  }, [selectedThreadId, sending, addMessage, triggerChatJob, clearDraft]);
+  }, [renderedThreadId, sending, addMessage, triggerChatJob, clearDraft]);
 
   // Handle updating thread title
   const handleUpdateTitle = useCallback(async (title) => {
-    if (!selectedThreadId) return;
+    if (!renderedThreadId) return;
 
     try {
-      await updateTitle({ id: selectedThreadId, title });
+      await updateTitle({ id: renderedThreadId, title });
     } catch (err) {
       console.error('Failed to update title:', err);
     }
-  }, [selectedThreadId, updateTitle]);
+  }, [renderedThreadId, updateTitle]);
 
   // Handle updating thread mode
   const handleUpdateMode = useCallback(async (mode) => {
-    if (!selectedThreadId) return;
+    if (!renderedThreadId) return;
 
     try {
-      await updateMode({ id: selectedThreadId, mode });
+      await updateMode({ id: renderedThreadId, mode });
     } catch (err) {
       console.error('Failed to update mode:', err);
     }
-  }, [selectedThreadId, updateMode]);
+  }, [renderedThreadId, updateMode]);
 
   // WP-7: Assignment status update callback (U5)
   const handleUpdateAssignmentStatus = useCallback(async (status) => {
@@ -704,13 +744,13 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
 
   // WP-7: Focus assignment change callback (U6)
   const handleChangeFocusAssignment = useCallback(async (assignmentId) => {
-    if (!selectedThreadId) return;
+    if (!renderedThreadId) return;
     try {
-      await updateFocusAssignment({ id: selectedThreadId, assignmentId });
+      await updateFocusAssignment({ id: renderedThreadId, assignmentId });
     } catch (err) {
       console.error('Failed to change focus assignment:', err);
     }
-  }, [selectedThreadId, updateFocusAssignment]);
+  }, [renderedThreadId, updateFocusAssignment]);
 
   // WP-7: Kill job callback (R1)
   const handleKillJob = useCallback(async (jobId) => {
