@@ -16,8 +16,13 @@ nowhere; the only durable output is the notification row submitted by the CLI.
 ## Submission
 
 1. Run `npx tsx .agents/tools/workflow/notify.ts --help` to learn the interface.
-2. Write the listenable body as plain UTF-8 text to:
-   `{{BODY_PATH}}`
+2. The Write tool is unavailable in this notify fork. Use Bash to write the
+   listenable body as plain UTF-8 text with a quoted heredoc:
+   ```bash
+   cat << 'EOF' > {{BODY_PATH}}
+   <listenable body>
+   EOF
+   ```
 3. Invoke:
    `npx tsx .agents/tools/workflow/notify.ts --thread-id {{THREAD_ID}} --input {{BODY_PATH}}`
 4. Exit after the CLI prints `ok`.

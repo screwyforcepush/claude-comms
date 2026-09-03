@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
   MAX_BODY_CHARS,
+  MAX_FEED_LIMIT,
   decodeNotificationFeedCursor,
   encodeNotificationFeedCursor,
   pageNotificationFeedRows,
@@ -130,5 +131,18 @@ describe("notification feed cursor helpers", () => {
     assert.deepStrictEqual(first.rows.map((row) => row.createdAt), [10, 20]);
     assert.deepStrictEqual(second.rows.map((row) => row._id), ["n3", "n4"]);
     assert.deepStrictEqual(second.rows.map((row) => row.createdAt), [20, 30]);
+  });
+
+  it("caps requested feed limits at the authoritative live feed maximum", () => {
+    const manyRows = Array.from({ length: 250 }, (_, index) => ({
+      _id: `n${index}`,
+      _creationTime: index + 1,
+    }));
+
+    assert.strictEqual(MAX_FEED_LIMIT, 200);
+    assert.strictEqual(
+      pageNotificationFeedRows(manyRows, { limit: 1000 }).rows.length,
+      200
+    );
   });
 });

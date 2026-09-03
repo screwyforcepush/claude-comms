@@ -1,6 +1,7 @@
 export const MAX_BODY_CHARS = 5000;
 export const DEFAULT_FEED_LIMIT = 50;
-export const MAX_FEED_LIMIT = 100;
+// Mirrors MAX_FEED_LIMIT in workflow-engine/convex/notifications.ts (authoritative live feed path); kept in manual sync across the Convex bundle boundary per Decision D6.
+export const MAX_FEED_LIMIT = 200;
 
 export interface ShouldNotifyInput {
   sessionId?: string | null;
