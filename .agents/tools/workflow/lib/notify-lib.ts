@@ -11,7 +11,7 @@ export interface ShouldNotifyInput {
 }
 
 export type PreparedBody =
-  | { ok: true; body: string; truncated: boolean }
+  | { ok: true; body: string }
   | { ok: false; error: string };
 
 export interface NotificationFeedRow {
@@ -38,6 +38,11 @@ export function shouldNotify(input: ShouldNotifyInput): boolean {
   return input.mode === "jam" || input.mode === "cook";
 }
 
+// Cap counts UTF-16 code units (JS string.length) — the same unit Android trims
+// notification CharSequences at (5120), not bytes. Overlong bodies are rejected,
+// never clipped: the fork compresses deliberately instead of losing an unauthored
+// tail. The server-side truncate in convex/notifications.ts stays as a storage
+// invariant for non-CLI callers only.
 export function prepareBody(rawBody: string): PreparedBody {
   const body = rawBody.trim();
   if (body === "") {
@@ -45,12 +50,11 @@ export function prepareBody(rawBody: string): PreparedBody {
   }
   if (body.length > MAX_BODY_CHARS) {
     return {
-      ok: true,
-      body: body.slice(0, MAX_BODY_CHARS),
-      truncated: true,
+      ok: false,
+      error: `body is ${body.length} chars of max ${MAX_BODY_CHARS}. Nothing was posted. Shorten the rendition and re-invoke.`,
     };
   }
-  return { ok: true, body, truncated: false };
+  return { ok: true, body };
 }
 
 export function encodeNotificationFeedCursor(row: NotificationFeedRow): number {

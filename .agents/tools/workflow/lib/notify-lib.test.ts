@@ -64,7 +64,6 @@ describe("prepareBody", () => {
     assert.deepStrictEqual(prepareBody("\n  Listen to this.  \t"), {
       ok: true,
       body: "Listen to this.",
-      truncated: false,
     });
   });
 
@@ -81,16 +80,15 @@ describe("prepareBody", () => {
     assert.deepStrictEqual(prepareBody(body), {
       ok: true,
       body,
-      truncated: false,
     });
   });
 
-  it("truncates a 5001 character body to the notification cap", () => {
+  it("rejects a 5001 character body with the measured count and no post", () => {
     const result = prepareBody("x".repeat(MAX_BODY_CHARS + 1));
 
-    assert.strictEqual(result.ok, true);
-    assert.strictEqual(result.truncated, true);
-    assert.strictEqual(result.body.length, MAX_BODY_CHARS);
+    assert.strictEqual(result.ok, false);
+    assert.match((result as { ok: false; error: string }).error, /5001 chars of max 5000/);
+    assert.match((result as { ok: false; error: string }).error, /Nothing was posted/);
   });
 });
 

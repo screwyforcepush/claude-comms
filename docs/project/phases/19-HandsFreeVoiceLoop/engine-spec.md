@@ -199,7 +199,7 @@ Concise note in the assignment's document output:
 
 ## Ambiguities / Decisions Made (flag to PM — overturn by decision record if wrong)
 1. **Completion summaries notify.** `isCompletionSummary` chat jobs land as assistant responses in jam/cook threads ⇒ included ("every assistant response"); it's also exactly what a stepped-away user wants to hear. Guardian evaluations are excluded by thread mode.
-2. **Truncate-not-reject at 5000 chars** (CLI and server). Guarantees delivery; front-loaded punchline makes truncation graceful. A rejected body = silently lost notification.
+2. **Truncate-not-reject at 5000 chars** (CLI and server). Guarantees delivery; front-loaded punchline makes truncation graceful. A rejected body = silently lost notification. *Superseded 2026-09-03 (user jam, post-live-verification): the CLI now rejects overlong bodies with the measured count so the fork compresses deliberately — authored compression over an unauthored mid-sentence chop. Server-side truncate retained as storage invariant for non-CLI callers.*
 3. **Toggle default OFF** when the settings row is absent.
 4. **Plain-text body file** instead of reflect's JSON input (single prose payload; avoids known escaping friction). The *interaction pattern* (help/single-shot/validate/file-input) is preserved.
 5. **Claude-only fork in v1.** North star names the claude invocation; chat runs on claude in practice. Non-claude chat jobs skip silently at the runner gate.

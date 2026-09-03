@@ -31,7 +31,8 @@ Body contract:
   - No code blocks, tables, URLs, or markdown syntax noise.
   - Reference files/artifacts by name; do not quote code.
   - The first sentence should carry the headline for collapsed previews.
-  - Bodies over 5000 characters are truncated and still posted.
+  - Bodies over 5000 characters are rejected with the measured count and
+    nothing is posted; shorten the rendition and re-invoke.
 
 This command validates the file, posts one notifications:post row, prints ok,
 and exits. No retries, no response parsing, no thread message is created.
@@ -72,9 +73,6 @@ async function main(): Promise<void> {
 
   const prepared = prepareBody(readFileSync(args.input, "utf-8"));
   if (!prepared.ok) fail(prepared.error);
-  if (prepared.truncated) {
-    console.error("warning: body exceeded 5000 characters and was truncated");
-  }
 
   const config = JSON.parse(readFileSync(configPath, "utf-8")) as Config;
   const client = new ConvexHttpClient(config.convexUrl);
