@@ -11,7 +11,7 @@ Why-layer: `docs/project/spec/mental-model.md` § "Sampling Budget & Engine Vers
 > 1. **The sampler is inert and fails OPEN.** `reflect-spawn.ts` already calls `shouldReflect` on the next terminal job (edits go live per-invocation via `npx tsx`), but the mutation doesn't exist on prod yet, so the call throws and the client proceeds to spawn reflections exactly as before. No reflection is lost from the sampler side pre-deploy.
 > 2. **`reflect.ts` inserts now carry an `engineVersion` arg the still-old prod `insert` rejects.** Reflections written from THIS repo's namespace between merge and deploy therefore **fail to insert**, and surface *visibly* in the coverage alarm as `reflection_missing` (honest, bounded failure — not silent loss).
 >
-> **Action for the user:** deploy Convex promptly after accepting this assignment. Deploy with the project-standard command (`CONVEX_DEPLOYMENT=prod:utmost-vulture-618 npx convex deploy`) and verify with `--prod`. Then optionally run `reflections status` per namespace to confirm the sampler is armed. The index `by_namespace_engineVersion` backfills automatically on deploy; no migration or backfill script is needed.
+> **Action for the user:** deploy Convex promptly after accepting this assignment. Deploy with the project-standard command (`CONVEX_DEPLOYMENT=prod:<convex-deployment> npx convex deploy`) and verify with `--prod`. Then optionally run `reflections status` per namespace to confirm the sampler is armed. The index `by_namespace_engineVersion` backfills automatically on deploy; no migration or backfill script is needed.
 
 > **SELF-SURGERY CONSTRAINTS (apply to every job in this assignment)**
 > This assignment modifies the engine that is running the assignment crew.

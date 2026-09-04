@@ -122,7 +122,6 @@ class AppPrefs(context: Context) {
         const val KEY_POSTED_BUT_UNACKED_IDS = "postedButUnackedIds"
         const val KEY_NOTIFICATIONS_BLOCKED = "notificationsBlocked"
         const val KEY_NOTIFICATIONS_BLOCKED_REASON = "notificationsBlockedReason"
-        const val DEFAULT_CONVEX_URL = "https://utmost-vulture-618.convex.cloud"
 
         fun getConfig(context: Context): ShellConfig? = AppPrefs(context).getConfig()
 

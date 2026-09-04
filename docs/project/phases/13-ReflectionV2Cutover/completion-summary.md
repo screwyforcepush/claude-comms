@@ -29,7 +29,7 @@ Shipped V2 reflection capture as a cutover alongside V1. New `reflectionsV2` Con
 | `ee724263` | Flip reflect.ts CLI to V2 shape; replace prompt template | reflect.ts, reflect.md, _generated/api.d.ts |
 | `ac7aaf81` | Remove aggregation talk from reflect.md narrative section (AC5 compliance) | reflect.md |
 
-Deploy gate between commits 1 and 2: `CONVEX_DEPLOYMENT=prod:utmost-vulture-618 npx convex deploy` succeeded; smoke-test `reflectionsV2.recent` returned empty page confirming table registration.
+Deploy gate between commits 1 and 2: `CONVEX_DEPLOYMENT=prod:<convex-deployment> npx convex deploy` succeeded; smoke-test `reflectionsV2.recent` returned empty page confirming table registration.
 
 Commit 3 was a post-review fix: Review B identified that line 30 of `reflect.md` contained "not aggregated" — downstream-aggregation language that violates AC5 ("NO talk of aggregation"). Surgical one-line removal changed the phrase from "rationale and context layer — it is read on drill-down, not aggregated." to "rationale and context layer." Grep-verified clean of all forbidden vocabulary (aggregation, normalize, join-key, Steward, downstream).
 

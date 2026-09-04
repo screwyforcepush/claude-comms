@@ -14,6 +14,7 @@ import type * as auth from "../auth.js";
 import type * as chatJobs from "../chatJobs.js";
 import type * as chatMessages from "../chatMessages.js";
 import type * as chatThreads from "../chatThreads.js";
+import type * as files from "../files.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_groupTransition from "../lib/groupTransition.js";
 import type * as lib_harnessDefaults from "../lib/harnessDefaults.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   chatJobs: typeof chatJobs;
   chatMessages: typeof chatMessages;
   chatThreads: typeof chatThreads;
+  files: typeof files;
   jobs: typeof jobs;
   "lib/groupTransition": typeof lib_groupTransition;
   "lib/harnessDefaults": typeof lib_harnessDefaults;

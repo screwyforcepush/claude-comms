@@ -59,7 +59,7 @@ app has `allowBackup=false` so these never leave the device) and are entered onc
 
 | Field | What it does | Value |
 |---|---|---|
-| **Convex URL** | The Convex deployment the foreground service subscribes to for the notifications feed. | `https://utmost-vulture-618.convex.cloud` (pre-filled) |
+| **Convex URL** | The Convex deployment the foreground service subscribes to for the notifications feed. | `https://<convex-deployment>.convex.cloud` (pre-filled) |
 | **Admin password** | The single-user password that gates all Convex access (same one the web PWA login wall uses). | your admin password |
 | **Web UI URL** | The deployed Workflow Engine web UI the shell wraps in its WebView; a notification tap deep-links here with `?thread=<id>`. | your deployed UI URL |
 

@@ -43,7 +43,7 @@ The assignment is self-validating: this very assignment's `implement`, `review`,
                                                         │ ConvexHttpClient
                                                         ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Convex (prod:utmost-vulture-618)                                     │
+│ Convex (prod:<convex-deployment>)                                     │
 │                                                                      │
 │   reflections (V1)   ────── still alive, still receiving writes      │
 │       │                     from older client SHAs                   │
@@ -498,7 +498,7 @@ Idempotency: a second invocation with the same mapping changes nothing.
 ### Step 2 — Convex deploy (the gate)
 
 1. Confirm the symlink: `readlink /workspaces/claude-comms/convex` → must print `/workspaces/claude-comms/workflow-engine/convex`. If missing, **STOP** — do not recreate. Surface to user.
-2. Run from monorepo root: `CONVEX_DEPLOYMENT=prod:utmost-vulture-618 npx convex deploy`.
+2. Run from monorepo root: `CONVEX_DEPLOYMENT=prod:<convex-deployment> npx convex deploy`.
 3. Wait for the deploy to finish.
 4. **Verify deploy success**:
    - Convex CLI exits 0 and reports new functions deployed (`reflectionsV2:insert`, `reflectionsV2:byJob`, `reflectionsV2:recent`, `reflectionsV2:coverageRate`, `reflectionsV2:gaps`, `reflectionsV2:normalizeKeywords`).
@@ -547,7 +547,7 @@ This is a single vertical-slice WP — splitting it would risk the cross-step or
 1. `git diff main -- workflow-engine/convex/reflections.ts` is empty (V1 module byte-frozen).
 2. `git diff main -- workflow-engine/convex/schema.ts` shows only an additive `reflectionsV2` block; the existing `reflections` block (originally lines 117–149) is byte-identical.
 3. `workflow-engine/convex/reflectionsV2.ts` exists, typechecks, and exposes `insert`, `byJob`, `recent`, `coverageRate`, `gaps`, `normalizeKeywords`.
-4. `npx convex deploy` against `prod:utmost-vulture-618` exits 0 and the smoke-test query against `reflectionsV2:recent` returns an empty page.
+4. `npx convex deploy` against `prod:<convex-deployment>` exits 0 and the smoke-test query against `reflectionsV2:recent` returns an empty page.
 5. `.agents/tools/workflow/reflect.ts`:
    - Has `REFLECTION_CLI_VERSION = "0.2.0"`.
    - Rejects V1-shape input with the message specified in §File 3.

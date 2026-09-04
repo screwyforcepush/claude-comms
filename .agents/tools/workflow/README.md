@@ -33,7 +33,7 @@ Edit `config.json`:
 
 ```json
 {
-  "convexUrl": "https://utmost-vulture-618.convex.cloud",
+  "convexUrl": "https://<convex-deployment>.convex.cloud",
   "namespace": "your-repo-name",
   "password": "your-admin-password",
   "timeoutMs": 600000,

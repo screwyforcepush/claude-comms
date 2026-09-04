@@ -205,7 +205,7 @@ Decision guards (verbatim north-star): no uat jobs; zero engine changes beyond d
 
 The assignment's terminal artifact (north-star AC7). Must contain, concretely:
 1. Sideload steps: enable installing unknown apps on the Pixel, `adb install` **and** file-transfer alternatives; APK location in-repo (or how to rebuild: `scripts/setup-toolchain.sh` then `./gradlew assembleDebug`, output path).
-2. First-run config: the three fields (Convex prod URL `https://utmost-vulture-618.convex.cloud`, admin password, deployed web UI URL), what each does, that the webview login is auto-seeded.
+2. First-run config: the three fields (Convex prod URL `https://<convex-deployment>.convex.cloud`, admin password, deployed web UI URL), what each does, that the webview login is auto-seeded.
 3. Battery-optimization exemption: the in-app button, plus the manual Settings path (Settings → Apps → [shell] → Battery → Unrestricted).
 4. Silencing the persistent service notification: long-press → channel settings → minimize/silence (channel already `IMPORTANCE_MIN`).
 5. **Known-unknown to test FIRST** (mental-model Open Question, user-owned finding): whether the assistant reads the full ~5k body aloud or truncates its reading — dictate a reply to a long rendition and observe. If it truncates, the rendition ceiling shrinks engine-side later (not this phase).

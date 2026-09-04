@@ -107,7 +107,7 @@ class ConfigActivity : AppCompatActivity() {
 
     private fun populateExistingConfig() {
         val config = AppPrefs.getConfig(this)
-        convexUrlInput.setText(config?.convexUrl ?: AppPrefs.DEFAULT_CONVEX_URL)
+        convexUrlInput.setText(config?.convexUrl.orEmpty())
         passwordInput.setText(config?.password.orEmpty())
         uiUrlInput.setText(config?.uiUrl.orEmpty())
     }

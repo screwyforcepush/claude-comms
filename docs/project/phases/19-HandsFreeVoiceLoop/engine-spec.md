@@ -139,7 +139,7 @@ notifications: defineTable({
 - `runner.ts` ← `lib/notify-lib.ts` (`shouldNotify`) — only runner file touched.
 - `notify-spawn.ts` ← `lib/fork-args.ts` (new: pure `buildClaudeForkArgs({ sessionId, model? })` extracted from reflect-spawn's inline `runClaude` args; `reflect-spawn.ts` refactored to consume it, behavior-identical — reflect-spawn is spawned fresh per job via npx tsx, so this is safe and never touches the running runner).
 - UI ↔ Convex via existing `useConvex` hooks + string-ref `api.js`.
-- Deploy: Convex additive deploy from **repo root** (root `convex` symlink must exist), `CONVEX_DEPLOYMENT=prod:utmost-vulture-618 npx convex deploy`; verify with `npx convex function-spec --prod` that `notifications:*` and `settings:*` are live (dev deployment reads lie — always `--prod`). Verify functions are bundled before deploying (empty-functions deploy = data loss).
+- Deploy: Convex additive deploy from **repo root** (root `convex` symlink must exist), `CONVEX_DEPLOYMENT=prod:<convex-deployment> npx convex deploy`; verify with `npx convex function-spec --prod` that `notifications:*` and `settings:*` are live (dev deployment reads lie — always `--prod`). Verify functions are bundled before deploying (empty-functions deploy = data loss).
 
 ## Dependency Map
 
@@ -184,7 +184,7 @@ Concise note in the assignment's document output:
 1. Restart the runner (`run-runner.sh` posture — user-owned step).
 2. Flip the audio toggle ON in the sidebar.
 3. Send a message in any jam/cook thread; wait for the assistant response.
-4. Watch the `notifications` table (Convex dashboard, prod `utmost-vulture-618`) for a row within ~1 minute: title `<namespace> · <thread topic>`, listenable body.
+4. Watch the `notifications` table (Convex dashboard, prod `<convex-deployment>`) for a row within ~1 minute: title `<namespace> · <thread topic>`, listenable body.
 5. Flip toggle OFF; confirm the next response produces no row.
 6. **Caveat to state explicitly (A-Low):** the audio loop is **claude-harness-only in v1**. Threads running on codex/agy harnesses produce no notification even with the toggle ON, silently — so verify in a claude-backed jam/cook thread.
 
