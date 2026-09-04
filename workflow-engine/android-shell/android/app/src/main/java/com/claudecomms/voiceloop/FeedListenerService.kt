@@ -13,6 +13,8 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.claudecomms.voiceloop.core.FeedPage
 import com.claudecomms.voiceloop.core.FeedProtocol
+import com.claudecomms.voiceloop.core.LobbyRoster
+import com.claudecomms.voiceloop.core.LobbyTarget
 import dev.convex.android.ConvexClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
@@ -27,11 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class FeedListenerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -107,13 +105,22 @@ class FeedListenerService : Service() {
         var retryDelayMs = INITIAL_RETRY_DELAY_MS
         while (serviceScope.isActive) {
             try {
-                // Every (re)subscribe pass re-posts missing lobbies, which is
-                // both bootstrap and dismissed-lobby resurrection.
-                ensureLobbies(client, config.password)
-                if (!prefs.isFeedInitialized()) {
-                    drainFreshInstall(client, config.password)
+                coroutineScope {
+                    // Lobby reconcile rides the live namespaces:list
+                    // subscription: a lobbyEnabled toggle flip reposts or
+                    // cancels lobbies within seconds — no service restart
+                    // needed. Each fresh pass also resurrects dismissed
+                    // lobbies via its first emission.
+                    val lobbies = launch { watchLobbies(client, config.password) }
+                    try {
+                        if (!prefs.isFeedInitialized()) {
+                            drainFreshInstall(client, config.password)
+                        }
+                        collectFeed(client, config.password)
+                    } finally {
+                        lobbies.cancel()
+                    }
                 }
-                collectFeed(client, config.password)
                 retryDelayMs = INITIAL_RETRY_DELAY_MS
             } catch (advanced: CursorAdvanced) {
                 retryDelayMs = INITIAL_RETRY_DELAY_MS
@@ -127,34 +134,37 @@ class FeedListenerService : Service() {
         }
     }
 
-    // Best-effort: lobbies are shade furniture and must never break the feed.
-    // Parsed as raw JSON so namespace-record fields can evolve without
-    // coupling the shell to their schema.
-    private suspend fun ensureLobbies(client: ConvexClient, password: String) {
-        runCatching {
-            val namespaces = client
-                .subscribe<JsonElement>("namespaces:list", mapOf("password" to password))
-                .first()
-                .getOrThrow()
-                .jsonArray
-            for (element in namespaces) {
-                val row = element.jsonObject
-                val id = row["_id"]?.jsonPrimitive?.contentOrNull ?: continue
-                val name = row["name"]?.jsonPrimitive?.contentOrNull ?: continue
-                // Standing lobbies are opt-in per namespace (lobbyEnabled,
-                // default off). Cancelling on the disabled path is what
-                // clears a standing lobby after its toggle flips off.
-                val enabled = row["lobbyEnabled"]?.jsonPrimitive?.booleanOrNull == true
-                if (enabled) {
-                    if (!poster.isLobbyPosted(id)) {
-                        poster.postLobby(id, name)
+    // Best-effort per emission: lobbies are shade furniture and must never
+    // break the feed. Emission failures are logged and skipped; if the
+    // subscription itself dies it takes the pass down with it and the retry
+    // loop relaunches both.
+    private suspend fun watchLobbies(client: ConvexClient, password: String) {
+        client
+            .subscribe<JsonElement>("namespaces:list", mapOf("password" to password))
+            .collect { result ->
+                result
+                    .onSuccess { rows ->
+                        runCatching { reconcileLobbies(LobbyRoster.parse(rows)) }
+                            .onFailure { error -> Log.w(TAG, "Lobby reconcile failed", error) }
                     }
-                } else if (poster.isLobbyPosted(id)) {
-                    poster.cancelLobby(id)
-                }
+                    .onFailure { error ->
+                        Log.w(TAG, "Lobby subscription emission failed", error)
+                    }
             }
-        }.onFailure { error ->
-            Log.w(TAG, "Lobby bootstrap failed", error)
+    }
+
+    private fun reconcileLobbies(targets: List<LobbyTarget>) {
+        for (target in targets) {
+            // Standing lobbies are opt-in per namespace (lobbyEnabled,
+            // default off). Cancelling on the disabled path is what
+            // clears a standing lobby after its toggle flips off.
+            if (target.enabled) {
+                if (!poster.isLobbyPosted(target.namespaceId)) {
+                    poster.postLobby(target.namespaceId, target.name)
+                }
+            } else if (poster.isLobbyPosted(target.namespaceId)) {
+                poster.cancelLobby(target.namespaceId)
+            }
         }
     }
 
