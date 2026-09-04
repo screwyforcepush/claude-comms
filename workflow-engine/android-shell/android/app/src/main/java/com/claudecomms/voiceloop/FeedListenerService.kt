@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -140,8 +141,16 @@ class FeedListenerService : Service() {
                 val row = element.jsonObject
                 val id = row["_id"]?.jsonPrimitive?.contentOrNull ?: continue
                 val name = row["name"]?.jsonPrimitive?.contentOrNull ?: continue
-                if (!poster.isLobbyPosted(id)) {
-                    poster.postLobby(id, name)
+                // Standing lobbies are opt-in per namespace (lobbyEnabled,
+                // default off). Cancelling on the disabled path is what
+                // clears a standing lobby after its toggle flips off.
+                val enabled = row["lobbyEnabled"]?.jsonPrimitive?.booleanOrNull == true
+                if (enabled) {
+                    if (!poster.isLobbyPosted(id)) {
+                        poster.postLobby(id, name)
+                    }
+                } else if (poster.isLobbyPosted(id)) {
+                    poster.cancelLobby(id)
                 }
             }
         }.onFailure { error ->

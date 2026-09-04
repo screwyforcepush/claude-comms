@@ -145,6 +145,24 @@ export const updateHarnessDefaults = mutation({
   },
 });
 
+export const setLobbyEnabled = mutation({
+  args: {
+    password: v.string(),
+    namespaceId: v.id("namespaces"),
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const ns = await ctx.db.get(args.namespaceId);
+    if (!ns) throw new Error("Namespace not found");
+
+    await ctx.db.patch(args.namespaceId, {
+      lobbyEnabled: args.enabled,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const setReflectionsEnabled = mutation({
   args: {
     password: v.string(),

@@ -13,6 +13,8 @@ export default defineSchema({
     })),
     harnessDefaults: v.optional(v.string()), // JSON-encoded HarnessDefaults
     reflectionsEnabled: v.optional(v.boolean()),
+    // Standing Slipgate lobby notification is opt-in per namespace (default off)
+    lobbyEnabled: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

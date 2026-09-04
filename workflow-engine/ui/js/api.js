@@ -24,6 +24,7 @@ export const api = {
     getHarnessDefaults: "namespaces:getHarnessDefaults",
     updateHarnessDefaults: "namespaces:updateHarnessDefaults",
     setReflectionsEnabled: "namespaces:setReflectionsEnabled",
+    setLobbyEnabled: "namespaces:setLobbyEnabled",
   },
 
   // Assignments API

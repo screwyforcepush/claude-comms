@@ -13,6 +13,8 @@ export function useNamespaceSettings(namespaceId) {
   const [saveError, setSaveError] = useState(null);
   const [reflectionsSaving, setReflectionsSaving] = useState(false);
   const [reflectionsError, setReflectionsError] = useState(null);
+  const [lobbySaving, setLobbySaving] = useState(false);
+  const [lobbyError, setLobbyError] = useState(null);
 
   const { data: defaults, loading, error } = useQuery(
     namespaceId ? api.namespaces.getHarnessDefaults : null,
@@ -25,6 +27,7 @@ export function useNamespaceSettings(namespaceId) {
 
   const updateMutation = useMutation(api.namespaces.updateHarnessDefaults);
   const setReflectionsMutation = useMutation(api.namespaces.setReflectionsEnabled);
+  const setLobbyMutation = useMutation(api.namespaces.setLobbyEnabled);
 
   const save = useCallback(async (harnessDefaults) => {
     if (!namespaceId) return;
@@ -67,10 +70,29 @@ export function useNamespaceSettings(namespaceId) {
     }
   }, [namespaceId, setReflectionsMutation]);
 
+  const setLobbyEnabled = useCallback(async (enabled) => {
+    if (!namespaceId) return;
+    setLobbySaving(true);
+    setLobbyError(null);
+    try {
+      await setLobbyMutation({
+        namespaceId,
+        enabled,
+      });
+    } catch (err) {
+      setLobbyError(err.message || 'Failed to update lobby');
+      throw err;
+    } finally {
+      setLobbySaving(false);
+    }
+  }, [namespaceId, setLobbyMutation]);
+
   return {
     defaults,
     namespace,
     reflectionsEnabled: namespace?.reflectionsEnabled !== false,
+    // Opt-in (default off), unlike reflections' default-on
+    lobbyEnabled: namespace?.lobbyEnabled === true,
     loading: loading || namespaceLoading,
     error: error || namespaceError,
     saving,
@@ -80,5 +102,8 @@ export function useNamespaceSettings(namespaceId) {
     reflectionsSaving,
     reflectionsError,
     setReflectionsEnabled,
+    lobbySaving,
+    lobbyError,
+    setLobbyEnabled,
   };
 }

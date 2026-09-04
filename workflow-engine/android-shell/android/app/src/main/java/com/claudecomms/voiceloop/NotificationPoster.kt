@@ -267,6 +267,10 @@ class NotificationPoster(private val context: Context) {
         return notify(tag, payload.identity.id, notification)
     }
 
+    fun cancelLobby(namespaceId: String) {
+        notificationManagerCompat.cancel(PayloadMapper.lobbyTag(namespaceId), MESSAGE_NOTIFICATION_ID)
+    }
+
     fun isLobbyPosted(namespaceId: String): Boolean {
         val tag = PayloadMapper.lobbyTag(namespaceId)
         return notificationManager.activeNotifications.any { active ->

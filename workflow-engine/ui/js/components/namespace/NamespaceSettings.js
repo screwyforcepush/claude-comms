@@ -364,7 +364,7 @@ function AddJobTypeRow({ onAdd }) {
   );
 }
 
-function ReflectionToggleRow({ enabled, saving, error, onToggle }) {
+function SettingToggleRow({ label, subtitle, enabled, saving, error, onToggle }) {
   const accent = enabled ? 'var(--q-slime1)' : 'var(--q-bone0)';
   return React.createElement('div', {
     style: {
@@ -402,7 +402,7 @@ function ReflectionToggleRow({ enabled, saving, error, onToggle }) {
             letterSpacing: '1px',
             textTransform: 'uppercase',
           }
-        }, 'Reflections'),
+        }, label),
         React.createElement('div', {
           style: {
             fontFamily: 'var(--font-console)',
@@ -410,7 +410,7 @@ function ReflectionToggleRow({ enabled, saving, error, onToggle }) {
             color: error ? 'var(--q-lava1)' : 'var(--q-bone0)',
             marginTop: '3px',
           }
-        }, error || 'self-arming per engine version')
+        }, error || subtitle)
       )
     ),
     React.createElement('button', {
@@ -570,6 +570,10 @@ export function NamespaceSettings({
     reflectionsSaving,
     reflectionsError,
     setReflectionsEnabled,
+    lobbyEnabled,
+    lobbySaving,
+    lobbyError,
+    setLobbyEnabled,
   } = useNamespaceSettings(namespaceId);
   const [localConfig, setLocalConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -682,6 +686,14 @@ export function NamespaceSettings({
       // reflectionsError is set by the hook
     }
   }, [setReflectionsEnabled]);
+
+  const handleLobbyToggle = useCallback(async (enabled) => {
+    try {
+      await setLobbyEnabled(enabled);
+    } catch {
+      // lobbyError is set by the hook
+    }
+  }, [setLobbyEnabled]);
 
   const handlePickNamespace = useCallback((nextNamespaceId) => {
     if (!onSwitchNamespace) return;
@@ -798,11 +810,21 @@ export function NamespaceSettings({
           padding: '0 16px',
         }
       },
-        React.createElement(ReflectionToggleRow, {
+        React.createElement(SettingToggleRow, {
+          label: 'Reflections',
+          subtitle: 'self-arming per engine version',
           enabled: reflectionsEnabled,
           saving: reflectionsSaving,
           error: reflectionsError,
           onToggle: handleReflectionToggle,
+        }),
+        React.createElement(SettingToggleRow, {
+          label: 'Lobby',
+          subtitle: 'standing new-thread notification on Slipgate',
+          enabled: lobbyEnabled,
+          saving: lobbySaving,
+          error: lobbyError,
+          onToggle: handleLobbyToggle,
         }),
 
         // Column headers
