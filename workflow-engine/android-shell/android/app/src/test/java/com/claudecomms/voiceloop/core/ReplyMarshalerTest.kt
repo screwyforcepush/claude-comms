@@ -15,7 +15,10 @@ class ReplyMarshalerTest {
             triggerMessageId = "message-1",
         )
 
-        assertEquals("dictated reply", descriptors[0].args["content"])
+        assertEquals(
+            "${ReplyMarshaler.PROVENANCE_PREFIX}\ndictated reply",
+            descriptors[0].args["content"],
+        )
         assertThrows(IllegalArgumentException::class.java) {
             ReplyMarshaler.mutationSequence(
                 password = "pw",
@@ -41,7 +44,7 @@ class ReplyMarshalerTest {
                 "password" to "pw",
                 "threadId" to "thread-1",
                 "role" to "user",
-                "content" to "reply",
+                "content" to "${ReplyMarshaler.PROVENANCE_PREFIX}\nreply",
             ),
             descriptors[0].args,
         )

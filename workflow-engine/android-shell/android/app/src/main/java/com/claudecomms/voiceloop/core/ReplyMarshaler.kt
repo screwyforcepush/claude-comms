@@ -4,6 +4,13 @@ object ReplyMarshaler {
     const val ADD_MESSAGE_MUTATION: String = "chatMessages:add"
     const val TRIGGER_JOB_MUTATION: String = "chatJobs:trigger"
 
+    // Notification replies are a mediated channel (dictation, sometimes phone-
+    // assistant co-drafting by a zero-repo-context agent). The prefix rides on
+    // the outgoing mutation only — never on the local notification echo, which
+    // shows the user their own words verbatim.
+    const val PROVENANCE_PREFIX: String =
+        "[transcribed/co-drafted with phone assistant — possible transcription errors; assistant has no repo context]"
+
     fun mutationSequence(
         password: String,
         threadId: String,
@@ -26,7 +33,7 @@ object ReplyMarshaler {
                 "password" to password,
                 "threadId" to threadId,
                 "role" to "user",
-                "content" to content,
+                "content" to "$PROVENANCE_PREFIX\n$content",
             ),
         )
     }

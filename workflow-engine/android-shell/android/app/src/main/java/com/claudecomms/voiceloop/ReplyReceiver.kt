@@ -22,7 +22,7 @@ class ReplyReceiver : BroadcastReceiver() {
             val threadId = threadIdFrom(intent)
             val title = intent?.getStringExtra(NotificationPoster.EXTRA_THREAD_TITLE)
                 ?: threadId
-                ?: "Claude Comms"
+                ?: "Slipgate"
 
             try {
                 if (threadId.isNullOrBlank()) {

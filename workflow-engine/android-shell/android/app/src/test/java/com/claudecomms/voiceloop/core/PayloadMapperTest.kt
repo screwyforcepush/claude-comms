@@ -6,15 +6,14 @@ import org.junit.Test
 
 class PayloadMapperTest {
     @Test
-    fun mapsTitleAndBodyVerbatimIncludingFiveThousandCharacters() {
+    fun keepsFullTitleAsConversationTitleAndPrependsTopicToFiveThousandCharBody() {
         val body = "x".repeat(5000)
-        val row = row(title = "Namespace - Thread", body = body)
+        val row = row(title = "claude-comms · Voice Loop", body = body)
 
         val payload = PayloadMapper.toNotificationPayload(row)
 
-        assertEquals("Namespace - Thread", payload.conversationTitle)
-        assertEquals(body, payload.incomingMessage.body)
-        assertEquals(5000, payload.incomingMessage.body.length)
+        assertEquals("claude-comms · Voice Loop", payload.conversationTitle)
+        assertEquals("Voice Loop — $body", payload.incomingMessage.body)
     }
 
     @Test
@@ -30,19 +29,31 @@ class PayloadMapperTest {
     }
 
     @Test
-    fun modelsLocalUserAsYouAndIncomingMessageBodyAsSenderContent() {
-        val payload = PayloadMapper.toNotificationPayload(row(body = "verbatim incoming body"))
+    fun sendsAsNamespaceWithTopicPrefixedBody() {
+        val payload = PayloadMapper.toNotificationPayload(
+            row(title = "claude-comms · Mobile Voice Workflow", body = "verbatim incoming body"),
+        )
 
         assertEquals("You", payload.localUser.name)
-        assertEquals("Assistant", payload.incomingMessage.sender.name)
+        assertEquals("claude-comms", payload.incomingMessage.sender.name)
         assertNotEquals(payload.localUser, payload.incomingMessage.sender)
+        assertEquals("Mobile Voice Workflow — verbatim incoming body", payload.incomingMessage.body)
+    }
+
+    @Test
+    fun fallsBackToWholeTitleAsSenderAndVerbatimBodyWhenSeparatorAbsent() {
+        val payload = PayloadMapper.toNotificationPayload(
+            row(title = "claude-comms", body = "verbatim incoming body"),
+        )
+
+        assertEquals("claude-comms", payload.incomingMessage.sender.name)
         assertEquals("verbatim incoming body", payload.incomingMessage.body)
     }
 
     private fun row(
         id: String = "note-1",
         threadId: String = "thread-1",
-        title: String = "Namespace - Thread",
+        title: String = "claude-comms · Thread Topic",
         body: String = "body",
     ): FeedRow = FeedRow(
         id = id,

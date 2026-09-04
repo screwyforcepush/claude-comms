@@ -23,7 +23,6 @@ class NotificationPoster(private val context: Context) {
     private val notificationManager = appContext.getSystemService(NotificationManager::class.java)
     private val notificationManagerCompat = NotificationManagerCompat.from(appContext)
     private val localUser = Person.Builder().setName(PayloadMapper.LOCAL_USER_NAME).build()
-    private val assistant = Person.Builder().setName(PayloadMapper.INCOMING_SENDER_NAME).build()
 
     init {
         ensureMessageChannel()
@@ -86,8 +85,9 @@ class NotificationPoster(private val context: Context) {
     fun appendReplyFailure(threadId: String, title: String): Boolean {
         if (!canPostMessages()) return false
         val failureText = "Reply failed - open the app"
+        val sender = Person.Builder().setName(PayloadMapper.senderNameFrom(title)).build()
         val style = styleFor(threadId, title)
-            .addMessage(failureText, System.currentTimeMillis(), assistant)
+            .addMessage(failureText, System.currentTimeMillis(), sender)
         return notify(
             threadId,
             MESSAGE_NOTIFICATION_ID,
@@ -204,7 +204,7 @@ class NotificationPoster(private val context: Context) {
                 "Messages",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Claude Comms voice-loop messages"
+                description = "Slipgate voice-loop messages"
                 setShowBadge(true)
             },
         )
