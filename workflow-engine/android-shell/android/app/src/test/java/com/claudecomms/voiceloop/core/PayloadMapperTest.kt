@@ -50,6 +50,32 @@ class PayloadMapperTest {
         assertEquals("verbatim incoming body", payload.incomingMessage.body)
     }
 
+    @Test
+    fun lobbyPayloadSpeaksAsNamespaceUnderTheLobbyTitle() {
+        val payload = PayloadMapper.toLobbyPayload(
+            namespaceId = "ns-1",
+            namespaceName = "claude-comms",
+            timestamp = 1717430400000.0,
+        )
+
+        assertEquals("lobby:ns-1", payload.identity.tag)
+        assertEquals(PayloadMapper.MESSAGE_NOTIFICATION_ID, payload.identity.id)
+        assertEquals(PayloadMapper.LOBBY_TITLE, payload.conversationTitle)
+        assertEquals("claude-comms", payload.incomingMessage.sender.name)
+        assertEquals(PayloadMapper.LOBBY_PROMPT, payload.incomingMessage.body)
+        assertEquals(1717430400000.0, payload.incomingMessage.timestamp, 0.0)
+    }
+
+    @Test
+    fun lobbyTagRoundTripsAndNeverCollidesWithThreadTags() {
+        val tag = PayloadMapper.lobbyTag("ns-1")
+
+        assertEquals(true, PayloadMapper.isLobbyTag(tag))
+        assertEquals(false, PayloadMapper.isLobbyTag("thread-1"))
+        assertEquals("ns-1", PayloadMapper.namespaceIdFromLobbyTag(tag))
+        assertNotEquals("ns-1", tag)
+    }
+
     private fun row(
         id: String = "note-1",
         threadId: String = "thread-1",

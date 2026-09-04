@@ -27,6 +27,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class FeedListenerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -102,6 +106,9 @@ class FeedListenerService : Service() {
         var retryDelayMs = INITIAL_RETRY_DELAY_MS
         while (serviceScope.isActive) {
             try {
+                // Every (re)subscribe pass re-posts missing lobbies, which is
+                // both bootstrap and dismissed-lobby resurrection.
+                ensureLobbies(client, config.password)
                 if (!prefs.isFeedInitialized()) {
                     drainFreshInstall(client, config.password)
                 }
@@ -116,6 +123,29 @@ class FeedListenerService : Service() {
                 delay(retryDelayMs)
                 retryDelayMs = (retryDelayMs * 2).coerceAtMost(MAX_RETRY_DELAY_MS)
             }
+        }
+    }
+
+    // Best-effort: lobbies are shade furniture and must never break the feed.
+    // Parsed as raw JSON so namespace-record fields can evolve without
+    // coupling the shell to their schema.
+    private suspend fun ensureLobbies(client: ConvexClient, password: String) {
+        runCatching {
+            val namespaces = client
+                .subscribe<JsonElement>("namespaces:list", mapOf("password" to password))
+                .first()
+                .getOrThrow()
+                .jsonArray
+            for (element in namespaces) {
+                val row = element.jsonObject
+                val id = row["_id"]?.jsonPrimitive?.contentOrNull ?: continue
+                val name = row["name"]?.jsonPrimitive?.contentOrNull ?: continue
+                if (!poster.isLobbyPosted(id)) {
+                    poster.postLobby(id, name)
+                }
+            }
+        }.onFailure { error ->
+            Log.w(TAG, "Lobby bootstrap failed", error)
         }
     }
 

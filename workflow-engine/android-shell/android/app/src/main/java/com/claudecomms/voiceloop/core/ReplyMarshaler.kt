@@ -3,6 +3,7 @@ package com.claudecomms.voiceloop.core
 object ReplyMarshaler {
     const val ADD_MESSAGE_MUTATION: String = "chatMessages:add"
     const val TRIGGER_JOB_MUTATION: String = "chatJobs:trigger"
+    const val CREATE_THREAD_MUTATION: String = "chatThreads:create"
 
     // Notification replies are a mediated channel (dictation, sometimes phone-
     // assistant co-drafting by a zero-repo-context agent). The prefix rides on
@@ -19,6 +20,20 @@ object ReplyMarshaler {
     ): List<ConvexMutationDescriptor> = listOf(
         addMessage(password, threadId, rawText),
         triggerJob(password, threadId, triggerMessageId),
+    )
+
+    // Lobby replies spawn a fresh thread. No title/mode: the server defaults to
+    // jam mode and the Steward retitles on first message, same as a web-created
+    // thread.
+    fun createThread(
+        password: String,
+        namespaceId: String,
+    ): ConvexMutationDescriptor = ConvexMutationDescriptor(
+        name = CREATE_THREAD_MUTATION,
+        args = mapOf(
+            "password" to password,
+            "namespaceId" to namespaceId,
+        ),
     )
 
     fun addMessage(

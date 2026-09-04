@@ -6,6 +6,39 @@ object PayloadMapper {
     const val TITLE_SEPARATOR: String = " · "
     const val TOPIC_BODY_SEPARATOR: String = " — "
 
+    // The lobby is the standing per-namespace conversation whose reply spawns a
+    // fresh thread. Title is just "Lobby": namespace identity already rides the
+    // sender, so the layers compose ("the Lobby from claude-comms") rather than
+    // duplicate. Tag prefix can't collide with thread tags — Convex IDs never
+    // contain ':'.
+    const val LOBBY_TITLE: String = "Lobby"
+    const val LOBBY_PROMPT: String = "Reply to start a new thread."
+    const val LOBBY_TAG_PREFIX: String = "lobby:"
+
+    fun lobbyTag(namespaceId: String): String = "$LOBBY_TAG_PREFIX$namespaceId"
+
+    fun isLobbyTag(tag: String): Boolean = tag.startsWith(LOBBY_TAG_PREFIX)
+
+    fun namespaceIdFromLobbyTag(tag: String): String = tag.removePrefix(LOBBY_TAG_PREFIX)
+
+    fun toLobbyPayload(
+        namespaceId: String,
+        namespaceName: String,
+        timestamp: Double,
+    ): NotificationPayload = NotificationPayload(
+        identity = NotificationIdentity(
+            tag = lobbyTag(namespaceId),
+            id = MESSAGE_NOTIFICATION_ID,
+        ),
+        conversationTitle = LOBBY_TITLE,
+        localUser = NotificationPerson(LOCAL_USER_NAME),
+        incomingMessage = NotificationMessage(
+            sender = NotificationPerson(namespaceName),
+            body = LOBBY_PROMPT,
+            timestamp = timestamp,
+        ),
+    )
+
     // Row titles are engine-composed as "<namespace> · <thread topic>" and
     // namespace names are slugs that never contain the separator, so the first
     // occurrence splits reliably. The phone assistant voices only sender + body

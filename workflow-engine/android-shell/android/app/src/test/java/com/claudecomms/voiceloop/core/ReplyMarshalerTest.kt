@@ -73,6 +73,19 @@ class ReplyMarshalerTest {
     }
 
     @Test
+    fun createThreadDescriptorCarriesOnlyPasswordAndNamespaceId() {
+        val descriptor = ReplyMarshaler.createThread(
+            password = "pw",
+            namespaceId = "ns-1",
+        )
+
+        assertEquals("chatThreads:create", descriptor.name)
+        // No title/mode: the server defaults a fresh thread to jam mode and the
+        // Steward retitles it on first message.
+        assertEquals(mapOf("password" to "pw", "namespaceId" to "ns-1"), descriptor.args)
+    }
+
+    @Test
     fun neverEmitsMarkReadDescriptor() {
         val descriptors = ReplyMarshaler.mutationSequence(
             password = "pw",
