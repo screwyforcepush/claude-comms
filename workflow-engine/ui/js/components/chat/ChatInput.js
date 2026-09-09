@@ -33,8 +33,9 @@ function getInitialEnterSafe() {
  * @param {string} props.placeholder - Placeholder text
  * @param {string} [props.draftText] - Controlled draft value (optional, WP-6)
  * @param {Function} [props.onDraftChange] - Draft change callback (optional, WP-6)
+ * @param {Function} [props.onSendToFork] - Callback to send message into a new forked thread
  */
-export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...', draftText, onDraftChange, onStop, stopPending = false }) {
+export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...', draftText, onDraftChange, onStop, stopPending = false, onSendToFork }) {
   const [internalMessage, setInternalMessage] = useState('');
 
   // Use controlled value if provided, otherwise internal state
@@ -76,6 +77,22 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
       }
     }
   }, [message, disabled, onSend, onDraftChange]);
+
+  // Send the message into a new forked thread instead of this one
+  const handleForkSubmit = useCallback(() => {
+    const trimmedMessage = message.trim();
+    if (trimmedMessage && !disabled && onSendToFork) {
+      onSendToFork(trimmedMessage);
+      if (onDraftChange) {
+        onDraftChange('');
+      } else {
+        setInternalMessage('');
+      }
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    }
+  }, [message, disabled, onSendToFork, onDraftChange]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -291,6 +308,37 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
               d: 'M20 7v4a2 2 0 01-2 2H4'
             })
           )
+        ),
+
+        // Send-to-fork: branch this message into a new jam thread
+        onSendToFork && React.createElement('button', {
+          type: 'button',
+          onClick: handleForkSubmit,
+          disabled: !canSend,
+          className: 'chat-input-fork-button',
+          style: {
+            width: '48px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: canSend ? 'rgba(92, 60, 124, 0.25)' : 'var(--q-stone2)',
+            border: `1px solid ${canSend ? 'var(--q-teleport)' : 'var(--q-stone3)'}`,
+            borderRadius: 0,
+            color: canSend ? 'var(--q-teleport)' : 'var(--q-bone0)',
+            cursor: canSend ? 'pointer' : 'not-allowed',
+            padding: 0,
+            transition: 'all 150ms ease'
+          },
+          title: canSend
+            ? 'Send to fork: branch this message into a new thread'
+            : 'Type a message to send to a fork'
+        },
+          React.createElement(QIcon, {
+            name: 'fork',
+            size: 14,
+            color: 'currentColor'
+          })
         ),
 
         // Send / Stop button

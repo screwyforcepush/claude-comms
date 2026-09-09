@@ -2,6 +2,12 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requirePassword } from "./auth";
+import {
+  DEFAULT_HARNESS_DEFAULTS,
+  parseHarnessDefaults,
+  resolveJobType,
+  HarnessModelEntry,
+} from "./lib/harnessDefaults";
 
 // Queries
 
@@ -111,6 +117,84 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+// User-initiated thread fork: branch the conversation into a fresh jam thread.
+// Atomic — creates the thread, inserts the user's message, and queues the chat
+// job in one transaction so a network hiccup can't leave a half-created fork.
+// History is NOT copied: the forked Claude session carries the full context;
+// the parent thread remains the authoritative scrollback.
+// @see docs/project/spec/mental-model.md — Session Context Isolation / The Fork Model
+export const fork = mutation({
+  args: {
+    password: v.string(),
+    sourceThreadId: v.id("chatThreads"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const source = await ctx.db.get(args.sourceThreadId);
+    if (!source) throw new Error("Source thread not found");
+    const now = Date.now();
+
+    // Always fork the OG session — never a guardian fork. Guardian context is
+    // evaluative noise for a fresh jam; the conversation lives in claudeSessionId.
+    const sessionId = source.claudeSessionId;
+
+    // Provisional title until the fork agent sets its own via chat-title.
+    const newThreadId = await ctx.db.insert("chatThreads", {
+      namespaceId: source.namespaceId,
+      title: `⑂ ${source.title}`,
+      mode: "jam",
+      claudeSessionId: sessionId,
+      forkedFrom: args.sourceThreadId,
+      latestMessageAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const messageId = await ctx.db.insert("chatMessages", {
+      threadId: newThreadId,
+      role: "user",
+      content: args.content,
+      createdAt: now,
+    });
+
+    // Resolve harness+model from namespace config (mirrors chatJobs.trigger).
+    const ns = await ctx.db.get(source.namespaceId);
+    const defaults = ns?.harnessDefaults
+      ? parseHarnessDefaults(ns.harnessDefaults)
+      : DEFAULT_HARNESS_DEFAULTS;
+    const resolved = resolveJobType(defaults, "chat");
+    const entry: HarnessModelEntry = Array.isArray(resolved) ? resolved[0] : resolved;
+
+    const chatContext = {
+      threadId: newThreadId,
+      namespaceId: source.namespaceId,
+      mode: "jam",
+      effectivePromptMode: "jam",
+      latestUserMessage: args.content,
+      claudeSessionId: sessionId,
+      // No session yet on the parent → falls through to a plain fresh session
+      // (prompt layer sends the full initial prompt).
+      forkSession: !!sessionId,
+      isThreadFork: true,
+      isGuardianEvaluation: false,
+      isCompletionSummary: false,
+    };
+
+    const jobId = await ctx.db.insert("chatJobs", {
+      threadId: newThreadId,
+      namespaceId: source.namespaceId,
+      harness: entry.harness,
+      model: entry.model,
+      context: JSON.stringify(chatContext),
+      status: "pending",
+      createdAt: now,
+    });
+
+    return { threadId: newThreadId, messageId, jobId };
   },
 });
 

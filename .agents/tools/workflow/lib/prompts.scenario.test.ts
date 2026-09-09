@@ -290,4 +290,46 @@ describe('buildChatPrompt scenarios', () => {
     assert.ok(!prompt.includes('{{LATEST_MESSAGE}}'), 'LATEST_MESSAGE should be replaced');
     assert.ok(!prompt.includes('{{ASSIGNMENT_ID}}'), 'ASSIGNMENT_ID should be replaced');
   });
+
+  it('scenario: thread fork gets fork preamble + jam mode section', () => {
+    const context = mockChatContext({
+      mode: 'jam',
+      threadId: 'thread_fork_456',
+      claudeSessionId: 'session_from_parent', // inherited from parent thread
+      isThreadFork: true,
+      latestUserMessage: 'Let us explore the caching idea separately.',
+    });
+
+    const prompt = buildChatPrompt(context, 'my-project');
+
+    // Fork preamble present, addressed to the NEW thread id
+    assert.ok(prompt.includes('FORKED THREAD'), 'Should use the THREAD_FORK section');
+    assert.ok(prompt.includes('thread_fork_456'), 'Should inject the new thread id');
+    assert.ok(prompt.includes('chat-title'), 'Should instruct setting a title');
+
+    // Jam mode section rides along (fork threads always open in jam)
+    assert.ok(prompt.includes('JAM MODE'), 'Should include the jam mode section');
+
+    // NOT the full initial prompt — the session already knows who it is
+    assert.ok(!prompt.includes('Context Primer'), 'Should not resend the full initial prompt');
+
+    // User message appended as usual
+    assert.ok(prompt.includes('Let us explore the caching idea separately.'),
+      'Should include the fork-opening message');
+    assert.ok(!prompt.includes('{{THREAD_ID}}'), 'THREAD_ID should be replaced');
+  });
+
+  it('scenario: fork of a session-less thread degrades to full initial prompt', () => {
+    const context = mockChatContext({
+      mode: 'jam',
+      claudeSessionId: undefined, // parent had no session to inherit
+      isThreadFork: true,
+    });
+
+    const prompt = buildChatPrompt(context, 'my-project');
+
+    // Fresh session takes priority: full prompt, no fork framing
+    assert.ok(prompt.includes('Context Primer'), 'Should send the full initial prompt');
+    assert.ok(!prompt.includes('FORKED THREAD'), 'Should not include fork preamble without a session');
+  });
 });

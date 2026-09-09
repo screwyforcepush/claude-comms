@@ -223,6 +223,9 @@ export default defineSchema({
     assignmentsCreated: v.optional(v.array(v.id("assignments"))), // U6: Multi-assignment history
     latestMessageAt: v.optional(v.number()), // Denormalized: timestamp of most recent message
     pinned: v.optional(v.boolean()),
+    // User-initiated thread fork: parent thread this one branched from.
+    // History is not copied — the forked Claude session carries the context.
+    forkedFrom: v.optional(v.id("chatThreads")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

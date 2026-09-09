@@ -62,8 +62,10 @@ export interface ChatJobContext {
   lastPromptMode?: "jam" | "cook";
   latestUserMessage: string;
   claudeSessionId?: string;
-  // Guardian session fork: true when forking from OG session for first guardian eval
+  // Session fork: true when forking from OG session (first guardian eval, or thread fork)
   forkSession?: boolean;
+  // User-initiated thread fork: first message of a thread branched from another thread
+  isThreadFork?: boolean;
   // Guardian mode context
   assignmentId?: string;
   isGuardianEvaluation?: boolean; // True when PO is evaluating PM response
@@ -71,7 +73,7 @@ export interface ChatJobContext {
 }
 
 // Prompt types for differential prompting
-export type PromptType = "full" | "mode_activation" | "minimal" | "guardian_eval" | "completion_summary";
+export type PromptType = "full" | "mode_activation" | "minimal" | "guardian_eval" | "completion_summary" | "thread_fork";
 
 // Resolve templates directory relative to this module
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -325,8 +327,15 @@ export function determinePromptType(chatContext: ChatJobContext): PromptType {
   }
 
   // New session (no claudeSessionId) - send full prompt
+  // Checked before thread_fork: a fork of a session-less thread degrades
+  // naturally to a plain fresh thread (nothing inherited to frame).
   if (isNewSession) {
     return "full";
+  }
+
+  // User-initiated thread fork: inherited session, new thread identity
+  if (chatContext.isThreadFork === true) {
+    return "thread_fork";
   }
 
   // Check if mode changed since last prompt
@@ -380,6 +389,14 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
       break;
 
     case "mode_activation":
+      parts.push(extractSection(template, mode));
+      break;
+
+    case "thread_fork":
+      // Fork preamble + mode section: forks always open in jam, and the
+      // inherited session may have last seen a cook prompt — the mode section
+      // doubles as the mode activation the differential check would miss.
+      parts.push(extractSection(template, "THREAD_FORK"));
       parts.push(extractSection(template, mode));
       break;
 

@@ -53,6 +53,24 @@ Example titles:
 Do this FIRST before responding to the user.
 {{/section}}
 
+{{#section THREAD_FORK}}
+## FORKED THREAD - New Session Branch
+
+This session was just **forked** from another thread's conversation. You inherit that full conversation context, but this is a **new thread** with its own identity:
+
+- **New Thread ID:** {{THREAD_ID}} — ALL toolkit commands in this conversation MUST use this ID, not the one from the inherited context.
+- The original thread continues separately. Treat the inherited conversation as background; do not continue its open loops unless the user's message below picks them up.
+- The user's message below opens this fork's topic.
+
+You MUST set this thread's title now. Run this command with a descriptive title (3-6 words) reflecting the fork's topic:
+
+```bash
+npx tsx .agents/tools/workflow/cli.ts chat-title {{THREAD_ID}} "<descriptive-title>"
+```
+
+Do this FIRST before responding to the user.
+{{/section}}
+
 {{#section COOK_MODE}}
 ## COOK MODE ACTIVE
 

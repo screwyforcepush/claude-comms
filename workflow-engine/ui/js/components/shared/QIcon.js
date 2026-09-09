@@ -33,6 +33,12 @@ export const ICON_PATHS = {
     React.createElement('path', { d: 'M4 12h12', stroke: 'currentColor', strokeWidth: sw }),
     React.createElement('path', { d: 'M14 7l6 5-6 5', stroke: 'currentColor', strokeWidth: sw, fill: 'none', strokeLinejoin: 'miter' })
   ),
+  fork: (sw) => React.createElement(React.Fragment, null,
+    React.createElement('polyline', { points: '12,21 12,12 5,5', stroke: 'currentColor', strokeWidth: sw, fill: 'none', strokeLinejoin: 'miter' }),
+    React.createElement('line', { x1: 12, y1: 12, x2: 19, y2: 5, stroke: 'currentColor', strokeWidth: sw }),
+    React.createElement('circle', { cx: 5, cy: 5, r: 1.5, fill: 'currentColor' }),
+    React.createElement('circle', { cx: 19, cy: 5, r: 1.5, fill: 'currentColor' })
+  ),
 
   // --- Weapons / Actions ---
   axe: (sw) => React.createElement(React.Fragment, null,

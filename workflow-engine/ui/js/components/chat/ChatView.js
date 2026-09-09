@@ -46,7 +46,10 @@ export function ChatView({
   onKillJob,                 // WP-7 R1: Kill a running job
   onKillChatJob,             // WP-7 R2: Kill active chatJob
   onRetryGroup,              // Retry a job group (cascade-deletes downstream)
-  activeChatJob = null       // WP-7 R2: Active chatJob for current thread
+  activeChatJob = null,      // WP-7 R2: Active chatJob for current thread
+  onSendToFork,              // Thread fork: send message into a new forked thread
+  forkOrigin = null,         // Thread fork: { threadId, title } of parent thread, if this is a fork
+  onSelectForkOrigin         // Thread fork: navigate to the parent thread
 }) {
   // WP-4: State for selected job modal
   const [selectedJob, setSelectedJob] = useState(null);
@@ -198,6 +201,28 @@ export function ChatView({
         disabled: sending
       }),
 
+      // Thread fork: origin banner — this thread branched off another conversation.
+      // History is not copied; the parent thread owns the scrollback, one click away.
+      forkOrigin && React.createElement('button', {
+        type: 'button',
+        onClick: onSelectForkOrigin,
+        className: 'flex items-center gap-2 px-4 py-1.5 text-xs text-left w-full',
+        style: {
+          backgroundColor: 'rgba(92, 60, 124, 0.12)',
+          borderBottom: '1px solid var(--q-stone3)',
+          color: 'var(--q-teleport)',
+          fontFamily: 'var(--font-display)',
+          cursor: onSelectForkOrigin ? 'pointer' : 'default'
+        },
+        title: 'Go to the original thread'
+      },
+        React.createElement('span', { 'aria-hidden': 'true' }, '⑂'),
+        React.createElement('span', null, 'FORKED FROM'),
+        React.createElement('span', {
+          style: { color: 'var(--q-bone2)', fontFamily: 'var(--font-console)' }
+        }, forkOrigin.title)
+      ),
+
       // Message list (scrollable)
       // WP-6: Added onMarkRead prop for unread tracking
       React.createElement(MessageList, {
@@ -220,7 +245,8 @@ export function ChatView({
         draftText: draftText,
         onDraftChange: onDraftChange,
         onStop: activeChatJob ? handleStopChatJob : null,
-        stopPending: stopRequested || !!activeChatJob?.killRequested
+        stopPending: stopRequested || !!activeChatJob?.killRequested,
+        onSendToFork: onSendToFork
       })
     ),
 

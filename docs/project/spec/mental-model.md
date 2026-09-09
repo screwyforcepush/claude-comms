@@ -199,6 +199,12 @@ The system routes based on thread mode:
 
 Switching between modes is instant and non-destructive. Nothing is lost.
 
+### User-Initiated Thread Fork
+Forking is also a conversation move the user can make, not just guardian machinery: send a message *sideways* into a fresh jam thread that inherits the full conversation context but diverges from that point. Use case: a jam surfaces a tangent worth its own thread — branch it without polluting the original.
+- **The fork carries the agent's memory, not the transcript.** Message history is not copied; the parent thread remains the authoritative scrollback, and the fork shows a pointer back to its origin. (Deliberate start-lean call — revisit copied scrollback only if its absence proves annoying in practice.)
+- Forks always open in **jam mode**, always fork the **OG session** (never a guardian fork — evaluative context is noise for a fresh jam), and start with no assignment links: a clean slate with full memory.
+- Claude-only, mirroring the guardian fork primitive. Forking a thread that has no session yet simply starts a fresh one — nothing inherited, nothing lost.
+
 ## Hands-Free Voice Loop (Mobile)
 
 The user increasingly drives jams by voice — dictating into the phone's chat input while away from a screen. The missing half is hearing responses. The phone assistant reads *notifications* aloud but cannot read in-app messages — so **push notifications are the audio surface for this system**, not merely an alert channel.

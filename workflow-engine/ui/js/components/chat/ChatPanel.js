@@ -549,6 +549,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
   const updateTitle = useMutation(api.chatThreads.updateTitle);
   const removeThread = useMutation(api.chatThreads.remove);
   const triggerChatJob = useMutation(api.chatJobs.trigger);
+  const forkThread = useMutation(api.chatThreads.fork);
 
   // WP-7: Mutation hooks for assignment & agent control (U5, U6, R1, R2)
   const updateAssignmentStatus = useMutation(api.assignments.update);
@@ -699,6 +700,44 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       setSending(false);
     }
   }, [renderedThreadId, sending, addMessage, triggerChatJob, clearDraft]);
+
+  // Send-to-fork: branch the message into a new jam thread that inherits
+  // this thread's session context. The fork mutation is atomic (thread +
+  // message + chat job); on success we jump to the fork and clear the
+  // parent's draft — the text went somewhere, it shouldn't linger here.
+  const handleSendToFork = useCallback(async (content) => {
+    if (!renderedThreadId || sending) return;
+
+    setSending(true);
+    try {
+      const { threadId: forkThreadId } = await forkThread({
+        sourceThreadId: renderedThreadId,
+        content: content
+      });
+      clearDraft(renderedThreadId);
+      setCurrentDraft('');
+      setSelectedThreadId(forkThreadId);
+    } catch (err) {
+      console.error('Failed to fork thread:', err);
+    } finally {
+      setSending(false);
+    }
+  }, [renderedThreadId, sending, forkThread, clearDraft]);
+
+  // Fork-origin banner data: parent thread's title from the already-subscribed
+  // thread list (no extra query; falls back gracefully if outside the window).
+  const forkOrigin = useMemo(() => {
+    if (!selectedThread?.forkedFrom) return null;
+    const parent = allThreads?.find(t => t._id === selectedThread.forkedFrom);
+    return {
+      threadId: selectedThread.forkedFrom,
+      title: parent?.title || 'original thread'
+    };
+  }, [selectedThread?.forkedFrom, allThreads]);
+
+  const handleSelectForkOrigin = useCallback(() => {
+    if (forkOrigin) setSelectedThreadId(forkOrigin.threadId);
+  }, [forkOrigin]);
 
   // Handle updating thread title
   const handleUpdateTitle = useCallback(async (title) => {
@@ -1026,7 +1065,10 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       onKillJob: handleKillJob,
       onKillChatJob: handleKillChatJob,
       onRetryGroup: handleRetryGroup,
-      activeChatJob: activeChatJob || null
+      activeChatJob: activeChatJob || null,
+      onSendToFork: handleSendToFork,
+      forkOrigin: forkOrigin,
+      onSelectForkOrigin: handleSelectForkOrigin
     }),
 
     // Settings modal
