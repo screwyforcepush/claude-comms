@@ -67,6 +67,8 @@ export const api = {
     get: "chatThreads:get",
     // Create a new thread
     create: "chatThreads:create",
+    // Fork a thread: new jam thread inheriting the source's session context
+    fork: "chatThreads:fork",
     // Update thread mode (jam/cook)
     updateMode: "chatThreads:updateMode",
     // Update thread title

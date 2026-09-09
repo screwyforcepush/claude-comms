@@ -719,10 +719,14 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       setSelectedThreadId(forkThreadId);
     } catch (err) {
       console.error('Failed to fork thread:', err);
+      // ChatInput cleared its text optimistically — restore it as the draft
+      // so a failed fork doesn't eat the user's message.
+      saveDraft(renderedThreadId, content);
+      setCurrentDraft(content);
     } finally {
       setSending(false);
     }
-  }, [renderedThreadId, sending, forkThread, clearDraft]);
+  }, [renderedThreadId, sending, forkThread, clearDraft, saveDraft]);
 
   // Fork-origin banner data: parent thread's title from the already-subscribed
   // thread list (no extra query; falls back gracefully if outside the window).
