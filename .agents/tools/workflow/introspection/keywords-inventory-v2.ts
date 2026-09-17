@@ -4,6 +4,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import { fetchAllReflectionsV2, fetchRecentReflectionsV2 } from "../lib/reflections-fetch.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "..", "config.json");
@@ -19,17 +20,19 @@ const api = anyApi;
 const client = new ConvexHttpClient(config.convexUrl);
 
 interface Args {
-  last: number;
+  last?: number;
+  since?: number;
   scope: "all" | "current";
   json: boolean;
 }
 
 function parseArgs(): Args {
-  const args: Args = { last: 1000, scope: "all", json: false };
+  const args: Args = { scope: "all", json: false };
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--last") args.last = Number(argv[++i]);
+    else if (a === "--since") args.since = Number(argv[++i]);
     else if (a === "--current") args.scope = "current";
     else if (a === "--all") args.scope = "all";
     else if (a === "--json") args.json = true;
@@ -40,12 +43,16 @@ Counts top-level (entry-level) keywords on V2 rows; items[]-level counting
 deliberately omitted (per mental-model.md §Structural Direction — aggregate
 volume at the entry level is the honest severity signal).
 
+By default every row is fetched by paging the table per namespace.
+
 Usage: keywords-inventory-v2.ts [options]
 
 Options:
   --all          (default) count across all namespaces
   --current      only the namespace named in config.json
-  --last <N>     window per namespace (default 1000, same as the page cap)
+  --since <ms>   only rows created at or after this epoch-ms timestamp
+  --last <N>     instead of paging everything, take only the most recent N
+                 rows per namespace (server cap 1000)
   --json         emit JSON instead of a sorted text table
 `);
       process.exit(0);
@@ -71,12 +78,9 @@ async function main() {
   let scanned = 0;
 
   for (const ns of namespaces) {
-    const recent = await client.query(api.reflectionsV2.recent, {
-      password: config.password,
-      namespaceId: ns._id,
-      last: args.last,
-    });
-    const rows = (recent.page ?? []) as Array<{ keywords?: string[] }>;
+    const rows: Array<{ keywords?: string[] }> = args.last !== undefined
+      ? await fetchRecentReflectionsV2(client, config.password, ns._id, args.last)
+      : await fetchAllReflectionsV2(client, config.password, ns._id, { since: args.since });
     scanned += rows.length;
     for (const r of rows) {
       for (const kw of r.keywords ?? []) {

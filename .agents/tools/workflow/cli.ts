@@ -25,7 +25,9 @@
  *   jobs [--status <status>] [--group <groupId>] [--assignment <assignmentId>]   List jobs
  *   job <id>                            Get job details
  *   queue                               Show queue status
- *   reflections [status|on|off]         Show or set per-namespace reflection capture
+ *   reflections [status|on|off|coverage] [--since <t>] [--until <t>] [--batch <N>]
+                                      Show/set per-namespace reflection capture; coverage sums
+                                      terminal vs reflected jobs and gaps over a window (default 7d)
  *
  *   create <northStar> [--priority N] [--independent] [--thread <threadId>]   Create assignment
  *   insert-job [assignmentId] [--type <type>] [--jobs <json>] [--jobs-file <path>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
@@ -62,6 +64,7 @@ import { fileURLToPath } from "url";
 import { HarnessDefaults, HarnessModelEntry, parseHarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
 import { collapseFanOutDuplicates } from "./lib/collapse-fanout.js";
 import { getEngineIdentity } from "./lib/engine-version.js";
+import { mergeCoverage, parseTimeArg, summarizeGaps, CoverageBatch, GapRow } from "./lib/coverage-merge.js";
 
 // Use anyApi for portability (same as runner.ts)
 const api = anyApi;
@@ -157,7 +160,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   jobs: ["status", "group", "assignment"],
   job: [],
   queue: [],
-  reflections: [],
+  reflections: ["since", "until", "batch"],
   create: ["priority", "independent", "thread"],
   "insert-job": ["type", "jobs", "jobs-file", "harness", "model", "context", "after"],
   "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason", "nudge", "clear-nudge", "append-northstar"],
@@ -294,9 +297,9 @@ async function getQueueStatus() {
   });
 }
 
-async function reflections(action: string = "status") {
-  if (action !== "status" && action !== "on" && action !== "off") {
-    error("Reflections command must be one of: status, on, off");
+async function reflections(action: string = "status", flags: Record<string, string> = {}) {
+  if (action !== "status" && action !== "on" && action !== "off" && action !== "coverage") {
+    error("Reflections command must be one of: status, on, off, coverage");
   }
 
   const nsId = await getNamespaceId();
@@ -305,6 +308,55 @@ async function reflections(action: string = "status") {
     id: nsId,
   });
   if (!ns) error("Namespace not found");
+
+  if (action === "coverage") {
+    // Cursor-batched so the window can span weeks on a busy namespace without
+    // tripping Convex's per-execution read limit. Pages are reduced client-side.
+    const until = flags.until ? parseTimeArg(flags.until, "until") : Date.now();
+    const since = flags.since ? parseTimeArg(flags.since, "since") : until - 7 * 24 * 60 * 60 * 1000;
+    const batchSize = flags.batch ? parseInt(flags.batch) : 200;
+    if (since > until) error("--since must be before --until");
+
+    const batches: CoverageBatch[] = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const page = await client.query(api.reflectionsV2.coverageRate, {
+        password: config.password,
+        namespaceId: nsId,
+        since,
+        until,
+        cursor,
+        batchSize,
+      });
+      batches.push(page);
+      if (page.isDone || !page.continueCursor) break;
+      cursor = page.continueCursor;
+    }
+
+    const gapRows: GapRow[] = [];
+    cursor = null;
+    for (;;) {
+      const page = await client.query(api.reflectionsV2.gaps, {
+        password: config.password,
+        namespaceId: nsId,
+        since,
+        until,
+        cursor,
+        batchSize,
+      });
+      gapRows.push(...(page.page ?? []));
+      if (page.isDone || !page.continueCursor) break;
+      cursor = page.continueCursor;
+    }
+
+    output({
+      namespace: ns.name,
+      window: { since: new Date(since).toISOString(), until: new Date(until).toISOString() },
+      ...mergeCoverage(batches),
+      gaps: summarizeGaps(gapRows),
+    });
+    return;
+  }
 
   if (action === "on" || action === "off") {
     const enabled = action === "on";
@@ -759,7 +811,9 @@ Commands:
                                       List jobs (filterable by status, group, or assignment)
   job <id>                            Get job details
   queue                               Show queue status
-  reflections [status|on|off]         Show or set per-namespace reflection capture
+  reflections [status|on|off|coverage] [--since <t>] [--until <t>] [--batch <N>]
+                                      Show/set per-namespace reflection capture; coverage sums
+                                      terminal vs reflected jobs and gaps over a window (default 7d)
 
   create <northStar> [--priority N] [--independent] [--thread <threadId>]
                                       Create assignment
@@ -863,7 +917,7 @@ async function main() {
         break;
 
       case "reflections":
-        await reflections(positional[0] || "status");
+        await reflections(positional[0] || "status", flags);
         break;
 
       case "create":

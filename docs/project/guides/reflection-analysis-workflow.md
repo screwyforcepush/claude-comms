@@ -119,9 +119,19 @@ Top-of-list is now the answer to *"what's loudest across this fleet right now?"*
 - **Stale canonicals.** When a rubric question changes, the keyword family agents reach for shifts too. Old canonicals can stop matching incoming spellings — re-cluster after rubric edits, not just after volume thresholds.
 - **Forgetting items[].** The mutation rewrites both layers, but cluster judgment only reads top-level counts. Sanity check by sampling items[].keywords for a few representative rows to make sure the canonical you picked is consistent with how items use it.
 
+## Coverage check over a window
+
+Before reading aggregates for a period, confirm the pipeline was actually capturing during it:
+
+```bash
+npx tsx .agents/tools/workflow/cli.ts reflections coverage --since 2026-08-07 [--until <t>]
+```
+
+Sums terminal vs reflected jobs (by harness) and gaps by skip reason for the config namespace. It pages the server queries, so multi-week windows on busy namespaces work; `reflection_disabled` gaps are the sampler doing its job, `reflection_missing` is the alarm.
+
 ## Reference
 
-- CLIs: `.agents/tools/workflow/introspection/{dump-reflections-v2,keywords-inventory-v2,keywords-normalize-v2}.ts`
+- CLIs: `.agents/tools/workflow/introspection/{dump-reflections-v2,keywords-inventory-v2,keywords-normalize-v2}.ts` — dump and inventory page the whole table by default; `--last N` opts back into a bounded most-recent window
 - V2 schema: `workflow-engine/convex/schema.ts` (`reflectionsV2` table)
 - V2 mutation: `workflow-engine/convex/reflectionsV2.ts` (`normalizeKeywords`)
 - Design principles: `docs/project/spec/mental-model.md` §Agent Reflection Feedback Loop, §Design Principles for Capture, §Structural Direction (Converging on V2)

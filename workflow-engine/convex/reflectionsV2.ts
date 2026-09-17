@@ -92,6 +92,22 @@ async function getReflectedJobIds(
   return reflected;
 }
 
+// Opt-in cursor batching for since/until windows. Range mode loads every
+// terminal job doc in the window; on busy namespaces a multi-day window exceeds
+// the 16 MiB per-execution read limit. Passing `cursor` (null for the first
+// page) switches the range read to paginate; callers reduce the pages.
+// `last` mode is already bounded and ignores the cursor.
+const batchArgs = {
+  cursor: v.optional(v.union(v.string(), v.null())),
+  batchSize: v.optional(v.number()),
+};
+
+interface TerminalJobBatch {
+  jobs: Array<Doc<"jobs">>;
+  isDone: boolean;
+  continueCursor: string | null;
+}
+
 async function selectTerminalJobs(
   ctx: { db: any },
   args: {
@@ -101,8 +117,10 @@ async function selectTerminalJobs(
     since?: number;
     until?: number;
     last?: number;
+    cursor?: string | null;
+    batchSize?: number;
   }
-): Promise<Array<Doc<"jobs">>> {
+): Promise<TerminalJobBatch> {
   const window = validateWindow(args);
 
   let queryBuilder: any;
@@ -141,13 +159,22 @@ async function selectTerminalJobs(
     );
   }
 
-  const jobs = window.kind === "last"
-    ? await queryBuilder.take(window.count)
-    : await queryBuilder.collect();
+  const keep = (jobs: Array<Doc<"jobs">>) =>
+    jobs.filter((job: Doc<"jobs">) =>
+      job.namespaceId === args.namespaceId && isTerminal(job.status)
+    );
 
-  return jobs.filter((job: Doc<"jobs">) =>
-    job.namespaceId === args.namespaceId && isTerminal(job.status)
-  );
+  if (window.kind === "last") {
+    return { jobs: keep(await queryBuilder.take(window.count)), isDone: true, continueCursor: null };
+  }
+  if (args.cursor !== undefined) {
+    const { page, isDone, continueCursor } = await queryBuilder.paginate({
+      numItems: args.batchSize ?? 200,
+      cursor: args.cursor,
+    });
+    return { jobs: keep(page), isDone, continueCursor };
+  }
+  return { jobs: keep(await queryBuilder.collect()), isDone: true, continueCursor: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -322,10 +349,11 @@ export const coverageRate = query({
     jobType: v.optional(v.string()),
     harness: v.optional(harnessValidator),
     ...windowArgs,
+    ...batchArgs,
   },
   handler: async (ctx, args) => {
     requirePassword(args);
-    const jobs = await selectTerminalJobs(ctx, args);
+    const { jobs, isDone, continueCursor } = await selectTerminalJobs(ctx, args);
     const reflected = await getReflectedJobIds(ctx, jobs);
 
     const byHarness: Record<Harness, { terminal: number; reflected: number }> = {
@@ -357,6 +385,10 @@ export const coverageRate = query({
       rate: terminalJobs === 0 ? 0 : reflectedJobs / terminalJobs,
       byHarness,
       eligibleCoverage: eligibleTerminal === 0 ? 0 : eligibleReflected / eligibleTerminal,
+      // Batched callers sum terminal/reflected across pages and recompute rate;
+      // per-page rates are not meaningful on their own.
+      isDone,
+      continueCursor,
     };
   },
 });
@@ -462,13 +494,14 @@ export const gaps = query({
     jobType: v.optional(v.string()),
     harness: v.optional(harnessValidator),
     ...windowArgs,
+    ...batchArgs,
   },
   handler: async (ctx, args) => {
     requirePassword(args);
-    const jobs = await selectTerminalJobs(ctx, args);
+    const { jobs, isDone, continueCursor } = await selectTerminalJobs(ctx, args);
     const reflected = await getReflectedJobIds(ctx, jobs);
 
-    return jobs
+    const rows = jobs
       .filter((job) => !reflected.has(job._id))
       .map((job) => {
         let skipReason: string;
@@ -493,5 +526,10 @@ export const gaps = query({
           resultPreview: (job.result ?? "").slice(0, 240),
         };
       });
+
+    // Array shape is preserved for existing (unbatched) callers such as the
+    // IntrospectionDashboard; batched callers opt in by passing a cursor.
+    if (args.cursor === undefined) return rows;
+    return { page: rows, isDone, continueCursor };
   },
 });
