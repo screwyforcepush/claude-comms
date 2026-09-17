@@ -753,7 +753,7 @@ DEVICE EMULATION:
   device                Show the current device
   device <spec>         Switch device mid-session. Auth, cookies and current route are
                         kept; the page reloads into the new device. Run snap after.
-    Presets (all devicePixelRatio 1):
+    Presets:
       mobile            390x844 portrait, mobile+touch, phone user agent
       tablet            1180x820 landscape, mobile+touch, tablet user agent
       desktop           2560x1440
@@ -803,8 +803,8 @@ PAGE MANIPULATION:
 
 USAGE TIPS:
 **Snapshots** are verbose. Always try to pipe grep first
-    # Orientation snap (what can I interact with?)                                                                                                                                                                                                 
-    - snap | grep -E '\b(button|textbox|combobox|checkbox|link|spinbutton|radio|heading)\b'                                                                                                                                                                                                                                                                                                                                                                             
+    # Orientation snap (what can I interact with?)
+    - snap | grep -E '\b(button|textbox|combobox|checkbox|link|spinbutton|radio|heading)\b'
     # Targeted snap (find specific elements)
     - snap | grep -iC5 "search term"
     - **Interaction commands** return updated page state snapshots: click, fill, key, hover, drag, wait return updated page state
