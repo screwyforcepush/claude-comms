@@ -126,17 +126,21 @@
   │                                                                                        │
   │  ASSIGNMENT JOB LIFECYCLE:                                                             │
   │                                                                                        │
-  │    Job pending ──▶ start ──▶ running ──▶ complete ──▶ done                            │
+  │    Job pending ──▶ start ──▶ running ──▶ complete ──▶ done ──▶ spawn reflection fork  │
   │                                  │                                                     │
-  │                                  └──▶ fail    ──▶ failed                              │
-  │                                  └──▶ timeout ──▶ failed                              │
+  │                                  ├──▶ fail    ──▶ failed  ──▶ spawn reflection fork   │
+  │                                  ├──▶ timeout ──▶ failed  (idle or max-duration)      │
+  │                                  └──▶ rate limit / 529 ──▶ awaiting_retry ──▶ pending │
+  │                                       (server-side timer, backoff ≤30m, uncapped;     │
+  │                                        group stays in progress — no PM spawn)         │
   │                                                                                        │
   │  GROUP COMPLETION FLOW:                                                                │
   │                                                                                        │
   │    All jobs in group terminal?                                                         │
   │      │                                                                                 │
   │      ├── Group has PM job ──▶ Trigger Guardian eval (if thread in guardian mode)       │
-  │      │                        If no nextGroup, check assignment completion              │
+  │      │                        If no nextGroup, check assignment completion ──▶         │
+  │      │                        post executive summary into originating jam/cook thread  │
   │      │                                                                                 │
   │      ├── Has nextGroup ──▶ Scheduler picks up next group automatically                │
   │      │                                                                                 │
@@ -166,7 +170,9 @@
   │    cli.ts chat-send <thread> <msg>    →  Send message, trigger chatJob                │
   │    cli.ts chat-mode <thread> cook     →  Switch thread mode                            │
   │                                                                                        │
-  │  Auto-expansion: "review" jobs fan out to claude+codex+gemini (3 parallel jobs)       │
+  │  Fan-out: job types whose namespace harnessDefaults entry is an array (e.g. review)   │
+  │  expand to one job per entry at insert time; harness+model are stamped on the job.    │
+  │  PM self-fanned duplicates collapse back to one canonical fan-out (contexts merged).  │
   │                                                                                        │
   │  ENV vars set by runner give context:                                                  │
   │    WORKFLOW_ASSIGNMENT_ID, WORKFLOW_GROUP_ID, WORKFLOW_JOB_ID, WORKFLOW_THREAD_ID      │
@@ -205,27 +211,66 @@
 
 
   ┌────────────────────────────────────────────────────────────────────────────────────────┐
-  │ TYPICAL ASSIGNMENT FLOW (end-to-end)                                                   │
+  │ THE OPERATING LOOP (humans + agents as one machine)                                    │
   │                                                                                        │
-  │  User in COOK thread ──▶ PO agent creates assignment ──▶ PM inserts first job(s)      │
+  │  ROLES — four agents and one human, each layer missing something on purpose:           │
   │                                                                                        │
-  │  ┌─────┐  next  ┌─────────┐  next  ┌────┐  next  ┌───────┐  next  ┌────┐             │
-  │  │plan │──────▶│review    │──────▶│ PM │──────▶│impl   │──────▶│ PM │             │
-  │  │     │       │A(cl)B(cx)│       │    │       │claude │       │    │             │
-  │  │     │       │C(gem)    │       │    │       │       │       │    │             │
-  │  └─────┘       └──────────┘       └────┘       └───────┘       └────┘             │
-  │                                     │                            │                     │
-  │                              PM decides next              PM decides next              │
-  │                              job(s) or done               job(s) or done               │
+  │    USER      intent, taste, priorities. Only the user resolves a Block.                │
+  │    STEWARD   (PO agent, in the user's thread) authors intent as a north star;          │
+  │              the pre-assignment structural pass + gap hunt happen HERE, in jam.        │
+  │    PM        adjudicates ONE job run and Decides the next group. Stateless: sees       │
+  │              north star + Artifacts/Decisions + latest run only. No cross-cycle memory.│
+  │    CREW      plan / implement / review / uat / document. Execute the brief; never      │
+  │              insert jobs or change status.                                             │
+  │    GUARDIAN  the Steward's per-assignment fork. The only layer with memory across PM   │
+  │              cycles → it is the drift detector AND the circuit breaker (ripcord=Block).│
   │                                                                                        │
-  │  Guardian thread watching ◄── PM result injected as "pm" message ──▶ PO evaluates     │
-  │                                 sets alignmentStatus on assignment                      │
-  │                                 optionally sets pmNudge for next PM                     │
+  │  STAGES AND GATES:                                                                     │
+  │                                                                                        │
+  │    1 JAM      user thinks out loud ◄─▶ Steward reads mental-model.md, hunts gaps,      │
+  │               drafts acceptance criteria. Gate: user says "cook it".                   │
+  │    2 COOK     Steward `create` north star (one-liner + user rationale + cucumber +     │
+  │               acceptance criteria + refs) ──▶ `insert-job` head job (usually plan).    │
+  │               Steward updates mental-model.md with new intent. Gate: assignment exists.│
+  │               (1-file tweaks: Steward does them in-thread, no assignment.)             │
+  │    3 CHAIN    crew group ──▶ auto PM ──▶ crew group ──▶ auto PM ──▶ ...                │
+  │               PM harvests Artifacts/Decisions, picks next group via pm-modules/*.md.   │
+  │               Gate per cycle: PM Decides insert | complete | block.                    │
+  │    4 WATCH    every PM result ──▶ guardian fork evaluates: aligned | hold (sense) |    │
+  │               nudge (pmNudge, consumed by next PM) | block (ripcord → user).           │
+  │               User can also nudge or amend the north star from the UI mid-flight.      │
+  │    5 CLOSE    PM completes only after an approved COMPLETION REVIEW group              │
+  │               (review + document + uat if UX). Runner posts an executive summary       │
+  │               into the originating jam/cook thread.                                    │
+  │    6 REFLECT  every non-chat job forks a throwaway session that writes an ergonomics   │
+  │               reflection (sampled ~100/namespace/engine version). Aggregates are read  │
+  │               in jam by user + Steward; edits to templates/AOP are authored there,     │
+  │               never by an autonomous loop. Feeds stage 1 of the NEXT assignment.       │
+  │                                                                                        │
+  │  WHERE THINGS SURFACE:                                                                 │
+  │    Block ──▶ assignment status pill + guardian thread; runner skips blocked assignments│
+  │    Rate limit / 529 ──▶ awaiting_retry (a pause, not a failure; no PM spawn)           │
+  │    Failed group ──▶ PM spawns with "diagnose and recover"; guardian sees the pattern   │
+  │    Chat reply (audio toggle on) ──▶ notify fork ──▶ Slipgate push, inline reply        │
+  │                                                                                        │
+  │  TYPICAL CHAIN:                                                                        │
+  │                                                                                        │
+  │    ┌─────┐ next ┌─────────┐ next ┌────┐ next ┌──────┐ next ┌────┐ next ┌──────────┐    │
+  │    │plan │─────▶│review   │─────▶│ PM │─────▶│impl  │─────▶│ PM │─────▶│review+uat│ ...│
+  │    │     │      │A  B  C  │      │    │      │      │      │    │      │+document │    │
+  │    └─────┘      └─────────┘      └────┘      └──────┘      └────┘      └──────────┘    │
+  │    ▲ head job inserted by Steward      fan-out from namespace harnessDefaults;         │
+  │      in cook mode                      results anonymised (review A/B/C)               │
   │                                                                                        │
   │  PM NUDGE FLOW:                                                                        │
   │    Guardian/User writes nudge ──▶ pmNudge field on assignment                          │
   │    Next PM starts ──▶ reads nudge via CLI ──▶ factors into decision                    │
   │    PM addresses nudge ──▶ clears via CLI   (or leaves for next PM if can't address)    │
+  │                                                                                        │
+  │  INDEPENDENT vs SEQUENTIAL:                                                            │
+  │    Sequential assignments queue (one active per namespace). `independent` ones run     │
+  │    concurrently in the SAME working tree — reserved for research/documentation work    │
+  │    that touches no code, so there is nothing to collide on.                            │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
 

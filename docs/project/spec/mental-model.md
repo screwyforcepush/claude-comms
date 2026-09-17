@@ -52,6 +52,19 @@ These are **not negotiable** in a visual refresh. The aesthetic wraps around fun
 3. Agents execute jobs and report progress
 4. UI surfaces progress, status, artifacts back to user
 
+### The Machine — Roles and What Each Layer Deliberately Lacks
+The workflow is not the runner and the job chain; it is the user, the Steward, the PM, the crew and the Guardian operating as one loop. Each layer is shaped by what it is *denied*, and the gaps are the design:
+
+- **User** owns intent, taste and priority. The user is the only resolver of a Block, and the only author of direction. Nothing in the machine may redefine scope on the user's behalf.
+- **Steward** (the Product Owner agent in the user's thread) owns the *pre-assignment* gate. The structural pass and the gap hunt happen in jam, against the mental model, before an assignment exists. The Steward then authors the north star: the one artifact that persists verbatim to every downstream job. What the Steward lacks is execution: it never runs the chain.
+- **PM** adjudicates exactly one job run and decides the next group. It is stateless by design: it sees the north star, Artifacts and Decisions, and the latest run, and nothing else. It has no memory across cycles, so it cannot be the layer that notices a *pattern* of failure or drift. Block is the PM's stop condition on conflict: anything it cannot infer from north star plus mental model with high confidence surfaces to the user instead of being resolved locally.
+- **Crew** (plan, implement, review, uat, document) execute a brief. They never insert jobs or change assignment status; their claims are inputs to the PM, never verdicts.
+- **Guardian** is the Steward's per-assignment fork, and the *only* layer with memory across PM cycles. That makes it both the intent-drift detector and the circuit breaker: repeated failure, spend without progress, or a heading the user didn't ask for is Guardian's to sense over two turns and, if it persists, to nudge or ripcord. Failure counting belongs here, not in the PM.
+
+Consequence for evaluating outside workflows: a stage that another method needs (plan review gate, failure threshold, stop-on-conflict) is usually already present here in a different layer. Check the Steward and Guardian layers before concluding the machine lacks it.
+
+**Independent assignments are non-code work.** The `independent` flag lets assignments run concurrently in the same working tree. It is reserved for research and documentation assignments that touch no code, so there is nothing to collide on. Code-touching assignments are always sequential; no file-ownership partition exists across assignments and none is needed while this holds.
+
 ### Visual Hierarchy
 - **Void** — deepest background, the abyss
 - **Stone** — surface containers, panels
