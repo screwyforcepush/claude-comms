@@ -122,6 +122,17 @@ def load_config() -> Dict[str, Any]:
     }
 
 
+def ensure_page_id_routing_disabled(mcp_args: list) -> list:
+    """chrome-devtools-mcp >= 1.x defaults `pageIdRouting=true`, which makes every
+    page-scoped tool (navigate_page, take_snapshot, click, ...) require a `pageId`
+    argument this wrapper never sends. The wrapper drives a single selected page,
+    so disable routing unless the config explicitly sets the flag either way."""
+    explicit = ("--page-id-routing", "--no-page-id-routing", "--pageIdRouting", "--no-pageIdRouting")
+    if any(str(a).startswith(explicit) for a in mcp_args):
+        return list(mcp_args)
+    return [*mcp_args, "--no-page-id-routing"]
+
+
 def save_default_config():
     """Save default config file."""
     ensure_state_dir()
@@ -306,7 +317,9 @@ async def run_daemon(instance_id: str):
     # Load config
     config = load_config()
     mcp_command = config.get("mcp_command", "npx")
-    mcp_args = config.get("mcp_args", ["-y", "chrome-devtools-mcp@latest", "--isolated"])
+    mcp_args = ensure_page_id_routing_disabled(
+        config.get("mcp_args", ["-y", "chrome-devtools-mcp@latest", "--isolated"])
+    )
 
     print(f"Starting chrome-devtools-mcp...", file=sys.stderr)
     print(f"Command: {mcp_command} {' '.join(mcp_args)}", file=sys.stderr)
@@ -482,7 +495,8 @@ async def execute_command(instance_id: str, cmd: str, cmd_args: Dict[str, Any]):
             tool_args["filePath"] = cmd_args["path"]
     elif cmd == "wait":
         tool_name = "wait_for"
-        tool_args = {"text": cmd_args["text"]}
+        _t = cmd_args["text"]
+        tool_args = {"text": _t if isinstance(_t, list) else [_t]}
         if "timeout" in cmd_args:
             tool_args["timeout"] = cmd_args["timeout"]
     elif cmd == "eval":
@@ -525,7 +539,8 @@ async def execute_command(instance_id: str, cmd: str, cmd_args: Dict[str, Any]):
             tool_args["promptText"] = cmd_args["prompt_text"]
     elif cmd == "upload":
         tool_name = "upload_file"
-        tool_args = {"uid": cmd_args["uid"], "filePath": cmd_args["file_path"]}
+        _fp = cmd_args["file_path"]
+        tool_args = {"uid": cmd_args["uid"], "filePaths": _fp if isinstance(_fp, list) else [_fp]}
     elif cmd == "drag":
         tool_name = "drag"
         tool_args = {"from_uid": cmd_args["from_uid"], "to_uid": cmd_args["to_uid"]}
@@ -658,7 +673,7 @@ EXAMPLES:
     fill.add_argument("value", help="Value to fill")
 
     wait = subparsers.add_parser("wait", help="Wait for text")
-    wait.add_argument("text", help="Text to wait for")
+    wait.add_argument("text", nargs='+', help="Text to wait for")
     wait.add_argument("--timeout", type=int, help="Max wait time in milliseconds")
 
     eval_parser = subparsers.add_parser("eval", help="Execute JavaScript")
@@ -699,7 +714,7 @@ EXAMPLES:
 
     upload = subparsers.add_parser("upload", help="Upload file through element")
     upload.add_argument("uid", help="File input element UID")
-    upload.add_argument("file_path", help="Local file path to upload")
+    upload.add_argument("file_path", nargs='+', help="Local file path(s) to upload")
 
     # Advanced interaction
     drag_parser = subparsers.add_parser("drag", help="Drag element to target")
