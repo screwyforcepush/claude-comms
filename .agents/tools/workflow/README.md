@@ -123,17 +123,20 @@ cli.ts insert-job <assignment_id> \
   [--context "instructions"] \
   [--after <job_id>]
 
-# Insert job(s) from inline JSON (parallel jobs share a groupId)
+# Insert job(s) from a JSON file — the normal path; job context is multi-paragraph prose
+cli.ts insert-job <assignment_id> --jobs-file ./path/to/jobs.json
+
+# Insert job(s) from inline JSON — trivial one-liners only (parallel jobs share a groupId)
 cli.ts insert-job <assignment_id> \
   --jobs '[{"jobType":"review"},{"jobType":"implement","harness":"codex"}]'
 
-# Insert job(s) from a JSON file (escape heredoc/JSON quoting)
-cli.ts insert-job <assignment_id> --jobs-file ./path/to/jobs.json
-
-# Update assignment metadata
+# Update assignment metadata (text is appended verbatim; response echoes what was appended)
+cli.ts update-assignment <id> --decisions-file - <<'EOF'
+D3: X over Y, because Z
+EOF
 cli.ts update-assignment <id> \
-  [--artifacts "filepath:description"] \
-  [--decisions "decision text"]
+  [--artifacts "filepath:description" | --artifacts-file <path|->] \
+  [--decisions "decision text"      | --decisions-file <path|->]
 
 # Complete assignment
 cli.ts update-assignment <assignment_id> --status complete

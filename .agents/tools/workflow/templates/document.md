@@ -38,6 +38,7 @@ You execute on Your Assignment while ensuring allignment with the ‚≠êNorth Star‚
    - Any other relevant guides based on the work
 3. **Update only impacted sections of guide docs** where changes can be **confidently inferred**.
 4. **Refine structure** where needed to keep docs clear and accurate.
+5. **MEMORY DISCIPLINE** refine, organise, and prune relevant memory files/index
 
 If you cannot confidently infer a change, do not edit that section.
 *note: do not edit `mental-model.md`. Consider this read only*

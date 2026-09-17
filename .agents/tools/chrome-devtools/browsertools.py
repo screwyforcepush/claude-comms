@@ -637,6 +637,67 @@ def clean_output(result: Any) -> str:
     return str(result)
 
 
+# Commands that target one element by snapshot uid. These accept --name/--role
+# as an alternative to a uid: the wrapper takes a fresh snapshot and resolves
+# the element at call time, so a DOM re-render between snap and action cannot
+# leave the caller holding a stale uid.
+UID_TARGET_CMDS = ("click", "fill", "hover", "upload")
+
+# One line of the pinned MCP's a11y snapshot: `  uid=1_5 button "Save" attr="x"`.
+# The accessible name is the first quoted token after the role; anything after
+# it is attributes (value="...", disabled, ...). Names containing a literal
+# double-quote will be truncated at that quote — acceptable, they're rare.
+SNAPSHOT_LINE_RE = re.compile(r'^\s*uid=(?P<uid>\S+)\s+(?P<role>\S+)(?:\s+"(?P<name>.*?)")?(?:\s|$)')
+
+
+def normalize_uid(uid: str) -> str:
+    """Accept both `2_7` and `uid=2_7` (the form the snapshot prints)."""
+    uid = uid.strip()
+    return uid[4:] if uid.startswith("uid=") else uid
+
+
+def parse_snapshot_lines(snapshot_text: str) -> list[Dict[str, str]]:
+    nodes = []
+    for line in snapshot_text.splitlines():
+        m = SNAPSHOT_LINE_RE.match(line)
+        if m:
+            nodes.append({"uid": m.group("uid"), "role": m.group("role"), "name": m.group("name") or ""})
+    return nodes
+
+
+async def resolve_uid_by_name(instance_id: str, name: str, role: Optional[str], exact: bool) -> str:
+    """Take a fresh snapshot and return the uid of the element matching role + accessible name.
+
+    Match is case-insensitive; substring unless exact=True. Exactly one match is
+    required — ambiguity is an error listing the candidates so the caller can add
+    --role or --exact rather than the wrapper guessing.
+    """
+    snapshot = clean_output(await send_command(instance_id, "take_snapshot", {}))
+    want = name.strip().lower()
+    candidates = []
+    for node in parse_snapshot_lines(snapshot):
+        if role and node["role"].lower() != role.lower():
+            continue
+        have = node["name"].lower()
+        if (have == want) if exact else (want in have):
+            candidates.append(node)
+
+    if len(candidates) == 1:
+        return candidates[0]["uid"]
+
+    scope = f'role={role} ' if role else ''
+    if not candidates:
+        raise RuntimeError(
+            f'No element with {scope}name matching "{name}" in the current snapshot. '
+            f'Try a looser --name, drop --role/--exact, or run snap to see what is on the page.'
+        )
+    listing = "\n".join(f'  uid={c["uid"]} {c["role"]} "{c["name"]}"' for c in candidates[:12])
+    more = f"\n  ... and {len(candidates) - 12} more" if len(candidates) > 12 else ""
+    raise RuntimeError(
+        f'{len(candidates)} elements match {scope}name "{name}" — narrow with --role or --exact:\n{listing}{more}'
+    )
+
+
 async def execute_command(instance_id: str, cmd: str, cmd_args: Dict[str, Any]):
     """Execute a single command via daemon."""
 
@@ -644,6 +705,20 @@ async def execute_command(instance_id: str, cmd: str, cmd_args: Dict[str, Any]):
     if cmd == "device":
         params = {"device": cmd_args["spec"]} if cmd_args.get("spec") else {}
         return clean_output(await send_request(instance_id, DEVICE_METHOD, params))
+
+    # Resolve --name targets against a fresh snapshot, then tolerate the
+    # `uid=` prefix on any uid the caller pasted from snapshot output.
+    if cmd in UID_TARGET_CMDS and cmd_args.get("name"):
+        cmd_args["uid"] = await resolve_uid_by_name(
+            instance_id, cmd_args["name"], cmd_args.get("role"), bool(cmd_args.get("exact"))
+        )
+    for key in ("uid", "from_uid", "to_uid"):
+        if key in cmd_args:
+            cmd_args[key] = normalize_uid(cmd_args[key])
+    if cmd == "fillform":
+        for el in cmd_args.get("elements", []):
+            if isinstance(el, dict) and "uid" in el:
+                el["uid"] = normalize_uid(str(el["uid"]))
 
     # Map commands to MCP tools
     tool_name = None
@@ -790,6 +865,18 @@ INTERACTION:
   drag <from> <to>      Drag element from UID to target UID
   fillform <json>       Fill multiple fields at once. JSON: [{"uid":"..","value":".."},...]
 
+  Target by name instead of uid (click, fill, hover, upload):
+    --name <text>       Accessible name, case-insensitive substring. The wrapper re-snaps
+                        and resolves the element AT CALL TIME, so it survives re-renders.
+    --role <role>       Narrow to an a11y role (button, checkbox, textbox, link, ...)
+    --exact             Whole-name match (when a substring is ambiguous)
+    e.g. click --name "Save" --role button
+         fill --name "Email" user@example.com
+    Exactly one element must match; ambiguity lists the candidates.
+  uids may be passed as `2_7` or `uid=2_7` (as printed by snap).
+  uids are RENUMBERED on every re-render — after any click/fill/nav, a previously
+  captured uid is stale. Prefer --name for multi-step flows.
+
 DEBUGGING:
   conslist              List console messages (--types, --size)
   consget <msgid>       Get console message details
@@ -864,11 +951,18 @@ EXAMPLES:
     shot = subparsers.add_parser("shot", help="Take screenshot")
     shot.add_argument("path", nargs="?", help="Save path (optional)")
 
+    def add_target_args(p: argparse.ArgumentParser, uid_help: str):
+        """uid positional OR --name (+ optional --role/--exact), resolved against a fresh snapshot."""
+        p.add_argument("uid", nargs="?", help=f"{uid_help} (omit when using --name)")
+        p.add_argument("--name", help="Target by accessible name (case-insensitive substring); re-snaps at call time")
+        p.add_argument("--role", help="Restrict --name match to this a11y role (button, textbox, checkbox, ...)")
+        p.add_argument("--exact", action="store_true", help="Require --name to match the whole accessible name")
+
     click = subparsers.add_parser("click", help="Click element")
-    click.add_argument("uid", help="Element UID from snapshot")
+    add_target_args(click, "Element UID from snapshot")
 
     fill = subparsers.add_parser("fill", help="Fill input")
-    fill.add_argument("uid", help="Element UID")
+    add_target_args(fill, "Element UID")
     fill.add_argument("value", help="Value to fill")
 
     wait = subparsers.add_parser("wait", help="Wait for text")
@@ -884,7 +978,7 @@ EXAMPLES:
     key.add_argument("key", help="Key to press (e.g., 'Enter', 'Tab', 'Escape')")
 
     hover_parser = subparsers.add_parser("hover", help="Hover over element")
-    hover_parser.add_argument("uid", help="Element UID from snapshot")
+    add_target_args(hover_parser, "Element UID from snapshot")
 
     # Network debugging
     netlist = subparsers.add_parser("netlist", help="List network requests")
@@ -917,7 +1011,7 @@ EXAMPLES:
     dialog.add_argument("--text", dest="prompt_text", help="Text for prompt dialog")
 
     upload = subparsers.add_parser("upload", help="Upload file through element")
-    upload.add_argument("uid", help="File input element UID")
+    add_target_args(upload, "File input element UID")
     upload.add_argument("file_path", nargs='+', help="Local file path(s) to upload")
 
     # Advanced interaction
@@ -1017,14 +1111,30 @@ EXAMPLES:
     try:
         cmd_args_dict = {}
 
+        if args.cmd in UID_TARGET_CMDS:
+            if args.cmd == "upload" and args.name and args.uid:
+                # optional uid + one-or-more paths: argparse hands the first path to uid
+                args.file_path = [args.uid] + args.file_path
+                args.uid = None
+            if not args.uid and not args.name:
+                print(f"Error: {args.cmd} needs a <uid> or --name '<accessible name>'", file=sys.stderr)
+                sys.exit(1)
+            if args.uid:
+                cmd_args_dict["uid"] = args.uid
+            if args.name:
+                cmd_args_dict["name"] = args.name
+                if args.role:
+                    cmd_args_dict["role"] = args.role
+                if args.exact:
+                    cmd_args_dict["exact"] = True
+
         if args.cmd == "nav":
             cmd_args_dict["url"] = args.url
             if args.timeout:
                 cmd_args_dict["timeout"] = args.timeout
         elif args.cmd == "click":
-            cmd_args_dict["uid"] = args.uid
+            pass  # target args handled above
         elif args.cmd == "fill":
-            cmd_args_dict["uid"] = args.uid
             cmd_args_dict["value"] = args.value
         elif args.cmd == "shot" and args.path:
             cmd_args_dict["path"] = args.path
@@ -1039,7 +1149,7 @@ EXAMPLES:
         elif args.cmd == "key":
             cmd_args_dict["key"] = args.key
         elif args.cmd == "hover":
-            cmd_args_dict["uid"] = args.uid
+            pass  # target args handled above
         elif args.cmd == "netlist":
             if args.types:
                 cmd_args_dict["resource_types"] = args.types
@@ -1066,7 +1176,6 @@ EXAMPLES:
             if args.prompt_text:
                 cmd_args_dict["prompt_text"] = args.prompt_text
         elif args.cmd == "upload":
-            cmd_args_dict["uid"] = args.uid
             cmd_args_dict["file_path"] = args.file_path
         elif args.cmd == "drag":
             cmd_args_dict["from_uid"] = args.from_uid
@@ -1078,7 +1187,17 @@ EXAMPLES:
         print(output)
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        msg = str(e)
+        print(f"Error: {msg}", file=sys.stderr)
+        # The MCP reports a uid the page no longer has as "not found", which reads
+        # like the element is gone. Usually the snapshot is just stale: uids are
+        # renumbered on every render.
+        if args.cmd in UID_TARGET_CMDS and "not found" in msg.lower() and not cmd_args_dict.get("name"):
+            print(
+                "Hint: uids are re-assigned whenever the page re-renders, so this uid is probably stale. "
+                f"Run snap again, or target by accessible name: {args.cmd} --name '<name>' [--role <role>]",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
 

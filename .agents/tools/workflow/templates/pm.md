@@ -75,10 +75,14 @@ Artifacts + Decisions are injected into every future PM and every crew member's 
 
 
 ```bash
+npx tsx .agents/tools/workflow/cli.ts update-assignment --decisions-file - <<'EOF'
+D1: JWT over sessions, because stateless scaling
+D2: 24hr expiry, because security/UX balance
+EOF
 npx tsx .agents/tools/workflow/cli.ts update-assignment \
-  --artifacts "src/auth.ts:JWT login endpoint, src/session.ts:Session manager with 24hr expiry" \
-  --decisions "D1: JWT over sessions (stateless scaling). D2: 24hr expiry (security/UX balance)."
+  --artifacts "src/auth.ts:JWT login endpoint, src/session.ts:Session manager with 24hr expiry"
 ```
+`--decisions-file` / `--artifacts-file` take a path or `-` for stdin and append the text verbatim — no quoting, no delimiter rules, punctuation is safe. Inline `--decisions "<str>"` is fine for a single short line. The response echoes what was appended.
 
 ## 2. 🧭 Set the Next Course
 Use your Decision Framework to help choose either the 📍 Next Job(s), or an End Command 🚨
@@ -88,11 +92,13 @@ Use your Decision Framework to help choose either the 📍 Next Job(s), or an En
 - implement jobType can manage a large crew, and can internally sequence many work pagages, tasks, etc. Assign them a full vertical slice of end to end functionality (or even the entire spec/North Star implementation).
 
 ```bash
-npx tsx .agents/tools/workflow/cli.ts insert-job \
-  --jobs '[{"jobType":"<type>","context":"WHAT: [deliverable]\nWHY: [reason]\nSUCCESS: [criteria]"}]'
+cat > /tmp/jobs.json <<'EOF'
+[{"jobType":"<type>","context":"WHAT: [deliverable]\nWHY: [reason]\nSUCCESS: [criteria]"}]
+EOF
+npx tsx .agents/tools/workflow/cli.ts insert-job --jobs-file /tmp/jobs.json
 ```
 
-For multi-paragraph context, write the jobs JSON to a file and use `--jobs-file /tmp/jobs.json` instead of `--jobs '...'` (escapes heredoc/quoting).
+Job context is multi-paragraph in practice, so the file is the normal path. `--jobs '[...]'` inline is only for trivial one-liners such as `[{"jobType":"review"}]`.
 
 Types: `plan`, `implement`, `review`, `uat`, `document`.
 

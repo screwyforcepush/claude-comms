@@ -39,7 +39,10 @@
  *              --type: single job type (shorthand for --jobs with one entry)
  *              --after defaults to WORKFLOW_GROUP_ID, then auto-finds tail group of assignment
  *   update-assignment [id] [--status <pending|active|blocked|complete>] [--reason <str>]
- *                          [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
+ *                          [--artifacts <str> | --artifacts-file <path|->] [--decisions <str> | --decisions-file <path|->]
+ *                          [--alignment <aligned|uncertain|misaligned>]
+ *              --artifacts-file / --decisions-file: read the text from a file ("-" = stdin) instead of argv;
+ *                           use for anything multi-line or with quotes/colons/commas. Text is appended as-is.
  *              --reason required when setting status to blocked
  *   delete-assignment <id>              Delete assignment and all its groups/jobs
  *
@@ -163,7 +166,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   reflections: ["since", "until", "batch"],
   create: ["priority", "independent", "thread"],
   "insert-job": ["type", "jobs", "jobs-file", "harness", "model", "context", "after"],
-  "update-assignment": ["artifacts", "decisions", "alignment", "status", "reason", "nudge", "clear-nudge", "append-northstar"],
+  "update-assignment": ["artifacts", "artifacts-file", "decisions", "decisions-file", "alignment", "status", "reason", "nudge", "clear-nudge", "append-northstar"],
   "delete-assignment": [],
   "start-job": [],
   "complete-job": ["result"],
@@ -655,7 +658,43 @@ async function updateAssignment(
     pmNudge,
     northStar,
   });
-  output({ message: "Assignment updated" });
+  // Echo back exactly what was appended so a writer can confirm the text
+  // survived shell quoting / file read intact.
+  const appended: Record<string, string> = {};
+  if (artifacts !== undefined) appended.artifacts = artifacts;
+  if (decisions !== undefined) appended.decisions = decisions;
+  output(Object.keys(appended).length ? { message: "Assignment updated", appended } : { message: "Assignment updated" });
+}
+
+/**
+ * Resolve a text field that may come inline (--<name> <str>) or from a file
+ * (--<name>-file <path>, "-" = stdin). Mirrors insert-job's --jobs/--jobs-file
+ * split, but the payload is raw text, not JSON: it is appended verbatim with
+ * only the trailing newline trimmed.
+ */
+function resolveTextFlag(
+  flags: Record<string, string>,
+  name: string,
+  stdinTaken: { by?: string }
+): string | undefined {
+  const inline = flags[name];
+  const fileFlag = `${name}-file`;
+  const path = flags[fileFlag];
+  if (inline !== undefined && path !== undefined) error(`Use only one of --${name} or --${fileFlag}`);
+  if (path === undefined) return inline;
+  if (path === "true") error(`--${fileFlag} requires a path (or "-" for stdin)`);
+  let raw: string;
+  if (path === "-") {
+    if (stdinTaken.by) error(`stdin already consumed by --${stdinTaken.by}; only one field can read from "-"`);
+    stdinTaken.by = fileFlag;
+    raw = readFileSync(0, "utf-8");
+  } else {
+    if (!existsSync(path)) error(`--${fileFlag} not found: ${path}`);
+    raw = readFileSync(path, "utf-8");
+  }
+  const text = raw.replace(/\r?\n$/, "");
+  if (!text.trim()) error(`--${fileFlag} ${path} is empty`);
+  return text;
 }
 
 async function deleteAssignment(id: string) {
@@ -817,15 +856,29 @@ Commands:
 
   create <northStar> [--priority N] [--independent] [--thread <threadId>]
                                       Create assignment
-  insert-job [assignmentId] [--type <type>] [--jobs <json>] [--jobs-file <path>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
+  insert-job [assignmentId] [--type <type>] [--jobs-file <path>] [--jobs <json>] [--harness <harness>] [--context <ctx>] [--after <groupId>]
               assignmentId defaults to WORKFLOW_ASSIGNMENT_ID
-              --jobs: JSON array [{\"jobType\":\"review\"},{\"jobType\":\"implement\",\"harness\":\"codex\"}]
-              --jobs-file: path to JSON file with the same array shape (escapes heredoc/quoting)
+              --jobs-file: path to a JSON file holding the jobs array — the normal path. Job context is
+                           multi-paragraph prose in practice; write it to a file, never escape it into argv.
+                           e.g. cat > /tmp/jobs.json <<'EOF'
+                                [{\"jobType\":\"implement\",\"context\":\"WHAT: ...\\nWHY: ...\\nSUCCESS: ...\"}]
+                                EOF
+                                cli.ts insert-job --jobs-file /tmp/jobs.json
+              --jobs: same array inline; only for trivial one-line jobs [{\"jobType\":\"review\"}]
               --type: single job type (shorthand for --jobs with one entry)
               --after defaults to WORKFLOW_GROUP_ID, then auto-finds tail group
   update-assignment [id] [--status <pending|active|blocked|complete>] [--reason <str>]
-                         [--artifacts <str>] [--decisions <str>] [--alignment <aligned|uncertain|misaligned>]
+                         [--artifacts <str> | --artifacts-file <path|->]
+                         [--decisions <str> | --decisions-file <path|->]
+                         [--alignment <aligned|uncertain|misaligned>]
                          [--nudge <str>] [--clear-nudge] [--append-northstar <str>]
+              --artifacts-file / --decisions-file: read the text from a file, or stdin with \"-\".
+                           Use for anything multi-line or containing quotes/colons/commas; the text is
+                           appended verbatim, no delimiter parsing. Only one field may read stdin per call.
+                           e.g. cli.ts update-assignment --decisions-file - <<'EOF'
+                                D5: JWT over sessions, because stateless scaling (see auth.ts:12)
+                                EOF
+              The response echoes back the appended text so you can confirm it landed intact.
               --reason required when setting status to blocked
               --nudge: set pmNudge for next PM   --clear-nudge: clear pmNudge
               --append-northstar: append amendment text to northStar
@@ -991,10 +1044,11 @@ async function main() {
       case "update-assignment": {
         const assignmentId = positional[0] || process.env.WORKFLOW_ASSIGNMENT_ID;
         if (!assignmentId) error("Assignment ID required (or set WORKFLOW_ASSIGNMENT_ID)");
+        const stdinTaken: { by?: string } = {};
         await updateAssignment(
           assignmentId,
-          flags.artifacts,
-          flags.decisions,
+          resolveTextFlag(flags, "artifacts", stdinTaken),
+          resolveTextFlag(flags, "decisions", stdinTaken),
           flags.alignment,
           flags.status,
           flags.reason,

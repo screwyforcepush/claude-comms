@@ -121,7 +121,7 @@ Don't refer to prior batch agents by name. Instead, supply reference artifacts t
 3. **Maximize parallelization** - more engineer agents, clear file ownership
 4. **Respond** only when complete, include summary of what was built, and each key decision made as "X over Y, because Z" — the PM harvests these into the Assignment's Decision Record.
 
-Do not respond with status updates. Make reasonable decisions, Continue Orchestrating batches until implementation of Your Assignment is complete.
+Make reasonable decisions, Continue Orchestrating batches until implementation of Your Assignment is complete.
 
 **Begin orchestrating this Assignment NOW!**
 ⚙️Remember: The key to effective orchestration is understanding which work can truly happen in parallel and spawning those agents together, while respecting sequential dependencies between batches.⚙️

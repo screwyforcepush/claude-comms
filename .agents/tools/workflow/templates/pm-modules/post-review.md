@@ -16,9 +16,8 @@ evaluate in order
    → Block the assignment
    → Respond with clarifying questions
 
-3. Else If(high-severity issues have a clear optimal solution and reviewers concur):
-   → high-severity issues must be handled explicitly.
-   → insert a new **{{P1_JOB_TYPE}}** job to address/refine
+3. Else If(any high-severity issues that Must Be Addressed):
+   → insert a new **{{P1_JOB_TYPE}}** job to address/refine high-severity and other issues impacting complete North Star delivery.
 
 4. Else If(issues that Must Be Addressed are medium/low/minor):{
    → If(R-1 == plan): update the plan doc yourself, then insert **implement**
