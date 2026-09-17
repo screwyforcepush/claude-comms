@@ -24,7 +24,8 @@ uv run .agents/tools/chrome-devtools/browsertools.py daemon stop
 Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to see all commands.
 
 **Key commands:**
-- `daemon start` - Start browser (run in background with `&`)
+- `daemon start [--device mobile|tablet|desktop]` - Start browser (default device: desktop)
+- `device [spec]` - Show or switch the emulated device mid-session
 - `nav <url>` - Navigate to URL
 - `snap` - Get page snapshot with element UIDs
 - `click <uid>` - Click element
@@ -33,14 +34,32 @@ Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to see all com
 - `conslist`, `netlist` - Debug console/network
 - `daemon stop` - Clean shutdown
 
+## Device Emulation
+
+Each instance emulates one device class at a time. Presets (all at devicePixelRatio 1):
+
+| Preset | Viewport | Flags | User agent |
+|---|---|---|---|
+| `mobile` | 390x844 portrait | mobile, touch | Android Chrome (phone) |
+| `tablet` | 1180x820 landscape | mobile, touch | Android Chrome (tablet) |
+| `desktop` | 2560x1440 | none | browser default |
+
+A raw spec is also accepted: `<w>x<h>[x<dpr>][,mobile][,touch][,landscape]`.
+
+Set the device at launch with `daemon start --device mobile`, or switch mid-session with `device mobile`. Switching keeps auth, cookies and the current route; the page reloads into the new device, so take a fresh `snap` before using UIDs. Screenshot output reports the device: `[screenshots taken: N | device: mobile]`.
+
+Start a second instance when a flow needs two browsers at once: pages with interplay (an update on page N must appear on page M), or two authenticated users (account A sends a request, account B sees it in an inbox).
+
 ## Configuration
 
 **Default:** Headless mode (no Chrome window)
 
+**MCP version is pinned** (`MCP_PINNED_VERSION` in `browsertools.py`). chrome-devtools-mcp changes tool input schemas between releases and the wrapper hard-codes each tool's argument shape, so an unpinned or `@latest` reference in any config is rewritten to the pin at launch. An explicit version in a config is respected. To bump: change the constant, then audit every tool the wrapper calls against the new release's schemas.
+
 **To use visual mode:** Create `~/.browsertools/config.json`:
 ```json
 {
-  "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated"]
+  "mcp_args": ["-y", "chrome-devtools-mcp@1.9.0", "--isolated"]
 }
 ```
 
@@ -94,7 +113,7 @@ uv run .agents/tools/chrome-devtools/browsertools.py daemon start &
 
 ## Files
 
-- `browsertools.py` - Main tool (24KB)
+- `browsertools.py` - Main tool
 - `config.json` - Default config (headless mode)
 - `README.md` - This file
 

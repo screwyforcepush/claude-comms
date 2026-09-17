@@ -13,12 +13,17 @@ Architecture:
 - Daemon listens on Unix socket for client commands
 - Multiple CLI invocations connect via socket, share same MCP session
 - State (snapshots, tabs, etc.) persists across all commands
+- Each instance emulates one device class (mobile|tablet|desktop) at a time;
+  set at launch (--device) or switched mid-session (device <spec>)
+- chrome-devtools-mcp is pinned (MCP_PINNED_VERSION); its tool schemas drift
+  between releases and this wrapper hard-codes each tool's arg shape
 """
 
 import asyncio
 import argparse
 import json
 import os
+import re
 import signal
 import sys
 import time
@@ -31,6 +36,33 @@ STATE_DIR = Path.home() / ".browsertools"
 CONFIG_FILE = STATE_DIR / "config.json"
 INACTIVITY_TIMEOUT = 600  # 10 minutes
 
+# Pinned MCP release. Bump deliberately: audit every tool the wrapper calls
+# (execute_command) against the new release's input schemas first.
+MCP_PACKAGE = "chrome-devtools-mcp"
+MCP_PINNED_VERSION = "1.9.0"
+MCP_PINNED_SPEC = f"{MCP_PACKAGE}@{MCP_PINNED_VERSION}"
+
+# Device presets: standard device classes, all at devicePixelRatio 1 (layout is
+# identical at higher ratios; only screenshot bytes grow). mobile/tablet carry the
+# mobile+touch flags and a matching Chrome user agent so pages behave as on a
+# handheld rather than as a narrow desktop window.
+DEVICE_PRESETS = {
+    "mobile": {
+        "viewport": "390x844x1,mobile,touch",
+        "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+    },
+    "tablet": {
+        "viewport": "1180x820x1,mobile,touch,landscape",
+        "userAgent": "Mozilla/5.0 (Linux; Android 14; SM-X910) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    },
+    "desktop": {
+        "viewport": "2560x1440x1",
+    },
+}
+DEFAULT_DEVICE = "desktop"
+VIEWPORT_SPEC_RE = re.compile(r"^\d+x\d+(x\d+(\.\d+)?)?(,(mobile|touch|landscape))*$")
+DEVICE_METHOD = "browsertools/device"  # daemon-local JSON-RPC method (not forwarded to MCP)
+
 # Global daemon state
 mcp_proc = None
 mcp_reader = None
@@ -39,6 +71,7 @@ pending_requests = {}  # msg_id -> response_future
 last_activity_time = time.time()
 current_instance_id = None
 screenshot_count = 0
+current_device = None  # {"label", "viewport", "userAgent"?} as last applied via emulate
 
 
 def generate_instance_id() -> str:
@@ -118,8 +151,54 @@ def load_config() -> Dict[str, Any]:
     # Fallback to hardcoded defaults
     return {
         "mcp_command": "npx",
-        "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--headless=true"]
+        "mcp_args": ["-y", MCP_PINNED_SPEC, "--isolated", "--headless=true"]
     }
+
+
+def resolve_device(spec: str) -> Dict[str, Any]:
+    """Resolve a preset name or raw viewport spec into an emulate payload.
+
+    Raw spec format is the MCP's own: '<w>x<h>[x<dpr>][,mobile][,touch][,landscape]'.
+    Raises ValueError for anything else."""
+    spec = (spec or "").strip()
+    if spec in DEVICE_PRESETS:
+        return {"label": spec, **DEVICE_PRESETS[spec]}
+    if VIEWPORT_SPEC_RE.match(spec):
+        return {"label": spec, "viewport": spec}
+    raise ValueError(
+        f"Unknown device '{spec}'. Use one of {', '.join(DEVICE_PRESETS)} "
+        "or a raw viewport '<w>x<h>[x<dpr>][,mobile][,touch][,landscape]'"
+    )
+
+
+def describe_device(dev: Optional[Dict[str, Any]]) -> str:
+    if not dev:
+        return "Device: unknown (no emulation applied yet)"
+    ua = " ua=preset" if dev.get("userAgent") else ""
+    return f"Device: {dev['label']} ({dev['viewport']}{ua})"
+
+
+def emulate_args(dev: Dict[str, Any]) -> Dict[str, Any]:
+    """emulate is absolute: any field omitted is cleared, so switching to a preset
+    without a userAgent drops the previous one automatically."""
+    args = {"viewport": dev["viewport"]}
+    if dev.get("userAgent"):
+        args["userAgent"] = dev["userAgent"]
+    return args
+
+
+def pin_mcp_version(mcp_args: list) -> list:
+    """Rewrite an unpinned chrome-devtools-mcp reference ('chrome-devtools-mcp',
+    '@latest', '@next') to MCP_PINNED_SPEC. An explicit version in a config is
+    respected. Covers user configs that live outside the repo."""
+    out = []
+    for a in mcp_args:
+        a_str = str(a)
+        if a_str == MCP_PACKAGE or a_str in (f"{MCP_PACKAGE}@latest", f"{MCP_PACKAGE}@next"):
+            out.append(MCP_PINNED_SPEC)
+        else:
+            out.append(a)
+    return out
 
 
 def ensure_page_id_routing_disabled(mcp_args: list) -> list:
@@ -138,16 +217,16 @@ def save_default_config():
     ensure_state_dir()
     config = {
         "mcp_command": "npx",
-        "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated"],
-        "_comment": "Customize MCP server startup. Examples:",
+        "mcp_args": ["-y", MCP_PINNED_SPEC, "--isolated"],
+        "_comment": f"Customize MCP server startup. The MCP version is pinned ({MCP_PINNED_VERSION}); an unpinned/@latest reference is rewritten to the pin at launch. Examples:",
         "_example_headless": {
-            "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--headless=true"]
+            "mcp_args": ["-y", MCP_PINNED_SPEC, "--isolated", "--headless=true"]
         },
         "_example_custom_chrome": {
-            "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--executablePath=/usr/local/bin/chromium-mcp"]
+            "mcp_args": ["-y", MCP_PINNED_SPEC, "--isolated", "--executablePath=/usr/local/bin/chromium-mcp"]
         },
         "_example_sandbox": {
-            "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated=true", "--headless=true", "--executablePath=/usr/local/bin/chromium-mcp"]
+            "mcp_args": ["-y", MCP_PINNED_SPEC, "--isolated=true", "--headless=true", "--executablePath=/usr/local/bin/chromium-mcp"]
         }
     }
     with open(CONFIG_FILE, "w") as f:
@@ -190,6 +269,55 @@ async def read_mcp_responses():
                 break
 
 
+def start_mcp_request(tool_name: str, args: Dict[str, Any]) -> asyncio.Future:
+    """Write a daemon-originated tools/call to the MCP pipe immediately (no await,
+    so ordering relative to later writes is guaranteed) and return the response
+    future, which read_mcp_responses resolves."""
+    msg_id = "daemon-" + os.urandom(6).hex()
+    future = asyncio.get_event_loop().create_future()
+    pending_requests[msg_id] = future
+    req = {"jsonrpc": "2.0", "method": "tools/call", "id": msg_id,
+           "params": {"name": tool_name, "arguments": args}}
+    mcp_writer.write(json.dumps(req).encode() + b"\n")
+    return future
+
+
+async def apply_device(dev: Dict[str, Any], timeout: float = 60.0) -> Dict[str, Any]:
+    """Apply a device via the MCP emulate tool and record it as current."""
+    global current_device
+    resp = await asyncio.wait_for(start_mcp_request("emulate", emulate_args(dev)), timeout=timeout)
+    if "error" in resp:
+        raise RuntimeError(resp["error"].get("message", str(resp["error"])))
+    current_device = dev
+    return resp
+
+
+def local_response(msg_id: Any, text: str) -> bytes:
+    return json.dumps({"jsonrpc": "2.0", "id": msg_id,
+                       "result": {"content": [{"type": "text", "text": text}]}}).encode() + b"\n"
+
+
+def local_error(msg_id: Any, message: str) -> bytes:
+    return json.dumps({"jsonrpc": "2.0", "id": msg_id,
+                       "error": {"code": -1, "message": message}}).encode() + b"\n"
+
+
+async def handle_device_request(msg_id: Any, params: Dict[str, Any]) -> bytes:
+    """browsertools/device: no spec -> report current; spec -> switch and report."""
+    spec = params.get("device")
+    if not spec:
+        return local_response(msg_id, describe_device(current_device))
+    try:
+        dev = resolve_device(spec)
+    except ValueError as e:
+        return local_error(msg_id, str(e))
+    try:
+        await apply_device(dev)
+    except Exception as e:
+        return local_error(msg_id, f"Failed to apply device '{spec}': {e}")
+    return local_response(msg_id, f"{describe_device(dev)}\nRun snap for fresh UIDs before interacting.")
+
+
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """Handle a client connection."""
     global mcp_writer, pending_requests, last_activity_time, screenshot_count
@@ -208,6 +336,12 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                 req = json.loads(line.decode())
                 msg_id = req.get("id")
 
+                # Daemon-local methods are answered here, never forwarded to MCP
+                if req.get("method") == DEVICE_METHOD:
+                    writer.write(await handle_device_request(msg_id, req.get("params") or {}))
+                    await writer.drain()
+                    continue
+
                 # Create future for response
                 response_future = asyncio.Future()
                 pending_requests[msg_id] = response_future
@@ -220,6 +354,20 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                 try:
                     resp = await asyncio.wait_for(response_future, timeout=30.0)
 
+                    # The MCP appends its emulation state to every response once a
+                    # device is applied (always, since launch). Strip the two lines the
+                    # wrapper itself controls; `device` and the screenshot label carry
+                    # that information without the per-command noise.
+                    try:
+                        for item in resp.get("result", {}).get("content", []):
+                            if isinstance(item, dict) and item.get("type") == "text" and "Emulating " in item.get("text", ""):
+                                item["text"] = "\n".join(
+                                    ln for ln in item["text"].split("\n")
+                                    if not ln.startswith(("Emulating viewport: ", "Emulating user agent: "))
+                                )
+                    except (TypeError, AttributeError):
+                        pass
+
                     # Track screenshot count
                     tool_name = req.get("params", {}).get("name", "")
                     if tool_name == "take_screenshot" and "error" not in resp:
@@ -229,7 +377,8 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                             content = resp.get("result", {}).get("content", [])
                             for item in content:
                                 if isinstance(item, dict) and item.get("type") == "text":
-                                    item["text"] += f"\n[screenshots taken: {screenshot_count}]"
+                                    label = current_device["label"] if current_device else "unknown"
+                                    item["text"] += f"\n[screenshots taken: {screenshot_count} | device: {label}]"
                                     break
                         except (TypeError, AttributeError):
                             pass
@@ -299,9 +448,9 @@ async def inactivity_monitor(shutdown_callback):
             return
 
 
-async def run_daemon(instance_id: str):
-    """Run the persistent daemon."""
-    global mcp_proc, mcp_reader, mcp_writer, current_instance_id, last_activity_time
+async def run_daemon(instance_id: str, device: Optional[Dict[str, Any]] = None):
+    """Run the persistent daemon. `device` is the resolved launch device."""
+    global mcp_proc, mcp_reader, mcp_writer, current_instance_id, last_activity_time, current_device
 
     current_instance_id = instance_id
     last_activity_time = time.time()
@@ -318,7 +467,7 @@ async def run_daemon(instance_id: str):
     config = load_config()
     mcp_command = config.get("mcp_command", "npx")
     mcp_args = ensure_page_id_routing_disabled(
-        config.get("mcp_args", ["-y", "chrome-devtools-mcp@latest", "--isolated"])
+        pin_mcp_version(config.get("mcp_args", ["-y", MCP_PINNED_SPEC, "--isolated"]))
     )
 
     print(f"Starting chrome-devtools-mcp...", file=sys.stderr)
@@ -337,6 +486,21 @@ async def run_daemon(instance_id: str):
 
     mcp_reader = mcp_proc.stdout
     mcp_writer = mcp_proc.stdin
+
+    # Launch device: written to the MCP pipe *before* the socket opens, so it is
+    # applied ahead of any client command. Resolved later by read_mcp_responses.
+    device = device or resolve_device(DEFAULT_DEVICE)
+    current_device = device
+    launch_device_future = start_mcp_request("emulate", emulate_args(device))
+    print(f"Launch {describe_device(device)}", file=sys.stderr)
+
+    async def confirm_launch_device():
+        try:
+            resp = await asyncio.wait_for(launch_device_future, timeout=120.0)
+            if "error" in resp:
+                print(f"WARNING: launch device emulation failed: {resp['error']}", file=sys.stderr)
+        except asyncio.TimeoutError:
+            print("WARNING: launch device emulation timed out", file=sys.stderr)
 
     # Write PID file
     pid_file.write_text(str(os.getpid()))
@@ -384,6 +548,7 @@ async def run_daemon(instance_id: str):
             server.serve_forever(),
             read_mcp_responses(),
             inactivity_monitor(handle_shutdown),
+            confirm_launch_device(),
         )
     except KeyboardInterrupt:
         print("\nShutting down daemon...", file=sys.stderr)
@@ -402,7 +567,12 @@ async def run_daemon(instance_id: str):
 # ============================================================================
 
 async def send_command(instance_id: str, tool_name: str, args: Dict[str, Any]) -> Any:
-    """Send a command to the daemon via socket."""
+    """Send an MCP tools/call to the daemon via socket."""
+    return await send_request(instance_id, "tools/call", {"name": tool_name, "arguments": args})
+
+
+async def send_request(instance_id: str, method: str, params: Dict[str, Any]) -> Any:
+    """Send a JSON-RPC request to the daemon via socket (MCP or daemon-local method)."""
     if not is_daemon_running(instance_id):
         raise RuntimeError(f"Daemon instance '{instance_id}' not running. Start with: browsertools.py daemon start")
 
@@ -419,11 +589,8 @@ async def send_command(instance_id: str, tool_name: str, args: Dict[str, Any]) -
         msg_id = os.urandom(8).hex()
         request = {
             "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": args
-            },
+            "method": method,
+            "params": params,
             "id": msg_id
         }
 
@@ -436,7 +603,8 @@ async def send_command(instance_id: str, tool_name: str, args: Dict[str, Any]) -
         response = json.loads(line.decode())
 
         if "error" in response:
-            raise RuntimeError(f"MCP error: {response['error']}")
+            err = response["error"]
+            raise RuntimeError(err.get("message", str(err)) if isinstance(err, dict) else str(err))
 
         return response.get("result")
 
@@ -471,6 +639,11 @@ def clean_output(result: Any) -> str:
 
 async def execute_command(instance_id: str, cmd: str, cmd_args: Dict[str, Any]):
     """Execute a single command via daemon."""
+
+    # Daemon-local commands
+    if cmd == "device":
+        params = {"device": cmd_args["spec"]} if cmd_args.get("spec") else {}
+        return clean_output(await send_request(instance_id, DEVICE_METHOD, params))
 
     # Map commands to MCP tools
     tool_name = None
@@ -570,10 +743,28 @@ browsertools.py - Chrome DevTools automation tool
 Usage: uv run .agents/tools/chrome-devtools/browsertools.py <command>
 
 DAEMON MANAGEMENT:
-  daemon start          Start new daemon instance
-                        Returns: "browsertools daemon started. Instance ID: <id>"
+  daemon start          Start new daemon instance (default device: desktop)
+    --device <spec>     mobile | tablet | desktop | raw viewport (see DEVICE EMULATION)
+                        Returns: "browsertools daemon started. Instance ID: <id> (Device: ...)"
   daemon stop <id>      Stop daemon. kill chrome cleanly.
   daemon config         Create config file
+
+DEVICE EMULATION:
+  device                Show the current device
+  device <spec>         Switch device mid-session. Auth, cookies and current route are
+                        kept; the page reloads into the new device. Run snap after.
+    Presets (all devicePixelRatio 1):
+      mobile            390x844 portrait, mobile+touch, phone user agent
+      tablet            1180x820 landscape, mobile+touch, tablet user agent
+      desktop           2560x1440
+    Raw spec            <w>x<h>[x<dpr>][,mobile][,touch][,landscape]  e.g. 1024x768  800x600x2,mobile,touch
+  Screenshot output reports the device it was taken on: [screenshots taken: N | device: <label>]
+
+MULTIPLE INSTANCES:
+  Each `daemon start` is an isolated browser (own cookies, storage, device). Use a
+  second instance when a flow needs two browsers at once, e.g.:
+    - pages with interplay: an update made on page N must appear on page M
+    - two authenticated users: account A sends a request, account B sees it in an inbox
 
 ALL OTHER COMMANDS REQUIRE --instance <id>:
   --instance <id>       Required for all browser commands
@@ -627,7 +818,8 @@ Limit output for **debugging** commands
 EXAMPLES:
   # Start daemon (backgrounds automatically, prints instance ID)
   uv run .agents/tools/chrome-devtools/browsertools.py daemon start
-  # Output: browsertools daemon started. Instance ID: a3f7b2c1
+  # Output: browsertools daemon started. Instance ID: a3f7b2c1 (Device: desktop (2560x1440x1))
+  # Or start on a phone: daemon start --device mobile
 
   # Use instance for all commands
   uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 nav http://app.com/login
@@ -635,6 +827,11 @@ EXAMPLES:
   uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 fill 1_23 user@example.com
   uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 snap | grep -iC5 "button.*(submit|login|sign.?in)"
   uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 click 1_25 | grep -iC5 "dashboard\|home\|welcome"
+
+  # Check the same screen on a phone, then return to desktop
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 device mobile
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 shot /tmp/dashboard-mobile.png
+  uv run .agents/tools/chrome-devtools/browsertools.py --instance a3f7b2c1 device desktop
 
   # Stop when finished to clean up resources
   uv run .agents/tools/chrome-devtools/browsertools.py daemon stop a3f7b2c1
@@ -649,7 +846,9 @@ EXAMPLES:
     # Daemon management
     daemon = subparsers.add_parser("daemon", help="Manage daemon")
     daemon_sub = daemon.add_subparsers(dest="daemon_cmd", required=True)
-    daemon_sub.add_parser("start", help="Start new daemon instance (returns instance ID)")
+    start_parser = daemon_sub.add_parser("start", help="Start new daemon instance (returns instance ID)")
+    start_parser.add_argument("--device", default=DEFAULT_DEVICE,
+                              help=f"Device class to emulate: {', '.join(DEVICE_PRESETS)} or raw '<w>x<h>[x<dpr>][,mobile][,touch][,landscape]' (default: {DEFAULT_DEVICE})")
     stop_parser = daemon_sub.add_parser("stop", help="Stop daemon instance")
     stop_parser.add_argument("instance_id", nargs="?", help="Instance ID to stop")
     stop_parser.add_argument("--all", dest="stop_all", action="store_true", help=argparse.SUPPRESS)  # Hidden
@@ -703,6 +902,11 @@ EXAMPLES:
     consget = subparsers.add_parser("consget", help="Get console message details")
     consget.add_argument("msgid", type=int, help="Message ID")
 
+    # Device emulation
+    device_parser = subparsers.add_parser("device", help="Show or switch the emulated device")
+    device_parser.add_argument("spec", nargs="?",
+                               help=f"{', '.join(DEVICE_PRESETS)} or raw '<w>x<h>[x<dpr>][,mobile][,touch][,landscape]'. Omit to show current.")
+
     # Page manipulation
     resize = subparsers.add_parser("resize", help="Resize page viewport")
     resize.add_argument("width", type=int, help="Width in pixels")
@@ -729,6 +933,12 @@ EXAMPLES:
     # Handle daemon commands
     if args.cmd == "daemon":
         if args.daemon_cmd == "start":
+            try:
+                launch_device = resolve_device(args.device)
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+
             # Generate new instance ID
             instance_id = generate_instance_id()
 
@@ -739,7 +949,7 @@ EXAMPLES:
                 # Parent process - print result and exit
                 # Give child a moment to start
                 time.sleep(0.5)
-                print(f"browsertools daemon started. Instance ID: {instance_id}")
+                print(f"browsertools daemon started. Instance ID: {instance_id} ({describe_device(launch_device)})")
                 return  # Exit from async main, let asyncio.run() clean up
             else:
                 # Child process - detach and run daemon
@@ -758,7 +968,7 @@ EXAMPLES:
                 asyncio.set_event_loop(asyncio.new_event_loop())
 
                 # Run the daemon in the new event loop (this blocks until shutdown)
-                asyncio.run(run_daemon(instance_id))
+                asyncio.run(run_daemon(instance_id, launch_device))
                 os._exit(0)
 
         elif args.daemon_cmd == "stop":
@@ -845,6 +1055,9 @@ EXAMPLES:
                 cmd_args_dict["page_size"] = args.size
         elif args.cmd == "consget":
             cmd_args_dict["msgid"] = args.msgid
+        elif args.cmd == "device":
+            if args.spec:
+                cmd_args_dict["spec"] = args.spec
         elif args.cmd == "resize":
             cmd_args_dict["width"] = args.width
             cmd_args_dict["height"] = args.height

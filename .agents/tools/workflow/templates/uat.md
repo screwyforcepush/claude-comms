@@ -41,6 +41,7 @@ You execute on Your Assignment while ensuring allignment with the ⭐North Star�
 2. **Toolkit Calibration**: Run `uv run .agents/tools/chrome-devtools/browsertools.py --help` to refresh command affordances, available modes, and capture options.
 3. **Flow Execution**: Execute each provided user flow end-to-end using ONLY the browser toolkit, mirroring end-user intent. 
  - For UI/design validation, screenshot the UI that is the primary subject of the user flow; UI checkpoints impacted by the recent implementation. 
+ - Verify UI-impacting flows at the device classes the product is expected to serve (toolkit `device` command: desktop, tablet, mobile). Switch device at the checkpoint and re-inspect; the page reloads into the new device, so re-orient with `snap` before interacting.
  - Visually inspect the screenshots, and record your qualitative design verdict against Design Bar FIRST, then consult console/logs and reconcile. Judgment before evidence — never let tool output lead your read.
  - While running flows, periodically check browser console logs, network panels, and the dev server logs, especially when issues are encountered.
  - ULTRATHINK about each flow's expected vs actual results, pass/fail outcome, severity, and supporting evidence.

@@ -2,19 +2,19 @@
   "mcp_command": "npx",
   "mcp_args": [
     "-y",
-    "chrome-devtools-mcp@latest",
+    "chrome-devtools-mcp@1.9.0",
     "--isolated",
     "--headless=true"
   ],
-  "_comment": "Default config runs headless. Override by creating ~/.browsertools/config.json",
+  "_comment": "Default config runs headless. Override by creating ~/.browsertools/config.json. The MCP version is pinned to match browsertools.py MCP_PINNED_VERSION; an unpinned/@latest reference is rewritten to the pin at launch.",
   "_examples": {
     "visual_mode": {
-      "mcp_args": ["-y", "chrome-devtools-mcp@latest", "--isolated"]
+      "mcp_args": ["-y", "chrome-devtools-mcp@1.9.0", "--isolated"]
     },
     "sandbox": {
       "mcp_args": [
         "-y",
-        "chrome-devtools-mcp@latest",
+        "chrome-devtools-mcp@1.9.0",
         "--isolated=true",
         "--headless=true",
         "--executablePath=/usr/local/bin/chromium-mcp"
