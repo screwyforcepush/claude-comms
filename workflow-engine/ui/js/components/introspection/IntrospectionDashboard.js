@@ -8,6 +8,10 @@ const HARNESSES = ['all', 'claude', 'codex', 'gemini'];
 const JOB_TYPES = ['all', 'implement', 'pm', 'review', 'uat', 'plan', 'document'];
 
 const RUBRIC_V2_LABELS = {
+  // r3 keys (2026-09). Retired keys below are kept so historical rows still label.
+  unpointedSoTDocNeeded: 'Unpointed SoT doc needed',
+  oversizedDocReadTruncated: 'Oversized doc read truncated',
+  trainingDefaultOverrideCausedRedo: 'Training-default override caused redo',
   unsolicitedContextReceived: 'Unsolicited context received',
   shellQuotingRetry: 'Shell quoting retry needed',
   parallelReadsMissed: 'Parallel reads missed',

@@ -455,6 +455,8 @@ V1 rubric was authored blind. Several questions are too broad to be answered wit
 
 **Iteration discipline**: refinement cycles are explicitly capped (e.g., 2 max per refinement assignment). Residual gaps go in `meta.knownGaps` rather than triggering further cycles.
 
+**A changed question is a new key.** When a question's meaning is tightened, it gets a fresh key and the old key is retired — never re-phrased in place. Rows answered under the old phrasing keep aggregating under the old key, so a trend line is never a splice of two different questions. Retired keys stay labelled in the read surfaces for as long as their rows are read. The CLI strips keys outside the live set rather than rejecting the row: a misnamed answer must not leak into aggregates, but the reflection's items and narrative are still worth keeping.
+
 ### Reflection Data Dump Utility
 
 `.agents/tools/workflow/introspection/dump-reflections.ts` writes all V1 reflection rows from all namespaces to a single JSON file. Feeds analysis assignments without making them invoke the introspection CLI.

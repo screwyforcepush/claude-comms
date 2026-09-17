@@ -7,7 +7,37 @@ import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
 import { getEngineIdentity } from "./lib/engine-version.js";
 
-const REFLECTION_CLI_VERSION = "0.3.0";
+const REFLECTION_CLI_VERSION = "0.4.0";
+
+// v2-draft.r3 — the live question set. Keep in sync with help() below.
+// Unknown keys are stripped (with a warning) so a misnamed answer can't leak
+// into aggregates; the row still writes so capture volume is preserved.
+// @see docs/project/spec/mental-model.md#rubricv2--greenfield-evidence-based-framing-led
+const KNOWN_RUBRIC_KEYS = new Set<string>([
+  // Intent / context conflicts
+  "assignmentInstructionConflict",
+  "silentReconciliationForced",
+  "intentDriftMidJob",
+  "trainingDefaultOverrideCausedRedo",
+  "decisionFrameworkAmbiguous",
+  // Context / docs
+  "unpointedSoTDocNeeded",
+  "oversizedDocReadTruncated",
+  "artifactReadBackNeeded",
+  "sameFileReadMultipleTimes",
+  // CLI / best-tool-for-job availability
+  "kludgedBashForMissingTool",
+  "betterToolMissedAtTime",
+  "toolSchemaLookupRequired",
+  // Tool ergonomics
+  "inputShapeMismatch",
+  "shellQuotingRetry",
+  "errorMessageUninformative",
+  "toolFailedRecoveredSameTurn",
+  // Workflow hygiene
+  "validationRunBeforeCompletion",
+  "subagentReportNeededVerification",
+]);
 
 const api = anyApi;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -65,7 +95,7 @@ Item rules:
     tags (e.g. "phase-6", "this-task"). The top-level keywords field on
     the stored row is derived automatically from the union of items' keywords.
 
-Rubric question keys (v2-draft.r2, 20 questions):
+Rubric question keys (v2-draft.r3, 18 questions):
   Intent / context conflicts:
     assignmentInstructionConflict
       "Did you encounter a direct contradiction between two instruction
@@ -79,27 +109,26 @@ Rubric question keys (v2-draft.r2, 20 questions):
       "Did your understanding of the assignment's true intent shift mid-job
        because of context that surfaced later (a doc you read mid-job, a
        tool result, a user message, an artifact from a prior PM round)?"
-    trainingDefaultOverriddenByProject
-      "Did a project-specific instruction (in CLAUDE.md, AGENTS.md, the
-       prompt template, the north star, or the user's direct message)
-       require you to override or suppress one of your training defaults?"
+    trainingDefaultOverrideCausedRedo
+      "Did overriding one of your training defaults for a project
+       instruction (CLAUDE.md, AGENTS.md, prompt template, north star,
+       user message) cost you a wrong first move or a redo — you acted
+       on the default first, then had to undo or rework it?"
     decisionFrameworkAmbiguous
       "Did the PM decision-framework rules give an ambiguous mapping for
        the actual situation in front of you, requiring judgment beyond
        the named rules?"
 
   Context / docs:
-    unsolicitedContextReceived
-      "Did you receive context you neither asked for nor used — in any
-       form — that ate context budget without changing your next action?"
-    externalSoTDocsNeeded
-      "To act on this assignment, did you need to read at least one
-       Source-of-Truth document (mental-model.md, AGENTS.md, a phase
-       spec) that was NOT inlined into the prompt?"
-    oversizedSingleDocEncountered
-      "Did you encounter a single document that you needed to read in
-       full, but which exceeded a comfortable single-Read bite (>5k
-       tokens or >300 lines) and forced you to either page or skim?"
+    unpointedSoTDocNeeded
+      "Did you need a Source-of-Truth document (a spec, guide, ADR,
+       mental model section) that NO prompt, primer, north star, or
+       AOP step pointed you at — one you had to discover on your own
+       to act correctly?"
+    oversizedDocReadTruncated
+      "Did a document you needed to read in full come back truncated,
+       or fail to read at all, because it hit a tool output limit —
+       forcing repeated narrower reads of the same file?"
     artifactReadBackNeeded
       "Did you have to scroll through a flat artifacts/decisions prose
        blob in the prompt to find a specific prior decision or artifact
@@ -140,10 +169,6 @@ Rubric question keys (v2-draft.r2, 20 questions):
        self-corrected on a retry without abandoning the approach?"
 
   Workflow hygiene:
-    parallelReadsMissed
-      "Did you make three or more sequential Read/Grep/Glob calls
-       within a single decision point that had no inter-dependency
-       and could have been issued as one parallel batch?"
     validationRunBeforeCompletion
       "Before reporting this job complete, did you execute the
        project's validation suite (tests, typecheck, lint, smoke
@@ -154,8 +179,13 @@ Rubric question keys (v2-draft.r2, 20 questions):
        alone was not trustworthy?"
 
 Rubric values must be booleans. Omit any key you have no opinion on;
-omission is itself signal. Keys not in the list above are accepted
-without warning (the schema is intentionally flexible).
+omission is itself signal. Keys not in the list above are STRIPPED with
+a warning (the row still writes) — use the exact keys shown; do not
+invent near-miss names.
+
+Retired in r3 (do not submit): unsolicitedContextReceived,
+externalSoTDocsNeeded, oversizedSingleDocEncountered,
+trainingDefaultOverriddenByProject, parallelReadsMissed.
 
 Notes:
   - description (V1) was dropped in V2; the narrative absorbs that
@@ -260,11 +290,22 @@ function validateInput(value: unknown): ReflectionInput {
   // Validate rubric
   if (!isObject(value.rubric)) fail("input.rubric must be an object");
   const rubric: Record<string, boolean> = {};
+  const unknownKeys: string[] = [];
   for (const [key, rubricValue] of Object.entries(value.rubric)) {
     if (typeof rubricValue !== "boolean") {
       fail(`input.rubric.${key} must be a boolean`);
     }
+    if (!KNOWN_RUBRIC_KEYS.has(key)) {
+      unknownKeys.push(key);
+      continue;
+    }
     rubric[key] = rubricValue;
+  }
+  if (unknownKeys.length > 0) {
+    console.error(
+      `warning: stripped ${unknownKeys.length} unknown rubric key(s) not in the r3 question set: ` +
+        `${unknownKeys.join(", ")}. Run --help for the exact keys.`
+    );
   }
 
   return { narrative, items, rubric };
