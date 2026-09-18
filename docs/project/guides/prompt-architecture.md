@@ -9,7 +9,7 @@ This document describes how prompts are constructed and selected within the work
   - `docs/project/spec/mental-model.md` (the user's conceptual model)
   - `docs/project/guides/system-diagram.md`
   - `docs/project/spec/workflow-engine-spec.md`
-  - Other relevant guides (when applicable)
+  - Other relevant guides (when applicable) — e.g. [`north-star-lifecycle.md`](north-star-lifecycle.md) traces how each template/PM module consumes `{{NORTH_STAR}}`
 
 ## Job Types → Templates
 
