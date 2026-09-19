@@ -1,6 +1,7 @@
 // ChatInput - Message input with send button
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { QIcon } from '../shared/index.js';
+import { formatBytes } from './attachmentUtils.js';
 
 // localStorage keys
 const CHAT_INPUT_COLLAPSED_KEY = 'workflow-engine:chat-input-collapsed';
@@ -23,6 +24,36 @@ function getInitialEnterSafe() {
   }
 }
 
+function dataTransferHasFiles(dataTransfer) {
+  return Array.from(dataTransfer?.types || []).includes('Files');
+}
+
+function extensionForMime(mime) {
+  switch ((mime || '').toLowerCase()) {
+    case 'image/jpeg': return 'jpg';
+    case 'image/png': return 'png';
+    case 'image/gif': return 'gif';
+    case 'image/webp': return 'webp';
+    case 'image/svg+xml': return 'svg';
+    case 'image/bmp': return 'bmp';
+    default: return 'bin';
+  }
+}
+
+function namePastedFile(file, timestamp, index) {
+  if (file.name) return file;
+  const suffix = index > 0 ? `-${index + 1}` : '';
+  const filename = `pasted-${timestamp}${suffix}.${extensionForMime(file.type)}`;
+  try {
+    return new File([file], filename, {
+      type: file.type || 'application/octet-stream',
+      lastModified: file.lastModified || Date.now(),
+    });
+  } catch {
+    return file;
+  }
+}
+
 /**
  * ChatInput component - Text input with send button
  * Supports both controlled (draftText/onDraftChange) and uncontrolled modes.
@@ -35,16 +66,37 @@ function getInitialEnterSafe() {
  * @param {Function} [props.onDraftChange] - Draft change callback (optional, WP-6)
  * @param {Function} [props.onSendToFork] - Callback to send message into a new forked thread
  */
-export function ChatInput({ onSend, disabled = false, placeholder = 'Type a message...', draftText, onDraftChange, onStop, stopPending = false, onSendToFork }) {
+export function ChatInput({
+  onSend,
+  disabled = false,
+  placeholder = 'Type a message...',
+  draftText,
+  onDraftChange,
+  pendingAttachments = [],
+  onAddFiles,
+  onRemoveAttachment,
+  onStop,
+  stopPending = false,
+  onSendToFork
+}) {
   const [internalMessage, setInternalMessage] = useState('');
 
   // Use controlled value if provided, otherwise internal state
   const message = draftText !== undefined ? draftText : internalMessage;
+  const attachments = Array.isArray(pendingAttachments) ? pendingAttachments : [];
+  const hasUploading = attachments.some((attachment) => attachment.status === 'uploading');
+  const readyAttachmentCount = attachments.filter((attachment) =>
+    attachment.status === 'ready' && attachment.storageId
+  ).length;
+  const hasSendableText = message.trim().length > 0;
   const [isFocused, setIsFocused] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(getInitialInputCollapsed);
   const [enterSafe, setEnterSafe] = useState(getInitialEnterSafe);
   const [showToggle, setShowToggle] = useState(false);
+  const [dropActive, setDropActive] = useState(false);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const dragDepthRef = useRef(0);
 
   const COLLAPSED_MAX = 150;
 
@@ -60,39 +112,38 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
     }
   }, [message, isCollapsed]); // message is derived from draftText or internalMessage
 
+  useEffect(() => {
+    if (!disabled) return;
+    dragDepthRef.current = 0;
+    setDropActive(false);
+  }, [disabled]);
+
   const handleSubmit = useCallback((e) => {
     e?.preventDefault();
     const trimmedMessage = message.trim();
-    if (trimmedMessage && !disabled && onSend) {
-      onSend(trimmedMessage);
-      // Clear the appropriate state source
-      if (onDraftChange) {
-        onDraftChange('');
-      } else {
-        setInternalMessage('');
-      }
+    const content = trimmedMessage.length > 0 ? trimmedMessage : '';
+    if ((trimmedMessage || readyAttachmentCount > 0) && !disabled && !hasUploading && onSend) {
+      onSend(content);
+      if (!onDraftChange) setInternalMessage('');
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     }
-  }, [message, disabled, onSend, onDraftChange]);
+  }, [message, readyAttachmentCount, disabled, hasUploading, onSend, onDraftChange]);
 
   // Send the message into a new forked thread instead of this one
   const handleForkSubmit = useCallback(() => {
     const trimmedMessage = message.trim();
-    if (trimmedMessage && !disabled && onSendToFork) {
-      onSendToFork(trimmedMessage);
-      if (onDraftChange) {
-        onDraftChange('');
-      } else {
-        setInternalMessage('');
-      }
+    const content = trimmedMessage.length > 0 ? trimmedMessage : '';
+    if ((trimmedMessage || readyAttachmentCount > 0) && !disabled && !hasUploading && onSendToFork) {
+      onSendToFork(content);
+      if (!onDraftChange) setInternalMessage('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     }
-  }, [message, disabled, onSendToFork, onDraftChange]);
+  }, [message, readyAttachmentCount, disabled, hasUploading, onSendToFork, onDraftChange]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -144,6 +195,63 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
     }
   }, [onDraftChange]);
 
+  const handlePickFiles = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileInputChange = useCallback((e) => {
+    if (!disabled && onAddFiles && e.target.files?.length) {
+      onAddFiles(e.target.files);
+    }
+    e.target.value = '';
+  }, [disabled, onAddFiles]);
+
+  const handlePaste = useCallback((e) => {
+    if (disabled || !onAddFiles) return;
+    const items = Array.from(e.clipboardData?.items || []);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const files = items
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter(Boolean)
+      .map((file, index) => namePastedFile(file, timestamp, index));
+
+    if (files.length > 0) {
+      e.preventDefault();
+      onAddFiles(files);
+    }
+  }, [disabled, onAddFiles]);
+
+  const handleDragEnter = useCallback((e) => {
+    if (disabled || !dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setDropActive(true);
+  }, [disabled]);
+
+  const handleDragOver = useCallback((e) => {
+    if (disabled || !dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDropActive(true);
+  }, [disabled]);
+
+  const handleDragLeave = useCallback((e) => {
+    if (dataTransferHasFiles(e.dataTransfer)) e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDropActive(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    if (disabled || !dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setDropActive(false);
+    if (onAddFiles && e.dataTransfer.files?.length) {
+      onAddFiles(e.dataTransfer.files);
+    }
+  }, [disabled, onAddFiles]);
+
   const handleFocus = useCallback(() => {
     setIsFocused(true);
   }, []);
@@ -176,19 +284,104 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
     });
   }, []);
 
-  const canSend = message.trim().length > 0 && !disabled;
+  const canSend = (hasSendableText || readyAttachmentCount > 0) && !disabled && !hasUploading;
+  const disabledReason = hasUploading
+    ? 'Waiting for uploads...'
+    : disabled
+      ? 'Quartermaster is busy...'
+      : '';
 
   return React.createElement('form', {
     onSubmit: handleSubmit,
-    className: 'chat-input-container border-t p-4',
+    onDragEnter: handleDragEnter,
+    onDragOver: handleDragOver,
+    onDragLeave: handleDragLeave,
+    onDrop: handleDrop,
+    className: `chat-input-container border-t p-4 ${dropActive ? 'chat-input-container--drop-active' : ''}`,
     style: {
       backgroundColor: 'var(--q-stone1)',
-      borderColor: 'var(--q-stone3)'
+      borderColor: 'var(--q-stone3)',
+      position: 'relative'
     }
   },
+    React.createElement('input', {
+      ref: fileInputRef,
+      type: 'file',
+      multiple: true,
+      onChange: handleFileInputChange,
+      className: 'sr-only',
+      tabIndex: -1
+    }),
+
+    attachments.length > 0 && React.createElement('div', {
+      className: 'chat-attachment-pending-list',
+      'aria-label': 'Pending attachments'
+    },
+      attachments.map((attachment) => {
+        const stateText = attachment.status === 'uploading'
+          ? 'uploading...'
+          : attachment.status === 'error'
+            ? `error: ${attachment.error || 'upload failed'}`
+            : 'ready';
+        return React.createElement('div', {
+          key: attachment.id,
+          className: `chat-attachment-pending-row chat-attachment-pending-row--${attachment.status}`
+        },
+          React.createElement('div', {
+            className: 'chat-attachment-pending-main'
+          },
+            React.createElement('span', {
+              className: 'chat-attachment-pending-name',
+              title: attachment.filename
+            }, attachment.filename),
+            React.createElement('span', {
+              className: 'chat-attachment-pending-meta'
+            }, formatBytes(attachment.size)),
+            React.createElement('span', {
+              className: `chat-attachment-state chat-attachment-state--${attachment.status}`,
+              'aria-live': attachment.status === 'uploading' ? 'polite' : undefined
+            }, stateText)
+          ),
+          attachment.oversize && React.createElement('div', {
+            className: 'chat-attachment-warning',
+            title: 'Over 20 MB'
+          },
+            React.createElement(QIcon, { name: 'warning', size: 14, color: 'currentColor' }),
+            React.createElement('span', null, "over 20 MB - the agent can't fetch this")
+          ),
+          React.createElement('button', {
+            type: 'button',
+            onClick: () => onRemoveAttachment?.(attachment.id),
+            className: 'chat-attachment-remove',
+            'aria-label': `Remove ${attachment.filename}`,
+            title: `Remove ${attachment.filename}`,
+            disabled: !onRemoveAttachment
+          },
+            React.createElement(QIcon, { name: 'close', size: 14, color: 'currentColor' })
+          )
+        );
+      })
+    ),
+
+    dropActive && React.createElement('div', {
+      className: 'chat-attachment-drop-overlay',
+      'aria-hidden': 'true'
+    }, 'Drop files to attach'),
+
     React.createElement('div', {
       className: 'flex items-end gap-3'
     },
+      React.createElement('button', {
+        type: 'button',
+        onClick: handlePickFiles,
+        disabled: disabled || !onAddFiles,
+        className: 'chat-attachment-add-button',
+        title: disabled ? 'Wait for the current send to finish' : 'Attach files',
+        'aria-label': 'Attach files'
+      },
+        React.createElement(QIcon, { name: 'add', size: 18, color: 'currentColor' })
+      ),
+
       // Textarea wrapper
       React.createElement('div', { className: 'flex-1 relative' },
         React.createElement('textarea', {
@@ -196,6 +389,7 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
           value: message,
           onChange: handleChange,
           onKeyDown: handleKeyDown,
+          onPaste: handlePaste,
           onFocus: handleFocus,
           onBlur: handleBlur,
           placeholder: placeholder,
@@ -332,7 +526,7 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
           },
           title: canSend
             ? 'Send to fork: branch this message into a new thread'
-            : 'Type a message to send to a fork'
+            : disabledReason || 'Type a message or attach a file to send to a fork'
         },
           React.createElement(QIcon, {
             name: 'fork',
@@ -379,14 +573,20 @@ export function ChatInput({ onSend, disabled = false, placeholder = 'Type a mess
                 color: canSend ? 'var(--q-void0)' : 'var(--q-bone0)',
                 cursor: canSend ? 'pointer' : 'not-allowed'
               },
-              title: canSend ? 'Send message' : disabled ? 'Sending...' : 'Type a message to send'
+              title: canSend
+                ? 'Send message'
+                : disabledReason || 'Type a message or attach a file to send'
             },
               React.createElement(QIcon, {
                 name: 'dispatch',
                 size: 20,
                 color: 'currentColor'
               })
-            )
+            ),
+        disabledReason && React.createElement('span', {
+          className: 'chat-input-disabled-reason',
+          role: 'status'
+        }, disabledReason)
       )
     )
   );

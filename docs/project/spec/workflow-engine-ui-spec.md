@@ -3,7 +3,7 @@
 > Browser-based CC3 operations terminal for workflow management, chat, assignment monitoring, and reflection introspection.
 
 **Version:** 2.0
-**Last Updated:** 2026-05-14
+**Last Updated:** 2026-09-19
 **Status:** Active
 
 **Why-layer authority:** The UI exists to serve the operating model in [`mental-model.md`](mental-model.md). That file is authoritative for intent, vocabulary, and product philosophy. This spec documents the live UI implementation and should not override the mental model.
@@ -45,6 +45,7 @@ components/
 │   └── PasswordContext.js
 ├── chat/
 │   ├── AssignmentPane.js
+│   ├── attachmentUtils.js
 │   ├── ChatHeader.js
 │   ├── ChatInput.js
 │   ├── ChatPanel.js
@@ -92,6 +93,7 @@ workflow-engine/ui/js/components/auth/LoginForm.js
 workflow-engine/ui/js/components/auth/LoginGate.js
 workflow-engine/ui/js/components/auth/PasswordContext.js
 workflow-engine/ui/js/components/chat/AssignmentPane.js
+workflow-engine/ui/js/components/chat/attachmentUtils.js
 workflow-engine/ui/js/components/chat/ChatHeader.js
 workflow-engine/ui/js/components/chat/ChatInput.js
 workflow-engine/ui/js/components/chat/ChatPanel.js
@@ -133,6 +135,7 @@ Top-level composition:
 | `js/main.js` | App shell, responsive mode detection, view switching between threads and introspection, mobile back handling |
 | `js/api.js` | String-based Convex API reference map used by UI hooks |
 | `js/hooks/useConvex.js` | Convex provider, live query hook, mutation hook, password injection |
+| `components/chat/attachmentUtils.js` | Pure chat-attachment helpers for site URL derivation, gated fetch headers, byte formatting, image detection, and draft serialization |
 | `js/hooks/useNamespaceSettings.js` | Namespace harness/model config reader and writer |
 | `components/auth/` | Password wall and credential context |
 | `components/chat/` | Cross-namespace thread list, chat, mode toggle, assignment pane |
@@ -175,21 +178,23 @@ Top-level composition:
 
 6. **Kill button:** `JobDetail` shows `Kill Agent` for running jobs that do not already have `killRequested`. The button calls `api.jobs.requestKill`. Chat jobs can also be interrupted from `ChatInput`; the stop button calls `api.chatJobs.requestKill` and then shows the pending kill state.
 
-7. **Draft persistence:** `ChatPanel` stores per-thread drafts in an in-memory `Map` and mirrors them to localStorage under `workflow-engine:draft:<threadId>` with a 500 ms debounce. Drafts are cleared after successful send.
+7. **Draft persistence:** `ChatPanel` stores per-thread drafts in an in-memory `Map`. Text mirrors to localStorage under `workflow-engine:draft:<threadId>` with a 500 ms debounce. Ready attachment metadata mirrors separately under `workflow-engine:draft-attachments:<threadId>` and is restored as ready draft chips. Both keys are cleared after successful send.
 
-8. **Assignment pane PM nudge and north-star surface:** `AssignmentPane` shows the current assignment, editable status, collapsible north star text, job chain, artifacts, decisions, and a PM Nudge editor. The nudge writes through `assignments.update({ pmNudge })`. North-star amendments are reflected when the assignment `northStar` has been appended by the authorized workflow path; the UI displays the resulting north star but does not author amendments directly. See [`mental-model.md`](mental-model.md#mid-flight-assignment-modification).
+8. **Chat input attachments:** `ChatInput` supports the attach button, drag-and-drop, and file paste. `ChatPanel` owns the upload state per thread, requests upload URLs through `api.files.generateUploadUrl`, posts files to Convex storage, marks uploaded items ready, and removes unsent blobs through `api.chatMessages.discardAttachment`. Files over 20 MiB show a warning because the fetch route cannot serve them, but the UI does not impose a count or total-size cap.
 
-9. **`assignmentsCreated` history:** If `thread.assignmentsCreated` contains more than one assignment, `AssignmentPane` shows previous/next navigation and calls `chatThreads.updateFocusAssignment` to move the thread focus pointer.
+9. **Assignment pane PM nudge and north-star surface:** `AssignmentPane` shows the current assignment, editable status, collapsible north star text, job chain, artifacts, decisions, and a PM Nudge editor. The nudge writes through `assignments.update({ pmNudge })`. North-star amendments are reflected when the assignment `northStar` has been appended by the authorized workflow path; the UI displays the resulting north star but does not author amendments directly. See [`mental-model.md`](mental-model.md#mid-flight-assignment-modification).
 
-10. **Introspection dashboard with V2 reflections:** `IntrospectionDashboard` is the V2 hard-cutover dashboard. It calls `api.reflectionsV2.coverageRate`, `api.reflectionsV2.recent`, and `api.reflectionsV2.gaps`, then renders coverage health, gap reasons, job-type attention, rubric heatmaps, run-shape scatter, theme cloud, reflection stream, and a detail drawer. See [`reflection-feedback-spec.md`](reflection-feedback-spec.md).
+10. **`assignmentsCreated` history:** If `thread.assignmentsCreated` contains more than one assignment, `AssignmentPane` shows previous/next navigation and calls `chatThreads.updateFocusAssignment` to move the thread focus pointer.
 
-11. **NamespaceSettings harness/model config:** The settings gear in the namespace filter opens `NamespaceSettings`. It reads `namespaces.getHarnessDefaults`, edits per-job-type harness/model entries, supports fan-out arrays, can add custom job types, saves the active namespace, and can "Save All" across all namespace IDs passed from `ChatPanel`. See [`harness-model-config-spec.md`](harness-model-config-spec.md).
+11. **Introspection dashboard with V2 reflections:** `IntrospectionDashboard` is the V2 hard-cutover dashboard. It calls `api.reflectionsV2.coverageRate`, `api.reflectionsV2.recent`, and `api.reflectionsV2.gaps`, then renders coverage health, gap reasons, job-type attention, rubric heatmaps, run-shape scatter, theme cloud, reflection stream, and a detail drawer. See [`reflection-feedback-spec.md`](reflection-feedback-spec.md).
 
-12. **Q palette and effects:** `styles.css` defines the Q palette, T tokens, font stack, copper textures, riveted panels, fullbright dots, Q buttons, markdown styling, and responsive layout rules. `QIcon.js` ports the brandkit icon system into React.createElement components. `GrainOverlay` renders a canvas grain layer and `ScanlineSweep` renders the ambient scanline. The source aesthetic pointer is [`../guides/styleguide/brandkit.jsx`](../guides/styleguide/brandkit.jsx).
+12. **NamespaceSettings harness/model config:** The settings gear in the namespace filter opens `NamespaceSettings`. It reads `namespaces.getHarnessDefaults`, edits per-job-type harness/model entries, supports fan-out arrays, can add custom job types, saves the active namespace, and can "Save All" across all namespace IDs passed from `ChatPanel`. See [`harness-model-config-spec.md`](harness-model-config-spec.md).
 
-13. **Responsive breakpoints:** `main.js` classifies widths as mobile `< 768`, tablet `< 1024`, laptop `< 1440`, and desktop otherwise. CSS has matching mobile drawer rules at `max-width: 767px`, tablet rules at `768px..1024px`, desktop spacious rules at `min-width: 1441px`, plus introspection compaction at `1320px` and `920px`.
+13. **Q palette and effects:** `styles.css` defines the Q palette, T tokens, font stack, copper textures, riveted panels, fullbright dots, Q buttons, markdown styling, and responsive layout rules. `QIcon.js` ports the brandkit icon system into React.createElement components. `GrainOverlay` renders a canvas grain layer and `ScanlineSweep` renders the ambient scanline. The source aesthetic pointer is [`../guides/styleguide/brandkit.jsx`](../guides/styleguide/brandkit.jsx).
 
-14. **Mobile back-button and drawer behavior:** On mobile, `AppLayout` pushes a history entry and intercepts `popstate`. If introspection is active, back returns to threads; otherwise it increments `mobileBackTrigger`, and `ChatPanel` closes the thread drawer and assignment pane. The thread pane is a left drawer with overlay, and the assignment pane is a full-width right drawer.
+14. **Responsive breakpoints:** `main.js` classifies widths as mobile `< 768`, tablet `< 1024`, laptop `< 1440`, and desktop otherwise. CSS has matching mobile drawer rules at `max-width: 767px`, tablet rules at `768px..1024px`, desktop spacious rules at `min-width: 1441px`, plus introspection compaction at `1320px` and `920px`.
+
+15. **Mobile back-button and drawer behavior:** On mobile, `AppLayout` pushes a history entry and intercepts `popstate`. If introspection is active, back returns to threads; otherwise it increments `mobileBackTrigger`, and `ChatPanel` closes the thread drawer and assignment pane. The thread pane is a left drawer with overlay, and the assignment pane is a full-width right drawer.
 
 ## Chat and Assignment Flow
 
@@ -197,11 +202,19 @@ The default screen is the operations center, not a landing page. The left pane i
 
 Message flow:
 
-1. User sends a message through `ChatInput`.
-2. `ChatPanel` inserts the user message through `chatMessages.add`.
-3. `ChatPanel` triggers a chat job through `chatJobs.trigger`.
-4. The runner writes assistant or PM messages back to Convex.
-5. `MessageList` updates through the live `chatMessages.list` subscription.
+1. User writes text and may attach files through `ChatInput` by picking, dropping, or pasting files.
+2. `ChatPanel` uploads each file with `files.generateUploadUrl`; pending attachments stay in the per-thread draft until ready or removed.
+3. On send or send-to-fork, `ChatPanel` passes ready attachment metadata with the message and clears both draft keys on success.
+4. `ChatPanel` inserts normal messages through `chatMessages.add`; forked sends use `chatThreads.fork`.
+5. `ChatPanel` triggers a chat job through `chatJobs.trigger` for normal sends.
+6. The runner writes assistant or PM messages back to Convex.
+7. `MessageList` updates through the live `chatMessages.list` subscription.
+
+Message bubbles render attachment chips below the markdown body. Chips are
+buttons, not public links: click fetches the blob through the password-gated
+HTTP route with an `Authorization` header, creates a temporary `blob:` URL, and
+downloads the file. Image attachments also render inline previews after the
+same gated fetch; the `<img>` receives only the generated `blob:` URL.
 
 Message rendering uses `marked` plus `DOMPurify`. Roles are styled as:
 
@@ -247,6 +260,9 @@ The assignment pane follows the subscription discipline in [`convex-bandwidth-op
 | Mark selected thread read | `chatThreads.markRead` |
 | Change focused assignment history item | `chatThreads.updateFocusAssignment` |
 | Send chat message | `chatMessages.add` then `chatJobs.trigger` |
+| Send message to fork | `chatThreads.fork` |
+| Upload chat attachment | `files.generateUploadUrl`, then browser `POST` to the Convex upload URL |
+| Remove unsent attachment | `chatMessages.discardAttachment` |
 | Interrupt active chat job | `chatJobs.requestKill` |
 | Edit assignment status or PM nudge | `assignments.update` |
 | Kill running assignment job | `jobs.requestKill` |

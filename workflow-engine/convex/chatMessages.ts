@@ -38,6 +38,12 @@ export const add = mutation({
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("pm")),
     content: v.string(),
     hint: v.optional(v.string()),
+    attachments: v.optional(v.array(v.object({
+      filename: v.string(),
+      storageId: v.id("_storage"),
+      size: v.number(),
+      mime: v.string(),
+    }))),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -52,6 +58,22 @@ export const add = mutation({
       content: args.content,
       createdAt: now,
       ...(args.hint ? { hint: args.hint } : {}),
+      ...(args.attachments && args.attachments.length > 0
+        ? { attachments: args.attachments }
+        : {}),
     });
+  },
+});
+
+export const discardAttachment = mutation({
+  args: { password: v.string(), storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    try {
+      await ctx.storage.delete(args.storageId);
+      return { deleted: true };
+    } catch {
+      return { deleted: false };
+    }
   },
 });

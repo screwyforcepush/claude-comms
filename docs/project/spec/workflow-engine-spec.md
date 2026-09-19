@@ -4,7 +4,7 @@
 > and lightweight peer communication.
 
 **Version:** 2.1
-**Last Updated:** 2026-05-14
+**Last Updated:** 2026-09-19
 **Status:** Active
 **Why-layer:** See [mental-model.md](mental-model.md) for the authoritative
 intent, philosophy, user mental model, and design principles. This document is
@@ -17,7 +17,7 @@ the what-layer: live schema, relationships, scheduler behavior, and CLI surface.
 This spec was refreshed against:
 
 - `workflow-engine/convex/schema.ts` for tables, fields, union values, and indexes.
-- `npx tsx .agents/tools/workflow/cli.ts --help` for the workflow CLI surface.
+- `npx tsx .agents/tools/workflow/cli.ts help` for the workflow CLI surface.
 - [harness-model-config-spec.md](harness-model-config-spec.md) for namespace
   harness/model semantics.
 - [reflection-feedback-spec.md](reflection-feedback-spec.md) for reflection row
@@ -64,6 +64,8 @@ Primary capabilities:
 - Harness/model resolution from namespace `harnessDefaults`, stamped onto jobs
   and chat jobs at insert time.
 - Real-time chat in `jam`, `cook`, and `guardian` modes.
+- Password-gated chat message attachments stored in Convex storage and fetched
+  through the workflow toolkit, never through public storage URLs.
 - Per-assignment guardian forks through `chatThreads.guardianSessions`.
 - Runner metrics, kill requests, session IDs, rate-limit pause/retry state, and
   reflection coverage data.
@@ -401,6 +403,7 @@ Messages in a chat thread.
 | `role` | union | Yes | Message speaker/source. |
 | `content` | `string` | Yes | Message body. |
 | `hint` | `string` | No | Metadata for differential prompting. |
+| `attachments` | object array | No | Files attached to the message. Each entry is `{ filename, storageId, size, mime }`, where `storageId` is an `Id<"_storage">` and `size` is bytes. |
 | `createdAt` | `number` | Yes | Message creation timestamp. |
 
 Union values:
@@ -415,6 +418,15 @@ Indexes:
 |---|---|---|
 | `by_thread` | `threadId` | List messages in a thread. |
 | `by_thread_created` | `threadId`, `createdAt` | Ordered thread history. |
+
+Attachment rows are optional and additive. `chatMessages.add` stores
+`attachments` only when the caller sends a non-empty array, and
+`chatMessages.discardAttachment` deletes an uploaded storage blob for a pending
+draft attachment. `chatJobs.trigger` and `chatThreads.fork` render attachment
+metadata into `chatJobs.context.latestUserMessage` so the agent sees a
+password-gated block with each filename, storage ID, and the
+`attachment-fetch` command. Deleting a thread best-effort deletes blobs for the
+messages it owns before removing the message rows.
 
 ### `agentComms`
 
@@ -600,7 +612,7 @@ not load the wrapper settings and the headless path remains unchanged.
 
 ## CLI Interface
 
-The live help output on 2026-05-14 is:
+The live help output on 2026-09-19 is:
 
 ```text
 Workflow Engine CLI
@@ -643,6 +655,8 @@ Chat Commands:
   chat-send <threadId> <message>      Send message and create chat job
   chat-mode <threadId> <jam|cook|guardian> [--assignment <id>]  Change thread mode
   chat-title <threadId> <title>       Update thread title
+  attachment-fetch <storageId> --out <path>
+                                      Fetch a chat attachment to a local file (password-gated)
 
 Environment Variables (auto-injected):
   WORKFLOW_ASSIGNMENT_ID   Default assignment for commands
@@ -673,6 +687,25 @@ Important CLI notes:
   `--jobs` and exists to avoid shell quoting/heredoc problems.
 - `WORKFLOW_ARTIFACTS` and `WORKFLOW_DECISIONS` are append bases for
   `update-assignment --artifacts` and `update-assignment --decisions`.
+- `attachment-fetch <storageId> --out <path>` reads the password from
+  `.agents/tools/workflow/config.json`, calls the protected HTTP attachment
+  route, creates the output directory, writes the bytes to the requested path,
+  and prints one JSON verdict. The CLI derives the HTTP-actions host from
+  `convexUrl` by converting `.convex.cloud` to `.convex.site`; set optional
+  `convexSiteUrl` in `config.json` for custom/self-hosted deployments.
+
+## HTTP Routes
+
+`workflow-engine/convex/http.ts` exposes the attachment read path:
+
+| Route | Method | Auth | Behavior |
+|---|---|---|---|
+| `/attachments/<storageId>` | `GET` | `Authorization: Bearer <ADMIN_PASSWORD>` | Reads the Convex storage blob, enforces the 20 MiB response cap, returns `Content-Type`, `Content-Length`, `Content-Disposition`, no-store cache headers, and no public storage URL. |
+| `/attachments/<storageId>` | `OPTIONS` | None | CORS preflight for browser callers using the `Authorization` header. |
+
+The route never accepts the password in a query string. The optional
+`filename` query parameter is only a non-secret display hint for
+`Content-Disposition`.
 
 ---
 
@@ -757,10 +790,13 @@ Rules:
 | Chat thread functions | `workflow-engine/convex/chatThreads.ts` |
 | Chat message functions | `workflow-engine/convex/chatMessages.ts` |
 | Chat job functions | `workflow-engine/convex/chatJobs.ts` |
+| Convex HTTP routes | `workflow-engine/convex/http.ts` |
+| Convex attachment helpers | `workflow-engine/convex/lib/attachments.ts` |
 | Reflection V1 functions | `workflow-engine/convex/reflections.ts` |
 | Reflection V2 functions | `workflow-engine/convex/reflectionsV2.ts` |
 | Agent comms functions | `workflow-engine/convex/agentComms.ts` |
 | Workflow CLI | `.agents/tools/workflow/cli.ts` |
+| Workflow CLI attachment helpers | `.agents/tools/workflow/lib/attachments.ts` |
 | Runner | `.agents/tools/workflow/runner.ts` |
 | Workflow config | `.agents/tools/workflow/config.json` |
 | Claude interactive driver | `.agents/tools/workflow/claude-interactive-driver.py` |

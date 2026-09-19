@@ -242,6 +242,12 @@ export default defineSchema({
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("pm")),
     content: v.string(),
     hint: v.optional(v.string()),
+    attachments: v.optional(v.array(v.object({
+      filename: v.string(),
+      storageId: v.id("_storage"),
+      size: v.number(),
+      mime: v.string(),
+    }))),
     createdAt: v.number(),
   })
     .index("by_thread", ["threadId"])

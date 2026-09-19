@@ -15,7 +15,7 @@
     },
     {
       "name": "test",
-      "command": "npx tsx --test .agents/tools/validate/*.test.ts"
+      "command": "npx tsx --test .agents/tools/validate/*.test.ts .agents/tools/workflow/lib/*.test.ts workflow-engine/convex/lib/*.test.ts workflow-engine/ui/test/*.test.ts"
     },
     {
       "name": "build",

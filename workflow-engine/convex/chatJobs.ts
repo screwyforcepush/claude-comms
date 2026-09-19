@@ -7,6 +7,7 @@ import {
   resolveJobType,
   HarnessModelEntry,
 } from "./lib/harnessDefaults";
+import { renderAttachmentsBlock } from "./lib/attachments";
 
 /**
  * Chat Jobs - Separate from assignment-based jobs
@@ -87,7 +88,10 @@ export const trigger = mutation({
       mode: thread.mode,
       effectivePromptMode,
       lastPromptMode: thread.lastPromptMode,
-      latestUserMessage: triggerMessage.content,
+      latestUserMessage: renderAttachmentsBlock(
+        triggerMessage.content,
+        triggerMessage.attachments
+      ),
       claudeSessionId: resolvedSessionId,
       forkSession,
       assignmentId: thread.assignmentId,

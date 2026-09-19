@@ -49,6 +49,7 @@
   │  ┌──────────┴──────────────┐    ┌──────────────────────────────────────────────────┐ │
   │  │ CHAT MESSAGES           │    │ ASSIGNMENT JOB CHAIN (Group Linked List)          │ │
   │  │                         │    │                                                    │ │
+  │  │  attachments?: [file]   │    │                                                    │ │
   │  │  role: user|assistant|pm│    │  assignment.headGroupId                            │ │
   │  │  content: "..."         │    │          │                                         │ │
   │  │  hint: (metadata)       │    │          ▼                                         │ │
@@ -168,6 +169,7 @@
   │    cli.ts update-assignment --append-northstar → Amend north star mid-flight           │
   │    cli.ts assignment --nudge          →  PM reads nudge (lightweight, env var aware)   │
   │    cli.ts chat-send <thread> <msg>    →  Send message, trigger chatJob                │
+  │    cli.ts attachment-fetch <id> --out →  Fetch password-gated chat attachment          │
   │    cli.ts chat-mode <thread> cook     →  Switch thread mode                            │
   │                                                                                        │
   │  Fan-out: job types whose namespace harnessDefaults entry is an array (e.g. review)   │

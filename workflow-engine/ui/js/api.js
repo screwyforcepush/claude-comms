@@ -91,8 +91,16 @@ export const api = {
     list: "chatMessages:list",
     // Add a message to a thread
     add: "chatMessages:add",
+    // Discard an uploaded chat attachment before it is sent
+    discardAttachment: "chatMessages:discardAttachment",
     // Get latest message timestamp for unread calc
     getLatestTimestamp: "chatMessages:getLatestTimestamp"
+  },
+
+  // File storage API
+  files: {
+    // Generate a Convex storage upload URL
+    generateUploadUrl: "files:generateUploadUrl"
   },
 
   // Chat jobs API - LEGACY, kept for future cook mode conversion only

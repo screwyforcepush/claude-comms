@@ -1,7 +1,17 @@
 // MessageBubble - Individual message display
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { useConvex } from '../../hooks/useConvex.js';
+import { usePassword } from '../auth/PasswordContext.js';
+import {
+  deriveSiteUrl,
+  fetchAttachmentBlob,
+  formatBytes,
+  isImageMime,
+} from './attachmentUtils.js';
+
+const previewUrlCache = new Map();
 
 /**
  * User icon for user messages
@@ -162,6 +172,86 @@ function renderMarkdown(content) {
   return { __html: cleanHtml };
 }
 
+function previewCacheKey(siteUrl, attachment) {
+  return `${siteUrl || ''}:${attachment.storageId}:${attachment.filename || ''}`;
+}
+
+function cachedPreviewUrl({ siteUrl, password, attachment }) {
+  const key = previewCacheKey(siteUrl, attachment);
+  if (!previewUrlCache.has(key)) {
+    const promise = fetchAttachmentBlob({
+      siteUrl,
+      password,
+      storageId: attachment.storageId,
+      filename: attachment.filename,
+    })
+      .then((blob) => URL.createObjectURL(blob))
+      .catch((err) => {
+        previewUrlCache.delete(key);
+        throw err;
+      });
+    previewUrlCache.set(key, promise);
+  }
+  return previewUrlCache.get(key);
+}
+
+function clickEphemeralDownload(blobUrl, filename) {
+  const anchor = document.createElement('a');
+  anchor.href = blobUrl;
+  anchor.download = filename || 'attachment';
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+function AttachmentPreview({ attachment, siteUrl, password }) {
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!isImageMime(attachment.mime) || !siteUrl || !password || !attachment.storageId) {
+      setPreviewUrl(null);
+      setFailed(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setFailed(false);
+    cachedPreviewUrl({ siteUrl, password, attachment })
+      .then((url) => {
+        if (!cancelled) setPreviewUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment.storageId, attachment.filename, attachment.mime, siteUrl, password]);
+
+  if (!isImageMime(attachment.mime)) return null;
+  if (failed) {
+    return React.createElement('div', {
+      className: 'chat-attachment-preview-unavailable'
+    }, 'preview unavailable');
+  }
+  if (!previewUrl) {
+    return React.createElement('div', {
+      className: 'chat-attachment-preview-loading',
+      'aria-label': `Loading preview for ${attachment.filename}`
+    });
+  }
+
+  return React.createElement('img', {
+    className: 'chat-attachment-preview-image',
+    src: previewUrl,
+    alt: attachment.filename || 'attachment preview',
+    loading: 'lazy'
+  });
+}
+
 /**
  * Get role configuration for styling - Q palette brandkit
  * User: copper gradient, Assistant: stone palette, Dispatcher: torch/copper accent
@@ -221,9 +311,47 @@ function getRoleConfig(role) {
 export function MessageBubble({ message, isLast = false }) {
   const config = getRoleConfig(message.role);
   const Icon = config.icon;
+  const { url: convexUrl } = useConvex();
+  const password = usePassword();
+  const siteUrl = deriveSiteUrl(convexUrl);
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const hasMarkdown = !!message.content?.trim();
+  const [attachmentErrors, setAttachmentErrors] = useState({});
 
   // Memoize markdown parsing per message content
-  const markdownHtml = useMemo(() => renderMarkdown(message.content), [message.content]);
+  const markdownHtml = useMemo(
+    () => hasMarkdown ? renderMarkdown(message.content) : { __html: '' },
+    [message.content, hasMarkdown]
+  );
+
+  const handleDownloadAttachment = useCallback((attachment) => {
+    if (!siteUrl || !password || !attachment.storageId) {
+      setAttachmentErrors((previous) => ({
+        ...previous,
+        [attachment.storageId || attachment.filename]: 'unavailable',
+      }));
+      return;
+    }
+
+    fetchAttachmentBlob({
+      siteUrl,
+      password,
+      storageId: attachment.storageId,
+      filename: attachment.filename,
+    })
+      .then((blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        clickEphemeralDownload(blobUrl, attachment.filename);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 15_000);
+      })
+      .catch((err) => {
+        console.error('Failed to download attachment:', err);
+        setAttachmentErrors((previous) => ({
+          ...previous,
+          [attachment.storageId]: 'unavailable',
+        }));
+      });
+  }, [siteUrl, password]);
 
   return React.createElement('div', {
     className: `flex ${config.isRight ? 'justify-end' : 'justify-start'} ${isLast ? '' : 'mb-4'} ${message.role === 'pm' ? 'pm-message' : ''}`
@@ -254,11 +382,49 @@ export function MessageBubble({ message, isLast = false }) {
           className: `message-bubble px-4 py-2.5 ${config.bubbleClass}`,
           style: config.bubbleStyle
         },
-          React.createElement('div', {
+          hasMarkdown && React.createElement('div', {
             className: `markdown-content ${config.isRight ? 'markdown-user' : ''} text-sm leading-relaxed break-words`,
             style: { fontFamily: 'var(--font-body)' },
             dangerouslySetInnerHTML: markdownHtml
-          })
+          }),
+          attachments.length > 0 && React.createElement('div', {
+            className: `chat-attachment-chip-list ${hasMarkdown ? 'chat-attachment-chip-list--after-markdown' : ''}`
+          },
+            attachments.map((attachment, index) => {
+              const errorKey = attachment.storageId || attachment.filename || `attachment-${index}`;
+              const unavailable = attachmentErrors[errorKey];
+              return React.createElement('div', {
+                key: errorKey,
+                className: 'chat-attachment-message-item'
+              },
+                React.createElement('button', {
+                  type: 'button',
+                  className: `chat-attachment-chip ${unavailable ? 'chat-attachment-chip--error' : ''}`,
+                  onClick: () => handleDownloadAttachment(attachment),
+                  disabled: !siteUrl || !password || !attachment.storageId || !!unavailable,
+                  title: unavailable
+                    ? 'Attachment unavailable'
+                    : 'Download attachment',
+                  'aria-label': unavailable
+                    ? `${attachment.filename || 'Attachment'} unavailable`
+                    : `Download ${attachment.filename || 'attachment'}`
+                },
+                  React.createElement('span', {
+                    className: 'chat-attachment-chip-name',
+                    title: attachment.filename
+                  }, attachment.filename || 'attachment'),
+                  React.createElement('span', {
+                    className: 'chat-attachment-chip-meta'
+                  }, formatBytes(attachment.size))
+                ),
+                React.createElement(AttachmentPreview, {
+                  attachment,
+                  siteUrl,
+                  password
+                })
+              );
+            })
+          )
         ),
 
         // Hint bars — system annotations beneath bubble, color-coded

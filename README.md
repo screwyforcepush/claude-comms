@@ -126,6 +126,7 @@ npx tsx cli.ts insert-job <id> --jobs '[{"jobType":"review"}]'  # Parallel group
 npx tsx cli.ts update-assignment <id> --artifacts "..." --decisions "..."
 npx tsx cli.ts queue                               # Show queue status
 npx tsx cli.ts chat-send <threadId> "message"      # Send chat message
+npx tsx cli.ts attachment-fetch <storageId> --out ./file.bin  # Fetch gated chat attachment
 ```
 
 ### Integration

@@ -9,10 +9,82 @@ import { ThreadIconWithAssignment } from './ThreadItem.js';
 import { ModeToggle } from './ModeToggle.js';
 import { QIcon, useConfirm } from '../shared/index.js';
 import { NamespaceSettings } from '../namespace/index.js';
+import {
+  DEFAULT_ATTACHMENT_MIME,
+  isOversize,
+  parseDraftAttachments,
+  serializeDraftAttachments,
+} from './attachmentUtils.js';
 
 // localStorage keys for collapse states
 const THREADS_PANE_COLLAPSED_KEY = 'workflow-engine:threads-pane-collapsed';
 const ASSIGNMENT_PANE_COLLAPSED_KEY = 'workflow-engine:assignment-pane-collapsed';
+const DRAFT_TEXT_KEY_PREFIX = 'workflow-engine:draft:';
+const DRAFT_ATTACHMENTS_KEY_PREFIX = 'workflow-engine:draft-attachments:';
+
+function draftTextKey(threadId) {
+  return `${DRAFT_TEXT_KEY_PREFIX}${threadId}`;
+}
+
+function draftAttachmentsKey(threadId) {
+  return `${DRAFT_ATTACHMENTS_KEY_PREFIX}${threadId}`;
+}
+
+function emptyDraft() {
+  return { text: '', attachments: [] };
+}
+
+function normalizeDraft(value) {
+  if (!value) return emptyDraft();
+  if (typeof value === 'string') return { text: value, attachments: [] };
+  return {
+    text: typeof value.text === 'string' ? value.text : '',
+    attachments: Array.isArray(value.attachments) ? value.attachments : [],
+  };
+}
+
+function persistDraftAttachments(threadId, attachments) {
+  try {
+    const ready = (attachments || []).filter((attachment) =>
+      attachment?.status === 'ready' && attachment.storageId
+    );
+    if (ready.length > 0) {
+      localStorage.setItem(draftAttachmentsKey(threadId), serializeDraftAttachments(ready));
+    } else {
+      localStorage.removeItem(draftAttachmentsKey(threadId));
+    }
+  } catch {
+    // Ignore localStorage errors.
+  }
+}
+
+function toMessageAttachments(attachments) {
+  return (attachments || [])
+    .filter((attachment) => attachment.status === 'ready' && attachment.storageId)
+    .map((attachment) => ({
+      filename: attachment.filename,
+      storageId: attachment.storageId,
+      size: attachment.size,
+      mime: attachment.mime || DEFAULT_ATTACHMENT_MIME,
+    }));
+}
+
+function createPendingAttachmentId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `upload:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function displayFileName(file) {
+  return file?.name || `attachment-${Date.now()}`;
+}
+
+function shortUploadError(err) {
+  if (err?.name === 'AbortError') return 'upload cancelled';
+  if (err?.message) return err.message.length > 120 ? `${err.message.slice(0, 117)}...` : err.message;
+  return 'upload failed';
+}
 
 /**
  * Get initial collapsed state from localStorage
@@ -358,65 +430,92 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
     }
   }, [mobileBackTrigger]);
 
-  // WP-6: Draft state management — in-memory Map + debounced localStorage persistence
+  // WP-6/Phase 21: Draft state management — in-memory Map + localStorage mirrors.
   const draftsRef = useRef(new Map());
   const draftTimersRef = useRef(new Map());
+  const uploadControllersRef = useRef(new Map());
+  const currentDraftThreadRef = useRef(null);
+  const [currentDraft, setCurrentDraft] = useState('');
+  const [currentDraftAttachments, setCurrentDraftAttachments] = useState([]);
 
   // Load draft from localStorage on first access for a given threadId
   const getDraft = useCallback((threadId) => {
-    if (!threadId) return '';
+    if (!threadId) return emptyDraft();
     if (draftsRef.current.has(threadId)) {
-      return draftsRef.current.get(threadId);
+      return normalizeDraft(draftsRef.current.get(threadId));
     }
-    // Try localStorage fallback
+
     try {
-      const stored = localStorage.getItem(`workflow-engine:draft:${threadId}`);
-      if (stored) {
-        draftsRef.current.set(threadId, stored);
-        return stored;
-      }
+      const text = localStorage.getItem(draftTextKey(threadId)) || '';
+      const attachments = parseDraftAttachments(localStorage.getItem(draftAttachmentsKey(threadId)));
+      const draft = { text, attachments };
+      draftsRef.current.set(threadId, draft);
+      return draft;
     } catch {
-      // Ignore localStorage errors
+      return emptyDraft();
     }
-    return '';
   }, []);
 
-  // Save draft (in-memory immediate, localStorage debounced at 500ms)
-  const saveDraft = useCallback((threadId, text) => {
+  // Save draft text (in-memory immediate, localStorage debounced at 500ms).
+  const saveDraftText = useCallback((threadId, text) => {
     if (!threadId) return;
-    draftsRef.current.set(threadId, text);
-    // Debounced localStorage write
+    const previous = getDraft(threadId);
+    draftsRef.current.set(threadId, { ...previous, text });
+
     const existing = draftTimersRef.current.get(threadId);
     if (existing) clearTimeout(existing);
     draftTimersRef.current.set(threadId, setTimeout(() => {
       try {
         if (text) {
-          localStorage.setItem(`workflow-engine:draft:${threadId}`, text);
+          localStorage.setItem(draftTextKey(threadId), text);
         } else {
-          localStorage.removeItem(`workflow-engine:draft:${threadId}`);
+          localStorage.removeItem(draftTextKey(threadId));
         }
       } catch {
         // Ignore localStorage errors
       }
     }, 500));
-  }, []);
+  }, [getDraft]);
 
-  // Clear draft from both in-memory and localStorage
+  const setDraftAttachments = useCallback((threadId, updater) => {
+    if (!threadId) return [];
+    const previous = getDraft(threadId);
+    const nextAttachments = typeof updater === 'function'
+      ? updater(previous.attachments)
+      : updater;
+    const safeAttachments = Array.isArray(nextAttachments) ? nextAttachments : [];
+
+    draftsRef.current.set(threadId, {
+      ...previous,
+      attachments: safeAttachments,
+    });
+    persistDraftAttachments(threadId, safeAttachments);
+
+    if (currentDraftThreadRef.current === threadId) {
+      setCurrentDraftAttachments(safeAttachments);
+    }
+
+    return safeAttachments;
+  }, [getDraft]);
+
+  // Clear draft from both in-memory and localStorage.
   const clearDraft = useCallback((threadId) => {
     if (!threadId) return;
     draftsRef.current.delete(threadId);
     try {
-      localStorage.removeItem(`workflow-engine:draft:${threadId}`);
+      localStorage.removeItem(draftTextKey(threadId));
+      localStorage.removeItem(draftAttachmentsKey(threadId));
     } catch {
       // Ignore localStorage errors
     }
     const timer = draftTimersRef.current.get(threadId);
     if (timer) clearTimeout(timer);
     draftTimersRef.current.delete(threadId);
+    if (currentDraftThreadRef.current === threadId) {
+      setCurrentDraft('');
+      setCurrentDraftAttachments([]);
+    }
   }, []);
-
-  // WP-6: Current draft state for the selected thread (reactive)
-  const [currentDraft, setCurrentDraft] = useState('');
 
   // WP-6: markRead mutation
   const markRead = useMutation(api.chatThreads.markRead);
@@ -520,6 +619,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
   const selectedThreadFromLookupHiddenByFilter = !!selectedThreadFromLookup && !selectedThreadFromLookupVisible;
   const selectedThread = listedSelectedThread || (selectedThreadFromLookupVisible ? selectedThreadFromLookup : null);
   const renderedThreadId = selectedThread?._id || null;
+  currentDraftThreadRef.current = renderedThreadId;
 
   // Per-assignment subscription for the selected thread's assignment
   const { data: selectedAssignment } = useQuery(
@@ -550,6 +650,8 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
   const removeThread = useMutation(api.chatThreads.remove);
   const triggerChatJob = useMutation(api.chatJobs.trigger);
   const forkThread = useMutation(api.chatThreads.fork);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const discardAttachment = useMutation(api.chatMessages.discardAttachment);
 
   // WP-7: Mutation hooks for assignment & agent control (U5, U6, R1, R2)
   const updateAssignmentStatus = useMutation(api.assignments.update);
@@ -594,14 +696,16 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
 
   // WP-6: Load draft when selected thread changes
   useEffect(() => {
-    setCurrentDraft(getDraft(renderedThreadId));
+    const draft = getDraft(renderedThreadId);
+    setCurrentDraft(draft.text);
+    setCurrentDraftAttachments(draft.attachments);
   }, [renderedThreadId, getDraft]);
 
   // WP-6: Handle draft text change from ChatInput
   const handleDraftChange = useCallback((text) => {
     setCurrentDraft(text);
-    saveDraft(renderedThreadId, text);
-  }, [renderedThreadId, saveDraft]);
+    saveDraftText(renderedThreadId, text);
+  }, [renderedThreadId, saveDraftText]);
 
   // WP-6: markRead callback for MessageList — fires when messages render
   const handleMarkRead = useCallback(() => {
@@ -616,6 +720,130 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       markRead({ id: renderedThreadId }).catch(() => {});
     }
   }, [renderedThreadId, markRead]);
+
+  const startAttachmentUpload = useCallback((threadId, file) => {
+    if (!threadId || !file) return;
+
+    const id = createPendingAttachmentId();
+    const mime = file.type || DEFAULT_ATTACHMENT_MIME;
+    const size = Number.isFinite(file.size) ? file.size : 0;
+    const controller = new AbortController();
+    uploadControllersRef.current.set(id, controller);
+
+    const pending = {
+      id,
+      filename: displayFileName(file),
+      storageId: null,
+      size,
+      mime,
+      status: 'uploading',
+      oversize: isOversize(size),
+    };
+
+    setDraftAttachments(threadId, (attachments) => [...attachments, pending]);
+
+    (async () => {
+      try {
+        const uploadUrl = await generateUploadUrl({});
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': mime },
+          body: file,
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`upload failed with HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (!result?.storageId) {
+          throw new Error('upload response missing storage id');
+        }
+
+        let attachmentStillPending = false;
+        setDraftAttachments(threadId, (attachments) => {
+          attachmentStillPending = attachments.some((attachment) => attachment.id === id);
+          return attachments.map((attachment) =>
+            attachment.id === id
+              ? { ...attachment, storageId: result.storageId, status: 'ready', error: undefined }
+              : attachment
+          );
+        });
+
+        if (!attachmentStillPending) {
+          discardAttachment({ storageId: result.storageId }).catch((err) => {
+            console.error('Failed to discard late attachment upload:', err);
+          });
+        }
+      } catch (err) {
+        if (controller.signal.aborted || err?.name === 'AbortError') return;
+        setDraftAttachments(threadId, (attachments) => attachments.map((attachment) =>
+          attachment.id === id
+            ? { ...attachment, status: 'error', error: shortUploadError(err) }
+            : attachment
+        ));
+      } finally {
+        uploadControllersRef.current.delete(id);
+      }
+    })();
+  }, [generateUploadUrl, discardAttachment, setDraftAttachments]);
+
+  const handleAddFilesToDraft = useCallback((fileList) => {
+    if (!renderedThreadId || !fileList) return;
+    Array.from(fileList)
+      .filter(Boolean)
+      .forEach((file) => startAttachmentUpload(renderedThreadId, file));
+  }, [renderedThreadId, startAttachmentUpload]);
+
+  const handleRemoveDraftAttachment = useCallback((attachmentId) => {
+    if (!renderedThreadId || !attachmentId) return;
+
+    let removed = null;
+    setDraftAttachments(renderedThreadId, (attachments) => {
+      removed = attachments.find((attachment) => attachment.id === attachmentId) || null;
+      return attachments.filter((attachment) => attachment.id !== attachmentId);
+    });
+
+    if (!removed) return;
+
+    if (removed.status === 'uploading') {
+      uploadControllersRef.current.get(removed.id)?.abort();
+      uploadControllersRef.current.delete(removed.id);
+    }
+
+    if (removed.status === 'ready' && removed.storageId) {
+      discardAttachment({ storageId: removed.storageId }).catch((err) => {
+        console.error('Failed to discard attachment:', err);
+      });
+    }
+  }, [renderedThreadId, setDraftAttachments, discardAttachment]);
+
+  const cleanupPendingAttachmentsForThread = useCallback(async (threadId) => {
+    if (!threadId) return;
+    const draft = getDraft(threadId);
+    const discardPromises = [];
+
+    for (const attachment of draft.attachments) {
+      if (attachment.status === 'uploading') {
+        uploadControllersRef.current.get(attachment.id)?.abort();
+        uploadControllersRef.current.delete(attachment.id);
+      }
+
+      if (attachment.status === 'ready' && attachment.storageId) {
+        discardPromises.push(discardAttachment({ storageId: attachment.storageId }));
+      }
+    }
+
+    clearDraft(threadId);
+
+    const results = await Promise.allSettled(discardPromises);
+    results.forEach((result) => {
+      if (result.status === 'rejected') {
+        console.error('Failed to discard pending attachment during thread delete:', result.reason);
+      }
+    });
+  }, [getDraft, discardAttachment, clearDraft]);
 
   // WP-5: Handle creating a new thread
   // Accepts optional namespaceId; falls back to first filtered or first available
@@ -661,6 +889,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
     if (!ok) return;
 
     try {
+      await cleanupPendingAttachmentsForThread(threadId);
       await removeThread({ id: threadId });
       if (selectedThreadId === threadId) {
         setSelectedThreadId(null);
@@ -668,11 +897,16 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
     } catch (err) {
       console.error('Failed to delete thread:', err);
     }
-  }, [removeThread, selectedThreadId, confirm]);
+  }, [removeThread, selectedThreadId, confirm, cleanupPendingAttachmentsForThread]);
 
   // Handle sending a message
   const handleSendMessage = useCallback(async (content) => {
     if (!renderedThreadId || sending) return;
+    const draft = getDraft(renderedThreadId);
+    const readyAttachments = toMessageAttachments(draft.attachments);
+    const hasUploading = draft.attachments.some((attachment) => attachment.status === 'uploading');
+    const messageContent = content.trim().length > 0 ? content : '';
+    if (hasUploading || (!messageContent.trim() && readyAttachments.length === 0)) return;
 
     setSending(true);
     try {
@@ -680,7 +914,8 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       const messageId = await addMessage({
         threadId: renderedThreadId,
         role: 'user',
-        content: content
+        content: messageContent,
+        ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {})
       });
 
       // 2. Trigger chat job - runner picks it up and executes Claude
@@ -694,12 +929,13 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       // WP-6: Clear draft on successful send
       clearDraft(renderedThreadId);
       setCurrentDraft('');
+      setCurrentDraftAttachments([]);
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {
       setSending(false);
     }
-  }, [renderedThreadId, sending, addMessage, triggerChatJob, clearDraft]);
+  }, [renderedThreadId, sending, getDraft, addMessage, triggerChatJob, clearDraft]);
 
   // Send-to-fork: branch the message into a new jam thread that inherits
   // this thread's session context. The fork mutation is atomic (thread +
@@ -707,26 +943,34 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
   // parent's draft — the text went somewhere, it shouldn't linger here.
   const handleSendToFork = useCallback(async (content) => {
     if (!renderedThreadId || sending) return;
+    const draft = getDraft(renderedThreadId);
+    const readyAttachments = toMessageAttachments(draft.attachments);
+    const hasUploading = draft.attachments.some((attachment) => attachment.status === 'uploading');
+    const messageContent = content.trim().length > 0 ? content : '';
+    if (hasUploading || (!messageContent.trim() && readyAttachments.length === 0)) return;
 
     setSending(true);
     try {
       const { threadId: forkThreadId } = await forkThread({
         sourceThreadId: renderedThreadId,
-        content: content
+        content: messageContent,
+        ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {})
       });
       clearDraft(renderedThreadId);
       setCurrentDraft('');
+      setCurrentDraftAttachments([]);
       setSelectedThreadId(forkThreadId);
     } catch (err) {
       console.error('Failed to fork thread:', err);
-      // ChatInput cleared its text optimistically — restore it as the draft
-      // so a failed fork doesn't eat the user's message.
-      saveDraft(renderedThreadId, content);
-      setCurrentDraft(content);
+      // Keep both draft parts intact if the fork mutation fails.
+      saveDraftText(renderedThreadId, messageContent);
+      setDraftAttachments(renderedThreadId, draft.attachments);
+      setCurrentDraft(messageContent);
+      setCurrentDraftAttachments(draft.attachments);
     } finally {
       setSending(false);
     }
-  }, [renderedThreadId, sending, forkThread, clearDraft, saveDraft]);
+  }, [renderedThreadId, sending, getDraft, forkThread, clearDraft, saveDraftText, setDraftAttachments]);
 
   // Fork-origin banner data: parent thread's title from the already-subscribed
   // thread list (no extra query; falls back gracefully if outside the window).
@@ -1062,6 +1306,9 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       onClosePane: handleClosePane,
       draftText: currentDraft,
       onDraftChange: handleDraftChange,
+      pendingAttachments: currentDraftAttachments,
+      onAddFiles: handleAddFilesToDraft,
+      onRemoveAttachment: handleRemoveDraftAttachment,
       onMarkRead: handleMarkRead,
       onUpdateAssignmentStatus: handleUpdateAssignmentStatus,
       onUpdateNudge: handleUpdateNudge,

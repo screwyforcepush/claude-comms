@@ -8,6 +8,7 @@ import {
   resolveJobType,
   HarnessModelEntry,
 } from "./lib/harnessDefaults";
+import { renderAttachmentsBlock } from "./lib/attachments";
 
 // Queries
 
@@ -131,6 +132,12 @@ export const fork = mutation({
     password: v.string(),
     sourceThreadId: v.id("chatThreads"),
     content: v.string(),
+    attachments: v.optional(v.array(v.object({
+      filename: v.string(),
+      storageId: v.id("_storage"),
+      size: v.number(),
+      mime: v.string(),
+    }))),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -159,6 +166,9 @@ export const fork = mutation({
       role: "user",
       content: args.content,
       createdAt: now,
+      ...(args.attachments && args.attachments.length > 0
+        ? { attachments: args.attachments }
+        : {}),
     });
 
     // Resolve harness+model from namespace config (mirrors chatJobs.trigger).
@@ -174,7 +184,7 @@ export const fork = mutation({
       namespaceId: source.namespaceId,
       mode: "jam",
       effectivePromptMode: "jam",
-      latestUserMessage: args.content,
+      latestUserMessage: renderAttachmentsBlock(args.content, args.attachments),
       claudeSessionId: sessionId,
       // No session yet on the parent → falls through to a plain fresh session
       // (prompt layer sends the full initial prompt).
@@ -495,6 +505,13 @@ export const remove = mutation({
       .withIndex("by_thread", (q) => q.eq("threadId", args.id))
       .collect();
     for (const message of messages) {
+      for (const attachment of message.attachments ?? []) {
+        try {
+          await ctx.storage.delete(attachment.storageId);
+        } catch {
+          // Blob already missing: thread deletion still owns removing the row.
+        }
+      }
       await ctx.db.delete(message._id);
     }
 

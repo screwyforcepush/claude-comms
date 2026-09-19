@@ -57,17 +57,25 @@
  *   chat-send <threadId> <message>      Send message and create chat job
  *   chat-mode <threadId> <jam|cook|guardian>  Change thread mode
  *   chat-title <threadId> <title>       Update thread title
+ *   attachment-fetch <storageId> --out <path>  Fetch a chat attachment to a local file (password-gated)
  */
 
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
-import { existsSync, readFileSync } from "fs";
-import { dirname, join } from "path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { HarnessDefaults, HarnessModelEntry, parseHarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
 import { collapseFanOutDuplicates } from "./lib/collapse-fanout.js";
 import { getEngineIdentity } from "./lib/engine-version.js";
 import { mergeCoverage, parseTimeArg, summarizeGaps, CoverageBatch, GapRow } from "./lib/coverage-merge.js";
+import {
+  ATTACHMENT_FETCH_COMMAND,
+  buildAttachmentRequest,
+  deriveSiteUrl,
+  describeFetchFailure,
+  successVerdict,
+} from "./lib/attachments.js";
 
 // Use anyApi for portability (same as runner.ts)
 const api = anyApi;
@@ -79,6 +87,7 @@ type Harness = "claude" | "codex" | "gemini";
 
 interface Config {
   convexUrl: string;
+  convexSiteUrl?: string;
   namespace: string;
   password: string;
   timeoutMs: number;
@@ -177,6 +186,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   "chat-send": ["harness"],
   "chat-mode": ["assignment"],
   "chat-title": [],
+  [ATTACHMENT_FETCH_COMMAND]: ["out"],
 };
 
 function validateFlags(command: string, flags: Record<string, string>) {
@@ -837,6 +847,53 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
   });
 }
 
+async function fetchAttachment(storageId: string, outPath: string) {
+  const siteUrl = config.convexSiteUrl?.trim() || deriveSiteUrl(config.convexUrl);
+  if (!siteUrl) {
+    error(describeFetchFailure({ type: "site-url", convexUrl: config.convexUrl }));
+  }
+
+  const request = buildAttachmentRequest({
+    siteUrl,
+    storageId,
+    password: config.password,
+  });
+
+  let response: Response;
+  try {
+    response = await fetch(request.url, { headers: request.headers });
+  } catch (err) {
+    error(describeFetchFailure({ type: "network", siteUrl, error: err }));
+  }
+
+  if (!response.ok) {
+    error(describeFetchFailure({ type: "http", status: response.status, storageId }));
+  }
+
+  let body: ArrayBuffer;
+  try {
+    body = await response.arrayBuffer();
+  } catch (err) {
+    error(describeFetchFailure({ type: "network", siteUrl, error: err }));
+  }
+
+  const absoluteOut = resolve(outPath);
+  const bytes = Buffer.from(body);
+  try {
+    mkdirSync(dirname(absoluteOut), { recursive: true });
+    writeFileSync(absoluteOut, bytes);
+  } catch (err) {
+    error(`Write failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  output(successVerdict({
+    storageId,
+    out: absoluteOut,
+    bytes: bytes.byteLength,
+    contentType: response.headers.get("content-type") || "application/octet-stream",
+  }));
+}
+
 // Help text
 const USAGE = `Workflow Engine CLI
 
@@ -895,6 +952,10 @@ Chat Commands:
   chat-send <threadId> <message>      Send message and create chat job
   chat-mode <threadId> <jam|cook|guardian> [--assignment <id>]  Change thread mode
   chat-title <threadId> <title>       Update thread title
+
+Attachment Commands:
+  attachment-fetch <storageId> --out <path>
+                                      Fetch a chat attachment to a local file (password-gated)
 
 Environment Variables (auto-injected):
   WORKFLOW_ASSIGNMENT_ID   Default assignment for commands
@@ -1111,6 +1172,13 @@ async function main() {
         if (!positional[0]) error("Thread ID required");
         if (!positional[1]) error("Title required");
         await updateChatTitle(positional[0], positional[1]);
+        break;
+
+      case ATTACHMENT_FETCH_COMMAND:
+        if (!positional[0]) error("storageId required");
+        if (!("out" in flags)) error("--out <path> required");
+        if (flags.out === "true") error("--out requires a path");
+        await fetchAttachment(positional[0], flags.out);
         break;
 
       default:

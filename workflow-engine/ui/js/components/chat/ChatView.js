@@ -39,6 +39,9 @@ export function ChatView({
   onClosePane,
   draftText,        // WP-6: Per-thread draft text (controlled)
   onDraftChange,    // WP-6: Draft change callback
+  pendingAttachments = [],       // Phase 21: Pending draft attachments
+  onAddFiles,                    // Phase 21: Add files to the current draft
+  onRemoveAttachment,            // Phase 21: Remove pending attachment
   onMarkRead,       // WP-6: Mark thread as read callback
   onUpdateAssignmentStatus,  // WP-7 U5: Update assignment status
   onUpdateNudge,             // PM Nudge: Update assignment pmNudge
@@ -244,6 +247,9 @@ export function ChatView({
             : 'Discuss ideas with the Quartermaster...',
         draftText: draftText,
         onDraftChange: onDraftChange,
+        pendingAttachments: pendingAttachments,
+        onAddFiles: onAddFiles,
+        onRemoveAttachment: onRemoveAttachment,
         onStop: activeChatJob ? handleStopChatJob : null,
         stopPending: stopRequested || !!activeChatJob?.killRequested,
         onSendToFork: onSendToFork

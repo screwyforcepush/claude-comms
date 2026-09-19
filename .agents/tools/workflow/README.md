@@ -34,6 +34,7 @@ Edit `config.json`:
 ```json
 {
   "convexUrl": "https://<convex-deployment>.convex.cloud",
+  "convexSiteUrl": "https://<convex-deployment>.convex.site",
   "namespace": "your-repo-name",
   "password": "your-admin-password",
   "timeoutMs": 600000,
@@ -46,6 +47,11 @@ Edit `config.json`:
   "claudeInteractiveStopGraceMs": 3000
 }
 ```
+
+`convexSiteUrl` is optional. The workflow CLI derives the HTTP-actions host by
+turning a `.convex.cloud` `convexUrl` into `.convex.site`; set
+`convexSiteUrl` only for custom/self-hosted deployments or when derivation
+cannot work.
 
 `claudeExecutionMode` is optional and defaults to `headless`, the existing
 `claude -p --output-format stream-json` path. Set it to `interactive` to run
@@ -152,6 +158,17 @@ cli.ts start-job <job_id>
 cli.ts complete-job <job_id> --result "output"
 cli.ts fail-job <job_id> [--result "error"]
 ```
+
+### Chat Attachments
+
+```bash
+# Fetch a password-gated chat attachment to a local file
+cli.ts attachment-fetch <storageId> --out <path>
+```
+
+`attachment-fetch` uses the password from `config.json`, calls the protected
+`/attachments/<storageId>` HTTP route with an `Authorization: Bearer ...`
+header, creates the output directory, and writes the blob to `--out`.
 
 ## Job Types
 

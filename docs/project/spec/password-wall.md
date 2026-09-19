@@ -8,10 +8,18 @@ This phase adds simple password protection as a gate to stop bots and casual sno
 
 ## Overview
 
-Add password protection at three integration points:
+Add password protection at four integration points:
 1. **Convex Backend**: All public functions require a `password` argument validated against `ADMIN_PASSWORD` env var
-2. **UI (React)**: Login form stores password in sessionStorage, passes with every Convex call
+2. **UI (React)**: Login form stores password and Convex URL in localStorage, passes the password with every Convex call
 3. **Runner + CLI**: Read password from `config.json`, pass with every Convex call
+4. **Attachment HTTP route**: `GET /attachments/<storageId>` is an untrusted entry point protected by `Authorization: Bearer <ADMIN_PASSWORD>`; the password is never accepted in the query string
+
+| Entry point | Trust level | Password transport | Notes |
+|---|---|---|---|
+| Convex queries/mutations | Untrusted | `password` function argument | Validated by `requirePassword(args)`. |
+| Workflow UI | Untrusted browser client | localStorage-backed `PasswordContext`, injected into Convex calls | Stores `convexUrl` and `adminPassword` in localStorage after validation. |
+| Runner and workflow CLI | Local trusted tooling calling an untrusted backend | `.agents/tools/workflow/config.json` `password` field | The password travels only in Convex function args or protected attachment headers. |
+| Attachment HTTP route | Untrusted HTTP action | `Authorization: Bearer <ADMIN_PASSWORD>` | `workflow-engine/convex/http.ts` serves storage blobs from `/attachments/<storageId>` without public storage URLs and without query-string passwords. |
 
 ## Architecture Design
 
@@ -41,7 +49,7 @@ Add password protection at three integration points:
                     │                   │                   │
          ┌──────────┴───────┐   ┌──────┴──────┐   ┌───────┴────────┐
          │   UI (React)     │   │   Runner    │   │     CLI        │
-         │   sessionStorage │   │  config.json│   │  config.json   │
+         │    localStorage  │   │  config.json│   │  config.json   │
          └──────────────────┘   └─────────────┘   └────────────────┘
 ```
 
@@ -96,20 +104,20 @@ export const list = query({
 #### 3. UI Login Component
 
 New `LoginGate` component that:
-- Shows login form if no password in sessionStorage
+- Shows login form if no password in localStorage
 - Validates password against Convex (call a simple query)
-- Stores password in sessionStorage on success
+- Stores password in localStorage on success
 - Wraps entire app (ConvexProvider receives password)
 
 ```typescript
 // workflow-engine/ui/js/components/auth/LoginGate.js
 function LoginGate({ children }) {
-  const [password, setPassword] = useState(sessionStorage.getItem('adminPassword'));
+  const [password, setPassword] = useState(localStorage.getItem('adminPassword'));
   const [error, setError] = useState(null);
 
   if (!password) {
     return <LoginForm onSuccess={(pwd) => {
-      sessionStorage.setItem('adminPassword', pwd);
+      localStorage.setItem('adminPassword', pwd);
       setPassword(pwd);
     }} />;
   }
@@ -158,7 +166,7 @@ Add password field to both config files:
 {
   "convexUrl": "https://..."
 }
-// Note: UI does NOT store password in config.json (uses sessionStorage)
+// Note: UI does NOT store password in config.json (uses localStorage)
 ```
 
 #### 6. Runner + CLI Changes
@@ -369,9 +377,9 @@ export const functionName = query({
    - Error message display
    - Calls `namespaces.list` with password to validate
 3. **LoginGate**: Wrapper that shows LoginForm or children
-   - Reads password from sessionStorage on mount
+   - Reads password from localStorage on mount
    - If no password, show LoginForm
-   - On successful login, store in sessionStorage
+   - On successful login, store in localStorage
 4. **useConvex hooks**: Auto-inject password from context
    - `useQuery`: Add password to all args
    - `useMutation`: Add password to all args
@@ -386,11 +394,11 @@ export const functionName = query({
 - Title: `var(--font-display)`, `var(--q-bone3)`
 
 **Success Criteria**:
-- [ ] Login form appears when no password in sessionStorage
+- [ ] Login form appears when no password in localStorage
 - [ ] Wrong password shows error message
-- [ ] Correct password stores in sessionStorage and shows app
+- [ ] Correct password stores in localStorage and shows app
 - [ ] All Convex calls include password automatically
-- [ ] Page refresh maintains login (sessionStorage persists)
+- [ ] Page refresh maintains login (localStorage persists)
 - [ ] Login form matches Q-palette aesthetic
 
 ---
@@ -521,8 +529,8 @@ const result = await client.query(api.assignments.list, {
 1. **Password validation query**: Should we create a dedicated lightweight `auth.validatePassword` query, or reuse `namespaces.list` for validation?
    - **Recommendation**: Create a dedicated `auth.validate` query that just checks password and returns `{ valid: true }`. This is cleaner and faster.
 
-2. **Logout functionality**: Should the UI have a logout button that clears sessionStorage?
-   - **Recommendation**: Yes, add a simple logout icon in the header that calls `sessionStorage.removeItem('adminPassword')` and refreshes.
+2. **Logout functionality**: Should the UI have a logout button that clears localStorage?
+   - **Recommendation**: Yes, add a simple logout icon in the header that calls `localStorage.removeItem('adminPassword')` and refreshes.
 
 3. **Error message specificity**: Should "Unauthorized" errors distinguish between missing password vs wrong password?
    - **Recommendation**: No - always return generic "Unauthorized" to avoid information leakage.
@@ -641,13 +649,13 @@ const result = await client.query(api.assignments.list, {
 
 ### UI Verification
 
-- [ ] Opening UI without sessionStorage password shows login form
+- [ ] Opening UI without localStorage password shows login form
 - [ ] Entering wrong password shows error message
-- [ ] Entering correct password stores in sessionStorage and shows app
+- [ ] Entering correct password stores in localStorage and shows app
 - [ ] All Convex queries work after login
 - [ ] All Convex mutations work after login
 - [ ] Page refresh maintains logged-in state
-- [ ] Logout button (if implemented) clears sessionStorage
+- [ ] Logout button (if implemented) clears localStorage
 
 ### Security Verification
 
