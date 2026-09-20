@@ -967,17 +967,27 @@ p, h1, h2, h3, h4, h5, h6 {
   white-space: nowrap;
 }
 
+/* Per-file state is a glyph: Fullbright dot while uploading, check / warning
+   icons otherwise. Meaning lives in the tooltip and aria-label. */
 .chat-attachment-state {
-  font-family: var(--font-display);
-  font-size: 9px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.chat-attachment-state-dot {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
 }
 
 .chat-attachment-state--uploading {
   color: var(--q-torch);
-  animation: torchFlicker 6s infinite;
+  animation: fullbright-pulse 2.5s ease-in-out infinite;
 }
 
 .chat-attachment-state--ready {
@@ -986,9 +996,6 @@ p, h1, h2, h3, h4, h5, h6 {
 
 .chat-attachment-state--error {
   color: var(--q-lava1);
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .chat-attachment-warning {
@@ -1052,16 +1059,6 @@ p, h1, h2, h3, h4, h5, h6 {
   text-transform: uppercase;
   pointer-events: none;
   box-shadow: inset 0 0 22px var(--q-copper1-44);
-}
-
-.chat-input-disabled-reason {
-  max-width: 72px;
-  color: var(--q-bone0);
-  font-family: var(--font-console);
-  font-size: 9px;
-  line-height: 1.2;
-  text-align: center;
-  overflow-wrap: anywhere;
 }
 
 .chat-attachment-chip-list {

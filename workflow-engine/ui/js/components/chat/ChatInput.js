@@ -285,11 +285,6 @@ export function ChatInput({
   }, []);
 
   const canSend = (hasSendableText || readyAttachmentCount > 0) && !disabled && !hasUploading;
-  const disabledReason = hasUploading
-    ? 'Waiting for uploads...'
-    : disabled
-      ? 'Quartermaster is busy...'
-      : '';
 
   return React.createElement('form', {
     onSubmit: handleSubmit,
@@ -318,11 +313,20 @@ export function ChatInput({
       'aria-label': 'Pending attachments'
     },
       attachments.map((attachment) => {
-        const stateText = attachment.status === 'uploading'
-          ? 'uploading...'
+        // State as a glyph, not a word: pulsing dot while uploading, check when
+        // ready, warning on error (the error text lives in the tooltip).
+        const stateLabel = attachment.status === 'uploading'
+          ? 'Uploading'
           : attachment.status === 'error'
-            ? `error: ${attachment.error || 'upload failed'}`
-            : 'ready';
+            ? `Upload failed: ${attachment.error || 'unknown error'}`
+            : 'Ready';
+        const stateGlyph = attachment.status === 'uploading'
+          ? React.createElement('span', { className: 'chat-attachment-state-dot' })
+          : React.createElement(QIcon, {
+              name: attachment.status === 'error' ? 'warning' : 'check',
+              size: 12,
+              color: 'currentColor'
+            });
         return React.createElement('div', {
           key: attachment.id,
           className: `chat-attachment-pending-row chat-attachment-pending-row--${attachment.status}`
@@ -339,8 +343,11 @@ export function ChatInput({
             }, formatBytes(attachment.size)),
             React.createElement('span', {
               className: `chat-attachment-state chat-attachment-state--${attachment.status}`,
+              role: 'img',
+              'aria-label': stateLabel,
+              title: stateLabel,
               'aria-live': attachment.status === 'uploading' ? 'polite' : undefined
-            }, stateText)
+            }, stateGlyph)
           ),
           attachment.oversize && React.createElement('div', {
             className: 'chat-attachment-warning',
@@ -527,7 +534,7 @@ export function ChatInput({
           },
           title: canSend
             ? 'Send to fork: branch this message into a new thread'
-            : disabledReason || 'Type a message or attach a file to send to a fork'
+            : 'Type a message or attach a file to send to a fork'
         },
           React.createElement(QIcon, {
             name: 'fork',
@@ -576,18 +583,14 @@ export function ChatInput({
               },
               title: canSend
                 ? 'Send message'
-                : disabledReason || 'Type a message or attach a file to send'
+                : 'Type a message or attach a file to send'
             },
               React.createElement(QIcon, {
                 name: 'dispatch',
                 size: 20,
                 color: 'currentColor'
               })
-            ),
-        disabledReason && React.createElement('span', {
-          className: 'chat-input-disabled-reason',
-          role: 'status'
-        }, disabledReason)
+            )
       )
     )
   );
