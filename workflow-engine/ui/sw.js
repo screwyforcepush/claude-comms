@@ -1,7 +1,12 @@
 // Service worker — required for PWA install prompt
-// Cache-first for static assets, network-first for API calls
+//
+// App shell (index.html, styles.css, manifest) is NETWORK-FIRST with cache
+// fallback: it changes with every deploy, and precaching it cache-first froze
+// styles.css on installed PWAs twice (see git history of this file). JS modules
+// are never cached — always fresh from the network. Icons are cache-first.
 
-const CACHE_NAME = 'cc3-v2';
+const CACHE_NAME = 'cc3-v3';
+const SHELL_PATHS = new Set(['/', '/index.html', '/styles.css', '/manifest.json']);
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -28,15 +33,37 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+function networkFirst(request) {
+  return fetch(request)
+    .then((response) => {
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    })
+    .catch(() =>
+      caches.match(request).then((cached) => cached || caches.match('/index.html'))
+    );
+}
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Network-only for Convex and esm.sh (live data + CDN modules)
-  if (url.hostname.includes('convex') || url.hostname.includes('esm.sh')) {
+  // Network-only for anything cross-origin (Convex, esm.sh, fonts)
+  if (url.origin !== self.location.origin) {
     return;
   }
 
-  // Cache-first for local static assets
+  // Navigations (Vercel rewrites every path to index.html) and the shell files
+  const isShell = event.request.mode === 'navigate' || SHELL_PATHS.has(url.pathname);
+  if (isShell) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
+
+  // Cache-first for the remaining precached statics (icons); everything else
+  // falls through to the network uncached.
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request))
   );
