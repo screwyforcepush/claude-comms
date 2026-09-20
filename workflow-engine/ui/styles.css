@@ -877,25 +877,27 @@ p, h1, h2, h3, h4, h5, h6 {
   box-shadow: inset 0 0 0 1px var(--q-copper1), 0 0 18px var(--q-copper1-44);
 }
 
+/* Sits in the send column as a 48x24 rune alongside safety/fork; no gradient,
+   same footprint and border treatment as its siblings. */
 .chat-attachment-add-button {
   width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
+  height: 24px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, var(--q-stone2), var(--q-stone1));
+  background: var(--q-stone2);
   border: 1px solid var(--q-stone3);
-  border-bottom: 2px solid var(--q-void0);
   border-radius: 0;
   color: var(--q-copper2);
   cursor: pointer;
+  padding: 0;
   transition: background var(--t-anim-transition-fast), border-color var(--t-anim-transition-fast), color var(--t-anim-transition-fast), box-shadow var(--t-anim-transition-fast);
 }
 
 .chat-attachment-add-button:hover:not(:disabled),
 .chat-attachment-add-button:focus-visible {
-  background: linear-gradient(180deg, var(--q-stone3), var(--q-stone2));
+  background: rgba(122, 78, 40, 0.25);
   border-color: var(--q-copper1);
   color: var(--q-torch);
   box-shadow: 0 0 10px var(--q-copper1-44);

@@ -371,17 +371,6 @@ export function ChatInput({
     React.createElement('div', {
       className: 'flex items-end gap-3'
     },
-      React.createElement('button', {
-        type: 'button',
-        onClick: handlePickFiles,
-        disabled: disabled || !onAddFiles,
-        className: 'chat-attachment-add-button',
-        title: disabled ? 'Wait for the current send to finish' : 'Attach files',
-        'aria-label': 'Attach files'
-      },
-        React.createElement(QIcon, { name: 'add', size: 18, color: 'currentColor' })
-      ),
-
       // Textarea wrapper
       React.createElement('div', { className: 'flex-1 relative' },
         React.createElement('textarea', {
@@ -456,10 +445,22 @@ export function ChatInput({
         )
       ),
 
-      // Send column: safety toggle + send button
+      // Send column: attach + safety toggle + fork + send button
       React.createElement('div', {
         className: 'flex-shrink-0 flex flex-col items-center gap-1'
       },
+        // Attach files: a rune in the column, not a horizontal tax on the textarea
+        React.createElement('button', {
+          type: 'button',
+          onClick: handlePickFiles,
+          disabled: disabled || !onAddFiles,
+          className: 'chat-attachment-add-button',
+          title: disabled ? 'Wait for the current send to finish' : 'Attach files',
+          'aria-label': 'Attach files'
+        },
+          React.createElement(QIcon, { name: 'add', size: 14, color: 'currentColor' })
+        ),
+
         // Enter safety toggle
         React.createElement('button', {
           type: 'button',
