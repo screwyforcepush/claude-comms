@@ -230,6 +230,7 @@ export function ChatView({
       // WP-6: Added onMarkRead prop for unread tracking
       React.createElement(MessageList, {
         messages: messages,
+        threadId: thread?._id || null,
         loading: loadingMessages,
         sending: sending,
         onMarkRead: onMarkRead

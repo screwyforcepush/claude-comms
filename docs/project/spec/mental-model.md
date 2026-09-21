@@ -152,6 +152,9 @@ The user's primary workflow surface is the **thread list**. Key principles:
 ### Draft Persistence
 When the user types in a chat pane and switches to another thread, the draft text must survive. Per-thread draft state stored client-side (localStorage or in-memory state keyed by threadId). This is critical for the user's multi-tasking workflow — they often start composing in one thread, jump to another for a quick message, and return.
 
+### Scrollback Belongs to the Reader
+Reading back through a thread is deliberate work — the user has scrolled up to re-read something the Steward said, often on the phone, often while the Steward is still busy. The viewport is theirs while they are there. Following the tail is a convenience for when the user is *at* the tail; it is never a right the system has over the reader's position. New activity — a reply landing, a PM post, a job starting or finishing, a reconnect re-delivering what was already there — must **signal, never yank**: a quiet "new messages" affordance the reader can take when they are ready. Switching threads is the one moment the reader expects to land at the tail.
+
 ### Message Attachments
 Attachments are how the user hands the Steward things it cannot otherwise see — a screenshot of a UI they're describing, a spreadsheet, a contract. The chat input accepts them the way any modern chat does: drop onto the box, paste from the clipboard, or pick via a "+" button. Pending attachments are listed in the input with a per-item remove, and they are part of the draft — they survive a thread switch like the text does. Removing one before send discards it entirely; nothing lingers.
 

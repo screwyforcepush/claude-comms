@@ -1,27 +1,112 @@
 // MessageList - Scrollable message history
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageBubble } from './MessageBubble.js';
 import { LoadingSpinner } from '../shared/LoadingSkeleton.js';
 import { EmptyState } from '../shared/EmptyState.js';
 
+// How close to the bottom (px) still counts as "at the tail".
+const NEAR_BOTTOM_PX = 48;
+
 /**
  * MessageList component - Scrollable list of messages
+ *
+ * Scroll policy — @see docs/project/spec/mental-model.md#scrollback-belongs-to-the-reader
+ * The list follows the tail only while the reader is already at the tail. Anything that
+ * lands while they are scrolled back (a reply, a PM post, a job starting, a websocket
+ * reconnect re-delivering the same rows) must not move the viewport; it raises a
+ * "new messages" pill instead. The follow trigger is keyed on the tail message, never
+ * on the array reference, so re-deliveries of identical content are no-ops.
+ *
  * @param {Object} props
  * @param {Array} props.messages - Array of message objects
+ * @param {string|null} [props.threadId] - Active thread; a change re-pins the reader to the tail
  * @param {boolean} props.loading - Whether messages are loading
  * @param {boolean} props.sending - Whether a message is being sent
  * @param {Function} [props.onMarkRead] - Callback to mark thread as read when messages render (WP-6)
  */
-export function MessageList({ messages = [], loading = false, sending = false, onMarkRead }) {
+export function MessageList({ messages = [], threadId = null, loading = false, sending = false, onMarkRead }) {
   const containerRef = useRef(null);
+  const contentRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  // Is the reader at the tail? Ref for handlers, no re-render needed.
+  const pinnedRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
+  // Tail identity of the last render we reacted to; null = fresh thread.
+  const prevTailRef = useRef(null);
+  const prevCountRef = useRef(0);
+  const [unseen, setUnseen] = useState(false);
+
+  const count = messages.length;
+  const tailKey = count > 0 ? `${count}:${messages[count - 1]._id || count}` : '0';
+
+  const scrollToBottom = useCallback((behavior) => {
+    const el = containerRef.current;
+    if (!el) return;
+    pinnedRef.current = true;
+    setUnseen(false);
+    if (typeof el.scrollTo === 'function') {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    } else {
+      el.scrollTop = el.scrollHeight;
     }
-  }, [messages, sending]);
+  }, []);
+
+  // Reader moved: pin when they reach the tail, unpin only when they move up
+  // (moving down without reaching the tail is a smooth-scroll animation or a
+  // partial drag — neither should flip state).
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const movedUp = el.scrollTop < lastScrollTopRef.current;
+    lastScrollTopRef.current = el.scrollTop;
+    if (distance <= NEAR_BOTTOM_PX) {
+      pinnedRef.current = true;
+      setUnseen(false);
+    } else if (movedUp) {
+      pinnedRef.current = false;
+    }
+  }, []);
+
+  // Thread switch: always start at the tail of the new thread.
+  useEffect(() => {
+    pinnedRef.current = true;
+    prevTailRef.current = null;
+    prevCountRef.current = 0;
+    setUnseen(false);
+  }, [threadId]);
+
+  // Tail changed (message appended/removed). Follow if pinned; otherwise signal.
+  useEffect(() => {
+    if (prevTailRef.current === tailKey) return; // same rows re-delivered — no-op
+    const firstForThread = prevTailRef.current === null;
+    const grew = count > prevCountRef.current;
+    prevTailRef.current = tailKey;
+    prevCountRef.current = count;
+    if (pinnedRef.current) {
+      scrollToBottom(firstForThread ? 'auto' : 'smooth');
+    } else if (grew) {
+      setUnseen(true);
+    }
+  }, [tailKey, count, scrollToBottom]);
+
+  // Layout changes (soft keyboard resizing the viewport, image previews loading,
+  // the typing indicator appearing) keep a pinned reader at the tail and leave
+  // an unpinned reader exactly where they are.
+  useEffect(() => {
+    const el = containerRef.current;
+    const content = contentRef.current;
+    if (!el || !content || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => {
+      if (pinnedRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    ro.observe(el);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [count === 0 && !sending]); // re-attach when the list mounts after empty/loading state
 
   // WP-6: Trigger markRead when messages are viewed (new messages arrive while thread is active)
   useEffect(() => {
@@ -78,11 +163,15 @@ export function MessageList({ messages = [], loading = false, sending = false, o
   }
 
   return React.createElement('div', {
+    className: 'chat-message-list-wrap flex-1 min-h-0 flex flex-col'
+  },
+  React.createElement('div', {
     ref: containerRef,
-    className: 'flex-1 overflow-y-auto p-4'
+    onScroll: handleScroll,
+    className: 'chat-message-list flex-1 min-h-0 overflow-y-auto p-4'
   },
     // Messages
-    React.createElement('div', { className: 'space-y-4' },
+    React.createElement('div', { ref: contentRef, className: 'space-y-4' },
       messages.map((message, index) =>
         React.createElement(MessageBubble, {
           key: message._id || `msg-${index}`,
@@ -154,6 +243,18 @@ export function MessageList({ messages = [], loading = false, sending = false, o
 
     // Scroll anchor
     React.createElement('div', { ref: messagesEndRef })
+  ),
+
+    // New-messages pill: raised when something lands while the reader is scrolled back.
+    unseen && React.createElement('button', {
+      type: 'button',
+      onClick: () => scrollToBottom('smooth'),
+      className: 'chat-new-messages-pill',
+      title: 'Jump to latest'
+    },
+      React.createElement('span', { 'aria-hidden': 'true' }, '▼'),
+      React.createElement('span', null, 'NEW')
+    )
   );
 }
 

@@ -998,6 +998,41 @@ p, h1, h2, h3, h4, h5, h6 {
   color: var(--q-lava1);
 }
 
+/* New-messages pill — raised over the message list when something lands while
+   the reader is scrolled back. Signal, never yank.
+   @see docs/project/spec/mental-model.md#scrollback-belongs-to-the-reader */
+.chat-message-list-wrap {
+  position: relative;
+}
+
+.chat-new-messages-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--q-stone1);
+  border: 1px solid var(--q-copper1);
+  border-bottom: 2px solid var(--q-void0);
+  border-radius: 0;
+  color: var(--q-copper2);
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--q-copper1-44);
+  animation: fullbright-pulse 2.5s ease-in-out infinite;
+  z-index: 2;
+}
+
+.chat-new-messages-pill:hover {
+  color: var(--q-bone3);
+  border-color: var(--q-copper2);
+}
+
 .chat-attachment-warning {
   display: inline-flex;
   align-items: center;

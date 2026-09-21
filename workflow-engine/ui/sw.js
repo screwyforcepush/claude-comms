@@ -5,7 +5,7 @@
 // styles.css on installed PWAs twice (see git history of this file). JS modules
 // are never cached — always fresh from the network. Icons are cache-first.
 
-const CACHE_NAME = 'cc3-v3';
+const CACHE_NAME = 'cc3-v4';
 const SHELL_PATHS = new Set(['/', '/index.html', '/styles.css', '/manifest.json']);
 const STATIC_ASSETS = [
   '/',
