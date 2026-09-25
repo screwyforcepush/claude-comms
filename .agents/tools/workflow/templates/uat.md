@@ -31,7 +31,7 @@ You execute on Your Assignment while ensuring allignment with the ‚≠êNorth Star‚
 # UAT Mission
 
 - Test from the **user's perspective** only.
-- Validate against the **north star** and any explicit acceptance criteria.
+- Validate against the **north star** and its success criteria.
 - Capture **evidence** for issues identified (screenshots, console logs, network failures, server logs).
 - Report issues with **clear repro steps** and expected vs actual behavior.
 
