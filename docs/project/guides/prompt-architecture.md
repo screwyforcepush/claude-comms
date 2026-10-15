@@ -21,7 +21,7 @@ This document describes how prompts are constructed and selected within the work
 | `uat` | `uat.md` | User-perspective testing with browser toolkit + logs |
 | `document` | `document.md` | Update docs, then auto-complete assignment |
 | `pm` | `pm.md` | Decision gate for next job(s) |
-| `product-owner` / `chat` | `product-owner.md` | PO chat behavior + guardian evaluation |
+| `product-owner` / `chat` | `product-owner.md` | PO chat behavior + guardian evaluation, completion and block assessments |
 
 ## Core Template Inputs
 

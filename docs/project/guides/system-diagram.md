@@ -141,7 +141,7 @@
   │      │                                                                                 │
   │      ├── Group has PM job ──▶ Fetch assignment fresh; blocked wins before chain read   │
   │      │    Blocked: one PM report + block assessment → guardian ▸ jam/cook; stay blocked│
-  │      │      No completion assessment or checkpoint, even if PM queued another group.  │
+  │      │      No completion assessment or checkpoint, even if PM queued another group.   │
   │      │    Otherwise: read linked chain shape; final → checkpoint → none.               │
   │      │    Final: PM is tail ──▶ all groups terminal? ──▶ atomic complete              │
   │      │      Blocked/missing: refuse, no writes/count changes, no summary.             │
@@ -221,7 +221,7 @@
   │                        No OG session? Start fresh and save to the guardian map.        │
   │      - Subsequent    → --resume <guardian fork> (accumulates eval context)              │
   │    - Per-assignment  → each assignment gets its own guardian fork                       │
-  │    - Guardian fork   → checkpoint evals, final/block assessments, and user messages     │
+  │    - Guardian fork   → checkpoint evals, final/block assessments, and user messages    │
   │                        Routine PM reports between checkpoints never reach the fork.    │
   │    - Mode switching  → instant, non-destructive (OG and forks coexist)                 │
   └────────────────────────────────────────────────────────────────────────────────────────┘
@@ -257,7 +257,7 @@
   │               convergence/alignment; nudge (next PM) | block (ripcord → user).         │
   │               Count review+document groups only; reacting PM must have a next group.  │
   │               Review-only, review+uat, and document-only groups never count.           │
-  │               A PM Block always gets advisory assessment in guardian, else jam/cook.  │
+  │               A PM Block always gets advisory assessment in guardian, else jam/cook.   │
   │               User can also nudge or amend the north star from the UI mid-flight.      │
   │    5 CLOSE    PM completes only after an approved COMPLETION REVIEW group              │
   │               (review + document + uat if UX). Finality beats checkpoint cadence.      │
