@@ -32,6 +32,11 @@ export const trigger = mutation({
     isGuardianEvaluation: v.optional(v.boolean()),
     // Completion summary: if true, this is the executive summary of a completed assignment
     isCompletionSummary: v.optional(v.boolean()),
+    checkpoint: v.optional(v.object({
+      round: v.number(),
+      completionReviews: v.number(),
+      chainShape: v.string(),
+    })),
   },
   handler: async (ctx, args) => {
     requirePassword(args);
@@ -97,6 +102,7 @@ export const trigger = mutation({
       assignmentId: thread.assignmentId,
       isGuardianEvaluation: args.isGuardianEvaluation ?? false,
       isCompletionSummary: args.isCompletionSummary ?? false,
+      ...(args.checkpoint ? { checkpoint: args.checkpoint } : {}),
     };
 
     // 5. Create chat job (no assignment!)

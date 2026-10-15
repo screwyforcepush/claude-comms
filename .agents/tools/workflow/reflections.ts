@@ -386,7 +386,7 @@ async function dump(flags: Record<string, string | boolean>): Promise<void> {
     namespace: { id: nsId, name: config.namespace },
     convexUrl: config.convexUrl,
     window: {
-      last: baseArgs.last,
+      last: (baseArgs as Record<string, unknown>).last,
       harness: (baseArgs as Record<string, unknown>).harness ?? null,
       jobType: (baseArgs as Record<string, unknown>).jobType ?? null,
     },

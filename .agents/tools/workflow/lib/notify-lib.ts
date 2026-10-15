@@ -1,18 +1,15 @@
-export const MAX_BODY_CHARS = 5000;
 export const DEFAULT_FEED_LIMIT = 50;
 // Mirrors MAX_FEED_LIMIT in workflow-engine/convex/notifications.ts (authoritative live feed path); kept in manual sync across the Convex bundle boundary per Decision D6.
 export const MAX_FEED_LIMIT = 200;
 
-export interface ShouldNotifyInput {
-  sessionId?: string | null;
-  harness?: string | null;
-  mode?: string | null;
-  isCompletionSummary?: boolean;
+export function composeNotificationBody({ content, hint, failed }: {
+  content: string;
+  hint?: string;
+  failed?: boolean;
+}): string {
+  if (failed && hint) return content ? `${hint}\n\n${content}` : hint;
+  return content;
 }
-
-export type PreparedBody =
-  | { ok: true; body: string }
-  | { ok: false; error: string };
 
 export interface NotificationFeedRow {
   _creationTime: number;
@@ -28,33 +25,6 @@ export interface NotificationFeedPageOptions {
 export interface NotificationFeedPage<T extends NotificationFeedRow> {
   rows: T[];
   nextCursor: number | null;
-}
-
-export function shouldNotify(input: ShouldNotifyInput): boolean {
-  if (typeof input.sessionId !== "string" || input.sessionId.trim() === "") {
-    return false;
-  }
-  if (input.harness !== "claude") return false;
-  return input.mode === "jam" || input.mode === "cook";
-}
-
-// Cap counts UTF-16 code units (JS string.length) — the same unit Android trims
-// notification CharSequences at (5120), not bytes. Overlong bodies are rejected,
-// never clipped: the fork compresses deliberately instead of losing an unauthored
-// tail. The server-side truncate in convex/notifications.ts stays as a storage
-// invariant for non-CLI callers only.
-export function prepareBody(rawBody: string): PreparedBody {
-  const body = rawBody.trim();
-  if (body === "") {
-    return { ok: false, error: "body is empty" };
-  }
-  if (body.length > MAX_BODY_CHARS) {
-    return {
-      ok: false,
-      error: `body is ${body.length} chars of max ${MAX_BODY_CHARS}. Nothing was posted. Compress the rendition keeping the substance, rewrite the input file, and re-invoke — wc -c under ${MAX_BODY_CHARS} on the file is a safe pre-check.`,
-    };
-  }
-  return { ok: true, body };
 }
 
 export function encodeNotificationFeedCursor(row: NotificationFeedRow): number {

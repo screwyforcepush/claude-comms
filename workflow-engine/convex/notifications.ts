@@ -1,20 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requirePassword } from "./auth";
+import { readAudioNotifications } from "./settings";
 
 const MAX_BODY_CHARS = 5000;
 const DEFAULT_FEED_LIMIT = 50;
 const MAX_FEED_LIMIT = 200;
-
-function prepareBody(body: string): string {
-  const trimmed = body.trim();
-  if (!trimmed) {
-    throw new Error("body must be non-empty");
-  }
-  return trimmed.length > MAX_BODY_CHARS
-    ? trimmed.slice(0, MAX_BODY_CHARS)
-    : trimmed;
-}
 
 function feedLimit(limit?: number): number {
   if (limit === undefined) return DEFAULT_FEED_LIMIT;
@@ -36,6 +27,8 @@ export const post = mutation({
     const thread = await ctx.db.get(args.threadId);
     if (!thread) throw new Error("Thread not found");
 
+    if (!await readAudioNotifications(ctx)) return null;
+
     const namespace = await ctx.db.get(thread.namespaceId);
     if (!namespace) throw new Error("Namespace not found");
 
@@ -44,7 +37,7 @@ export const post = mutation({
       namespaceId: thread.namespaceId,
       threadId: thread._id,
       title: `${namespace.name} · ${thread.title}`,
-      body: prepareBody(args.body),
+      body: args.body.slice(0, MAX_BODY_CHARS),
       createdAt: now,
     });
   },

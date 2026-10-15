@@ -14,6 +14,7 @@ import {
   loadTemplate,
   buildPrompt,
   buildChatPrompt,
+  determinePromptType,
   Assignment,
   Job,
   JobGroup,
@@ -46,7 +47,7 @@ function mockJob(overrides: Partial<Job> = {}): Job {
   return {
     _id: 'job_def456',
     _creationTime: Date.now(),
-    assignmentId: 'asgn_abc123',
+    groupId: 'group_789',
     jobType: 'implement',
     harness: 'claude',
     context: 'Implement the login form with email/password fields and validation.',
@@ -77,9 +78,6 @@ function mockChatContext(overrides: Partial<ChatJobContext> = {}): ChatJobContex
     namespaceId: 'ns_xyz',
     mode,
     effectivePromptMode,
-    messages: [
-      { _id: 'msg1', threadId: 'thread_123', role: 'user', content: 'Hello', createdAt: Date.now() - 1000 },
-    ],
     latestUserMessage: 'Can you help me with the authentication flow?',
     ...overrides,
   };
@@ -290,6 +288,67 @@ describe('buildChatPrompt scenarios', () => {
     assert.ok(!prompt.includes('{{LATEST_MESSAGE}}'), 'LATEST_MESSAGE should be replaced');
     assert.ok(!prompt.includes('{{ASSIGNMENT_ID}}'), 'ASSIGNMENT_ID should be replaced');
   });
+
+  it('scenario: guardian checkpoint renders its round, review count, and chain shape', () => {
+    const context = mockChatContext({
+      mode: 'guardian',
+      assignmentId: 'asgn_abc123',
+      isGuardianEvaluation: true,
+      checkpoint: { round: 2, completionReviews: 6, chainShape: 'P M I M R+R+R+D M' },
+    });
+    assert.strictEqual(determinePromptType(context), 'guardian_eval');
+    const prompt = buildChatPrompt(context, 'my-project');
+    assert.ok(prompt.includes('**Checkpoint round:** 2 · **Completion reviews:** 6'));
+    assert.ok(prompt.includes('**Chain shape:** `P M I M R+R+R+D M`'));
+    assert.ok(!/\{\{(?:CHECKPOINT_|COMPLETION_REVIEWS|CHAIN_SHAPE)/.test(prompt));
+  });
+
+  it('scenario: guardian evaluation without a checkpoint renders n/a metadata', () => {
+    const prompt = buildChatPrompt(mockChatContext({
+      mode: 'guardian', isGuardianEvaluation: true,
+    }), 'my-project');
+    assert.ok(prompt.includes('**Checkpoint round:** (n/a) · **Completion reviews:** (n/a)'));
+    assert.ok(prompt.includes('**Chain shape:** `(n/a)`'));
+    assert.ok(!/\{\{(?:CHECKPOINT_|COMPLETION_REVIEWS|CHAIN_SHAPE)/.test(prompt));
+  });
+
+  it('scenario: checkpoint metadata leaves a jam prompt byte-identical', () => {
+    const context = mockChatContext({ mode: 'jam' });
+    assert.strictEqual(buildChatPrompt(context, 'my-project'), buildChatPrompt({
+      ...context, checkpoint: { round: 1, completionReviews: 3, chainShape: 'R+D M' },
+    }, 'my-project'));
+  });
+
+  for (const session of [
+    { name: 'existing guardian fork', claudeSessionId: 'guardian_session', forkSession: false },
+    { name: 'first guardian fork', claudeSessionId: 'original_session', forkSession: true },
+    { name: 'session-less guardian', claudeSessionId: undefined, forkSession: false },
+  ]) {
+    for (const isGuardianEvaluation of [false, true]) {
+      it(`scenario: completion wins for ${session.name}, evaluation=${isGuardianEvaluation}`, () => {
+        const pmReport = 'Final report: acceptance criteria verified; deployment remains owner-only.';
+        const context = mockChatContext({
+          mode: 'guardian',
+          claudeSessionId: session.claudeSessionId,
+          forkSession: session.forkSession,
+          assignmentId: 'asgn_abc123',
+          latestUserMessage: pmReport,
+          isCompletionSummary: true,
+          isGuardianEvaluation,
+        });
+        assert.strictEqual(determinePromptType(context), 'completion_summary');
+        const prompt = buildChatPrompt(context, 'my-project');
+        assert.ok(prompt.includes('ASSIGNMENT COMPLETE'));
+        assert.ok(prompt.includes('asgn_abc123'));
+        assert.strictEqual(prompt.split(pmReport).length - 1, 1);
+        assert.ok(!prompt.includes('GUARDIAN MODE'));
+        assert.ok(!prompt.includes('Alignment Response'));
+        assert.ok(!prompt.includes('Context Primer'));
+        assert.ok(!prompt.includes('**User says:**'));
+        assert.ok(!/\{\{(?:CHECKPOINT_|COMPLETION_REVIEWS|CHAIN_SHAPE)/.test(prompt));
+      });
+    }
+  }
 
   it('scenario: thread fork gets fork preamble + jam mode section', () => {
     const context = mockChatContext({

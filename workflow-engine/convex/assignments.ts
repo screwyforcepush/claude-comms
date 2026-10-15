@@ -157,6 +157,32 @@ export const getChainWithTerminalJobs = query({
   },
 });
 
+// Guardian checkpoints need chain order and job types, without archive payloads.
+export const getChainShape = query({
+  args: { password: v.string(), id: v.id("assignments") },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const assignment = await ctx.db.get(args.id);
+    if (!assignment) return [];
+
+    const groups: { _id: Id<"jobGroups">; jobTypes: string[] }[] = [];
+    const visited = new Set<Id<"jobGroups">>();
+    let currentGroupId = assignment.headGroupId;
+    while (currentGroupId && !visited.has(currentGroupId)) {
+      visited.add(currentGroupId);
+      const group = await ctx.db.get(currentGroupId);
+      if (!group) break;
+      const jobs = await ctx.db
+        .query("jobs")
+        .withIndex("by_group", (q) => q.eq("groupId", currentGroupId!))
+        .collect();
+      groups.push({ _id: group._id, jobTypes: jobs.map(job => job.jobType) });
+      currentGroupId = group.nextGroupId;
+    }
+    return groups;
+  },
+});
+
 // Mutations
 
 export const create = mutation({
@@ -242,7 +268,11 @@ export const complete = mutation({
   handler: async (ctx, args) => {
     requirePassword(args);
     const assignment = await ctx.db.get(args.id);
-    if (assignment && assignment.status !== "complete") {
+    if (!assignment) return { completed: false, status: null };
+    // Blocking belongs to the user; guard in the transaction to prevent a read/write race.
+    // @see docs/project/spec/mental-model.md § The Machine — Roles and What Each Layer Deliberately Lacks
+    if (assignment.status === "blocked") return { completed: false, status: "blocked" };
+    if (assignment.status !== "complete") {
       await adjustNamespaceCounts(ctx, assignment.namespaceId, {
         [assignment.status]: -1,
         complete: 1,
@@ -252,6 +282,7 @@ export const complete = mutation({
       status: "complete",
       updatedAt: Date.now(),
     });
+    return { completed: true };
   },
 });
 

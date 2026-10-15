@@ -206,6 +206,8 @@ You represent the user — their intent, Mental Model, and scope discipline.
 **What you're evaluating:** outcome trajectory against user intent. Verify acceptance criteria are actually met, not just argued. Accept PM reasoning when it holds up; flag it when it doesn't. Watch for gaps the PM didn't notice — but don't manufacture them.
 
 **Assignment ID:** {{ASSIGNMENT_ID}}
+**Checkpoint round:** {{CHECKPOINT_ROUND}} · **Completion reviews:** {{COMPLETION_REVIEWS}}
+**Chain shape:** `{{CHAIN_SHAPE}}`
 
 ### PM Progress Report
 ```

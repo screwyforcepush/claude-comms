@@ -39,9 +39,9 @@ describe("collapseFanOutDuplicates — tripwire arms", () => {
       { jobType: "review", harness: "gemini", model: "auto-gemini-3" },
     ];
     const { jobs: out, notices } = collapseFanOutDuplicates(DEFAULTS, jobs);
-    assert.deepStrictEqual(out, [{ jobType: "review", context: undefined }]);
     assert.strictEqual(out[0].harness, undefined);
     assert.strictEqual(out[0].model, undefined);
+    assert.deepStrictEqual(out, [{ jobType: "review", context: undefined }]);
     assert.deepStrictEqual(notices, [{ jobType: "review", from: 3, to: 3 }]);
   });
 

@@ -1,94 +1,45 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
-  MAX_BODY_CHARS,
   MAX_FEED_LIMIT,
+  composeNotificationBody,
   decodeNotificationFeedCursor,
   encodeNotificationFeedCursor,
   pageNotificationFeedRows,
-  prepareBody,
-  shouldNotify,
 } from "./notify-lib.js";
 
-describe("shouldNotify", () => {
-  it("allows jam and cook Claude chat responses", () => {
-    assert.strictEqual(
-      shouldNotify({ sessionId: "session_123", harness: "claude", mode: "jam" }),
-      true
-    );
-    assert.strictEqual(
-      shouldNotify({ sessionId: "session_123", harness: "claude", mode: "cook" }),
-      true
-    );
+describe("composeNotificationBody", () => {
+  it("ignores success telemetry hints", () => {
+    assert.strictEqual(composeNotificationBody({ content: "Done.", hint: "Context Pressure: 72k" }), "Done.");
   });
 
-  it("allows completion summaries in jam or cook mode", () => {
-    assert.strictEqual(
-      shouldNotify({
-        sessionId: "session_123",
-        harness: "claude",
-        mode: "jam",
-        isCompletionSummary: true,
-      }),
-      true
-    );
-    assert.strictEqual(
-      shouldNotify({
-        sessionId: "session_123",
-        harness: "claude",
-        mode: "cook",
-        isCompletionSummary: true,
-      }),
-      true
-    );
+  it("places a kill hint before a partial failure response", () => {
+    assert.strictEqual(composeNotificationBody({ content: "Partial response", hint: "Killed by user.", failed: true }), "Killed by user.\n\nPartial response");
   });
 
-  it("gates guardian mode, missing session ids, and non-Claude harnesses", () => {
-    assert.strictEqual(
-      shouldNotify({ sessionId: "session_123", harness: "claude", mode: "guardian" }),
-      false
-    );
-    assert.strictEqual(
-      shouldNotify({ sessionId: undefined, harness: "claude", mode: "jam" }),
-      false
-    );
-    assert.strictEqual(
-      shouldNotify({ sessionId: "session_123", harness: "codex", mode: "jam" }),
-      false
-    );
-  });
-});
-
-describe("prepareBody", () => {
-  it("trims surrounding whitespace", () => {
-    assert.deepStrictEqual(prepareBody("\n  Listen to this.  \t"), {
-      ok: true,
-      body: "Listen to this.",
-    });
+  it("uses only the hint when a failure has no partial response", () => {
+    assert.strictEqual(composeNotificationBody({ content: "", hint: "Agent stalled.", failed: true }), "Agent stalled.");
   });
 
-  it("rejects empty and whitespace-only bodies", () => {
-    assert.deepStrictEqual(prepareBody(" \n\t "), {
-      ok: false,
-      error: "body is empty",
-    });
+  it("preserves successful markdown byte for byte", () => {
+    const content = " \n# Result\n```ts\nconst x = 1;\n```\n[artifact](https://example.com)\n ";
+    assert.strictEqual(composeNotificationBody({ content }), content);
   });
 
-  it("leaves an exactly 5000 character body untouched", () => {
-    const body = "x".repeat(MAX_BODY_CHARS);
-
-    assert.deepStrictEqual(prepareBody(body), {
-      ok: true,
-      body,
-    });
+  it("does not truncate a 12k body in the runner", () => {
+    const content = "x".repeat(12_000);
+    assert.strictEqual(composeNotificationBody({ content }), content);
   });
 
-  it("rejects a 5001 character body with the measured count and no post", () => {
-    const result = prepareBody("x".repeat(MAX_BODY_CHARS + 1));
+  it("preserves empty success and whitespace in every branch", () => {
+    assert.strictEqual(composeNotificationBody({ content: "", hint: "telemetry" }), "");
+    assert.strictEqual(composeNotificationBody({ content: " \n\t " }), " \n\t ");
+    assert.strictEqual(composeNotificationBody({ content: " \n", hint: " \t ", failed: true }), " \t \n\n \n");
+  });
 
-    assert.strictEqual(result.ok, false);
-    assert.match((result as { ok: false; error: string }).error, /5001 chars of max 5000/);
-    assert.match((result as { ok: false; error: string }).error, /Nothing was posted/);
+  it("preserves failure content when no hint is supplied", () => {
+    assert.strictEqual(composeNotificationBody({ content: " partial \n", failed: true }), " partial \n");
+    assert.strictEqual(composeNotificationBody({ content: " partial \n", hint: "", failed: true }), " partial \n");
   });
 });
 

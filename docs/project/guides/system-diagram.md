@@ -139,9 +139,14 @@
   │                                                                                        │
   │    All jobs in group terminal?                                                         │
   │      │                                                                                 │
-  │      ├── Group has PM job ──▶ Trigger Guardian eval (if thread in guardian mode)       │
-  │      │                        If no nextGroup, check assignment completion ──▶         │
-  │      │                        post executive summary into originating jam/cook thread  │
+  │      ├── Group has PM job ──▶ Read linked chain shape; final → checkpoint → none       │
+  │      │    Final: PM is tail ──▶ all groups terminal? ──▶ atomic complete              │
+  │      │      Blocked/missing: refuse, no writes/count changes, no summary.             │
+  │      │      Otherwise: final PM report + completion prompt → guardian ▸ jam/cook.     │
+  │      │    Checkpoint: reacting PM has next group; predecessor has review+document;    │
+  │      │      qualifying group count is 3, 6, 9, ... ──▶ guardian eval if linked.       │
+  │      │      Metadata: round=count/3, count, prefix shape through PM (not next group). │
+  │      │    None: log only; no PM message or guardian chatJob. Finality always wins.    │
   │      │                                                                                 │
   │      ├── Has nextGroup ──▶ Scheduler picks up next group automatically                │
   │      │                                                                                 │
@@ -154,6 +159,8 @@
   │                                   save sessionId (routed by mode):                     │
   │                                     jam/cook → claudeSessionId                         │
   │                                     guardian → guardianSessions[assignmentId]           │
+  │    Any assistant save succeeds ──▶ notifications.post (own catch; no fork/retry)      │
+  │      Server audio toggle on ──▶ body.slice(0, 5000); off ──▶ no notification row     │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -189,25 +196,29 @@
   │  │          │    │          │    │             │                                       │
   │  │ Read-only│    │ Can make │    │ Watches an  │                                       │
   │  │ ideation │    │ assign-  │    │ assignment. │                                       │
-  │  │ + spec.  │    │ ments &  │    │ PM results  │                                       │
-  │  │ No side  │    │ jobs.    │    │ auto-inject │                                       │
-  │  │ effects. │    │ Full CLI │    │ as messages.│                                       │
-  │  │          │    │ access.  │    │ PO evaluates│                                       │
-  │  └──────────┘    └──────────┘    │ alignment.  │                                       │
+  │  │ + spec.  │    │ ments &  │    │ Checkpoints │                                       │
+  │  │ No side  │    │ jobs.    │    │ + final PM  │                                       │
+  │  │ effects. │    │ Full CLI │    │ report only.│                                       │
+  │  │          │    │ access.  │    │ PO assesses │                                       │
+  │  └──────────┘    └──────────┘    │ convergence.│                                       │
   │                                   └─────────────┘                                       │
   │                                                                                        │
   │  Differential Prompting:                                                               │
   │    - New session     → full system prompt + mode prompt                                │
   │    - Mode changed    → mode activation prompt only (session resumed)                   │
   │    - Same mode       → minimal (just user message, session resumed)                    │
-  │    - Guardian eval   → special guardian prompt with PM report                           │
+  │    - Guardian eval   → checkpoint PM report + round/count/prefix shape                 │
+  │    - Final report    → completion prompt (also in guardian mode); no checkpoint eval   │
   │                                                                                        │
   │  Session Isolation (Guardian Fork):                                                    │
   │    - jam/cook        → resumes claudeSessionId (OG session)                            │
   │    - guardian         → resumes guardianSessions[assignmentId]                          │
   │      - First eval    → --resume <OG> --fork-session (creates branch)                   │
+  │                        No OG session? Start fresh and save to the guardian map.        │
   │      - Subsequent    → --resume <guardian fork> (accumulates eval context)              │
   │    - Per-assignment  → each assignment gets its own guardian fork                       │
+  │    - Guardian fork   → checkpoint evals, final assessment, and user messages only      │
+  │                        PM reports between checkpoints never reach the fork.            │
   │    - Mode switching  → instant, non-destructive (OG and forks coexist)                 │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -238,12 +249,15 @@
   │    3 CHAIN    crew group ──▶ auto PM ──▶ crew group ──▶ auto PM ──▶ ...                │
   │               PM harvests Artifacts/Decisions, picks next group via pm-modules/*.md.   │
   │               Gate per cycle: PM Decides insert | complete | block.                    │
-  │    4 WATCH    every PM result ──▶ guardian fork evaluates: aligned | hold (sense) |    │
-  │               nudge (pmNudge, consumed by next PM) | block (ripcord → user).           │
+  │    4 WATCH    every third completion-review knock-back ──▶ guardian fork assesses     │
+  │               convergence/alignment; nudge (next PM) | block (ripcord → user).         │
+  │               Count review+document groups only; reacting PM must have a next group.  │
+  │               Review-only, review+uat, and document-only groups never count.           │
   │               User can also nudge or amend the north star from the UI mid-flight.      │
   │    5 CLOSE    PM completes only after an approved COMPLETION REVIEW group              │
-  │               (review + document + uat if UX). Runner posts an executive summary       │
-  │               into the originating jam/cook thread.                                    │
+  │               (review + document + uat if UX). Finality beats checkpoint cadence.      │
+  │               Executive assessment prefers guardian, otherwise linked jam/cook.       │
+  │               Blocked assignments are never auto-completed or given a summary.         │
   │    6 REFLECT  every non-chat job forks a throwaway session that writes an ergonomics   │
   │               reflection (sampled ~100/namespace/engine version). Aggregates are read  │
   │               in jam by user + Steward; edits to templates/AOP are authored there,     │
@@ -252,8 +266,12 @@
   │  WHERE THINGS SURFACE:                                                                 │
   │    Block ──▶ assignment status pill + guardian thread; runner skips blocked assignments│
   │    Rate limit / 529 ──▶ awaiting_retry (a pause, not a failure; no PM spawn)           │
-  │    Failed group ──▶ PM spawns with "diagnose and recover"; guardian sees the pattern   │
-  │    Chat reply (audio toggle on) ──▶ notify fork ──▶ Slipgate push, inline reply        │
+  │    Failed group ──▶ PM spawns with "diagnose and recover"; guardian sees checkpoints  │
+  │    Assistant save (any mode/harness) ──▶ verbatim post ──▶ Slipgate push, inline reply │
+  │      Success: content only, no telemetry hints. Fail/kill/timeout: hint + blank line    │
+  │      + partial (hint only if empty; content only if no hint). No trimming.             │
+  │      Guardian responses included; PM/user messages excluded. Server toggle gates rows.│
+  │      Markdown/whitespace/empty preserved; slice to 5000 chars; no notification agent. │
   │                                                                                        │
   │  TYPICAL CHAIN:                                                                        │
   │                                                                                        │

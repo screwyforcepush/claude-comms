@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import { requirePassword } from "./auth";
 
 const AUDIO_NOTIFICATIONS_KEY = "audioNotifications";
@@ -12,18 +13,22 @@ function parseBooleanSetting(value: string): boolean {
   }
 }
 
+export async function readAudioNotifications(ctx: Pick<QueryCtx, "db">): Promise<boolean> {
+  const row = await ctx.db
+    .query("settings")
+    .withIndex("by_key", (q) => q.eq("key", AUDIO_NOTIFICATIONS_KEY))
+    .order("desc")
+    .first();
+
+  return row ? parseBooleanSetting(row.value) : false;
+}
+
 export const getAudioNotifications = query({
   args: { password: v.string() },
   handler: async (ctx, args) => {
     requirePassword(args);
 
-    const row = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", AUDIO_NOTIFICATIONS_KEY))
-      .order("desc")
-      .first();
-
-    return row ? parseBooleanSetting(row.value) : false;
+    return await readAudioNotifications(ctx);
   },
 });
 

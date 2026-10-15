@@ -37,10 +37,9 @@ Consequence for you: the north star is a **single flat blob** read identically b
 | document | `document.md` | full verbatim |
 | pm | `pm.md` | full verbatim (PM modules ride inside this one injection) |
 | reflect | `reflect.md` | **first 200 chars only**, as a scope *hint* |
-| notify | `notify.md` | **not received at all** |
 | product-owner (Steward) | `product-owner.md` | **not re-injected** — you authored it; you work from session memory |
 
-The last three are the structurally interesting ones and are covered under "Where the north star is NOT checked".
+The last two are the structurally interesting ones and are covered under "Where the north star is NOT checked". Notifications are not a prompt consumer: since Phase 22 the runner posts the Steward's message verbatim (failure hints precede partial content), capped at 5000 characters by the server. There is no notification prompt, agent fork, or separate north-star injection.
 
 ---
 
@@ -92,7 +91,6 @@ These are concatenated into `pm.md` at `{{PM_MODULES}}` — they have **no separ
 Derived from the templates, not from samples. These are points where nothing compares work against the north star:
 
 - **Reflect never checks it.** `reflect.md` is outcome-blind by mandate — "Do not evaluate output quality — outcome effectiveness is out of scope" (line 4). It receives only `northStar.slice(0, 200)` as a "brief context cue" (`reflect-spawn.ts:176`), not the full text. Reflection is an ergonomics instrument; it is structurally incapable of catching north-star drift and should never be relied on to.
-- **Notify never sees it.** `notify.md` renders the previous assistant message into a listenable form and has no north-star reference. Correct by design — it is an audio-surface transform, not a gate.
 - **The tail sign-off does not re-inject the north star.** When the assignment completes, the Steward's COMPLETION_SUMMARY prompt (`product-owner.md` lines 249-265) receives `{{LATEST_MESSAGE}}` (the final PM message) — **not** a fresh copy of the north star. `buildChatPrompt` (`prompts.ts:368`) has no `{{NORTH_STAR}}` substitution at all. So at sign-off you are checking the PM's closing claim against *your own session memory* of what you authored, not against a re-presented north star. If your memory of the north star has drifted, nothing in the prompt corrects it. **This is the moment to re-read the north star string yourself.**
 - **The crew cannot gate on misalignment.** plan, implement, review, uat and document all *receive* the north star and are told to "align" — but none can change assignment status. Per the mental model: their "claims are inputs to the PM, never verdicts." A crew member that spots the north star is subtly wrong has no lever except to write it into a report and hope the PM acts on it.
 - **The PM is stateless and single-run.** It sees only the latest job run plus north star, mental model, artifacts and decisions — never the full chain. It "cannot be the layer that notices a *pattern* of failure or drift" (mental model). So drift that only shows up *across* cycles is invisible to every individual PM.

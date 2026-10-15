@@ -8,6 +8,7 @@
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import type { GuardianCheckpoint } from "./guardian-checkpoint.js";
 
 // Types needed for prompt building
 export interface Assignment {
@@ -69,6 +70,7 @@ export interface ChatJobContext {
   // Guardian mode context
   assignmentId?: string;
   isGuardianEvaluation?: boolean; // True when PO is evaluating PM response
+  checkpoint?: GuardianCheckpoint;
   isCompletionSummary?: boolean; // True when PO is summarizing a completed assignment
 }
 
@@ -377,7 +379,10 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
       .replace(/\{\{NAMESPACE\}\}/g, namespace)
       .replace(/\{\{MODE\}\}/g, chatContext.effectivePromptMode)
       .replace(/\{\{LATEST_MESSAGE\}\}/g, chatContext.latestUserMessage)
-      .replace(/\{\{ASSIGNMENT_ID\}\}/g, chatContext.assignmentId || "(no assignment linked)");
+      .replace(/\{\{ASSIGNMENT_ID\}\}/g, chatContext.assignmentId || "(no assignment linked)")
+      .replace(/\{\{CHECKPOINT_ROUND\}\}/g, chatContext.checkpoint ? String(chatContext.checkpoint.round) : "(n/a)")
+      .replace(/\{\{COMPLETION_REVIEWS\}\}/g, chatContext.checkpoint ? String(chatContext.checkpoint.completionReviews) : "(n/a)")
+      .replace(/\{\{CHAIN_SHAPE\}\}/g, chatContext.checkpoint?.chainShape ?? "(n/a)");
   };
 
   const parts: string[] = [];

@@ -36,6 +36,7 @@ import {
   isChatJob,
   determinePromptType,
 } from "./lib/prompts.js";
+import { decideGuardianWake, type ChainGroup, type GuardianCheckpoint } from "./lib/guardian-checkpoint.js";
 
 // Harness executor (file-based event streaming for crash resilience)
 import { HarnessExecutor, Harness, OrphanInfo } from "./lib/harness-executor.js";
@@ -53,7 +54,7 @@ import {
   formatContextPressure,
   recordMetricsEvent,
 } from "./lib/metrics.js";
-import { shouldNotify } from "./lib/notify-lib.js";
+import { composeNotificationBody } from "./lib/notify-lib.js";
 
 // Prefix all console output with a UTC timestamp — runner.log is append-only
 // (via run-runner.sh) and untimestamped lines are impossible to correlate.
@@ -140,41 +141,6 @@ function spawnReflection(jobId: string): void {
   }
 }
 
-function maybeSpawnNotification(
-  chatContext: ChatJobContext,
-  sessionId: string | null | undefined,
-  harness: string
-): void {
-  try {
-    const notificationSessionId = typeof sessionId === "string" ? sessionId : "";
-    if (!shouldNotify({
-      sessionId: notificationSessionId,
-      harness,
-      mode: chatContext.mode,
-      isCompletionSummary: chatContext.isCompletionSummary,
-    })) {
-      return;
-    }
-
-    const child = spawn(
-      "npx",
-      ["tsx", join(__dirname, "notify-spawn.ts"), chatContext.threadId, notificationSessionId],
-      {
-        detached: true,
-        stdio: "ignore",
-        cwd: __dirname,
-        env: process.env,
-      }
-    );
-    child.on("error", () => {
-      // Silent: notification delivery is best-effort and must not affect chat.
-    });
-    child.unref();
-  } catch {
-    // Silent: notification delivery is best-effort and must not affect chat.
-  }
-}
-
 // State
 let client: ConvexClient | null = null;
 let unsubscribeJobs: (() => void) | null = null;
@@ -208,7 +174,11 @@ async function fetchHarnessDefaults(namespaceId: string): Promise<HarnessDefault
 }
 
 // Save assistant response to chat thread
-async function saveChatResponse(threadId: string, content: string, hint?: string): Promise<void> {
+async function saveChatResponse(
+  threadId: string,
+  content: string,
+  opts?: { hint?: string; failed?: boolean }
+): Promise<void> {
   try {
     const msg: Record<string, any> = {
       password: config.password,
@@ -216,9 +186,18 @@ async function saveChatResponse(threadId: string, content: string, hint?: string
       role: "assistant",
       content,
     };
-    if (hint) msg.hint = hint;
+    if (opts?.hint) msg.hint = opts.hint;
     await client!.mutation(api.chatMessages.add, msg);
     console.log(`[Chat] Saved assistant response to thread ${threadId}`);
+    try {
+      await client!.mutation(api.notifications.post, {
+        password: config.password,
+        threadId: threadId as any,
+        body: composeNotificationBody({ content, hint: opts?.hint, failed: opts?.failed }),
+      });
+    } catch (e) {
+      console.error(`[Chat] Failed to post notification for thread ${threadId}:`, e);
+    }
   } catch (e) {
     console.error(`[Chat] Failed to save response:`, e);
   }
@@ -274,7 +253,7 @@ async function saveLastPromptMode(
   }
 }
 
-// Guardian Mode: Trigger PO evaluation when PM completes
+// Guardian Mode: Trigger PO evaluation at a convergence checkpoint
 interface ChatThread {
   _id: string;
   mode: "jam" | "cook" | "guardian";
@@ -285,7 +264,8 @@ interface ChatThread {
 
 async function triggerGuardianEvaluation(
   assignment: Assignment,
-  pmResult: string
+  pmResult: string,
+  checkpoint: GuardianCheckpoint
 ): Promise<void> {
   try {
     const guardianThread: ChatThread | null = await client!.query(
@@ -320,6 +300,7 @@ async function triggerGuardianEvaluation(
         threadId: guardianThread._id as any,
         triggerMessageId: pmMessageId as any,
         isGuardianEvaluation: true,
+        checkpoint,
       });
       console.log(`[Guardian] Triggered PO evaluation chatJob`);
     } catch (triggerError) {
@@ -331,7 +312,7 @@ async function triggerGuardianEvaluation(
   }
 }
 
-// Completion Summary: drop an executive assessment into the jam/cook thread that owns the assignment
+// Completion Summary: prefer the guardian thread, otherwise the assignment's jam/cook thread
 async function triggerCompletionSummary(
   assignment: Assignment,
   pmResult: string
@@ -343,7 +324,7 @@ async function triggerCompletionSummary(
     );
 
     if (!thread) {
-      console.log(`[Completion] No jam/cook thread for assignment ${assignment._id}`);
+      console.log(`[Completion] No completion thread for assignment ${assignment._id}`);
       return;
     }
 
@@ -522,11 +503,10 @@ async function executeJob(
               ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
               : undefined;
             const hint = [pressureLine, forceKillLine].filter(Boolean).join(" ") || undefined;
-            await saveChatResponse(chatContext.threadId, result, hint);
+            await saveChatResponse(chatContext.threadId, result, { hint });
             if (sessionId) {
               await saveSessionId(chatContext.threadId, sessionId);
             }
-            maybeSpawnNotification(chatContext, sessionId, job.harness);
           } else {
             // groupCompleted is the exactly-once token: only the mutation that
             // flipped the group terminal runs group-completion side effects.
@@ -561,7 +541,7 @@ async function executeJob(
             await saveChatResponse(
               chatContext.threadId,
               partialResult || "",
-              wasKilled ? "Killed by user." : `Agent failed (${reason}). Partial response shown above.`
+              { hint: wasKilled ? "Killed by user." : `Agent failed (${reason}). Partial response shown above.`, failed: true }
             );
           } else {
             if (res?.groupCompleted ?? true) {
@@ -605,7 +585,7 @@ async function executeJob(
             await saveChatResponse(
               chatContext.threadId,
               partialResult || "",
-              describeTimeoutForChat(reason)
+              { hint: describeTimeoutForChat(reason), failed: true }
             );
           } else {
             if (res?.groupCompleted ?? true) {
@@ -648,16 +628,31 @@ async function handleGroupCompletion(
   const jobs = currentGroup.jobs || [];
   const hasPMJob = jobs.some((j: Job) => j.jobType === "pm");
 
-  // PM groups: always trigger guardian evaluation (even if PM inserted next job)
+  // Guardian sees convergence checkpoints and the final assessment only.
+  // @see docs/project/spec/mental-model.md § The Machine — Roles and What Each Layer Deliberately Lacks
   if (hasPMJob) {
-    // PM completed - trigger guardian evaluation if applicable
     // Find the PM job's result (not aggregatedResult with headers)
     const pmJob = jobs.find((j: Job) => j.jobType === "pm" && j.result);
     const pmResult = pmJob?.result || "";
-    await triggerGuardianEvaluation(assignment, pmResult);
-    // If PM didn't insert a next job, check if assignment is done
-    if (!currentGroup.nextGroupId) {
-      await checkAndCompleteAssignment(assignment._id, group._id, assignment, pmResult);
+    const chain: ChainGroup[] = await client!.query(api.assignments.getChainShape, {
+      password: config.password,
+      id: assignment._id as any,
+    });
+    const wake = decideGuardianWake(chain, group._id);
+    switch (wake.kind) {
+      case "final":
+        await checkAndCompleteAssignment(assignment._id, group._id, assignment, pmResult);
+        break;
+      case "checkpoint":
+        await triggerGuardianEvaluation(assignment, pmResult, wake.checkpoint);
+        break;
+      case "none":
+        if (!chain.some(g => g._id === group._id)) {
+          console.warn(`[${group._id}] Completed PM group missing from assignment ${assignment._id} chain`);
+        } else {
+          console.log(`[${group._id}] No guardian checkpoint`);
+        }
+        break;
     }
     return;
   }
@@ -692,12 +687,16 @@ async function checkAndCompleteAssignment(
   }
 
   console.log(`[${completedGroupId}] All groups done, marking assignment ${assignmentId} as complete`);
-  await client!.mutation(api.assignments.complete, {
+  const completion = await client!.mutation(api.assignments.complete, {
     password: config.password,
     id: assignmentId,
   });
+  if (!completion.completed) {
+    console.log(`[${completedGroupId}] Assignment ${assignmentId} completion refused (status: ${completion.status})`);
+    return;
+  }
 
-  // Drop an executive summary of the completed assignment into its jam/cook thread
+  // Drop an executive summary into the preferred completion thread.
   await triggerCompletionSummary(assignment, pmResult);
 }
 
@@ -903,7 +902,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
             ? "Background processes were force-killed. Tell me to nohup if persistence is desired."
             : undefined;
           const hint = [pressureLine, forceKillLine].filter(Boolean).join(" ") || undefined;
-          await saveChatResponse(chatContext.threadId, result, hint);
+          await saveChatResponse(chatContext.threadId, result, { hint });
           if (sessionId) {
             // Route session save: guardian mode saves to per-assignment map
             const isGuardianSession = chatContext.mode === "guardian" && chatContext.assignmentId;
@@ -916,7 +915,6 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           if (!chatContext.isGuardianEvaluation && !chatContext.isCompletionSummary) {
             await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);
           }
-          maybeSpawnNotification(chatContext, sessionId, chatJob.harness);
         } catch (e) {
           console.error(`[${jobId}] Error in onComplete:`, e);
           try {
@@ -946,7 +944,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           await saveChatResponse(
             chatContext.threadId,
             partialResult || "",
-            wasKilled ? "Killed by user." : `Agent failed (${reason}). Partial response shown above.`
+            { hint: wasKilled ? "Killed by user." : `Agent failed (${reason}). Partial response shown above.`, failed: true }
           );
         } catch (e) {
           console.error(`[${jobId}] Error in onFail:`, e);
@@ -967,7 +965,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           await saveChatResponse(
             chatContext.threadId,
             partialResult || "",
-            describeTimeoutForChat(reason)
+            { hint: describeTimeoutForChat(reason), failed: true }
           );
         } catch (e) {
           console.error(`[${jobId}] Error in onTimeout:`, e);

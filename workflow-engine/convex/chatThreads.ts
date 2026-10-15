@@ -306,21 +306,20 @@ export const getGuardianThread = query({
   },
 });
 
-// Query the jam/cook thread whose focus assignment is this one (completion summary).
-// Mirrors getGuardianThread's indexed lookup; only the mode filter differs.
+// Completion assessment prefers the guardian fork, then the linked jam/cook thread.
+// @see docs/project/spec/mental-model.md § Session Routing
 export const getCompletionThread = query({
   args: { password: v.string(), assignmentId: v.id("assignments") },
   handler: async (ctx, args) => {
     requirePassword(args);
-    const thread = await ctx.db
+    const threads = await ctx.db
       .query("chatThreads")
       .withIndex("by_assignment", (q) => q.eq("assignmentId", args.assignmentId))
-      .filter((q) =>
-        q.or(q.eq(q.field("mode"), "jam"), q.eq(q.field("mode"), "cook"))
-      )
-      .first();
+      .collect();
 
-    return thread ?? null;
+    return threads.find(thread => thread.mode === "guardian")
+      ?? threads.find(thread => thread.mode === "jam" || thread.mode === "cook")
+      ?? null;
   },
 });
 

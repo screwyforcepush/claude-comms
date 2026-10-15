@@ -16,7 +16,7 @@ export function buildClaudeForkArgs(options: ClaudeForkArgsOptions): string[] {
     args.push("--model", options.model);
   }
 
-  // fork-args intentionally omits disallowed tools; notify-spawn adds its own.
+  // Fork arguments intentionally omit disallowed tools.
   args.push("--resume", options.sessionId, "--fork-session", "-p");
   return args;
 }
