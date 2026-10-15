@@ -2,9 +2,9 @@
 
 > PO as alignment guardian for autonomous assignment execution
 
-**Version:** 1.2
+**Version:** 1.3
 **Last Updated:** 2026-10-15
-**Status:** Active (Phase 22 convergence checkpoints)
+**Status:** Active (Phase 22 convergence checkpoints + block assessment)
 
 ---
 
@@ -26,7 +26,8 @@ A third thread mode (alongside jam and cook) where:
 - PO evaluates every third completion-review knock-back for convergence and alignment with original intent
 - PO has jam context and checkpoint history via a per-assignment session fork
 - The final PM report triggers an executive assessment, preferring the guardian thread, otherwise the linked jam/cook thread
-- PM reports between checkpoints never reach the guardian fork
+- A blocking PM report triggers an advisory block assessment in the guardian thread, otherwise the linked jam/cook thread, regardless of whether the PM queued another group
+- Routine PM reports between checkpoints never reach the guardian fork
 - PO acts as user's advocate, flagging drift before it compounds
 - User can engage PO to discuss and resolve uncertainty
 
@@ -40,7 +41,7 @@ A third thread mode (alongside jam and cook) where:
 |------|-------------|
 | `jam` | Read-only ideation. PO helps refine requirements. Cannot create assignments. |
 | `cook` | Full autonomy. PO creates assignments, inserts jobs. No oversight. |
-| `guardian` | Cook + checkpoint alignment monitoring and final executive assessment. Requires linked assignment; routine PM reports are not injected. |
+| `guardian` | Cook + checkpoint alignment monitoring, final executive assessment, and block assessment. Requires linked assignment; routine PM reports are not injected. |
 
 ### Alignment Status
 
@@ -64,7 +65,11 @@ Default: `aligned` when guardian mode activated.
 
 On PM-group completion:
 5. PM response stored in jobs.result
-6. System reads the linked chain shape and decides final → checkpoint → none
+6. System fetches the assignment fresh. If blocked, insert one PM report and
+   trigger one block_assessment in guardian, otherwise linked jam/cook; stop
+   without a completion assessment or checkpoint evaluation. This also applies
+   when the blocking PM queued another group. Assignment stays blocked.
+   Otherwise read the linked chain shape and decide final → checkpoint → none
 7. Final (PM is chain tail): check all groups terminal, then atomically complete
    unless blocked/missing; on success, surface final PM report in guardian thread
    if present, otherwise linked jam/cook thread, and trigger completion_summary
@@ -77,14 +82,20 @@ On PM-group completion:
 11. If misaligned: PO blocks assignment
 12. None: no PM chatMessage and no guardian chatJob; report stays in jobs.result
 
+On a PM Block:
+13. Steward assesses the recorded reason and PM report, recommending answers
+    with Mental Model/conversation evidence and identifying user-only decisions
+14. User confirms the resolution; the assessment itself never resumes work
+15. Resolution is a cook move: set the answers as a nudge and insert a pm job
+
 On misalignment:
-13. User sees red status, discusses with PO in thread
-14. User confirms resolution direction
-15. PO unblocks assignment
-16. Work continues
+16. User sees red status, discusses with PO in thread
+17. User confirms resolution direction
+18. PO unblocks assignment
+19. Work continues
 ```
 
-A completion-review group contains both exact job types `review` and `document`; fan-out reviews count as one group, and an accompanying `uat` does not affect the count. Review-only, review+uat, and document-only groups do not count. The reacting PM must immediately follow a qualifying group and have a successor: the knock-back is recognized when it schedules more work. Finality wins even at count 3, 6, or 9, so the final report triggers only the completion prompt.
+A completion-review group contains both exact job types `review` and `document`; fan-out reviews count as one group, and an accompanying `uat` does not affect the count. Review-only, review+uat, and document-only groups do not count. The reacting PM must immediately follow a qualifying group and have a successor: the knock-back is recognized when it schedules more work. For an unblocked assignment, finality wins even at count 3, 6, or 9, so the final report triggers only the completion prompt.
 
 Checkpoint context is `{ round, completionReviews, chainShape }`: round is count / 3, count includes qualifying groups before the reacting PM, and shape covers the prefix through that PM, excluding its newly inserted next group. Groups are in linked-list order, joined by spaces; jobs retain stored order, joined by `+`. Letters are `plan=P`, `pm=M`, `implement=I`, `review=R`, `uat=U`, `document=D` (unknown types use their uppercased first character). Example round 1, count 3:
 
@@ -92,7 +103,9 @@ Checkpoint context is `{ round, completionReviews, chainShape }`: round is count
 P M I M R+R+R+D M I M R+R+R+D M I M R+R+R+D M
 ```
 
-The final assessment uses `completion_summary`, even in guardian mode, rather than `guardian_eval`. Guardian checkpoint evaluations, final assessments, and user messages all use the assignment's guardian fork; jam/cook uses the original session. Without an existing fork or original session, a guardian interaction starts fresh and saves its returned session to the guardian map.
+The final assessment uses `completion_summary`, even in guardian mode, rather than `guardian_eval`. A PM Block takes precedence over both and uses `block_assessment`. Guardian checkpoint evaluations, final assessments, block assessments, and user messages all use the assignment's guardian fork; jam/cook uses the original session. Without an existing fork or original session, a guardian interaction starts fresh and saves its returned session to the guardian map.
+
+The block trigger mirrors the completion trigger: `getCompletionThread` prefers guardian, otherwise a linked jam/cook thread; one `role: 'pm'` message carries the PM report and one `chatJobs.trigger` call carries `isBlockAssessment: true` and the fresh assignment's `blockedReason`. These optional fields are stored in the existing JSON context; no schema change is needed. `determinePromptType` gates the block flag before `guardian_eval` and the new-session check. `buildChatPrompt` selects only `BLOCK_ASSESSMENT`, substitutes `{{BLOCKED_REASON}}` and `{{LATEST_MESSAGE}}`, and omits the user-message suffix. Like completion summaries and guardian evaluations, block assessments do not update `lastPromptMode`.
 
 ### Async Execution
 
@@ -209,22 +222,30 @@ If user responds to discuss alignment concerns:
 
 ## Runner Changes
 
-After the existing `res.groupCompleted` gate, the PM-group branch queries the lean chain shape once and delegates cadence to the pure decision module:
+After the existing `res.groupCompleted` gate, the PM-group branch fetches the assignment fresh, skips the chain query when blocked, and delegates block-versus-checkpoint precedence to the pure `pm-completion.ts` module:
 
 ```typescript
-const chain = await query(assignments.getChainShape, { id: assignment._id });
-const wake = decideGuardianWake(chain, group._id);
+const currentAssignment = await query(assignments.get, { id: assignment._id });
+if (!currentAssignment) return;
+const chain = currentAssignment.status === 'blocked' ? []
+  : await query(assignments.getChainShape, { id: currentAssignment._id });
+const wake = decidePmCompletion(currentAssignment, chain, group._id);
 switch (wake.kind) {
+  case 'blocked':
+    // getCompletionThread prefers guardian, otherwise linked jam/cook.
+    // One PM report + isBlockAssessment:true and blockedReason; no status write.
+    await triggerBlockAssessment(currentAssignment, pmResult, wake.blockedReason);
+    return;
   case 'final':
     // Checks pending/running groups, calls assignments.complete, and stops
     // if completed:false. Otherwise queues isCompletionSummary:true in the
     // preferred guardian thread, falling back to a linked jam/cook thread.
-    await checkAndCompleteAssignment(assignment._id, group._id, assignment, pmResult);
+    await checkAndCompleteAssignment(currentAssignment._id, group._id, currentAssignment, pmResult);
     break;
   case 'checkpoint':
     // Looks up guardian thread; if present, inserts role:'pm' and triggers
     // isGuardianEvaluation:true with checkpoint: wake.checkpoint.
-    await triggerGuardianEvaluation(assignment, pmResult, wake.checkpoint);
+    await triggerGuardianEvaluation(currentAssignment, pmResult, wake.checkpoint);
     break;
   case 'none':
     // Log only; warn if the completed PM group is missing from the chain.
@@ -236,11 +257,11 @@ switch (wake.kind) {
 
 `getChainShape` walks `headGroupId` → `nextGroupId`, with a visited-id guard, and returns only `{ _id, jobTypes }` per group. It does not use the archive query or creation-time order. Query errors reach the existing callback catch; no fallback restores per-PM evaluation.
 
-`assignments.complete` refuses blocked or missing assignments inside its transaction, before any write or namespace-count adjustment, returning `{ completed: false, status: 'blocked' | null }`. The runner then skips the summary. Already-complete assignments return `{ completed: true }` without recounting, so a PM's earlier status update does not suppress the terminal callback's summary. The existing group-finalization token owns these side effects; this is not a durable delivery guarantee.
+`assignments.complete` still refuses blocked or missing assignments inside its transaction, before any write or namespace-count adjustment, returning `{ completed: false, status: 'blocked' | null }`. The runner then skips the completion summary; the fresh blocked-status branch above handles the PM's block assessment before reaching completion. Already-complete assignments return `{ completed: true }` without recounting, so a PM's earlier status update does not suppress the terminal callback's summary. The existing group-finalization token owns these side effects; this is not a durable delivery guarantee.
 
 ### Notifications
 
-After any assistant response is successfully saved, `saveChatResponse` attempts `notifications.post` in a separate catch. This includes success, failure, kill, and timeout in any mode or harness, including guardian checkpoint responses and final assessments. PM-role reports and user messages do not push. If the chat save fails there is no post; notification failure does not affect the chat save and is not retried.
+After any assistant response is successfully saved, `saveChatResponse` attempts `notifications.post` in a separate catch. This includes success, failure, kill, and timeout in any mode or harness, including guardian checkpoint responses, final assessments, and block-assessment replies. PM-role reports and user messages do not push. If the chat save fails there is no post; notification failure does not affect the chat save and is not retried.
 
 Successful responses post `content` verbatim, excluding telemetry hints. Failure/kill/timeout posts use `hint + "\n\n" + partial content`, or just the hint when content is empty; without a hint, content stays verbatim. The completion-error fallback already supplies its whole error message as content. The server checks the global audio toggle: off returns `null` without inserting; on stores `body.slice(0, 5000)`, preserving markdown, whitespace, and empty bodies. There is no notification session fork, prompt, or agent run.
 
@@ -273,15 +294,17 @@ Design consideration: Space is limited. Defer detailed UI design to focused agen
 - Add `--alignment` flag to CLI
 
 ### Phase 2: Runner Integration
-- Query linked chain shape and dispatch final → checkpoint → none
+- Fetch assignment fresh and dispatch blocked → final → checkpoint → none
+- On blocked, surface one PM report and trigger one advisory block assessment via guardian, otherwise linked jam/cook, with no completion or checkpoint evaluation
 - At every third qualifying knock-back, surface the PM report and trigger guardian evaluation with checkpoint metadata
 - At finality, atomically refuse blocked completion; otherwise trigger the executive assessment in guardian, falling back to jam/cook
-- Leave reports between checkpoints outside the fork
+- Leave routine reports between checkpoints outside the fork
 
 ### Phase 3: PO Prompt Module
 - Add `{{#if GUARDIAN_MODE}}` section to product-owner.md
 - Render checkpoint round, completion-review count and prefix shape; retain the owner's production prose
 - Use the completion module for final assessment, including in guardian mode
+- Use the separate block module for PM Blocks; recommend a resolution without resuming the assignment
 - Token-efficient response format (emoji-only for aligned)
 
 ### Phase 4: UI Indicators
@@ -293,7 +316,7 @@ Design consideration: Space is limited. Defer detailed UI design to focused agen
 
 ## Token Economy
 
-Guardian mode adds one PO evaluation per third completion-review knock-back, plus the final executive assessment. Routine PM cycles add no guardian message or agent run. Other cost controls:
+Guardian mode adds one PO evaluation per third completion-review knock-back, plus the final executive assessment. A PM Block adds one advisory Steward assessment in the preferred linked thread. Routine PM cycles add no guardian message or agent run. Other cost controls:
 
 1. **Aligned = emoji only**: No rationale when trajectory is good
 2. **Resume-session**: No message history in prompt, Claude maintains context
@@ -306,11 +329,11 @@ Guardian mode adds one PO evaluation per third completion-review knock-back, plu
 ## Success Criteria
 
 1. User can switch thread to guardian mode when linked to assignment
-2. Only checkpoint interim PM reports surface in the guardian thread; reports between checkpoints never reach its fork
+2. Checkpoint and blocking PM reports surface in the guardian thread; routine reports between checkpoints never reach its fork
 3. PO evaluates knock-backs at counts 3, 6, 9, ... with correct round/count/prefix shape; non-qualifying groups do not advance the count
 4. User can see alignment status at a glance in thread selector
 5. Misalignment blocks assignment until user confirms resolution
 6. Full jam context preserved for accurate alignment evaluation
-7. Finality takes precedence over a checkpoint; one completion assessment prefers guardian, otherwise linked jam/cook, using the completion prompt
-8. Blocked completion is refused atomically, with no status/count writes or executive assessment
+7. For unblocked assignments, finality takes precedence over a checkpoint; one completion assessment prefers guardian, otherwise linked jam/cook, using the completion prompt
+8. A fresh blocked status wins over finality and checkpoint cadence, including with a queued next group: one PM report and one block-assessment chat job prefer guardian, otherwise linked jam/cook; no completion assessment or guardian checkpoint fires, and the assignment stays blocked. The atomic blocked-completion guard remains in place.
 9. Every saved assistant response can notify in any mode/harness when the server toggle is on; stored bodies follow the verbatim slice-to-5000 contract, and PM/user messages never push

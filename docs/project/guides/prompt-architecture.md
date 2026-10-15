@@ -93,5 +93,6 @@ Chat prompting uses **differential prompting** based on session state:
 - **minimal**: same mode resume
 - **guardian_eval**: PO evaluation of a PM report at a convergence checkpoint (every third completion-review knock-back), with `{{CHECKPOINT_ROUND}}`, `{{COMPLETION_REVIEWS}}`, `{{CHAIN_SHAPE}}` (each `(n/a)` without checkpoint metadata)
 - **completion_summary**: executive assessment of the final PM report. It takes precedence over `guardian_eval` and is also used in guardian mode.
+- **block_assessment**: advisory assessment of a blocking PM report and the recorded `{{BLOCKED_REASON}}`, regardless of whether the PM queued another group. The block flag is checked before `guardian_eval` and session-state prompting. It uses only the `BLOCK_ASSESSMENT` section, without the user-message suffix, and does not update `lastPromptMode`, like completion summaries and guardian evaluations. The assignment remains blocked until the user resolves it through a cook move (answers as a nudge, then a PM job).
 
 These are determined in `.agents/tools/workflow/lib/prompts.ts`.

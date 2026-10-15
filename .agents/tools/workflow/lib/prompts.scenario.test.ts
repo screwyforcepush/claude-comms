@@ -25,6 +25,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', 'templates');
 const TEST_TEMPLATE_PATH = join(TEMPLATES_DIR, '_test-scenario.md');
 
+const BLOCK_ASSESSMENT_SECTION = `## ASSIGNMENT BLOCKED — STEWARD ASSESSMENT
+
+Outcome🧭Steward — assignment j57b3dahvkvk19bz4bgfgqmgb58gan7t has been blocked by its PM.
+Reason on record: {{BLOCKED_REASON}}
+
+A PM blocks only when a decision cannot be inferred from the north star plus
+Mental Model with high confidence. Assess whether the block is warranted.
+For each open question, give your recommended answer and the Mental Model or
+conversation evidence behind it. Separate what you can answer from what only
+the user can decide.
+
+Respond with a tight **executive summary** and **a recommended resolution**.
+This is advisory — the user is the only resolver of a Block. Do not resume
+the assignment. Resuming is a cook move: once the user confirms, set the
+answers as a nudge and insert a pm job.
+
+### Blocking PM message
+\`\`\`
+{{LATEST_MESSAGE}}
+\`\`\``;
+
 // Test fixtures
 function mockAssignment(overrides: Partial<Assignment> = {}): Assignment {
   return {
@@ -216,6 +237,87 @@ Job: {{CURRENT_JOB_ID}}
 describe('buildChatPrompt scenarios', () => {
   // Note: These tests use the actual product-owner.md template
   // They verify conditional logic and placeholder replacement
+
+  it('scenario: block-assessment template preserves the supplied section exactly', () => {
+    const template = loadTemplate('product-owner');
+    assert.ok(template.includes(`{{#section BLOCK_ASSESSMENT}}\n${BLOCK_ASSESSMENT_SECTION}\n{{/section}}`));
+  });
+
+  for (const mode of ['jam', 'cook', 'guardian'] as const) {
+    for (const session of [
+      { name: 'resumed session', claudeSessionId: 'session_existing', forkSession: false },
+      { name: 'first fork', claudeSessionId: 'session_original', forkSession: true },
+      { name: 'fresh session', claudeSessionId: undefined, forkSession: false },
+    ]) {
+      for (const isGuardianEvaluation of [false, true]) {
+        it(`scenario: block assessment wins in ${mode}, ${session.name}, evaluation=${isGuardianEvaluation}`, () => {
+          const pmReport = 'PM BLOCKED: Which direction should the user choose?\nEvidence remains unresolved.';
+          const blockedReason = 'North star conflicts with the user’s latest decision.\nNeeds user resolution.';
+          const context = mockChatContext({
+            mode,
+            claudeSessionId: session.claudeSessionId,
+            forkSession: session.forkSession,
+            isThreadFork: true,
+            assignmentId: 'asgn_other',
+            latestUserMessage: pmReport,
+            blockedReason,
+            isBlockAssessment: true,
+            isGuardianEvaluation,
+            checkpoint: { round: 1, completionReviews: 3, chainShape: 'R+D M' },
+          });
+          assert.strictEqual(determinePromptType(context), 'block_assessment');
+          const prompt = buildChatPrompt(context, 'my-project');
+          assert.strictEqual(prompt, BLOCK_ASSESSMENT_SECTION
+            .replace('{{BLOCKED_REASON}}', () => blockedReason)
+            .replace('{{LATEST_MESSAGE}}', () => pmReport));
+          assert.strictEqual(prompt.split(pmReport).length - 1, 1);
+          assert.strictEqual(prompt.split(blockedReason).length - 1, 1);
+          assert.ok(!prompt.includes('**User says:**'));
+          assert.ok(!/GUARDIAN MODE|JAM MODE|COOK MODE|Context Primer|FORKED THREAD|ASSIGNMENT COMPLETE/.test(prompt));
+        });
+      }
+    }
+  }
+
+  it('scenario: blocking reason and PM report render verbatim without interpreting replacement tokens or placeholders', () => {
+    const blockedReason = '  Reason: $& $$ $` $\' {{LATEST_MESSAGE}} {{ASSIGNMENT_ID}}\n  ';
+    const pmReport = '  PM: $& $$ $` $\' {{BLOCKED_REASON}} {{CHECKPOINT_ROUND}}\n  ';
+    const prompt = buildChatPrompt(mockChatContext({
+      isBlockAssessment: true, blockedReason, latestUserMessage: pmReport,
+    }), 'my-project');
+    const expected = BLOCK_ASSESSMENT_SECTION.replace(/\{\{(BLOCKED_REASON|LATEST_MESSAGE)\}\}/g,
+      (_match, name: string) => name === 'BLOCKED_REASON' ? blockedReason : pmReport);
+    assert.strictEqual(prompt, expected);
+  });
+
+  it('scenario: an empty recorded block reason is preserved', () => {
+    const prompt = buildChatPrompt(mockChatContext({
+      isBlockAssessment: true, blockedReason: '',
+    }), 'my-project');
+    assert.ok(prompt.includes('Reason on record: \n\nA PM blocks'));
+  });
+
+  it('scenario: an older block context without a recorded reason remains renderable', () => {
+    const prompt = buildChatPrompt(mockChatContext({ isBlockAssessment: true }), 'my-project');
+    assert.ok(prompt.includes('Reason on record: (no reason recorded)'));
+  });
+
+  for (const overrides of [
+    { mode: 'jam' as const },
+    { mode: 'cook' as const, claudeSessionId: 'session_existing' },
+    { mode: 'jam' as const, claudeSessionId: 'session_existing', lastPromptMode: 'jam' as const },
+    { mode: 'jam' as const, claudeSessionId: 'session_existing', isThreadFork: true },
+    { mode: 'guardian' as const, isGuardianEvaluation: true },
+    { mode: 'guardian' as const, isCompletionSummary: true },
+  ]) {
+    it(`scenario: inactive block metadata leaves ${JSON.stringify(overrides)} unchanged`, () => {
+      const context = mockChatContext(overrides);
+      assert.strictEqual(buildChatPrompt(context, 'my-project'), buildChatPrompt({
+        ...context, isBlockAssessment: false, blockedReason: 'Unrelated block metadata',
+      }, 'my-project'));
+      assert.ok(!buildChatPrompt(context, 'my-project').includes('ASSIGNMENT BLOCKED'));
+    });
+  }
 
   it('scenario: new jam session (safe mode)', () => {
     const context = mockChatContext({

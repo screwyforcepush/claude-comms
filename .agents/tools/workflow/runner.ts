@@ -36,7 +36,8 @@ import {
   isChatJob,
   determinePromptType,
 } from "./lib/prompts.js";
-import { decideGuardianWake, type ChainGroup, type GuardianCheckpoint } from "./lib/guardian-checkpoint.js";
+import { type ChainGroup, type GuardianCheckpoint } from "./lib/guardian-checkpoint.js";
+import { decidePmCompletion } from "./lib/pm-completion.js";
 
 // Harness executor (file-based event streaming for crash resilience)
 import { HarnessExecutor, Harness, OrphanInfo } from "./lib/harness-executor.js";
@@ -349,6 +350,44 @@ async function triggerCompletionSummary(
   }
 }
 
+// Block Assessment: deliver the PM's questions through the same guardian-first route as completion.
+// @see docs/project/spec/mental-model.md § The Machine — Roles and What Each Layer Deliberately Lacks
+async function triggerBlockAssessment(
+  assignment: Assignment,
+  pmResult: string,
+  blockedReason: string
+): Promise<void> {
+  try {
+    const thread: ChatThread | null = await client!.query(
+      api.chatThreads.getCompletionThread,
+      { password: config.password, assignmentId: assignment._id as any }
+    );
+
+    if (!thread) {
+      console.log(`[Block] No assessment thread for assignment ${assignment._id}`);
+      return;
+    }
+
+    const pmMessageId: string = await client!.mutation(api.chatMessages.add, {
+      password: config.password,
+      threadId: thread._id as any,
+      role: "pm",
+      content: pmResult,
+    });
+
+    await client!.mutation(api.chatJobs.trigger, {
+      password: config.password,
+      threadId: thread._id as any,
+      triggerMessageId: pmMessageId as any,
+      isBlockAssessment: true,
+      blockedReason,
+    });
+    console.log(`[Block] Triggered block assessment chatJob for thread ${thread._id}`);
+  } catch (e) {
+    console.error(`[Block] Assessment failed for assignment ${assignment._id}:`, e);
+  }
+}
+
 // Job execution (uses HarnessExecutor for crash-resilient file-based streaming)
 async function executeJob(
   job: Job,
@@ -628,23 +667,36 @@ async function handleGroupCompletion(
   const jobs = currentGroup.jobs || [];
   const hasPMJob = jobs.some((j: Job) => j.jobType === "pm");
 
-  // Guardian sees convergence checkpoints and the final assessment only.
+  // A Block reaches the Steward immediately; active work follows checkpoint cadence.
   // @see docs/project/spec/mental-model.md § The Machine — Roles and What Each Layer Deliberately Lacks
   if (hasPMJob) {
-    // Find the PM job's result (not aggregatedResult with headers)
-    const pmJob = jobs.find((j: Job) => j.jobType === "pm" && j.result);
-    const pmResult = pmJob?.result || "";
-    const chain: ChainGroup[] = await client!.query(api.assignments.getChainShape, {
+    // The PM may have blocked after executeJob captured its assignment snapshot.
+    const currentAssignment: Assignment | null = await client!.query(api.assignments.get, {
       password: config.password,
       id: assignment._id as any,
     });
-    const wake = decideGuardianWake(chain, group._id);
+    if (!currentAssignment) {
+      console.warn(`[${group._id}] Assignment ${assignment._id} not found after PM completion`);
+      return;
+    }
+
+    // Find the PM job's result (not aggregatedResult with headers)
+    const pmJob = jobs.find((j: Job) => j.jobType === "pm" && j.result);
+    const pmResult = pmJob?.result || "";
+    const chain: ChainGroup[] = currentAssignment.status === "blocked" ? [] : await client!.query(api.assignments.getChainShape, {
+      password: config.password,
+      id: assignment._id as any,
+    });
+    const wake = decidePmCompletion(currentAssignment, chain, group._id);
     switch (wake.kind) {
+      case "blocked":
+        await triggerBlockAssessment(currentAssignment, pmResult, wake.blockedReason);
+        return;
       case "final":
-        await checkAndCompleteAssignment(assignment._id, group._id, assignment, pmResult);
+        await checkAndCompleteAssignment(assignment._id, group._id, currentAssignment, pmResult);
         break;
       case "checkpoint":
-        await triggerGuardianEvaluation(assignment, pmResult, wake.checkpoint);
+        await triggerGuardianEvaluation(currentAssignment, pmResult, wake.checkpoint);
         break;
       case "none":
         if (!chain.some(g => g._id === group._id)) {
@@ -912,7 +964,7 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
               await saveSessionId(chatContext.threadId, sessionId);
             }
           }
-          if (!chatContext.isGuardianEvaluation && !chatContext.isCompletionSummary) {
+          if (!chatContext.isGuardianEvaluation && !chatContext.isCompletionSummary && !chatContext.isBlockAssessment) {
             await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);
           }
         } catch (e) {

@@ -72,10 +72,12 @@ export interface ChatJobContext {
   isGuardianEvaluation?: boolean; // True when PO is evaluating PM response
   checkpoint?: GuardianCheckpoint;
   isCompletionSummary?: boolean; // True when PO is summarizing a completed assignment
+  isBlockAssessment?: boolean; // True when PO is assessing a PM block for the user
+  blockedReason?: string;
 }
 
 // Prompt types for differential prompting
-export type PromptType = "full" | "mode_activation" | "minimal" | "guardian_eval" | "completion_summary" | "thread_fork";
+export type PromptType = "full" | "mode_activation" | "minimal" | "guardian_eval" | "completion_summary" | "block_assessment" | "thread_fork";
 
 // Resolve templates directory relative to this module
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -323,6 +325,12 @@ export function determinePromptType(chatContext: ChatJobContext): PromptType {
     return "completion_summary";
   }
 
+  // A block is advisory to the user, even in a guardian or fresh session.
+  // @see docs/project/spec/mental-model.md § The Machine — Roles and What Each Layer Deliberately Lacks
+  if (chatContext.isBlockAssessment === true) {
+    return "block_assessment";
+  }
+
   // Guardian evaluation always gets its special prompt
   if (isGuardianEval) {
     return "guardian_eval";
@@ -374,6 +382,14 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
 
   // Variable replacements
   const replaceVars = (text: string): string => {
+    if (promptType === "block_assessment") {
+      // One pass preserves literal replacement tokens and placeholders in PM/user text.
+      return text.replace(/\{\{(BLOCKED_REASON|LATEST_MESSAGE)\}\}/g, (_match, name: string) =>
+        name === "BLOCKED_REASON"
+          ? chatContext.blockedReason ?? "(no reason recorded)"
+          : chatContext.latestUserMessage
+      );
+    }
     return text
       .replace(/\{\{THREAD_ID\}\}/g, chatContext.threadId)
       .replace(/\{\{NAMESPACE\}\}/g, namespace)
@@ -413,6 +429,10 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
       parts.push(extractSection(template, "COMPLETION_SUMMARY"));
       break;
 
+    case "block_assessment":
+      parts.push(extractSection(template, "BLOCK_ASSESSMENT"));
+      break;
+
     case "minimal":
       // No template content - just user message
       break;
@@ -420,8 +440,8 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
 
   let prompt = replaceVars(parts.join("\n\n---\n\n"));
 
-  // Append user message (not for guardian/completion - PM report is already in LATEST_MESSAGE)
-  if (promptType !== "guardian_eval" && promptType !== "completion_summary") {
+  // Assessment prompts already carry the PM report in LATEST_MESSAGE.
+  if (promptType !== "guardian_eval" && promptType !== "completion_summary" && promptType !== "block_assessment") {
     prompt += `\n\n---\n\n**User says:**\n${chatContext.latestUserMessage}`;
   }
 

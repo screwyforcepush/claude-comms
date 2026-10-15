@@ -238,7 +238,7 @@ describe("chatJobs.trigger guardian context cold handler", () => {
         assert.deepEqual(JSON.parse(row.value.context), {
           threadId: "thread", namespaceId: "ns", mode: "guardian", effectivePromptMode: "cook", lastPromptMode: "cook",
           latestUserMessage: "PM report", ...(scenario.session ? { claudeSessionId: scenario.session } : {}),
-          forkSession: scenario.fork, assignmentId: "a", isGuardianEvaluation: !completion, isCompletionSummary: completion,
+          forkSession: scenario.fork, assignmentId: "a", isGuardianEvaluation: !completion, isCompletionSummary: completion, isBlockAssessment: false,
           ...(!completion ? { checkpoint } : {}),
         });
         assert.deepEqual(db.tables.chatThreads, [thread]);

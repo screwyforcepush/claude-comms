@@ -32,6 +32,9 @@ export const trigger = mutation({
     isGuardianEvaluation: v.optional(v.boolean()),
     // Completion summary: if true, this is the executive summary of a completed assignment
     isCompletionSummary: v.optional(v.boolean()),
+    // Block assessment: the Steward reads a blocked PM report for the user
+    isBlockAssessment: v.optional(v.boolean()),
+    blockedReason: v.optional(v.string()),
     checkpoint: v.optional(v.object({
       round: v.number(),
       completionReviews: v.number(),
@@ -102,6 +105,8 @@ export const trigger = mutation({
       assignmentId: thread.assignmentId,
       isGuardianEvaluation: args.isGuardianEvaluation ?? false,
       isCompletionSummary: args.isCompletionSummary ?? false,
+      isBlockAssessment: args.isBlockAssessment ?? false,
+      blockedReason: args.blockedReason,
       ...(args.checkpoint ? { checkpoint: args.checkpoint } : {}),
     };
 

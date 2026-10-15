@@ -139,7 +139,10 @@
   │                                                                                        │
   │    All jobs in group terminal?                                                         │
   │      │                                                                                 │
-  │      ├── Group has PM job ──▶ Read linked chain shape; final → checkpoint → none       │
+  │      ├── Group has PM job ──▶ Fetch assignment fresh; blocked wins before chain read   │
+  │      │    Blocked: one PM report + block assessment → guardian ▸ jam/cook; stay blocked│
+  │      │      No completion assessment or checkpoint, even if PM queued another group.  │
+  │      │    Otherwise: read linked chain shape; final → checkpoint → none.               │
   │      │    Final: PM is tail ──▶ all groups terminal? ──▶ atomic complete              │
   │      │      Blocked/missing: refuse, no writes/count changes, no summary.             │
   │      │      Otherwise: final PM report + completion prompt → guardian ▸ jam/cook.     │
@@ -197,8 +200,8 @@
   │  │ Read-only│    │ Can make │    │ Watches an  │                                       │
   │  │ ideation │    │ assign-  │    │ assignment. │                                       │
   │  │ + spec.  │    │ ments &  │    │ Checkpoints │                                       │
-  │  │ No side  │    │ jobs.    │    │ + final PM  │                                       │
-  │  │ effects. │    │ Full CLI │    │ report only.│                                       │
+  │  │ No side  │    │ jobs.    │    │ + final /   │                                       │
+  │  │ effects. │    │ Full CLI │    │ blocked PM. │                                       │
   │  │          │    │ access.  │    │ PO assesses │                                       │
   │  └──────────┘    └──────────┘    │ convergence.│                                       │
   │                                   └─────────────┘                                       │
@@ -209,6 +212,7 @@
   │    - Same mode       → minimal (just user message, session resumed)                    │
   │    - Guardian eval   → checkpoint PM report + round/count/prefix shape                 │
   │    - Final report    → completion prompt (also in guardian mode); no checkpoint eval   │
+  │    - Blocking report → block prompt + recorded reason; no completion/checkpoint eval   │
   │                                                                                        │
   │  Session Isolation (Guardian Fork):                                                    │
   │    - jam/cook        → resumes claudeSessionId (OG session)                            │
@@ -217,8 +221,8 @@
   │                        No OG session? Start fresh and save to the guardian map.        │
   │      - Subsequent    → --resume <guardian fork> (accumulates eval context)              │
   │    - Per-assignment  → each assignment gets its own guardian fork                       │
-  │    - Guardian fork   → checkpoint evals, final assessment, and user messages only      │
-  │                        PM reports between checkpoints never reach the fork.            │
+  │    - Guardian fork   → checkpoint evals, final/block assessments, and user messages     │
+  │                        Routine PM reports between checkpoints never reach the fork.    │
   │    - Mode switching  → instant, non-destructive (OG and forks coexist)                 │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -253,6 +257,7 @@
   │               convergence/alignment; nudge (next PM) | block (ripcord → user).         │
   │               Count review+document groups only; reacting PM must have a next group.  │
   │               Review-only, review+uat, and document-only groups never count.           │
+  │               A PM Block always gets advisory assessment in guardian, else jam/cook.  │
   │               User can also nudge or amend the north star from the UI mid-flight.      │
   │    5 CLOSE    PM completes only after an approved COMPLETION REVIEW group              │
   │               (review + document + uat if UX). Finality beats checkpoint cadence.      │
@@ -264,7 +269,8 @@
   │               never by an autonomous loop. Feeds stage 1 of the NEXT assignment.       │
   │                                                                                        │
   │  WHERE THINGS SURFACE:                                                                 │
-  │    Block ──▶ assignment status pill + guardian thread; runner skips blocked assignments│
+  │    PM Block ──▶ status pill + Steward assessment in guardian, else linked jam/cook     │
+  │      User alone resolves: answers as a nudge + PM job (cook); runner skips blocked work│
   │    Rate limit / 529 ──▶ awaiting_retry (a pause, not a failure; no PM spawn)           │
   │    Failed group ──▶ PM spawns with "diagnose and recover"; guardian sees checkpoints  │
   │    Assistant save (any mode/harness) ──▶ verbatim post ──▶ Slipgate push, inline reply │

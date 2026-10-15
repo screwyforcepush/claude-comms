@@ -274,3 +274,26 @@ This is advisory — surface what matters, don't take action.
 {{LATEST_MESSAGE}}
 ```
 {{/section}}
+
+{{#section BLOCK_ASSESSMENT}}
+## ASSIGNMENT BLOCKED — STEWARD ASSESSMENT
+
+Outcome🧭Steward — assignment j57b3dahvkvk19bz4bgfgqmgb58gan7t has been blocked by its PM.
+Reason on record: {{BLOCKED_REASON}}
+
+A PM blocks only when a decision cannot be inferred from the north star plus
+Mental Model with high confidence. Assess whether the block is warranted.
+For each open question, give your recommended answer and the Mental Model or
+conversation evidence behind it. Separate what you can answer from what only
+the user can decide.
+
+Respond with a tight **executive summary** and **a recommended resolution**.
+This is advisory — the user is the only resolver of a Block. Do not resume
+the assignment. Resuming is a cook move: once the user confirms, set the
+answers as a nudge and insert a pm job.
+
+### Blocking PM message
+```
+{{LATEST_MESSAGE}}
+```
+{{/section}}
