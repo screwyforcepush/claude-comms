@@ -1,7 +1,7 @@
 # Guardian Convergence Checkpoints + Verbatim Notifications (Spec)
 
 Phase: `22-GuardianCheckpointsVerbatimNotify`
-Status: PLANNED (2026-10-15)
+Status: IMPLEMENTED in git (`d6ad6158`, 2026-10-15); awaiting owner cutover. Convex is not deployed and the runner has not been restarted. Cutover is owner-only, at an idle boundary (no PM group or guardian chat job in flight): deploy Convex **first**, then restart the runner **immediately** (see §"Live-vs-memory map" and P2). Owner follow-ups: §"Owner follow-ups".
 Why-layer: `docs/project/spec/mental-model.md` → "The Machine — Roles and What Each Layer Deliberately Lacks" (Guardian bullet), "Session Routing", "Mid-Flight Assignment Modification", "Hands-Free Voice Loop (Mobile)". These were tuned in jam to this intent. Settled there and in the north star, **not relitigated here**: Guardian wakes at convergence checkpoints (every third completion-review knock-back) and at the final assessment; PM reports between checkpoints never reach the fork; notifications are the message verbatim, truncated at ~5k chars, for every Steward message in any mode or harness when the global toggle is on.
 
 External research: skipped deliberately. This is repo-internal refinement on an existing engine. Every choice is constrained by in-repo patterns (pure `lib/` modules + `node:test`, Convex `by_group` / chain walks, the validate gate config). There is no greenfield technology decision to put through a matrix.
@@ -468,6 +468,14 @@ No UAT is permitted (self-surgery). Each package's "vertical slice" is proven co
 - **Q1: the `GUARDIAN_MODE` prose is tuned for per-PM cadence.** It describes a "two-turn rhythm" (🟠 hold, then 🔴 nudge on the next PM cycle). At checkpoint cadence, the "next turn" is three completion reviews later, or the final assessment. Per the north star, the prose is yours and is not rewritten here. Only the three metadata placeholders are added. You may want to retune it to the single-turn "converging, or thrashing on the wrong thing?" verdict that the mental model describes, including the scope-clamp lever.
 - **Q2: Timeout/fail hint wording.** `describeTimeoutForChat` and `"Agent failed (…). Partial response shown above."` say "shown above". In the notification the hint sits *above* the partial. That is cosmetic, so the wording is left as is. Changing it would alter the thread hint too.
 - **Observation (out of scope, not fixed):** a PM job that **fails or times out** without inserting a next group is still treated as `final` and auto-completes the assignment. Today's code does the same. Fixing it widens scope. Consider a follow-up that requires a `complete` PM group status for `final`.
+
+## Owner follow-ups (out of scope for this assignment)
+
+- **Flip `noImplicitAny` on (D2).** `tsconfig.typecheck.json` runs `strict` with `noImplicitAny: false` only because full strict raises TS7022 at `cli.ts:336`, `cli.ts:352` (the `page` variables in the reflection coverage/gaps loops), and `lib/reflections-fetch.ts:32` (`result`). Annotate all three variables, then delete the override. `cli.ts` must not be edited while a chain is using it.
+- **Align the `post-document.md` completion-review route (D11).** `templates/pm-modules/post-document.md` inserts a completion review as `review` (+`uat`) with no `document` job. The checkpoint rule counts only groups containing both `review` and `document`, so chains that take this route under-fire checkpoints. Aligning the template, or the rule, is the owner's call.
+- **Retune the `GUARDIAN_MODE` prose (Q1).** It still describes a per-PM two-turn rhythm. Only the three checkpoint placeholders were added.
+- **A failed/timed-out PM with no next group is treated as `final` (Observation above).** This is unchanged from before Phase 22. A follow-up could require a `complete` PM group status before `final` applies.
+- **A PM Block now produces no push.** A blocking PM inserts no next group, so it takes the `final` path. `assignments.complete` refuses (D6), and the runner skips the summary (`runner.ts` `checkAndCompleteAssignment`). Before Phase 22, guardian mode saw the block through the per-PM evaluation, and jam/cook got a wrongly framed completion summary that also auto-completed the assignment. Now the block is visible only through the assignment status in the UI. A follow-up could post the PM report to `getCompletionThread` with a block framing when `complete` returns `status: "blocked"`. That would give one message and one notification row.
 
 ## Recommended Job Sequence
 

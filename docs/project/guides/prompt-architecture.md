@@ -91,6 +91,7 @@ Chat prompting uses **differential prompting** based on session state:
 - **full**: new session with full `product-owner.md`
 - **mode_activation**: mode changed (jam ↔ cook)
 - **minimal**: same mode resume
-- **guardian_eval**: PO evaluation of PM report
+- **guardian_eval**: PO evaluation of a PM report at a convergence checkpoint (every third completion-review knock-back), with `{{CHECKPOINT_ROUND}}`, `{{COMPLETION_REVIEWS}}`, `{{CHAIN_SHAPE}}` (each `(n/a)` without checkpoint metadata)
+- **completion_summary**: executive assessment of the final PM report. It takes precedence over `guardian_eval` and is also used in guardian mode.
 
 These are determined in `.agents/tools/workflow/lib/prompts.ts`.

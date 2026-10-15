@@ -89,7 +89,7 @@ The primary user interface is a chat-based system with three modes:
 |------|-------------|
 | **Jam** | Read-only ideation. PO helps refine requirements. Cannot create assignments. |
 | **Cook** | Full autonomy. PO creates assignments, inserts jobs. No oversight. |
-| **Guardian** | Cook + alignment monitoring. PO evaluates every PM report. Flags drift. |
+| **Guardian** | Cook + alignment monitoring. PO wakes at convergence checkpoints (every third completion-review knock-back) and for the final assessment. Flags drift and thrash. |
 
 #### Assignments & Job Chain
 - **Assignments**: Work objectives with a "north star" description, priority, and independence flag
@@ -215,7 +215,7 @@ cd .agents/tools/workflow && npx tsx cli.ts queue
 ### 🎮 Chat-Driven Workflow
 - **Jam Mode**: Brainstorm with the PO agent. Refine requirements before committing to work
 - **Cook Mode**: PO autonomously creates assignments, schedules jobs, and manages execution
-- **Guardian Mode**: PO monitors every PM decision for alignment with original intent. Flags drift before it compounds
+- **Guardian Mode**: PO checks convergence and alignment with original intent at checkpoints (every third completion-review knock-back), then gives the final assessment. Flags drift before it compounds
 - **Session Resume**: Chat threads maintain Claude session continuity across messages
 
 ### 🔥 Parallel Execution at Scale
