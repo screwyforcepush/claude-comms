@@ -27,7 +27,7 @@ const TEST_TEMPLATE_PATH = join(TEMPLATES_DIR, '_test-scenario.md');
 
 const BLOCK_ASSESSMENT_SECTION = `## ASSIGNMENT BLOCKED — STEWARD ASSESSMENT
 
-Outcome🧭Steward — assignment j57b3dahvkvk19bz4bgfgqmgb58gan7t has been blocked by its PM.
+Outcome🧭Steward — assignment {{ASSIGNMENT_ID}} has been blocked by its PM.
 Reason on record: {{BLOCKED_REASON}}
 
 A PM blocks only when a decision cannot be inferred from the north star plus
@@ -241,6 +241,10 @@ describe('buildChatPrompt scenarios', () => {
   it('scenario: block-assessment template preserves the supplied section exactly', () => {
     const template = loadTemplate('product-owner');
     assert.ok(template.includes(`{{#section BLOCK_ASSESSMENT}}\n${BLOCK_ASSESSMENT_SECTION}\n{{/section}}`));
+    const section = template.match(/\{\{#section BLOCK_ASSESSMENT\}\}([\s\S]*?)\{\{\/section\}\}/)?.[1];
+    assert.ok(section);
+    assert.ok(section.includes('{{ASSIGNMENT_ID}}'));
+    assert.doesNotMatch(section, /\b[a-z0-9]{32}\b/);
   });
 
   for (const mode of ['jam', 'cook', 'guardian'] as const) {
@@ -268,8 +272,10 @@ describe('buildChatPrompt scenarios', () => {
           assert.strictEqual(determinePromptType(context), 'block_assessment');
           const prompt = buildChatPrompt(context, 'my-project');
           assert.strictEqual(prompt, BLOCK_ASSESSMENT_SECTION
+            .replace('{{ASSIGNMENT_ID}}', () => context.assignmentId!)
             .replace('{{BLOCKED_REASON}}', () => blockedReason)
             .replace('{{LATEST_MESSAGE}}', () => pmReport));
+          assert.ok(prompt.includes(`assignment ${context.assignmentId} has been blocked by its PM.`));
           assert.strictEqual(prompt.split(pmReport).length - 1, 1);
           assert.strictEqual(prompt.split(blockedReason).length - 1, 1);
           assert.ok(!prompt.includes('**User says:**'));
@@ -281,14 +287,27 @@ describe('buildChatPrompt scenarios', () => {
 
   it('scenario: blocking reason and PM report render verbatim without interpreting replacement tokens or placeholders', () => {
     const blockedReason = '  Reason: $& $$ $` $\' {{LATEST_MESSAGE}} {{ASSIGNMENT_ID}}\n  ';
-    const pmReport = '  PM: $& $$ $` $\' {{BLOCKED_REASON}} {{CHECKPOINT_ROUND}}\n  ';
+    const pmReport = '  PM: $& $$ $` $\' {{BLOCKED_REASON}} {{CHECKPOINT_ROUND}} {{ASSIGNMENT_ID}}\n  ';
+    const assignmentId = 'asgn_verbatim';
     const prompt = buildChatPrompt(mockChatContext({
-      isBlockAssessment: true, blockedReason, latestUserMessage: pmReport,
+      isBlockAssessment: true, blockedReason, latestUserMessage: pmReport, assignmentId,
     }), 'my-project');
-    const expected = BLOCK_ASSESSMENT_SECTION.replace(/\{\{(BLOCKED_REASON|LATEST_MESSAGE)\}\}/g,
-      (_match, name: string) => name === 'BLOCKED_REASON' ? blockedReason : pmReport);
+    const expected = BLOCK_ASSESSMENT_SECTION
+      .replace('{{ASSIGNMENT_ID}}', () => assignmentId)
+      .replace(/\{\{(BLOCKED_REASON|LATEST_MESSAGE)\}\}/g,
+        (_match, name: string) => name === 'BLOCKED_REASON' ? blockedReason : pmReport);
     assert.strictEqual(prompt, expected);
   });
+
+  for (const assignmentId of [undefined, '']) {
+    it(`scenario: block assessment without assignment ID ${JSON.stringify(assignmentId)} uses the linked-assignment fallback`, () => {
+      const prompt = buildChatPrompt(mockChatContext({
+        isBlockAssessment: true, assignmentId,
+      }), 'my-project');
+      assert.ok(prompt.includes('assignment (no assignment linked) has been blocked by its PM.'));
+      assert.ok(!prompt.includes('{{ASSIGNMENT_ID}}'));
+    });
+  }
 
   it('scenario: an empty recorded block reason is preserved', () => {
     const prompt = buildChatPrompt(mockChatContext({

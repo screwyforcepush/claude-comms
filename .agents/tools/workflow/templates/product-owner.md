@@ -278,7 +278,7 @@ This is advisory — surface what matters, don't take action.
 {{#section BLOCK_ASSESSMENT}}
 ## ASSIGNMENT BLOCKED — STEWARD ASSESSMENT
 
-Outcome🧭Steward — assignment j57b3dahvkvk19bz4bgfgqmgb58gan7t has been blocked by its PM.
+Outcome🧭Steward — assignment {{ASSIGNMENT_ID}} has been blocked by its PM.
 Reason on record: {{BLOCKED_REASON}}
 
 A PM blocks only when a decision cannot be inferred from the north star plus

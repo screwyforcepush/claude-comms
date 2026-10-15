@@ -384,10 +384,12 @@ export function buildChatPrompt(chatContext: ChatJobContext, namespace: string):
   const replaceVars = (text: string): string => {
     if (promptType === "block_assessment") {
       // One pass preserves literal replacement tokens and placeholders in PM/user text.
-      return text.replace(/\{\{(BLOCKED_REASON|LATEST_MESSAGE)\}\}/g, (_match, name: string) =>
-        name === "BLOCKED_REASON"
-          ? chatContext.blockedReason ?? "(no reason recorded)"
-          : chatContext.latestUserMessage
+      return text.replace(/\{\{(ASSIGNMENT_ID|BLOCKED_REASON|LATEST_MESSAGE)\}\}/g, (_match, name: string) =>
+        name === "ASSIGNMENT_ID"
+          ? chatContext.assignmentId || "(no assignment linked)"
+          : name === "BLOCKED_REASON"
+            ? chatContext.blockedReason ?? "(no reason recorded)"
+            : chatContext.latestUserMessage
       );
     }
     return text
