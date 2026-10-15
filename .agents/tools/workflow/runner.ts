@@ -479,6 +479,12 @@ async function executeJob(
     env.WORKFLOW_ARTIFACTS = assignment.artifacts || "";
     env.WORKFLOW_DECISIONS = assignment.decisions || "";
   }
+  // Auto-memory is the Steward's alone: crews get everything they need from the
+  // assignment spec, so a crew-side memory read is a context tax and a crew-side
+  // write is unsupervised churn. Chat jobs (Steward) keep memory.
+  if (!isChat) {
+    env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1";
+  }
 
   executor.execute(
     {

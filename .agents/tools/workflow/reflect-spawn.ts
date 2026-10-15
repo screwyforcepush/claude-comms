@@ -59,7 +59,8 @@ async function runWithTimeout(
   await new Promise<void>((resolve) => {
     const child = spawn(command, args, {
       cwd: projectRoot,
-      env: process.env,
+      // Reflection forks resume crew sessions; crews run without auto-memory.
+      env: { ...process.env, CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" },
       stdio: ["pipe", "ignore", "ignore"],
     });
 
