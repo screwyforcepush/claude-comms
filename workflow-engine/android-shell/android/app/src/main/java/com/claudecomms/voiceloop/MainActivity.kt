@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.claudecomms.voiceloop.core.WebAppLink
 import com.getcapacitor.BridgeActivity
 import org.json.JSONObject
 
@@ -41,7 +42,16 @@ class MainActivity : BridgeActivity() {
             return
         }
 
-        pendingThreadId = extractThreadId(intent)
+        // Headless shell: a thread deep link (notification tap or a conversation
+        // shortcut pinned before this build) belongs to the installed web app,
+        // not to this WebView. Hand it off and get out of the way.
+        extractThreadId(intent)?.let { threadId ->
+            handOffToWebApp(config, threadId)
+            finish()
+            return
+        }
+
+        pendingThreadId = null
         needsRuntimeLoad = true
 
         super.onCreate(savedInstanceState)
@@ -86,7 +96,11 @@ class MainActivity : BridgeActivity() {
         }
 
         startFeedListenerService(permissionRecoveryActionIfBlocked())
-        pendingThreadId = extractThreadId(intent)
+        extractThreadId(intent)?.let { threadId ->
+            handOffToWebApp(config, threadId)
+            return
+        }
+        pendingThreadId = null
         needsRuntimeLoad = true
         if (started) {
             bridge?.webView?.onResume()
@@ -140,6 +154,17 @@ class MainActivity : BridgeActivity() {
 
     private fun startConfigActivity() {
         startActivity(Intent(this, ConfigActivity::class.java))
+    }
+
+    private fun handOffToWebApp(config: ShellConfig, threadId: String) {
+        val url = WebAppLink.threadUrl(config.uiUrl, threadId)
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(intent)
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "No handler for web app link $url", error)
+        }
     }
 
     private fun startFeedListenerService(action: String? = null) {

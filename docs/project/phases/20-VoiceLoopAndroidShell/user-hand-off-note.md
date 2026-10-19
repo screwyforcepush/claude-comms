@@ -61,7 +61,7 @@ app has `allowBackup=false` so these never leave the device) and are entered onc
 |---|---|---|
 | **Convex URL** | The Convex deployment the foreground service subscribes to for the notifications feed. | `https://<convex-deployment>.convex.cloud` (pre-filled) |
 | **Admin password** | The single-user password that gates all Convex access (same one the web PWA login wall uses). | your admin password |
-| **Web UI URL** | The deployed Workflow Engine web UI the shell wraps in its WebView; a notification tap deep-links here with `?thread=<id>`. | your deployed UI URL |
+| **Web UI URL** | The deployed Workflow Engine web UI (your installed PWA). A notification tap hands off to it with `?thread=<id>`; the shell itself is headless. | your deployed UI URL |
 
 Tap **Save** to store them. If notifications are already enabled, the shell nudges the
 listener immediately and enters the app. If notifications are still denied, the shell keeps
@@ -130,9 +130,11 @@ not a shell change.
   and try again from there.
 - **Hearing** a rendition and **dictating a reply** leave the thread **unread** — you can come
   back later and read the real message with its tables/code/links intact.
-- **Tapping** a notification opens that thread in the wrapped web UI, which marks it read
-  exactly as opening it at your desk would. That is intended: a tap means you're actually
-  looking at the message.
+- **Tapping** a notification hands off to the installed web app (PWA) at that thread via
+  `<Web UI URL>?thread=<id>`, which marks it read exactly as opening it at your desk would.
+  That is intended: a tap means you're actually looking at the message. The shell is
+  headless: it never opens its own browser view for reading. Tapping a Lobby opens the web
+  app at its root. If Android asks which app should open the link, pick the PWA and "Always".
 
 ---
 

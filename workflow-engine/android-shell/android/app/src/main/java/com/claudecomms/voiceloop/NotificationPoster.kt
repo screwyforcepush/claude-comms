@@ -22,6 +22,7 @@ import androidx.core.graphics.drawable.IconCompat
 import com.claudecomms.voiceloop.core.FeedRow
 import com.claudecomms.voiceloop.core.NotificationPayload
 import com.claudecomms.voiceloop.core.PayloadMapper
+import com.claudecomms.voiceloop.core.WebAppLink
 
 class NotificationPoster(private val context: Context) {
     private val appContext = context.applicationContext
@@ -179,12 +180,22 @@ class NotificationPoster(private val context: Context) {
             .build()
     }
 
+    // Headless shell: a tap hands off to the installed web app (PWA) at the
+    // thread deep link. Slipgate owns the notification; the PWA owns reading.
+    // Falls back to the shell's own activity only when no UI URL is configured.
     private fun openThreadIntent(threadId: String): Intent =
-        Intent(appContext, MainActivity::class.java)
-            .setAction(ACTION_OPEN_THREAD)
-            .setData(threadUri("open", threadId))
-            .putExtra(EXTRA_THREAD_ID, threadId)
-            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        webAppIntent(threadId)
+            ?: Intent(appContext, MainActivity::class.java)
+                .setAction(ACTION_OPEN_THREAD)
+                .setData(threadUri("open", threadId))
+                .putExtra(EXTRA_THREAD_ID, threadId)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+    private fun webAppIntent(threadId: String?): Intent? {
+        val uiUrl = AppPrefs(appContext).getConfig()?.uiUrl ?: return null
+        return Intent(Intent.ACTION_VIEW, Uri.parse(WebAppLink.threadUrl(uiUrl, threadId)))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
 
     private fun tapPendingIntent(threadId: String): PendingIntent {
         val intent = openThreadIntent(threadId)
@@ -243,9 +254,7 @@ class NotificationPoster(private val context: Context) {
             tag = tag,
             label = payload.conversationTitle,
             person = sender,
-            intent = Intent(appContext, MainActivity::class.java)
-                .setAction(Intent.ACTION_MAIN)
-                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            intent = openAppIntent(),
         )
 
         val notification = NotificationCompat.Builder(appContext, LOBBY_CHANNEL_ID)
@@ -278,10 +287,15 @@ class NotificationPoster(private val context: Context) {
         }
     }
 
+    // The lobby has no thread yet — tapping opens the web app at its root.
+    private fun openAppIntent(): Intent =
+        webAppIntent(null)
+            ?: Intent(appContext, MainActivity::class.java)
+                .setAction(Intent.ACTION_MAIN)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
     private fun lobbyTapPendingIntent(tag: String): PendingIntent {
-        // The lobby has no thread yet — tapping just opens the app.
-        val intent = Intent(appContext, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val intent = openAppIntent()
         return PendingIntent.getActivity(
             appContext,
             requestCode("open", tag),
