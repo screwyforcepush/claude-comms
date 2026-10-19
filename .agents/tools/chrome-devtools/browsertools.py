@@ -41,6 +41,7 @@ INACTIVITY_TIMEOUT = 600  # 10 minutes
 MCP_PACKAGE = "chrome-devtools-mcp"
 MCP_PINNED_VERSION = "1.9.0"
 MCP_PINNED_SPEC = f"{MCP_PACKAGE}@{MCP_PINNED_VERSION}"
+MCP_PROTOCOL_VERSION = "2025-06-18"
 
 # Device presets: standard device classes, all at devicePixelRatio 1 (layout is
 # identical at higher ratios; only screenshot bytes grow). mobile/tablet carry the
@@ -68,6 +69,7 @@ mcp_proc = None
 mcp_reader = None
 mcp_writer = None
 pending_requests = {}  # msg_id -> response_future
+mcp_workspace_roots = []  # canonical launch cwd, fixed for this MCP session
 last_activity_time = time.time()
 current_instance_id = None
 screenshot_count = 0
@@ -239,7 +241,7 @@ def save_default_config():
 # ============================================================================
 
 async def read_mcp_responses():
-    """Read responses from MCP stdout and route to clients."""
+    """Answer MCP server requests and route responses to waiting clients."""
     global mcp_reader, pending_requests
 
     while True:
@@ -254,10 +256,26 @@ async def read_mcp_responses():
                 resp = json.loads(line.decode())
                 msg_id = resp.get("id")
 
+                # Server request IDs belong to the server, not pending client
+                # requests. In particular, roots/list commonly arrives with id=0.
+                if "method" in resp:
+                    if msg_id is not None:
+                        reply = {"jsonrpc": "2.0", "id": msg_id}
+                        if resp["method"] == "roots/list":
+                            reply["result"] = {"roots": mcp_workspace_roots}
+                        elif resp["method"] == "ping":
+                            reply["result"] = {}
+                        else:
+                            reply["error"] = {"code": -32601, "message": "Method not found"}
+                        mcp_writer.write(json.dumps(reply).encode() + b"\n")
+                        await mcp_writer.drain()
+                    continue
+
                 # Route response to waiting client
-                if msg_id and msg_id in pending_requests:
+                if msg_id is not None and msg_id in pending_requests:
                     future = pending_requests.pop(msg_id)
-                    future.set_result(resp)
+                    if not future.done():
+                        future.set_result(resp)
             except json.JSONDecodeError as e:
                 print(f"Invalid JSON from MCP: {e}", file=sys.stderr)
                 print(f"Line length: {len(line)}", file=sys.stderr)
@@ -269,17 +287,55 @@ async def read_mcp_responses():
                 break
 
 
-def start_mcp_request(tool_name: str, args: Dict[str, Any]) -> asyncio.Future:
-    """Write a daemon-originated tools/call to the MCP pipe immediately (no await,
+def start_mcp_rpc_request(method: str, params: Dict[str, Any]) -> asyncio.Future:
+    """Write a daemon-originated request to the MCP pipe immediately (no await,
     so ordering relative to later writes is guaranteed) and return the response
     future, which read_mcp_responses resolves."""
     msg_id = "daemon-" + os.urandom(6).hex()
     future = asyncio.get_event_loop().create_future()
     pending_requests[msg_id] = future
-    req = {"jsonrpc": "2.0", "method": "tools/call", "id": msg_id,
-           "params": {"name": tool_name, "arguments": args}}
+    req = {"jsonrpc": "2.0", "method": method, "id": msg_id, "params": params}
     mcp_writer.write(json.dumps(req).encode() + b"\n")
     return future
+
+
+def start_mcp_request(tool_name: str, args: Dict[str, Any]) -> asyncio.Future:
+    """Write a tools/call immediately, preserving device-before-client ordering."""
+    return start_mcp_rpc_request("tools/call", {"name": tool_name, "arguments": args})
+
+
+async def initialize_mcp(timeout: float = 120.0):
+    """Negotiate MCP roots before any tools run; grant only the launch workspace.
+
+    Without this handshake chrome-devtools-mcp never learns a workspace root and
+    confines every file-taking tool (upload_file, take_screenshot filePath,
+    screencast, heap snapshot) to the OS temp directory. The timeout matches the
+    launch-device budget: on a fresh install `npx -y` must download the MCP first.
+
+    The upstream server remains responsible for canonical path validation,
+    including rejecting symlink escapes. Never substitute an unrestricted root.
+    """
+    global mcp_workspace_roots
+    workspace = Path.cwd().resolve()
+    if workspace == Path(workspace.anchor):
+        raise ValueError("Launch browsertools from a workspace directory, not the filesystem root")
+    mcp_workspace_roots = [{"uri": workspace.as_uri(), "name": workspace.name}]
+    future = start_mcp_rpc_request("initialize", {
+        "protocolVersion": MCP_PROTOCOL_VERSION,
+        "capabilities": {"roots": {"listChanged": False}},
+        "clientInfo": {"name": "browsertools", "version": "1.0.0"},
+    })
+    try:
+        resp = await asyncio.wait_for(future, timeout=timeout)
+    finally:
+        # A timeout must not leave a cancelled future registered indefinitely.
+        for msg_id, pending in list(pending_requests.items()):
+            if pending is future:
+                pending_requests.pop(msg_id, None)
+    if "error" in resp:
+        raise RuntimeError(resp["error"].get("message", str(resp["error"])))
+    mcp_writer.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}).encode() + b"\n")
+    await mcp_writer.drain()
 
 
 async def apply_device(dev: Dict[str, Any], timeout: float = 60.0) -> Dict[str, Any]:
@@ -487,6 +543,17 @@ async def run_daemon(instance_id: str, device: Optional[Dict[str, Any]] = None):
     mcp_reader = mcp_proc.stdout
     mcp_writer = mcp_proc.stdin
 
+    # The reader must run during initialization: it resolves initialize and
+    # answers the server's roots/list before workspace file tools can run.
+    mcp_reader_task = asyncio.create_task(read_mcp_responses())
+    try:
+        await initialize_mcp()
+    except BaseException:
+        mcp_reader_task.cancel()
+        await asyncio.gather(mcp_reader_task, return_exceptions=True)
+        await shutdown_mcp()
+        raise
+
     # Launch device: written to the MCP pipe *before* the socket opens, so it is
     # applied ahead of any client command. Resolved later by read_mcp_responses.
     device = device or resolve_device(DEFAULT_DEVICE)
@@ -546,7 +613,7 @@ async def run_daemon(instance_id: str, device: Optional[Dict[str, Any]] = None):
     try:
         await asyncio.gather(
             server.serve_forever(),
-            read_mcp_responses(),
+            mcp_reader_task,
             inactivity_monitor(handle_shutdown),
             confirm_launch_device(),
         )
@@ -554,6 +621,8 @@ async def run_daemon(instance_id: str, device: Optional[Dict[str, Any]] = None):
         print("\nShutting down daemon...", file=sys.stderr)
     finally:
         # Cleanup
+        mcp_reader_task.cancel()
+        await asyncio.gather(mcp_reader_task, return_exceptions=True)
         if not shutdown_triggered.is_set():
             await shutdown_mcp()
             server.close()
