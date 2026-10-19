@@ -531,7 +531,10 @@ export function ChatSidebar({
   namespaceMap,
   hasMore = false,
   onLoadMore,
-  onOpenSettings
+  onOpenSettings,
+  searchTerm = '',
+  onSearchChange,
+  searching = false
 }) {
   const handleCreateThread = useCallback(() => {
     if (!creating && onCreateThread) {
@@ -551,6 +554,51 @@ export function ChatSidebar({
       backgroundColor: 'var(--q-stone0)'
     }
   },
+    // Thread search box — plain words, no tag/operator syntax. Drives title+body
+    // full-text search; empty box restores the recency+pins list.
+    React.createElement('div', {
+      className: 'px-3 py-2',
+      style: { borderBottom: '1px solid var(--q-stone3)' }
+    },
+      React.createElement('div', { className: 'relative flex items-center' },
+        React.createElement('input', {
+          type: 'text',
+          value: searchTerm,
+          onChange: (e) => onSearchChange && onSearchChange(e.target.value),
+          placeholder: 'Search conversations…',
+          'aria-label': 'Search conversations',
+          spellCheck: false,
+          className: 'w-full text-sm',
+          style: {
+            backgroundColor: 'var(--q-void1)',
+            border: '1px solid var(--q-stone3)',
+            borderRadius: 0,
+            color: 'var(--q-bone2)',
+            padding: '6px 28px 6px 8px',
+            fontFamily: 'var(--font-body)',
+            outline: 'none'
+          }
+        }),
+        searchTerm && React.createElement('button', {
+          type: 'button',
+          onClick: () => onSearchChange && onSearchChange(''),
+          title: 'Clear search',
+          'aria-label': 'Clear search',
+          style: {
+            position: 'absolute',
+            right: 6,
+            background: 'none',
+            border: 'none',
+            color: 'var(--q-bone0)',
+            cursor: 'pointer',
+            padding: 0,
+            lineHeight: 1,
+            fontSize: '14px'
+          }
+        }, '×')
+      )
+    ),
+
     // WP-5: Namespace filter accordion — above New Chat button
     React.createElement(NamespaceFilterAccordion, {
       namespaces: namespaces,
@@ -592,7 +640,7 @@ export function ChatSidebar({
             letterSpacing: '2px',
             minWidth: 0
           }
-        }, 'Conversations'),
+        }, searching ? 'Results' : 'Conversations'),
         React.createElement('div', {
           className: 'flex items-center gap-2 flex-shrink-0'
         },
@@ -618,8 +666,8 @@ export function ChatSidebar({
       namespaceMap: namespaceMap
     }),
 
-    // Load more button — shown when server returned a full page
-    hasMore && onLoadMore && React.createElement('div', {
+    // Load more button — shown when server returned a full page (not while searching)
+    !searching && hasMore && onLoadMore && React.createElement('div', {
       className: 'px-3 py-2',
       style: { borderTop: '1px solid var(--q-stone2)' }
     },

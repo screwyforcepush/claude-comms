@@ -39,7 +39,7 @@ the user can decide.
 Respond with a tight **executive summary** and **a recommended resolution**.
 This is advisory — the user is the only resolver of a Block. Do not resume
 the assignment. Resuming is a cook move: once the user confirms, set the
-answers as a nudge and insert a pm job.
+answers as a nudge and insert a pm job. Unblock if the user asks.
 
 ### Blocking PM message
 \`\`\`

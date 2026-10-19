@@ -422,6 +422,20 @@ export function ThreadItem({ thread, assignment, isSelected, onClick, namespaceN
           }
         }, thread.title || 'New Chat'),
 
+        // Search snippet — only present on content-tier search matches.
+        // Shows why the thread matched when the hit was in a message body.
+        thread.snippet && React.createElement('div', {
+          className: 'text-xs mt-0.5',
+          style: {
+            color: 'var(--q-bone0)',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            lineHeight: '1.3'
+          }
+        }, thread.snippet),
+
         // Meta info
         React.createElement('div', {
           className: 'flex items-center gap-2 mt-0.5 flex-wrap'

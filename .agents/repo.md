@@ -33,6 +33,8 @@ without purpose — not plainness. Consistency > surprise.
 - The repo design guide (`docs/project/guides/design-system.md` or equivalent) owns the specifics — tokens, focus/ring treatment, motion, loading vocabulary — and extends or overrides this section.
 - House-style allowlist patterns are intentional; never flag them.
 
+*Ops tooling*
+   - Reuse the repo's ops tooling home `ops/scripts/`, before writing a script. Ad-hoc scripts, probes and notes go in the phase directory `docs/project/phases/<phase-id>/`.
 
 ## PRE Deployment
 `vercel build --yes` must pass otherwise CI/CD will FAIL!

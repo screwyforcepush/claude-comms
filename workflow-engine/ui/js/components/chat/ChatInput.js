@@ -65,6 +65,7 @@ function namePastedFile(file, timestamp, index) {
  * @param {string} [props.draftText] - Controlled draft value (optional, WP-6)
  * @param {Function} [props.onDraftChange] - Draft change callback (optional, WP-6)
  * @param {Function} [props.onSendToFork] - Callback to send message into a new forked thread
+ * @param {Function} [props.onSendToHandover] - Callback to hand the topic over to a fresh Steward thread
  */
 export function ChatInput({
   onSend,
@@ -77,7 +78,8 @@ export function ChatInput({
   onRemoveAttachment,
   onStop,
   stopPending = false,
-  onSendToFork
+  onSendToFork,
+  onSendToHandover
 }) {
   const [internalMessage, setInternalMessage] = useState('');
 
@@ -144,6 +146,19 @@ export function ChatInput({
       }
     }
   }, [message, readyAttachmentCount, disabled, hasUploading, onSendToFork, onDraftChange]);
+
+  // Hand the typed topic over to a fresh Steward thread. Text is required:
+  // the topic is the user's focus for the new session (no empty fallback).
+  const handleHandoverSubmit = useCallback(() => {
+    const trimmedMessage = message.trim();
+    if (trimmedMessage && !disabled && !hasUploading && onSendToHandover) {
+      onSendToHandover(trimmedMessage);
+      if (!onDraftChange) setInternalMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    }
+  }, [message, disabled, hasUploading, onSendToHandover, onDraftChange]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -285,6 +300,8 @@ export function ChatInput({
   }, []);
 
   const canSend = (hasSendableText || readyAttachmentCount > 0) && !disabled && !hasUploading;
+  // Handover needs a typed topic; attachments alone don't name a focus.
+  const canHandover = hasSendableText && !disabled && !hasUploading;
 
   return React.createElement('form', {
     onSubmit: handleSubmit,
@@ -375,11 +392,9 @@ export function ChatInput({
       'aria-hidden': 'true'
     }, 'Drop files to attach'),
 
-    React.createElement('div', {
-      className: 'flex items-end gap-3'
-    },
-      // Textarea wrapper
-      React.createElement('div', { className: 'flex-1 relative' },
+    // Textarea takes the full width; the controls live in a rail beneath it so
+    // the row height follows the text, not a stack of buttons.
+    React.createElement('div', { className: 'relative' },
         React.createElement('textarea', {
           ref: textareaRef,
           value: message,
@@ -452,11 +467,18 @@ export function ChatInput({
         )
       ),
 
-      // Send column: attach + safety toggle + fork + send button
+      // Control rail: composer tools on the left (shape the draft), destinations
+      // on the right beside send (dispatch it, here or elsewhere). Every control
+      // is a single click; destinations are never hidden in a picker.
       React.createElement('div', {
-        className: 'flex-shrink-0 flex flex-col items-center gap-1'
+        className: 'chat-input-rail',
+        role: 'toolbar',
+        'aria-label': 'Message controls'
       },
-        // Attach files: a rune in the column, not a horizontal tax on the textarea
+      React.createElement('div', {
+        className: 'chat-input-rail-group chat-input-rail-left'
+      },
+        // Attach files
         React.createElement('button', {
           type: 'button',
           onClick: handlePickFiles,
@@ -510,8 +532,12 @@ export function ChatInput({
               d: 'M20 7v4a2 2 0 01-2 2H4'
             })
           )
-        ),
+        )
+      ),
 
+      React.createElement('div', {
+        className: 'chat-input-rail-group chat-input-rail-right'
+      },
         // Send-to-fork: branch this message into a new jam thread
         onSendToFork && React.createElement('button', {
           type: 'button',
@@ -543,13 +569,45 @@ export function ChatInput({
           })
         ),
 
+        // Handover: carry this topic into a fresh Steward session that reads
+        // this thread's scrollback and plays back intent before shaping.
+        onSendToHandover && React.createElement('button', {
+          type: 'button',
+          onClick: handleHandoverSubmit,
+          disabled: !canHandover,
+          className: 'chat-input-handover-button',
+          style: {
+            width: '48px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: canHandover ? 'rgba(92, 60, 124, 0.25)' : 'var(--q-stone2)',
+            border: `1px solid ${canHandover ? 'var(--q-teleport)' : 'var(--q-stone3)'}`,
+            borderRadius: 0,
+            color: canHandover ? 'var(--q-teleport)' : 'var(--q-bone0)',
+            cursor: canHandover ? 'pointer' : 'not-allowed',
+            padding: 0,
+            transition: 'all 150ms ease'
+          },
+          title: canHandover
+            ? 'Hand over: open a fresh Steward on this topic, pointed at this thread'
+            : 'Type the topic to hand over to a fresh Steward'
+        },
+          React.createElement(QIcon, {
+            name: 'handover',
+            size: 14,
+            color: 'currentColor'
+          })
+        ),
+
         // Send / Stop button
         disabled && onStop
           ? React.createElement('button', {
               type: 'button',
               onClick: onStop,
               disabled: stopPending,
-              className: 'flex-shrink-0 w-12 h-12 flex items-center justify-center transition-all',
+              className: 'chat-input-send-button transition-all',
               style: {
                 background: stopPending ? 'var(--q-lava0)' : 'rgba(140, 40, 20, 0.2)',
                 border: '1px solid var(--q-lava0)',
@@ -563,14 +621,14 @@ export function ChatInput({
             },
               React.createElement(QIcon, {
                 name: 'skull',
-                size: 20,
+                size: 18,
                 color: 'currentColor'
               })
             )
           : React.createElement('button', {
               type: 'submit',
               disabled: !canSend,
-              className: 'flex-shrink-0 w-12 h-12 flex items-center justify-center transition-all',
+              className: 'chat-input-send-button transition-all',
               style: {
                 background: canSend
                   ? 'linear-gradient(180deg, var(--q-copper1), var(--q-copper0))'
@@ -587,7 +645,7 @@ export function ChatInput({
             },
               React.createElement(QIcon, {
                 name: 'dispatch',
-                size: 20,
+                size: 18,
                 color: 'currentColor'
               })
             )

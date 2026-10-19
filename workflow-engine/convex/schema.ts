@@ -226,6 +226,10 @@ export default defineSchema({
     // User-initiated thread fork: parent thread this one branched from.
     // History is not copied — the forked Claude session carries the context.
     forkedFrom: v.optional(v.id("chatThreads")),
+    // Steward handover: source thread this one was handed over from.
+    // The complement of a fork — no session is carried; the new Steward reads
+    // the source thread's scrollback by pointer and plays back intent.
+    handedOverFrom: v.optional(v.id("chatThreads")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -235,7 +239,13 @@ export default defineSchema({
     .index("by_latest_message", ["latestMessageAt"])
     // Pinned-first sidebar: eq("pinned", true) then recency, so listAll can fetch
     // the (tiny) pinned set with an index instead of scanning the whole table.
-    .index("by_pinned_latest", ["pinned", "latestMessageAt"]),
+    .index("by_pinned_latest", ["pinned", "latestMessageAt"])
+    // Thread search — title tier. namespaceId as a filter field so search obeys
+    // the namespace filter. Titles rank above body matches (merged in the query).
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["namespaceId"],
+    }),
 
   chatMessages: defineTable({
     threadId: v.id("chatThreads"),
@@ -251,7 +261,13 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_thread", ["threadId"])
-    .index("by_thread_created", ["threadId", "createdAt"]),
+    .index("by_thread_created", ["threadId", "createdAt"])
+    // Thread search — content tier. No namespace filter field: chatMessages carry
+    // only threadId, so namespace scoping is applied post-hoc by looking up each
+    // hit's thread (Option B — avoids denormalizing namespaceId onto this large table).
+    .searchIndex("search_content", {
+      searchField: "content",
+    }),
 
   // Lightweight peer comms for hand-cranked agent batches.
   // groupId is a capability-style string passed in the prompt; position is

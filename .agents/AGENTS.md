@@ -31,8 +31,9 @@ feel the edges. THINK HARD about the implications/impacts
    - Refactor code for clarity, performance, maintainability
 
 *Citing the why-layer* 
-   - When code embodies a non-obvious, deliberate design decision, cite its rationale: `@see docs/project/spec/mental-model.md#mm-<slug>` (slug = the `{#mm-…}` tag on the heading).
-   - Not every decision needs a cite. eg. no citable section, routine CRUD.
+   - When code embodies a non-obvious, deliberate design decision, cite its rationale: `@see docs/project/spec/mental-model.md#mm-<slug>` (slug = the `{#mm-…}` tag on the heading). If no stance covers the decision, nothing is cited.
+   - Not every decision needs a cite. eg. no citable mental-model section, routine CRUD. 
+   - Phase directories are scratch with a shelf life, and are not a cite ref.
    - Cite, never author. Never adjust the why-layer to match the code. adjust code or re-cite if the why doesnt match.
    - `mental-model.md` is read-only!
  

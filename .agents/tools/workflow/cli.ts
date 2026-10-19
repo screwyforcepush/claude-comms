@@ -52,6 +52,7 @@
  *
  * Chat Commands:
  *   chat-threads                        List chat threads
+ *   chat-search <words...> [--limit N]  Full-text search threads (title tier first) in this namespace
  *   chat-thread <threadId>              Get thread with messages
  *   chat-create [--title <title>]       Create a new chat thread
  *   chat-send <threadId> <message>      Send message and create chat job
@@ -181,6 +182,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   "complete-job": ["result"],
   "fail-job": ["result"],
   "chat-threads": [],
+  "chat-search": ["limit"],
   "chat-thread": [],
   "chat-create": ["title"],
   "chat-send": ["harness"],
@@ -752,6 +754,34 @@ async function listChatThreads() {
   output(result);
 }
 
+// Full-text thread search, always scoped to this CLI's namespace. Steward recall
+// surface ("has this come up in a prior jam?"): rows are title + tier + snippet,
+// cheap to read — pull a full thread with chat-thread only once a hit looks relevant.
+// No cross-namespace flag by design: tenant content must not be reachable from here.
+async function searchChatThreads(words: string[], limitFlag?: string) {
+  const term = words.join(" ").trim();
+  if (!term) error("Search words required");
+  const limit = limitFlag ? parseInt(limitFlag) : 20;
+  if (Number.isNaN(limit) || limit < 1) error("--limit must be a positive integer");
+  const nsId = await getNamespaceId();
+  const results = await client.query(api.chatThreads.search, {
+    password: config.password,
+    query: term,
+    namespaceIds: [nsId],
+    limit,
+  });
+  output(
+    (results as Array<Record<string, unknown>>).map((r) => ({
+      id: r._id,
+      match: r.matchType,
+      title: r.title,
+      mode: r.mode,
+      latestMessageAt: r.latestMessageAt,
+      snippet: r.snippet ?? undefined,
+    }))
+  );
+}
+
 async function getChatThread(threadId: string) {
   const thread = await client.query(api.chatThreads.get, {
     password: config.password,
@@ -947,6 +977,7 @@ Commands:
 
 Chat Commands:
   chat-threads                        List chat threads
+  chat-search <words...> [--limit N]  Full-text search threads (title tier first) in this namespace
   chat-thread <threadId>              Get thread with messages
   chat-create [--title <title>]       Create a new chat thread
   chat-send <threadId> <message>      Send message and create chat job
@@ -1145,6 +1176,10 @@ async function main() {
       // Chat commands
       case "chat-threads":
         await listChatThreads();
+        break;
+
+      case "chat-search":
+        await searchChatThreads(positional, flags.limit);
         break;
 
       case "chat-thread":

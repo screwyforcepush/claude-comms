@@ -63,12 +63,16 @@ export const api = {
     list: "chatThreads:list",
     // List all threads cross-namespace
     listAll: "chatThreads:listAll",
+    // Full-text search over thread titles + message bodies (title tier first)
+    search: "chatThreads:search",
     // Get a single thread by ID
     get: "chatThreads:get",
     // Create a new thread
     create: "chatThreads:create",
     // Fork a thread: new jam thread inheriting the source's session context
     fork: "chatThreads:fork",
+    // Hand over to a fresh Steward: new session-less jam thread pointed at this one
+    handover: "chatThreads:handover",
     // Update thread mode (jam/cook)
     updateMode: "chatThreads:updateMode",
     // Update thread title

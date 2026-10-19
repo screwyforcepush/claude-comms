@@ -39,6 +39,14 @@ export const ICON_PATHS = {
     React.createElement('circle', { cx: 5, cy: 5, r: 1.5, fill: 'currentColor' }),
     React.createElement('circle', { cx: 19, cy: 5, r: 1.5, fill: 'currentColor' })
   ),
+  // Handover: a baton passed sideways to a fresh head — arrow into a bar, with a
+  // Fullbright dot at the origin it leaves behind.
+  handover: (sw) => React.createElement(React.Fragment, null,
+    React.createElement('line', { x1: 4, y1: 12, x2: 16, y2: 12, stroke: 'currentColor', strokeWidth: sw }),
+    React.createElement('polyline', { points: '11,7 16,12 11,17', stroke: 'currentColor', strokeWidth: sw, fill: 'none', strokeLinejoin: 'miter' }),
+    React.createElement('line', { x1: 20, y1: 5, x2: 20, y2: 19, stroke: 'currentColor', strokeWidth: sw }),
+    React.createElement('circle', { cx: 4, cy: 12, r: 1.5, fill: 'currentColor' })
+  ),
 
   // --- Weapons / Actions ---
   axe: (sw) => React.createElement(React.Fragment, null,

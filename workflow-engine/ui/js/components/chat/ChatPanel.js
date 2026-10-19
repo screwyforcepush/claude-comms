@@ -571,6 +571,16 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
     return map;
   }, [namespaces]);
 
+  // Thread search — raw input + debounced term. Non-empty term swaps the
+  // recency/pins list for ranked full-text results (title tier above body tier).
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(searchInput.trim()), 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  const searching = searchTerm.length > 0;
+
   // Thread pagination — increase limit to load more
   const [threadLimit, setThreadLimit] = useState(50);
 
@@ -593,6 +603,24 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
     if (selectedNamespaceIds.size === 0) return allThreads; // No filter = show all
     return allThreads.filter(t => selectedNamespaceIds.has(t.namespaceId));
   }, [allThreads, selectedNamespaceIds]);
+
+  // Search results — query runs only while searching. Namespace scoping is applied
+  // server-side (post-lookup for body hits), so results need no client-side filter.
+  const searchArgs = useMemo(() => {
+    const nsIds = [...selectedNamespaceIds];
+    return nsIds.length > 0
+      ? { query: searchTerm, namespaceIds: nsIds, limit: 40 }
+      : { query: searchTerm, limit: 40 };
+  }, [searchTerm, selectedNamespaceIds]);
+  const { data: searchResults, loading: searchLoading } = useQuery(
+    searching ? api.chatThreads.search : null,
+    searching ? searchArgs : {}
+  );
+
+  // The list the sidebar renders: search results while searching, else the
+  // namespace-filtered recency/pins list. Selected-thread resolution below stays
+  // on the recency list + get() fallback, so an off-list result still opens.
+  const displayThreads = searching ? (searchResults || null) : threads;
 
   // Get selected thread object (must be defined before useMemos that reference it)
   const listedSelectedThread = threads?.find(t => t._id === selectedThreadId) || null;
@@ -650,6 +678,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
   const removeThread = useMutation(api.chatThreads.remove);
   const triggerChatJob = useMutation(api.chatJobs.trigger);
   const forkThread = useMutation(api.chatThreads.fork);
+  const handoverThread = useMutation(api.chatThreads.handover);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const discardAttachment = useMutation(api.chatMessages.discardAttachment);
 
@@ -972,16 +1001,52 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
     }
   }, [renderedThreadId, sending, getDraft, forkThread, clearDraft, saveDraftText, setDraftAttachments]);
 
-  // Fork-origin banner data: parent thread's title from the already-subscribed
-  // thread list (no extra query; falls back gracefully if outside the window).
+  // Handover: open a fresh, session-less Steward thread on the typed topic,
+  // pointed at this thread for readback. Same atomic shape and same
+  // jump-and-clear-draft behaviour as fork; the server composes the wrapper.
+  const handleSendToHandover = useCallback(async (topic) => {
+    if (!renderedThreadId || sending) return;
+    const draft = getDraft(renderedThreadId);
+    const readyAttachments = toMessageAttachments(draft.attachments);
+    const hasUploading = draft.attachments.some((attachment) => attachment.status === 'uploading');
+    if (hasUploading || !topic.trim()) return;
+
+    setSending(true);
+    try {
+      const { threadId: newThreadId } = await handoverThread({
+        sourceThreadId: renderedThreadId,
+        topic,
+        ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {})
+      });
+      clearDraft(renderedThreadId);
+      setCurrentDraft('');
+      setCurrentDraftAttachments([]);
+      setSelectedThreadId(newThreadId);
+    } catch (err) {
+      console.error('Failed to hand over thread:', err);
+      // Keep both draft parts intact if the handover mutation fails.
+      saveDraftText(renderedThreadId, topic);
+      setDraftAttachments(renderedThreadId, draft.attachments);
+      setCurrentDraft(topic);
+      setCurrentDraftAttachments(draft.attachments);
+    } finally {
+      setSending(false);
+    }
+  }, [renderedThreadId, sending, getDraft, handoverThread, clearDraft, saveDraftText, setDraftAttachments]);
+
+  // Origin banner data (fork or handover): parent thread's title from the
+  // already-subscribed thread list (no extra query; falls back gracefully if
+  // outside the window). `kind` picks the banner's wording and glyph.
   const forkOrigin = useMemo(() => {
-    if (!selectedThread?.forkedFrom) return null;
-    const parent = allThreads?.find(t => t._id === selectedThread.forkedFrom);
+    const originId = selectedThread?.forkedFrom || selectedThread?.handedOverFrom;
+    if (!originId) return null;
+    const parent = allThreads?.find(t => t._id === originId);
     return {
-      threadId: selectedThread.forkedFrom,
+      threadId: originId,
+      kind: selectedThread?.forkedFrom ? 'fork' : 'handover',
       title: parent?.title || 'original thread'
     };
-  }, [selectedThread?.forkedFrom, allThreads]);
+  }, [selectedThread?.forkedFrom, selectedThread?.handedOverFrom, allThreads]);
 
   const handleSelectForkOrigin = useCallback(() => {
     if (forkOrigin) setSelectedThreadId(forkOrigin.threadId);
@@ -1243,7 +1308,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
         React.createElement('div', {
           className: 'flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-2 py-2 scrollbar-hide'
         },
-          threads && threads.map(thread =>
+          displayThreads && displayThreads.map(thread =>
             React.createElement(ThreadIconWithAssignment, {
               key: thread._id,
               thread: thread,
@@ -1268,13 +1333,16 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
         // ChatSidebar content (without its own header)
         // WP-5: Pass namespace filter props and namespaceMap for cross-namespace view
         React.createElement(ChatSidebar, {
-          threads: threads || [],
+          threads: displayThreads || [],
           selectedThreadId: selectedThreadId,
           onSelectThread: handleSelectThread,
           onCreateThread: handleCreateThread,
           onCreateInNamespace: handleCreateThread,
           onDeleteThread: handleDeleteThread,
-          loading: loadingThreads,
+          loading: searching ? searchLoading : loadingThreads,
+          searchTerm: searchInput,
+          onSearchChange: setSearchInput,
+          searching: searching,
           creating: creating,
           namespaces: namespaces,
           selectedNamespaceIds: selectedNamespaceIds,
@@ -1318,6 +1386,7 @@ export function ChatPanel({ namespaces, responsive, mobileBackTrigger, onOpenInt
       onRetryGroup: handleRetryGroup,
       activeChatJob: activeChatJob || null,
       onSendToFork: handleSendToFork,
+      onSendToHandover: handleSendToHandover,
       forkOrigin: forkOrigin,
       onSelectForkOrigin: handleSelectForkOrigin
     }),

@@ -9,6 +9,7 @@ import {
   HarnessModelEntry,
 } from "./lib/harnessDefaults";
 import { renderAttachmentsBlock } from "./lib/attachments";
+import { composeHandoverMessage, handoverTitle } from "./lib/handover";
 
 // Queries
 
@@ -47,6 +48,92 @@ export const listAll = query({
     const merged = [...pinned, ...recent.filter((t) => !pinnedIds.has(t._id))];
 
     return merged.slice(0, limit);
+  },
+});
+
+// Build a short, match-centered snippet from a message body so the search row
+// shows *why* a thread matched. Whitespace-collapsed, ellipsed at the edges.
+function buildSnippet(content: string, term: string): string {
+  if (!content) return "";
+  const lc = content.toLowerCase();
+  const words = term.toLowerCase().split(/\s+/).filter(Boolean);
+  let idx = -1;
+  for (const w of words) {
+    const i = lc.indexOf(w);
+    if (i >= 0 && (idx < 0 || i < idx)) idx = i;
+  }
+  if (idx < 0) idx = 0;
+  const start = Math.max(0, idx - 60);
+  const end = Math.min(content.length, idx + 120);
+  let snippet = content.slice(start, end).replace(/\s+/g, " ").trim();
+  if (start > 0) snippet = "…" + snippet;
+  if (end < content.length) snippet = snippet + "…";
+  return snippet;
+}
+
+// Thread search: full-text over thread titles and message bodies.
+// Title matches always rank above content matches; a thread that matches on both
+// surfaces once, in the title tier. Namespace scoping is applied here (title tier
+// could use the index filter, but content hits must be filtered post-lookup, so
+// both tiers use one post-filter for consistency). Reactive — full-text search
+// runs inside a query, not an action. See mental-model.md "Search is retrieval
+// against forgetting".
+export const search = query({
+  args: {
+    password: v.string(),
+    query: v.string(),
+    namespaceIds: v.optional(v.array(v.id("namespaces"))),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const term = args.query.trim();
+    if (!term) return [];
+    const limit = args.limit || 30;
+    const nsFilter =
+      args.namespaceIds && args.namespaceIds.length > 0
+        ? new Set(args.namespaceIds.map((id) => String(id)))
+        : null;
+
+    const results: Array<Record<string, unknown>> = [];
+    const seen = new Set<string>();
+
+    // Title tier.
+    const titleHits = await ctx.db
+      .query("chatThreads")
+      .withSearchIndex("search_title", (q) => q.search("title", term))
+      .take(limit);
+    for (const t of titleHits) {
+      if (results.length >= limit) break;
+      if (nsFilter && !nsFilter.has(String(t.namespaceId))) continue;
+      seen.add(String(t._id));
+      results.push({ ...t, matchType: "title", snippet: null });
+    }
+
+    // Content tier — only if the title tier left room. Over-fetch message hits
+    // because several may collapse onto one thread or fall outside the filter.
+    if (results.length < limit) {
+      const contentHits = await ctx.db
+        .query("chatMessages")
+        .withSearchIndex("search_content", (q) => q.search("content", term))
+        .take(limit * 3);
+      for (const m of contentHits) {
+        if (results.length >= limit) break;
+        const tid = String(m.threadId);
+        if (seen.has(tid)) continue;
+        const thread = await ctx.db.get(m.threadId);
+        if (!thread) continue;
+        if (nsFilter && !nsFilter.has(String(thread.namespaceId))) continue;
+        seen.add(tid);
+        results.push({
+          ...thread,
+          matchType: "content",
+          snippet: buildSnippet(m.content, term),
+        });
+      }
+    }
+
+    return results.slice(0, limit);
   },
 });
 
@@ -190,6 +277,94 @@ export const fork = mutation({
       // (prompt layer sends the full initial prompt).
       forkSession: !!sessionId,
       isThreadFork: true,
+      isGuardianEvaluation: false,
+      isCompletionSummary: false,
+    };
+
+    const jobId = await ctx.db.insert("chatJobs", {
+      threadId: newThreadId,
+      namespaceId: source.namespaceId,
+      harness: entry.harness,
+      model: entry.model,
+      context: JSON.stringify(chatContext),
+      status: "pending",
+      createdAt: now,
+    });
+
+    return { threadId: newThreadId, messageId, jobId };
+  },
+});
+
+// Steward handover: carry on in a fresh head with the same scrollback.
+// The complement of `fork`: no session is carried, so the new thread takes the
+// full first-message prompt path and the Steward re-derives intent by reading
+// the source thread (chat-thread <id>) and playing it back before shaping.
+// Atomic like fork (thread + message + chat job). Text and a pointer only, so
+// it works on any harness. Assignment links stay with the source thread.
+// @see docs/project/spec/mental-model.md — Session Context Isolation / Steward Handover
+export const handover = mutation({
+  args: {
+    password: v.string(),
+    sourceThreadId: v.id("chatThreads"),
+    // The user's focus for the fresh session. Required: the empty case was
+    // dropped by design (the user always names a focus subset).
+    topic: v.string(),
+    attachments: v.optional(v.array(v.object({
+      filename: v.string(),
+      storageId: v.id("_storage"),
+      size: v.number(),
+      mime: v.string(),
+    }))),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const source = await ctx.db.get(args.sourceThreadId);
+    if (!source) throw new Error("Source thread not found");
+    const now = Date.now();
+
+    // Composed server-side so one place owns the wrapper and the stored
+    // message is exactly what the Steward received. Throws on an empty topic.
+    const content = composeHandoverMessage(args.topic, args.sourceThreadId);
+
+    // Provisional title until the new Steward sets its own via chat-title.
+    const newThreadId = await ctx.db.insert("chatThreads", {
+      namespaceId: source.namespaceId,
+      title: handoverTitle(source.title),
+      mode: "jam",
+      handedOverFrom: args.sourceThreadId,
+      latestMessageAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const messageId = await ctx.db.insert("chatMessages", {
+      threadId: newThreadId,
+      role: "user",
+      content,
+      createdAt: now,
+      ...(args.attachments && args.attachments.length > 0
+        ? { attachments: args.attachments }
+        : {}),
+    });
+
+    // Resolve harness+model from namespace config (mirrors chatJobs.trigger).
+    const ns = await ctx.db.get(source.namespaceId);
+    const defaults = ns?.harnessDefaults
+      ? parseHarnessDefaults(ns.harnessDefaults)
+      : DEFAULT_HARNESS_DEFAULTS;
+    const resolved = resolveJobType(defaults, "chat");
+    const entry: HarnessModelEntry = Array.isArray(resolved) ? resolved[0] : resolved;
+
+    // No claudeSessionId → determinePromptType returns "full": the ordinary
+    // FIRST MESSAGE Steward template, unchanged. Nothing fork-flavoured here.
+    const chatContext = {
+      threadId: newThreadId,
+      namespaceId: source.namespaceId,
+      mode: "jam",
+      effectivePromptMode: "jam",
+      latestUserMessage: renderAttachmentsBlock(content, args.attachments),
+      forkSession: false,
+      isThreadFork: false,
       isGuardianEvaluation: false,
       isCompletionSummary: false,
     };

@@ -57,6 +57,29 @@ Dont pick one, use claude, codex, and gemini!. I've built "consultant" subagents
 - The orchestrator gets the agents to check each others work to gap fill weaknesses in individual models. Claude checks Codex's work, Codex checks Gemini's work, Gemini checks Claudes work.
 - When planning/architecting, the orchestrator get one of each to independently analyse, research, plan. then the orchestrator merges to get the best of both perspectives.
 
+## Harness Leakage
+Problem: AI is bad at prompting AI. If I ask an AI to write the prompt for my UAT agent, it will absolutely tell the UAT agent what happens next. A PM spawns, decides implement or refine or close out. UAT doesnt need to know any of that. It needs to run the dev server, drive the browser, report what it finds. Thats it.
+I call it harness leakage: the surrounding deterministic/workflow infrastructure (what happens next, what happens to the output afterward) leaking into the unit level prompt.
+It is not just noise. Telling the model about future states it cant measure and doesnt control creates anxiety. It starts handling things that are not its to handle, or reaches into the next stage. An early PM that was told about job insertion started inserting jobs itself.
+Leaks I keep catching:
+- "when you hit the limit your tool results get compacted into this shape". It will see the compacted shape when it happens. Knowing in advance changes nothing except its nerves.
+- voice agent: "if the customer is disqualified, hang up". The harness hangs up. The agent collects the info. It doesnt even need to know there IS a disqualifier, thats the harness's decision.
+- tool description: "loads the artifact from the database without metadata". The consuming agent doesnt need to know storage metadata exists.
+- tool described in the system prompt AND in the tool def. Now the prompt drifts from the tool.
+Approach: the agent is a unit. Separation of concerns. It gets the why (north star), the area it works in, how to do the thing, how to report back. Nothing downstream of its output. The fix is omission: purpose stays, machinery goes.
+- Error messages are the point of disclosure. Query limit, permission scope: it hits the wall, reads the error, learns. Progressive Disclosure again.
+- Dont patch a leak with scolding ("Do NOT leak between contexts"). Thats whack-a-mole on the symptom, and models follow positive direction better than dont. Cut the line that leaks.
+- I let the AI draft prompts, then hand-refine. The prompt is the one artifact I dont delegate. Write it from the perspective of the agent that consumes it, an agent inside the harness. Ironically the AI is bad at this even though it IS an agent inside the harness.
+
+## Memory
+Auto-memory (harness memory that persists across sessions) is the Steward's alone. Crew get the north star, Artifacts/Decisions, and the repo. That is everything they need, nothing they dont. Memory in a crew prompt is the Steward's surroundings leaking into the unit: who I am, what else is in flight, what other jams settled. A crew read is a context tax. A crew write is unsupervised churn.
+What goes in memory is whats left after the other homes:
+- product why → `mental-model.md`
+- harness bad habits → `CLAUDE.md`
+- anything a crew needs → repo guides
+- the residual → memory. The context AROUND the repo: people, businesses, entities, relationships, my vocab and stances with no repo home yet, rejected paths, what a jam settled that landed nowhere else.
+Record what things ARE and WHY. Never STATE. State lives in code, git, assignment records and gets read from there when it is needed. A memory pointer prompts a check, it never ends a line of work.
+
 ## Progressive Disclosure
 Loading up all important context all the time, chokes the model's context and confuses it. The agents can pull in what they need when they need it. Just provide them an index of resources and when to consume/use them.
 This is why you will find pointers to docs, scripts, prompts in key locations in the codebase.

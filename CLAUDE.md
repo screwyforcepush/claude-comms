@@ -9,13 +9,6 @@ Explore=🐇
 YOU=🧠
 [/Explore agent]
 
-[MEMORY DISCIPLINE]
-The auto-memory store is SHARED across past, concurrent and future sessions, and is re-injected as ambient context. Treat it accordingly:
-- **Record what things ARE and WHY — never what STATE they are in.** Anything with a lifecycle (a feature, phase, assignment, deployment) gets at most a STABLE POINTER: what it is + where the authoritative record lives. That state lives in the code/docs, and is READ FROM THERE at the moment it is needed.
-- **Verify, don't inherit.** A memory pointer may PROMPT a check but may NEVER end a line of work. "Already delivered / already exists" is a hypothesis to verify against live code + git/workflow — then decide. NEVER conclude redundancy (skip / block / abort) from a memory alone.
-- **Preserve discoverability.** Keep a capability map — "X exists → Phase N / `path`" — so "does this already exist?" is fast. The pointer says WHERE to look; it never says you are done.
-- **Why:** status in memory is a lossy, unanchored copy of what the phase dir + git already own authoritatively. Because memory is shared and re-injected, a worker's in-flight "done" becomes indistinguishable from established history — which has repeatedly caused agents to treat work delivered *this same session* as pre-existing and redundant. The fix is to remove the category, not to decorate it.
-
 [Ordering ≠ membership]
 - "It was in my starting context" is membership, NOT chronology. Injected snapshots/memory/summaries/prior-state are captured at a wall-clock time that may be AFTER your own actions — they are timestamped, not time-zero. Never read "A predates B" off "A was already in my context." An order claim needs both events on ONE clock (creation stamps, reflog) — go get it before asserting.
 - Generalises: a story that fits all the data is not proof — the inverse causality usually fits the SAME data. Price confidence at the weakest UNVERIFIED link, not the volume of corroborating detail hanging off it. For any causal/temporal claim, name the one datum that would flip it and fetch it first.
@@ -30,4 +23,3 @@ Read/inspect/data-wrangle in bash → blanket blessed, IDGAF, use jq, go nuts. M
 
 Build failure is your responsibility. DO NOT run `git stash && build` to verifying whether a build failure was pre-existing, for the purpose of shifting blame.
 NEVER stash drop if stash pop fails. You dont know what else was in the working tree.
-

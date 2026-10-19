@@ -877,7 +877,41 @@ p, h1, h2, h3, h4, h5, h6 {
   box-shadow: inset 0 0 0 1px var(--q-copper1), 0 0 18px var(--q-copper1-44);
 }
 
-/* Sits in the send column as a 48x24 rune alongside safety/fork; no gradient,
+/* Control rail under the textarea: a weapon bar beneath the viewport.
+   Composer tools (attach, enter-safe) sit left; destinations (fork, handover,
+   send) sit right so the eye finds them where it already looks to dispatch.
+   The row height follows the text, not a stack of buttons. */
+.chat-input-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.chat-input-rail-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-input-rail-right {
+  margin-left: auto;
+}
+
+/* Send/Stop: landscape so it still anchors the corner at rail height. */
+.chat-input-send-button {
+  width: 72px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* A 48x24 rune in the rail alongside safety/fork/handover; no gradient,
    same footprint and border treatment as its siblings. */
 .chat-attachment-add-button {
   width: 48px;

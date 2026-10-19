@@ -51,8 +51,9 @@ export function ChatView({
   onRetryGroup,              // Retry a job group (cascade-deletes downstream)
   activeChatJob = null,      // WP-7 R2: Active chatJob for current thread
   onSendToFork,              // Thread fork: send message into a new forked thread
-  forkOrigin = null,         // Thread fork: { threadId, title } of parent thread, if this is a fork
-  onSelectForkOrigin         // Thread fork: navigate to the parent thread
+  onSendToHandover,          // Steward handover: open a fresh Steward on the typed topic, pointed here
+  forkOrigin = null,         // Origin: { threadId, title, kind: 'fork'|'handover' } of parent thread
+  onSelectForkOrigin         // Origin: navigate to the parent thread
 }) {
   // WP-4: State for selected job modal
   const [selectedJob, setSelectedJob] = useState(null);
@@ -204,8 +205,9 @@ export function ChatView({
         disabled: sending
       }),
 
-      // Thread fork: origin banner — this thread branched off another conversation.
-      // History is not copied; the parent thread owns the scrollback, one click away.
+      // Origin banner — this thread branched off (fork) or was handed over from
+      // (handover) another conversation. History is not copied either way; the
+      // parent thread owns the scrollback, one click away.
       forkOrigin && React.createElement('button', {
         type: 'button',
         onClick: onSelectForkOrigin,
@@ -219,8 +221,8 @@ export function ChatView({
         },
         title: 'Go to the original thread'
       },
-        React.createElement('span', { 'aria-hidden': 'true' }, '⑂'),
-        React.createElement('span', null, 'FORKED FROM'),
+        React.createElement('span', { 'aria-hidden': 'true' }, forkOrigin.kind === 'handover' ? '↦' : '⑂'),
+        React.createElement('span', null, forkOrigin.kind === 'handover' ? 'HANDED OVER FROM' : 'FORKED FROM'),
         React.createElement('span', {
           style: { color: 'var(--q-bone2)', fontFamily: 'var(--font-console)' }
         }, forkOrigin.title)
@@ -253,7 +255,8 @@ export function ChatView({
         onRemoveAttachment: onRemoveAttachment,
         onStop: activeChatJob ? handleStopChatJob : null,
         stopPending: stopRequested || !!activeChatJob?.killRequested,
-        onSendToFork: onSendToFork
+        onSendToFork: onSendToFork,
+        onSendToHandover: onSendToHandover
       })
     ),
 
