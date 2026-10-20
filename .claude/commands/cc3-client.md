@@ -14,14 +14,14 @@ This project repo is a **client** in the workflow engine. The Convex workflow en
   │ Convex (cloud or local)        │◄────────│ .agents/tools/workflow/      │
   │   jobs, assignments, chat      │  poll   │   runner.ts (daemon)         │
   └────────────────────────────────┘  +write │   - polls for ready jobs     │
-                                             │   - spawns claude/codex/     │
-                                             │     gemini agent sessions    │
+                                             │   - spawns claude/codex/agy  │
+                                             │     agent sessions           │
                                              │   - reports results back     │
                                              │   config.json (connection)   │
                                              └──────────────────────────────┘
 ```
 
-The **runner** is a long-lived daemon that subscribes to the Convex backend, picks up ready jobs for this project's namespace, spawns the appropriate agent CLI (`claude`, `codex`, or `gemini`), streams their output, and writes results back. Multiple project repos can each run their own runner against the same Convex backend.
+The **runner** is a long-lived daemon that subscribes to the Convex backend, picks up ready jobs for this project's namespace, spawns the appropriate agent CLI (`claude`, `codex`, or `agy` for the `gemini` harness), streams their output, and writes results back. Multiple project repos can each run their own runner against the same Convex backend.
 
 # Key files
 
@@ -37,9 +37,9 @@ The **runner** is a long-lived daemon that subscribes to the Convex backend, pic
 
 The runner spawns CLI processes per harness:
 
-- **Claude:** `claude --dangerously-skip-permissions --verbose --output-format stream-json -p "<prompt>"`
-- **Codex:** `codex --yolo e "<prompt>" --json`
-- **Gemini:** `gemini --yolo -m gemini-2.5-pro --output-format stream-json "<prompt>"`
+- **Claude:** `claude --dangerously-skip-permissions --verbose --output-format stream-json --disable-slash-commands --disallowedTools ... -p` with the prompt piped on stdin
+- **Codex:** `codex --yolo e - --json` with the prompt piped on stdin
+- **Gemini (Antigravity):** `agy --dangerously-skip-permissions --disable-slash-commands --output-format stream-json [--model <model>] [--conversation <id>]` with the prompt piped on stdin. Same stdout NDJSON path as the other two; no hook install.
 
 Each job gets environment variables: `WORKFLOW_ASSIGNMENT_ID`, `WORKFLOW_GROUP_ID`, `WORKFLOW_JOB_ID`.
 
@@ -76,12 +76,12 @@ codex e "is codex authed test: respond 'hello world'"
 ```
 If not installed, `npm install -g @openai/codex` and ask the user to codex -> auth in terminal
 
-### Gemini (optional - Google)
+### Antigravity (optional - Google, serves the `gemini` harness)
 ```bash
-gemini --version
-gemini -p "is gemini authed test: respond 'hello world'"
+agy --version
+echo "is agy authed test: respond 'hello world'" | agy --dangerously-skip-permissions
 ```
-If not installed, `npm install -g @google/gemini-cli@latest` and ask the user to gemini -> auth in terminal
+If not installed, `curl -fsSL https://antigravity.google/cli/install.sh | bash` and ask the user to run `agy` in a terminal to sign in
 
 Tell the user which harnesses are available and authed. If user only wants claude and none/one of the others this system will still work, just not as good quality outcomes.
 

@@ -6,15 +6,13 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import {
   AgyStreamHandler,
   ClaudeStreamHandler,
   CodexStreamHandler,
-  GeminiStreamHandler,
-  buildAgyCommand,
   buildCommand,
   buildInteractiveClaudeCommand,
   parseCodexUsageLimitReset,
@@ -418,119 +416,139 @@ describe("parseCodexUsageLimitReset", () => {
 });
 
 // ============================================================================
-// GeminiStreamHandler tests
+// AgyStreamHandler tests — replay real `agy --output-format stream-json`
+// captures from lib/fixtures/agy/
 // ============================================================================
 
-describe("GeminiStreamHandler", () => {
-  it("accumulates assistant content and marks complete on result", () => {
-    const handler = new GeminiStreamHandler();
+const AGY_FIXTURES = fileURLToPath(new URL("./fixtures/agy/", import.meta.url));
 
-    handler.onEvent({ type: "message", role: "assistant", content: "Hello " });
-    handler.onEvent({ type: "message", role: "assistant", content: "world" });
-    handler.onEvent({ type: "result" });
+function loadAgyStdout(name: string): Record<string, unknown>[] {
+  return readFileSync(join(AGY_FIXTURES, `${name}.stdout.jsonl`), "utf-8")
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
+}
 
-    assert.strictEqual(handler.getResult(), "Hello world");
-    assert.strictEqual(handler.isComplete(), true);
-  });
+function loadAgyStderr(name: string): string {
+  return readFileSync(join(AGY_FIXTURES, `${name}.stderr.txt`), "utf-8");
+}
 
-  it("ignores non-assistant messages", () => {
-    const handler = new GeminiStreamHandler();
-
-    handler.onEvent({ type: "message", role: "user", content: "User input" });
-    handler.onEvent({ type: "tool_use", tool_name: "shell" });
-
-    assert.strictEqual(handler.getResult(), "");
-  });
-
-  it("captures session_id from init for resume", () => {
-    const handler = new GeminiStreamHandler();
-
-    handler.onEvent({
-      type: "init",
-      session_id: "915d455b-c502-4f48-829e-a3858cd370f8",
-    });
-
-    assert.strictEqual(handler.getSessionId(), "915d455b-c502-4f48-829e-a3858cd370f8");
-  });
-});
-
-// ============================================================================
-// AgyStreamHandler tests
-// ============================================================================
+function replayAgy(name: string, opts: { stderr?: boolean; stderrChunk?: number } = {}): AgyStreamHandler {
+  const handler = new AgyStreamHandler();
+  for (const event of loadAgyStdout(name)) handler.onEvent(event);
+  if (opts.stderr) {
+    const text = loadAgyStderr(name);
+    const size = opts.stderrChunk ?? text.length;
+    for (let i = 0; i < text.length; i += size) handler.onStderr(text.slice(i, i + size));
+  }
+  return handler;
+}
 
 describe("AgyStreamHandler", () => {
-  it("captures root conversation id and final Stop result", () => {
-    const handler = new AgyStreamHandler();
+  it("completes on result SUCCESS with the response text and init conversation id", () => {
+    const handler = replayAgy("success-describe-repo-tools");
 
-    handler.onEvent({
-      hook_event_name: "PreInvocation",
-      conversationId: "root-session",
-      invocationNum: 0,
-    });
-    handler.onEvent({
-      hook_event_name: "Stop",
-      conversationId: "root-session",
-      terminationReason: "NO_TOOL_CALL",
-      fullyIdle: true,
-      error: "",
-      result: "line one\nline two",
-    });
-
-    assert.strictEqual(handler.getSessionId(), "root-session");
-    assert.strictEqual(handler.getResult(), "line one\nline two");
+    assert.strictEqual(handler.isTerminal(), true);
     assert.strictEqual(handler.isComplete(), true);
+    assert.strictEqual(handler.getSessionId(), "2215b561-14fa-4994-b30f-95a91cf5a59a");
+    assert.ok(handler.getResult().startsWith("[claude-comms]"));
+    assert.strictEqual(handler.getFailureReason(), null);
+    assert.strictEqual(handler.getRateLimitInfo(), null);
   });
 
-  it("ignores non-idle root Stop events and subagent Stop events", () => {
-    const handler = new AgyStreamHandler();
+  it("keeps the resumed conversation id across a --conversation run", () => {
+    const handler = replayAgy("success-resume-conversation");
 
-    handler.onEvent({
-      hook_event_name: "PreInvocation",
-      conversationId: "root-session",
-    });
-    handler.onEvent({
-      hook_event_name: "Stop",
-      conversationId: "root-session",
-      fullyIdle: false,
-      result: "not done",
-    });
-    handler.onEvent({
-      hook_event_name: "Stop",
-      conversationId: "subagent-session",
-      fullyIdle: true,
-      result: "subagent done",
-    });
+    assert.strictEqual(handler.isComplete(), true);
+    assert.strictEqual(handler.getSessionId(), "1cfb10b0-a668-4810-aa0f-591f5b1d31e8");
+    assert.match(handler.getResult(), /Greeting Agent 1/);
+  });
+
+  it("prefers result.response over accumulated text deltas", () => {
+    const handler = replayAgy("success-two-subagents");
+    // text deltas are streamed before result; result.response is the complete text
+    assert.strictEqual(handler.isComplete(), true);
+    assert.ok(handler.getResult().length > 0);
+  });
+
+  it("falls back to joined text deltas when no result arrived (timeout case)", () => {
+    const handler = new AgyStreamHandler();
+    for (const event of loadAgyStdout("success-describe-repo-tools")) {
+      if (event.event === "result") break;
+      handler.onEvent(event);
+    }
 
     assert.strictEqual(handler.isTerminal(), false);
-    assert.strictEqual(handler.getResult(), "");
+    assert.strictEqual(handler.isComplete(), false);
+    assert.match(handler.getResult(), /claude-comms/);
   });
 
-  it("falls back to transcript final planner response", () => {
-    const dir = mkdtempSync(join(tmpdir(), "agy-stream-"));
-    const transcriptPath = join(dir, "transcript_full.jsonl");
-    writeFileSync(transcriptPath, [
-      JSON.stringify({ type: "PLANNER_RESPONSE", source: "MODEL", content: "old" }),
-      JSON.stringify({ type: "PLANNER_RESPONSE", source: "MODEL", content: "final\nanswer" }),
-    ].join("\n") + "\n");
+  it("fails fast on a quota wall: rate_limited reason, legible result, NO rate-limit info", () => {
+    const handler = replayAgy("quota-exhausted", { stderr: true });
 
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), false);
+    assert.strictEqual(handler.getSessionId(), "689d74e5-57a8-4a76-9045-4f9ac0b05d88");
+    assert.strictEqual(handler.getFailureReason(), "rate_limited:RESOURCE_EXHAUSTED");
+    // Hardcoded: agy never enters the awaiting_retry pause path
+    assert.strictEqual(handler.getRateLimitInfo(), null);
+    assert.deepStrictEqual(handler.getAgyError()?.error_code, 429);
+
+    const result = handler.getResult();
+    assert.match(result, /quota exhausted/);
+    assert.match(result, /produced no output/);
+    assert.match(result, /Resets in 99h45m50s/);
+    assert.match(result, /absent agent, not a verdict/);
+  });
+
+  it("parses the AGY_ERROR line when stderr arrives in arbitrary chunks", () => {
+    const handler = replayAgy("quota-exhausted", { stderr: true, stderrChunk: 7 });
+
+    assert.strictEqual(handler.getFailureReason(), "rate_limited:RESOURCE_EXHAUSTED");
+    assert.strictEqual(handler.getRateLimitInfo(), null);
+  });
+
+  it("parses an AGY_ERROR line with no trailing newline", () => {
     const handler = new AgyStreamHandler();
-    handler.onEvent({
-      hook_event_name: "PreInvocation",
-      conversationId: "root-session",
-    });
-    handler.onEvent({
-      hook_event_name: "Stop",
-      conversationId: "root-session",
-      fullyIdle: true,
-      terminationReason: "NO_TOOL_CALL",
-      error: "",
-      transcriptPath,
-    });
+    handler.onStderr('error: something\nAGY_ERROR: {"status":"RESOURCE_EXHAUSTED","error_code":429,"retryable":true}');
 
-    assert.strictEqual(handler.getResult(), "final\nanswer");
-    assert.strictEqual(handler.isComplete(), true);
+    assert.strictEqual(handler.getFailureReason(), "rate_limited:RESOURCE_EXHAUSTED");
+  });
+
+  it("fails fast on non-quota provider errors too, with the status in the reason", () => {
+    const handler = new AgyStreamHandler();
+    handler.onEvent({ event: "init", conversation_id: "c1" });
+    handler.onEvent({ event: "result", result: { conversation_id: "c1", status: "ERROR", response: "", error: "boom" } });
+    handler.onStderr('AGY_ERROR: {"short_error":"INTERNAL (code 500): boom","status":"INTERNAL","error_code":500,"retryable":true}\n');
+
+    assert.strictEqual(handler.isComplete(), false);
+    assert.strictEqual(handler.getFailureReason(), "agy_error:INTERNAL");
+    assert.strictEqual(handler.getRateLimitInfo(), null);
+    assert.match(handler.getResult(), /provider error/);
+    assert.match(handler.getResult(), /INTERNAL 500/);
+  });
+
+  it("reports a startup rejection (invalid model) from the stdout result alone", () => {
+    const handler = replayAgy("invalid-model", { stderr: true });
+
+    assert.strictEqual(handler.isTerminal(), true);
+    assert.strictEqual(handler.isComplete(), false);
+    // empty conversation_id → no session to resume
+    assert.strictEqual(handler.getSessionId(), null);
+    assert.match(handler.getFailureReason() ?? "", /^agy_result_error: invalid model selection/);
+    assert.strictEqual(handler.getRateLimitInfo(), null);
+    assert.strictEqual(handler.getAgyError(), null);
+  });
+
+  it("ignores stderr noise that is not an AGY_ERROR line", () => {
+    const handler = new AgyStreamHandler();
+    handler.onStderr("warning: print timeout\nAGY_ERROR: not json\n");
+
+    assert.strictEqual(handler.getAgyError(), null);
+    assert.strictEqual(handler.getFailureReason(), null);
   });
 });
+
 
 // ============================================================================
 // buildCommand tests
@@ -577,28 +595,43 @@ describe("buildCommand", () => {
     ]);
   });
 
-  it("builds agy command with conversation resume and print timeout", () => {
-    const agy = buildAgyCommand({
-      sessionId: "915d455b-c502-4f48-829e-a3858cd370f8",
-      model: "gemini-3.5-flash",
-      printTimeoutMs: 3600000,
-    });
+  it("builds agy stream-json command for the gemini harness with stdin prompt delivery", () => {
+    const agy = buildCommand("gemini");
 
-    // No -p: agy reads the prompt from stdin when it is not a TTY
+    assert.strictEqual(agy.cmd, "agy");
+    // No -p: agy reads the prompt from stdin when it is not a TTY.
+    // No --print-timeout: an expired agy timeout exits 0 with truncated output;
+    // the executor max-duration kill is the honest timeout.
     assert.deepStrictEqual(agy.args, [
       "--dangerously-skip-permissions",
-      "--conversation",
-      "915d455b-c502-4f48-829e-a3858cd370f8",
-      "--model",
-      "gemini-3.5-flash",
-      "--print-timeout",
-      "3600s",
+      "--disable-slash-commands",
+      "--output-format",
+      "stream-json",
     ]);
   });
 
-  it("throws for unknown harness, including removed gemini CLI", () => {
+  it("builds agy command with model and conversation resume", () => {
+    const agy = buildCommand("gemini", {
+      sessionId: "915d455b-c502-4f48-829e-a3858cd370f8",
+      model: "gemini-3.8-flash-high",
+    });
+
+    assert.deepStrictEqual(agy.args, [
+      "--dangerously-skip-permissions",
+      "--disable-slash-commands",
+      "--output-format",
+      "stream-json",
+      "--model",
+      "gemini-3.8-flash-high",
+      "--conversation",
+      "915d455b-c502-4f48-829e-a3858cd370f8",
+    ]);
+    assert.ok(!agy.args.includes("--print-timeout"));
+  });
+
+  it("throws for unknown harness", () => {
     assert.throws(() => buildCommand("unknown"), /Unknown harness/);
-    assert.throws(() => buildCommand("gemini"), /Unknown harness/);
+    assert.throws(() => buildCommand("agy"), /Unknown harness/);
   });
 
   it("builds interactive claude command without print or stream-json", () => {

@@ -582,7 +582,7 @@ Default namespace config from the live parser is:
   "review": [
     { "harness": "claude" },
     { "harness": "codex" },
-    { "harness": "gemini", "model": "auto-gemini-3" }
+    { "harness": "gemini" }
   ],
   "pm": { "harness": "claude" },
   "chat": { "harness": "claude" }

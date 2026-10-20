@@ -84,7 +84,6 @@ Each consumer repo needs its own `config.json`:
   "idleTimeoutMs": 600000,
   "reflectionTimeoutMs": 300000,
   "claudeExecutionMode": "headless",
-  "geminiExecutionMode": "gemini",
   "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
   "claudeInteractiveSettingSources": "user",
   "claudeInteractiveStopGraceMs": 3000
@@ -100,10 +99,9 @@ wrapper. The wrapper uses explicit hook settings from `.agents/tools/workflow/`
 via `--settings` and does not require a project `.claude/settings.json` hook
 install, so headless mode remains isolated.
 
-`geminiExecutionMode` can be changed to `agy` to run jobs whose harness is
-`gemini` through Antigravity headless mode. The runner merges one workflow-owned
-entry into `~/.gemini/config/hooks.json`; the hook only records events when the
-runner provides `AGY_HOOK_EVENTS_FILE`.
+Jobs whose harness is `gemini` run through Antigravity headless mode
+(`agy --output-format stream-json`). No hook install or home-config edit is
+needed; `agy` just has to be on `PATH` and authenticated.
 
 ## Initialization
 

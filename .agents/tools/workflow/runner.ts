@@ -40,7 +40,7 @@ import { type ChainGroup, type GuardianCheckpoint } from "./lib/guardian-checkpo
 import { decidePmCompletion } from "./lib/pm-completion.js";
 
 // Harness executor (file-based event streaming for crash resilience)
-import { HarnessExecutor, Harness, OrphanInfo } from "./lib/harness-executor.js";
+import { HarnessExecutor, Harness, OrphanInfo, removeLegacyAgyHookEntry } from "./lib/harness-executor.js";
 
 // Harness defaults (namespace-scoped harness+model config)
 import { HarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
@@ -161,6 +161,12 @@ const executor = new HarnessExecutor({
   claudeInteractiveSettingSources: config.claudeInteractiveSettingSources,
   claudeInteractiveStopGraceMs: config.claudeInteractiveStopGraceMs,
 });
+
+// agy now streams NDJSON on stdout; the global hook earlier runners installed
+// in ~/.gemini/config/hooks.json points at a script that no longer exists.
+if (removeLegacyAgyHookEntry()) {
+  console.log("[Runner] Removed legacy workflow-runner-agy-events hook from ~/.gemini/config/hooks.json");
+}
 
 async function fetchHarnessDefaults(namespaceId: string): Promise<HarnessDefaults> {
   try {

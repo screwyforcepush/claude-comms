@@ -24,8 +24,10 @@ export interface HarnessDefaults {
 const VALID_HARNESSES: ReadonlySet<string> = new Set(["claude", "codex", "gemini"]);
 
 /**
- * Default config that matches current behavior exactly.
- * Only Gemini gets an explicit model because buildCommand currently hardcodes auto-gemini-3.
+ * Default config seeded into new namespaces. No entry pins a model: each
+ * harness runs its own default, and the user pins models per namespace via
+ * the UI settings modal. (The gemini slot used to pin `auto-gemini-3`; agy
+ * no longer recognises that slug and hard-fails on it.)
  */
 export const DEFAULT_HARNESS_DEFAULTS: HarnessDefaults = {
   default: { harness: "claude" },
@@ -33,7 +35,7 @@ export const DEFAULT_HARNESS_DEFAULTS: HarnessDefaults = {
   review: [
     { harness: "claude" },
     { harness: "codex" },
-    { harness: "gemini", model: "auto-gemini-3" },
+    { harness: "gemini" },
   ],
   pm: { harness: "claude" },
   chat: { harness: "claude" },

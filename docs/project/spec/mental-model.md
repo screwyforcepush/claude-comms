@@ -289,7 +289,9 @@ This design keeps retry coordination state minimal — just `retryCount` on the 
 
 **Emergency brake:** Setting the assignment to `blocked` prevents the runner from picking up retried jobs. The Convex timer still fires and flips the job to `pending`, but the runner skips blocked assignments.
 
-**Scope:** Claude and Codex harnesses (a limit wall must pause the job, not insta-fail it; detection is per-harness, the pause machinery is shared). Assignment jobs only (chat jobs fail normally — the user can re-send). No cap on total retries — keeps going at 30m intervals until the window clears.
+**Scope:** Detection is per-harness, the pause machinery is shared. Assignment jobs only (chat jobs fail normally — the user can re-send). No cap on total retries — keeps going at 30m intervals until the window clears.
+
+**The pause is for the job that would otherwise be lost, not for every job.** A scarce-quota, expendable fan-out harness fails fast and is marked limited rather than pausing, because a days-long provider window on one reviewer must never hold a round hostage. Today that is the Gemini/Antigravity slot: its quota is small, its resets run to days, and its siblings cover the round. The failed job must still read as an absent reviewer, not a verdict on the work — the PM judges sibling output by what it says, so a limit wall has to say so.
 
 **Transient provider errors are pauses too.** The same principle extends beyond usage limits: a provider-side overload (Anthropic's 529) or other transient server error is not a verdict on the job — it's the provider having a moment. These differ from rate limits in one respect: no reset time is given. So the retry starts on a short synthetic delay and the same escalating backoff takes over; everything else (pause semantics, no PM cascade, countdown, emergency brake, uncapped retries) is inherited from the rate-limit design. Two deliberate calls:
 - **Detection keys on the structured error status the harness reports, never on error-message text** — the message wording drifts across CLI versions (observed in the wild); the status code is the invariant. Retry only statuses that are plausibly transient (rate-limit and server-side classes); deterministic request errors must still fail fast.
@@ -309,7 +311,7 @@ The workflow engine supports three AI harnesses: Claude, Codex, and Gemini. Each
   "review": [
     { "harness": "claude" },
     { "harness": "codex" },
-    { "harness": "gemini", "model": "auto-gemini-3" }
+    { "harness": "gemini" }
   ],
   "pm": { "harness": "claude" },
   "chat": { "harness": "claude" }

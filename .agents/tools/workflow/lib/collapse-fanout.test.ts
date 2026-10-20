@@ -15,7 +15,7 @@ const DEFAULTS: HarnessDefaults = {
   review: [
     { harness: "claude" },
     { harness: "codex" },
-    { harness: "gemini", model: "auto-gemini-3" },
+    { harness: "gemini", model: "gemini-3.8-flash-high" },
   ],
   pm: { harness: "claude" },
 };
@@ -36,7 +36,7 @@ describe("collapseFanOutDuplicates — tripwire arms", () => {
     const jobs: CollapsibleJob[] = [
       { jobType: "review", harness: "claude" },
       { jobType: "review", harness: "codex" },
-      { jobType: "review", harness: "gemini", model: "auto-gemini-3" },
+      { jobType: "review", harness: "gemini", model: "gemini-3.8-flash-high" },
     ];
     const { jobs: out, notices } = collapseFanOutDuplicates(DEFAULTS, jobs);
     assert.strictEqual(out[0].harness, undefined);

@@ -19,6 +19,7 @@ import type * as http from "../http.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_attachments from "../lib/attachments.js";
 import type * as lib_groupTransition from "../lib/groupTransition.js";
+import type * as lib_handover from "../lib/handover.js";
 import type * as lib_harnessDefaults from "../lib/harnessDefaults.js";
 import type * as namespaces from "../namespaces.js";
 import type * as notifications from "../notifications.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   jobs: typeof jobs;
   "lib/attachments": typeof lib_attachments;
   "lib/groupTransition": typeof lib_groupTransition;
+  "lib/handover": typeof lib_handover;
   "lib/harnessDefaults": typeof lib_harnessDefaults;
   namespaces: typeof namespaces;
   notifications: typeof notifications;

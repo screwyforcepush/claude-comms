@@ -41,7 +41,6 @@ node .agents/tools/workflow/sync-codex-agents.mjs
 ## Step 4: Update global CLI tools
 
 ```bash
-sudo npm install -g @google/gemini-cli@latest
 sudo npm install -g @openai/codex
 sudo npm install -g @anthropic-ai/claude-code
 curl -fsSL https://antigravity.google/cli/install.sh | bash

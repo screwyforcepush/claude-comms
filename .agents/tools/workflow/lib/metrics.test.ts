@@ -6,14 +6,24 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import {
   createMetricsState,
   formatContextPressure,
   recordMetricsEvent,
 } from "./metrics.js";
+
+const AGY_FIXTURES = fileURLToPath(new URL("./fixtures/agy/", import.meta.url));
+
+function loadAgyFixture(name: string): Record<string, unknown>[] {
+  return readFileSync(join(AGY_FIXTURES, `${name}.stdout.jsonl`), "utf-8")
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
+}
 
 describe("recordMetricsEvent", () => {
   it("counts Claude Task tool uses as subagents and deduplicates by tool id", () => {
@@ -210,47 +220,46 @@ describe("recordMetricsEvent", () => {
     assert.strictEqual(metrics.contextPressure, 10560);
   });
 
-  it("counts Antigravity hook tool calls under the Gemini harness", () => {
+  it("counts agy stream-json tool steps once per step_index (ACTIVE+DONE pairs)", () => {
     const metrics = createMetricsState();
-    const event = {
-      hook_event_name: "PreToolUse",
-      conversationId: "agy-root",
-      stepIdx: 6,
-      toolCall: {
-        name: "run_command",
-        args: {
-          CommandLine: "npm test",
-        },
-      },
-    };
+    for (const event of loadAgyFixture("success-describe-repo-tools")) {
+      recordMetricsEvent("gemini", event, metrics);
+    }
 
-    recordMetricsEvent("gemini", event, metrics);
-    recordMetricsEvent("gemini", event, metrics);
-
-    assert.strictEqual(metrics.toolCallCount, 1);
+    // 8 real tool calls (2 run_command, 6 read_file), each with an ACTIVE and a DONE event
+    assert.strictEqual(metrics.toolCallCount, 8);
     assert.strictEqual(metrics.subagentCount, 0);
+    // Context pressure = last agent_response DONE input_tokens, not the run aggregate (104750)
+    assert.strictEqual(metrics.totalTokens, 14156);
+    assert.strictEqual(metrics.contextPressure, 14156);
   });
 
-  it("counts Antigravity invoke_subagent specs as subagents", () => {
+  it("counts agy subagents by subagent_info conversation id regardless of ACTIVE step_type", () => {
+    // Run 1: one spawn surfaces as `subagent ACTIVE` then `subagent DONE`.
+    const run1 = createMetricsState();
+    for (const event of loadAgyFixture("success-two-subagents")) {
+      recordMetricsEvent("gemini", event, run1);
+    }
+    assert.strictEqual(run1.subagentCount, 2);
+    assert.strictEqual(run1.toolCallCount, 2);
+
+    // Run 2: both spawns surface as `tool ACTIVE` then `subagent DONE`.
+    const run2 = createMetricsState();
+    for (const event of loadAgyFixture("success-two-subagents-run2")) {
+      recordMetricsEvent("gemini", event, run2);
+    }
+    assert.strictEqual(run2.subagentCount, 2);
+    assert.strictEqual(run2.toolCallCount, 2);
+  });
+
+  it("ignores the agy terminal result usage for context pressure", () => {
     const metrics = createMetricsState();
-
     recordMetricsEvent("gemini", {
-      hook_event_name: "PreToolUse",
-      conversationId: "agy-root",
-      stepIdx: 16,
-      toolCall: {
-        name: "invoke_subagent",
-        args: {
-          Subagents: [
-            { Role: "A", TypeName: "self", Prompt: "hello" },
-            { Role: "B", TypeName: "self", Prompt: "hello" },
-          ],
-        },
-      },
+      event: "result",
+      result: { status: "SUCCESS", usage: { input_tokens: 104750, total_tokens: 105868 } },
     }, metrics);
-
-    assert.strictEqual(metrics.toolCallCount, 1);
-    assert.strictEqual(metrics.subagentCount, 2);
+    assert.strictEqual(metrics.totalTokens, null);
+    assert.strictEqual(metrics.toolCallCount, 0);
   });
 });
 

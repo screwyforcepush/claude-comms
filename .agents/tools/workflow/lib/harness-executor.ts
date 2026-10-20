@@ -20,7 +20,6 @@ import {
   createReadStream,
   statSync,
   existsSync,
-  mkdirSync,
   readFileSync,
   writeFileSync,
 } from "fs";
@@ -48,7 +47,6 @@ import {
   RateLimitInfo,
   createStreamHandler,
   buildCommand,
-  buildAgyCommand,
   buildInteractiveClaudeCommand,
   CommandOptions,
 } from "./streams.js";
@@ -102,10 +100,6 @@ export interface ExecutorConfig {
   claudeInteractiveStopGraceMs?: number;
   /** Path to the Python PTY bridge. Defaults to workflow/claude-interactive-driver.py. */
   claudeInteractiveDriverPath?: string;
-  /** Global Antigravity hooks file. Defaults to ~/.gemini/config/hooks.json. */
-  agyHooksPath?: string;
-  /** Path to Antigravity hook receiver script. Defaults to workflow/agy-hook-post-event.sh. */
-  agyHookScriptPath?: string;
 }
 
 export interface ExecuteOptions {
@@ -353,55 +347,30 @@ const workflowDir = join(__dirname, "..");
 const DEFAULT_CLAUDE_INTERACTIVE_SETTINGS_PATH = join(workflowDir, "claude-hook-settings.json");
 const DEFAULT_CLAUDE_INTERACTIVE_DRIVER_PATH = join(workflowDir, "claude-interactive-driver.py");
 const DEFAULT_CLAUDE_INTERACTIVE_STOP_GRACE_MS = 3000;
-const DEFAULT_AGY_HOOK_SCRIPT_PATH = join(workflowDir, "agy-hook-post-event.sh");
-const AGY_HOOK_NAME = "workflow-runner-agy-events";
+const LEGACY_AGY_HOOK_NAME = "workflow-runner-agy-events";
 
-function defaultAgyHooksPath(): string {
+/**
+ * One-time cleanup of the global Antigravity hook the runner used to install
+ * before agy gained `--output-format stream-json`. The hook pointed at a script
+ * that no longer ships, so a stale entry would make every agy run invoke a
+ * missing file. Removes only the workflow-owned key; other hooks are untouched.
+ * Best-effort: returns true when an entry was removed.
+ */
+export function removeLegacyAgyHookEntry(hooksPath?: string): boolean {
   const home = process.env.HOME;
-  if (!home) {
-    throw new Error("HOME is required to locate ~/.gemini/config/hooks.json for agy hooks");
+  const path = hooksPath ?? (home ? join(home, ".gemini", "config", "hooks.json") : null);
+  if (!path || !existsSync(path)) return false;
+  try {
+    const raw = readFileSync(path, "utf-8").trim();
+    if (!raw) return false;
+    const hooksConfig = JSON.parse(raw) as Record<string, unknown>;
+    if (!(LEGACY_AGY_HOOK_NAME in hooksConfig)) return false;
+    delete hooksConfig[LEGACY_AGY_HOOK_NAME];
+    writeFileSync(path, JSON.stringify(hooksConfig, null, 2) + "\n");
+    return true;
+  } catch {
+    return false;
   }
-  return join(home, ".gemini", "config", "hooks.json");
-}
-
-function agyHookCommand(scriptPath: string, eventName: string): string {
-  return `bash ${JSON.stringify(scriptPath)} ${eventName}`;
-}
-
-function buildAgyHooksEntry(scriptPath: string): Record<string, unknown> {
-  const hook = (eventName: string) => ({
-    type: "command",
-    command: agyHookCommand(scriptPath, eventName),
-    timeout: 10,
-  });
-
-  return {
-    enabled: true,
-    PreToolUse: [{ matcher: "*", hooks: [hook("PreToolUse")] }],
-    PostToolUse: [{ matcher: "*", hooks: [hook("PostToolUse")] }],
-    PreInvocation: [hook("PreInvocation")],
-    PostInvocation: [hook("PostInvocation")],
-    Stop: [hook("Stop")],
-  };
-}
-
-function ensureAgyHooksInstalled(hooksPath: string, scriptPath: string): void {
-  mkdirSync(dirname(hooksPath), { recursive: true });
-
-  let hooksConfig: Record<string, unknown> = {};
-  if (existsSync(hooksPath)) {
-    const raw = readFileSync(hooksPath, "utf-8").trim();
-    if (raw) {
-      hooksConfig = JSON.parse(raw) as Record<string, unknown>;
-    }
-  }
-
-  const desiredEntry = buildAgyHooksEntry(scriptPath);
-  const existingEntry = hooksConfig[AGY_HOOK_NAME];
-  if (JSON.stringify(existingEntry) === JSON.stringify(desiredEntry)) return;
-
-  hooksConfig[AGY_HOOK_NAME] = desiredEntry;
-  writeFileSync(hooksPath, JSON.stringify(hooksConfig, null, 2) + "\n");
 }
 
 /**
@@ -436,11 +405,8 @@ export class HarnessExecutor {
     if (options.harness === "claude" && this.config.claudeExecutionMode === "interactive") {
       return this.executeClaudeInteractive(options, callbacks);
     }
-    if (options.harness === "gemini") {
-      // The gemini CLI backend is gone; harness "gemini" now always means agy.
-      return this.executeAgy(options, callbacks);
-    }
-
+    // Harness "gemini" runs on Antigravity (agy), whose stream-json stdout
+    // flows through this same path; buildCommand/createStreamHandler map it.
     const { jobId, harness, prompt, sessionId, forkSession, env } = options;
 
     // 1. Create job directory and ensure log file exists
@@ -634,9 +600,12 @@ export class HarnessExecutor {
       callbacks.onFail(reason, undefined, undefined, handler.getSessionId() || undefined);
     });
 
-    // 10. Handle stderr
+    // 10. Handle stderr — logged, and offered to the handler for harnesses
+    // that report structured errors there (agy's AGY_ERROR line).
     child.stderr?.on("data", (data: Buffer) => {
-      console.error(`[${jobId}] stderr: ${data.toString()}`);
+      const text = data.toString();
+      console.error(`[${jobId}] stderr: ${text}`);
+      handler.onStderr?.(text);
     });
 
     // 11. Handle process exit
@@ -695,199 +664,6 @@ export class HarnessExecutor {
         child.kill("SIGTERM");
         setTimeout(() => {
           if (!child.killed) child.kill("SIGKILL");
-        }, 5000);
-      },
-      getTracker: () => tracker,
-    };
-  }
-
-  /**
-   * Execute Gemini-compatible jobs through Antigravity headless mode.
-   *
-   * agy does not provide JSON stream output. Instead, a global Antigravity hook
-   * appends structured JSONL events to the per-job agent.log file while stdout
-   * remains plain text and is kept only as a fallback result.
-   */
-  private executeAgy(options: ExecuteOptions, callbacks: ExecutionCallbacks): ExecutionHandle {
-    const { jobId, prompt, sessionId, env } = options;
-
-    const paths = ensureJobDir(jobId);
-    writeFileSync(paths.logPath, "");
-
-    const hooksPath = this.config.agyHooksPath ?? defaultAgyHooksPath();
-    const hookScriptPath = this.config.agyHookScriptPath ?? DEFAULT_AGY_HOOK_SCRIPT_PATH;
-    try {
-      ensureAgyHooksInstalled(hooksPath, hookScriptPath);
-    } catch (err) {
-      const pid = 0;
-      const tracker = new JobTracker(jobId, "gemini", pid);
-      const reason = `agy_hooks_error: ${err instanceof Error ? err.message : String(err)}`;
-      tracker.fail(reason);
-      callbacks.onFail(reason);
-      return {
-        jobId,
-        pid,
-        kill: () => {},
-        getTracker: () => tracker,
-      };
-    }
-
-    const command = buildAgyCommand({
-      model: options.model,
-      sessionId,
-      printTimeoutMs: this.config.timeoutMs,
-    });
-
-    const child = spawn(command.cmd, command.args, {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        ...env,
-        AGY_HOOK_EVENTS_FILE: paths.logPath,
-      },
-      cwd: this.config.cwd,
-    });
-
-    // Error handler must be attached before end(): a child that dies without
-    // draining stdin emits EPIPE here, which would otherwise crash the runner.
-    child.stdin?.on("error", (err) => {
-      console.error(`[${jobId}] agy stdin write failed: ${err.message}`);
-    });
-    child.stdin?.end(prompt, "utf-8");
-
-    const pid = child.pid || 0;
-    const tracker = new JobTracker(jobId, "gemini", pid);
-    const handler = createStreamHandler("agy");
-    const tailer = new LogTailer(paths.logPath, 0, {
-      pollIntervalMs: this.config.pollIntervalMs,
-      debounceMs: this.config.debounceMs,
-    });
-
-    let timedOut = false;
-    let idleTimedOut = false;
-    let timeoutReason: TimeoutReason | null = null;
-    let spawnFailed = false;
-    let jobCompleted = false;
-    let stdoutFallback = "";
-
-    const appendStdoutFallback = (chunk: Buffer): void => {
-      stdoutFallback += chunk.toString();
-      if (stdoutFallback.length > 5000) {
-        stdoutFallback = "...truncated.\n" + stdoutFallback.slice(-5000);
-      }
-    };
-
-    const completeFromCurrentState = (
-      code: number | null,
-      timedOutStatus: boolean
-    ): void => {
-      if (jobCompleted) return;
-      jobCompleted = true;
-      this.activeJobs.delete(jobId);
-
-      const result = handler.getResult() || stdoutFallback.trim();
-      console.log(`[${jobId}] agy exited with code ${code}`);
-
-      if (timedOutStatus) {
-        callbacks.onTimeout(result || "(no output)", handler.getSessionId() || undefined, timeoutReason ?? "max_duration");
-      } else if (code === 0 && (handler.isComplete() || result)) {
-        tracker.complete(result);
-        callbacks.onComplete(result, handler.getSessionId() || undefined, false);
-      } else {
-        const failureReason = handler.getFailureReason();
-        const reason = failureReason
-          ? `process_exit_${code} (${failureReason})`
-          : `process_exit_${code}`;
-        tracker.fail(reason);
-        callbacks.onFail(reason, result, false, handler.getSessionId() || undefined);
-      }
-    };
-
-    let idleTimeout: NodeJS.Timeout | null = null;
-    const resetIdleTimeout = () => {
-      const idleTimeoutMs = this.config.idleTimeoutMs;
-      if (!idleTimeoutMs) return;
-      if (idleTimeout) clearTimeout(idleTimeout);
-      idleTimeout = setTimeout(() => {
-        idleTimedOut = true;
-        timeoutReason ??= "idle_timeout";
-        console.log(`[${jobId}] Idle timeout after ${idleTimeoutMs}ms (no agy hook events)`);
-        tracker.timeout(timeoutReason);
-        child.kill("SIGTERM");
-        setTimeout(() => {
-          if (child.exitCode === null) child.kill("SIGKILL");
-        }, 5000);
-      }, idleTimeoutMs);
-    };
-
-    tailer.on("event", (event: Record<string, unknown>) => {
-      handler.onEvent(event);
-      const eventType =
-        (event.hook_event_name as string | undefined) ??
-        (event.type as string | undefined) ??
-        "event";
-      tracker.recordEvent(eventType);
-      resetIdleTimeout();
-      callbacks.onEvent?.(event);
-    });
-
-    tailer.on("position", (pos: number) => {
-      tracker.setReadPosition(pos);
-    });
-
-    tailer.start();
-    resetIdleTimeout();
-
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      timeoutReason ??= "max_duration";
-      console.log(`[${jobId}] Timeout after ${this.config.timeoutMs}ms (max duration)`);
-      tracker.timeout(timeoutReason);
-      child.kill("SIGTERM");
-      setTimeout(() => {
-        if (child.exitCode === null) child.kill("SIGKILL");
-      }, 5000);
-    }, this.config.timeoutMs);
-
-    child.stdout?.on("data", appendStdoutFallback);
-
-    child.stderr?.on("data", (data: Buffer) => {
-      console.error(`[${jobId}] agy stderr: ${data.toString()}`);
-    });
-
-    child.on("error", (err) => {
-      spawnFailed = true;
-      clearTimeout(timeout);
-      if (idleTimeout) clearTimeout(idleTimeout);
-      tailer.stop();
-      this.activeJobs.delete(jobId);
-
-      const reason = `spawn_error: ${err.message}`;
-      console.error(`[${jobId}] agy spawn failed: ${err.message}`);
-      tracker.fail(reason);
-      callbacks.onFail(reason, undefined, undefined, handler.getSessionId() || undefined);
-    });
-
-    child.on("close", async (code) => {
-      if (spawnFailed || jobCompleted) return;
-
-      clearTimeout(timeout);
-      if (idleTimeout) clearTimeout(idleTimeout);
-      await tailer.flush();
-      tailer.stop();
-
-      completeFromCurrentState(code, timedOut || idleTimedOut);
-    });
-
-    this.activeJobs.set(jobId, { child, tailer, tracker, handler, timeout });
-
-    return {
-      jobId,
-      pid,
-      kill: () => {
-        child.kill("SIGTERM");
-        setTimeout(() => {
-          if (child.exitCode === null) child.kill("SIGKILL");
         }, 5000);
       },
       getTracker: () => tracker,

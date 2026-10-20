@@ -89,28 +89,40 @@ function extractToolCallInfo(
       return { ids, hadToolUse: true };
     }
     case "gemini": {
-      if (hookEventName === "PreToolUse") {
-        const toolCall = event.toolCall as {
-          name?: string;
-        } | undefined;
-        if (!toolCall?.name) return { ids: [], hadToolUse: false };
-        const conversationId = event.conversationId as string | undefined;
-        const stepIdx = event.stepIdx as number | string | undefined;
-        const id = conversationId && stepIdx !== undefined
-          ? `${conversationId}:${stepIdx}:${toolCall.name}`
-          : undefined;
-        return { ids: id ? [id] : [], hadToolUse: true };
+      // agy stream-json: a tool call is a `tool` (or `subagent`, for
+      // invoke_subagent) step. ACTIVE and DONE share a step_index, so the
+      // conversation:step pair dedupes the pair to one call.
+      const step = agyStep(event);
+      if (!step || (step.step_type !== "tool" && step.step_type !== "subagent")) {
+        return { ids: [], hadToolUse: false };
       }
-      if (type !== "tool_use") return { ids: [], hadToolUse: false };
-      const toolId =
-        (event.tool_id as string | undefined) ??
-        (event.toolId as string | undefined) ??
-        (event.toolID as string | undefined);
-      return { ids: toolId ? [String(toolId)] : [], hadToolUse: true };
+      const id = agyStepId(step);
+      return { ids: id ? [id] : [], hadToolUse: true };
     }
     default:
       return { ids: [], hadToolUse: false };
   }
+}
+
+interface AgyStepUpdate {
+  conversation_id?: string;
+  step_index?: number;
+  state?: string;
+  step_type?: string;
+  usage?: { input_tokens?: number; cache_read_tokens?: number };
+  subagent_info?: { subagents?: Array<{ conversation_id?: string }> };
+}
+
+function agyStep(event: Record<string, unknown>): AgyStepUpdate | null {
+  if (event.event !== "step_update") return null;
+  const step = event.step_update;
+  return step && typeof step === "object" ? (step as AgyStepUpdate) : null;
+}
+
+function agyStepId(step: AgyStepUpdate): string | undefined {
+  return step.conversation_id && step.step_index !== undefined
+    ? `${step.conversation_id}:${step.step_index}`
+    : undefined;
 }
 
 function extractSubagentInfo(
@@ -167,34 +179,19 @@ function extractSubagentInfo(
       return { ids, hadSubagent: true };
     }
     case "gemini": {
-      if (hookEventName === "PreToolUse") {
-        const toolCall = event.toolCall as {
-          name?: string;
-          args?: {
-            Subagents?: unknown;
-          };
-        } | undefined;
-        if (toolCall?.name !== "invoke_subagent") return { ids: [], hadSubagent: false };
-        const conversationId = event.conversationId as string | undefined;
-        const stepIdx = event.stepIdx as number | string | undefined;
-        const subagents = Array.isArray(toolCall.args?.Subagents)
-          ? toolCall.args.Subagents
-          : [null];
-        const ids = subagents.map((_, index) =>
-          conversationId && stepIdx !== undefined
-            ? `${conversationId}:${stepIdx}:subagent:${index}`
-            : ""
-        ).filter(Boolean);
-        return { ids, hadSubagent: true };
+      // agy stream-json: key on subagent_info, not step_type. A spawn's ACTIVE
+      // event is sometimes `tool` and sometimes `subagent`; the DONE event is
+      // always `subagent` and always carries subagent_info. Each subagent has
+      // its own conversation_id, which dedupes ACTIVE/DONE to one count.
+      const step = agyStep(event);
+      const subagents = step?.subagent_info?.subagents;
+      if (!Array.isArray(subagents) || subagents.length === 0) {
+        return { ids: [], hadSubagent: false };
       }
-      if (type !== "tool_use") return { ids: [], hadSubagent: false };
-      const toolName = event.tool_name as string | undefined;
-      if (toolName !== "delegate_to_agent") return { ids: [], hadSubagent: false };
-      const toolId =
-        (event.tool_id as string | undefined) ??
-        (event.toolId as string | undefined) ??
-        (event.toolID as string | undefined);
-      return { ids: toolId ? [String(toolId)] : [], hadSubagent: true };
+      const ids = subagents
+        .map((s) => (s?.conversation_id ? String(s.conversation_id) : ""))
+        .filter(Boolean);
+      return { ids, hadSubagent: true };
     }
     default:
       return { ids: [], hadSubagent: false };
@@ -235,15 +232,16 @@ function extractTotalTokens(
     }
   }
 
-  if (harness === "gemini" && type === "result") {
-    const stats = event.stats as {
-      total_tokens?: number;
-      input_tokens?: number;
-      output_tokens?: number;
-    } | undefined;
-    if (typeof stats?.total_tokens === "number") return stats.total_tokens;
-    if (typeof stats?.input_tokens === "number" && typeof stats?.output_tokens === "number") {
-      return stats.input_tokens + stats.output_tokens;
+  if (harness === "gemini") {
+    // agy stream-json: each agent_response DONE carries that step's usage;
+    // its input_tokens (+ cache reads) is the live context size, which is the
+    // same context-pressure semantics Claude's per-message usage gives. The
+    // terminal result's usage is the run aggregate and would overstate it.
+    const step = agyStep(event);
+    if (step?.step_type === "agent_response" && step.state === "DONE" && step.usage) {
+      if (typeof step.usage.input_tokens === "number") {
+        return step.usage.input_tokens + (step.usage.cache_read_tokens ?? 0);
+      }
     }
   }
 

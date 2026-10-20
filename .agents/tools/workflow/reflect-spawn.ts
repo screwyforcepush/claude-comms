@@ -7,7 +7,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
 import { getEngineIdentity } from "./lib/engine-version.js";
 import { buildClaudeForkArgs } from "./lib/fork-args.js";
-import { buildAgyCommand } from "./lib/streams.js";
+import { buildCommand } from "./lib/streams.js";
 
 const DEFAULT_REFLECTION_TIMEOUT_MS = 5 * 60_000;
 const KILL_GRACE_MS = 10_000;
@@ -103,11 +103,7 @@ async function runCodex(prompt: string, sessionId: string, timeoutMs: number, mo
 }
 
 async function runAgy(prompt: string, sessionId: string, timeoutMs: number, model?: string): Promise<void> {
-  const command = buildAgyCommand({
-    sessionId,
-    model,
-    printTimeoutMs: timeoutMs,
-  });
+  const command = buildCommand("gemini", { sessionId, model });
   await runWithTimeout(command.cmd, command.args, timeoutMs, prompt);
 }
 

@@ -1,9 +1,7 @@
-import { existsSync, readFileSync } from "fs";
-
 /**
  * Stream Handlers for different AI harnesses
  *
- * Parses JSON stream output from Claude, Codex, and Gemini CLIs.
+ * Parses JSON stream output from the Claude, Codex, and Antigravity (agy) CLIs.
  * Extracts text results, completion status, and session IDs.
  */
 
@@ -29,8 +27,18 @@ export interface StreamHandler {
   getSessionId(): string | null;
   /** Get a failure reason if a terminal error was observed */
   getFailureReason(): string | null;
-  /** Get rate-limit info if a provider usage limit was detected (Claude and Codex) */
+  /**
+   * Get rate-limit info if a provider usage limit was detected. Returning
+   * info routes the job into the pause-and-retry path; returning null on a
+   * limit wall makes the job fail fast instead (the agy handler does this
+   * deliberately — see mental-model.md "Rate-Limit Resilience").
+   */
   getRateLimitInfo(): RateLimitInfo | null;
+  /**
+   * Optional: receive raw stderr chunks. Harnesses that report structured
+   * errors on stderr (agy's `AGY_ERROR: {...}` line) parse them here.
+   */
+  onStderr?(chunk: string): void;
 }
 
 export interface CommandOptions {
@@ -40,11 +48,6 @@ export interface CommandOptions {
   forkSession?: boolean;
   /** Model to pass to harness CLI */
   model?: string;
-}
-
-export interface AgyCommandOptions extends CommandOptions {
-  /** Print-mode timeout passed to agy, in milliseconds */
-  printTimeoutMs?: number;
 }
 
 export interface CommandResult {
@@ -352,131 +355,142 @@ export class CodexStreamHandler implements StreamHandler {
 }
 
 // ============================================================================
-// Gemini Stream Handler
+// Agy (Antigravity) Stream Handler — `agy --output-format stream-json`
 // ============================================================================
 
-export class GeminiStreamHandler implements StreamHandler {
-  private buffer = "";
-  private currentTurnBuffer = "";
-  private complete = false;
-  private failureReason: string | null = null;
-  private sessionId: string | null = null;
-
-  onEvent(event: Record<string, unknown>): void {
-    const type = event.type as string;
-
-    if (type === "init" && event.session_id) {
-      this.sessionId = String(event.session_id);
-    }
-
-    if (type === "message" && event.role === "assistant") {
-      const content = event.content as string | undefined;
-      if (content) {
-        this.buffer += content;
-        this.currentTurnBuffer += content;
-      }
-    }
-
-    // tool_use marks a turn boundary — next assistant messages are a new turn
-    if (type === "tool_use") {
-      this.currentTurnBuffer = "";
-    }
-
-    if (type === "result") {
-      this.complete = true;
-      const status = event.status as string | undefined;
-      if (status && status !== "success") {
-        this.failureReason = `gemini_result_${status}`;
-      }
-    }
-  }
-
-  getResult(): string {
-    // Prefer the last assistant turn, fall back to full accumulated buffer
-    return this.currentTurnBuffer || truncateFallback(this.buffer);
-  }
-
-  isTerminal(): boolean {
-    return this.complete;
-  }
-
-  isComplete(): boolean {
-    return this.complete;
-  }
-
-  getSessionId(): string | null {
-    return this.sessionId;
-  }
-
-  getFailureReason(): string | null {
-    return this.failureReason;
-  }
-
-  getRateLimitInfo(): RateLimitInfo | null {
-    return null;
-  }
+/**
+ * Structured error agy prints on stderr as `AGY_ERROR: {...}` when a headless
+ * run fails for a provider/model reason (exit code 3). `status` is the
+ * invariant we key on; the message text drifts across CLI versions.
+ */
+export interface AgyError {
+  status: string;
+  error_code?: number;
+  code_kind?: string;
+  retryable?: boolean;
+  short_error?: string;
+  error_id?: string;
 }
 
-// ============================================================================
-// Agy Stream Handler
-// ============================================================================
+const AGY_ERROR_PREFIX = "AGY_ERROR:";
 
+/**
+ * Parses the NDJSON stream agy emits on stdout in print mode:
+ *   { event: "init", conversation_id, init: { model, cwd, tools[] } }
+ *   { event: "step_update", step_update: { step_type, state, text_delta?, usage?, tool_info?, subagent_info? } }
+ *   { event: "result", result: { conversation_id, status: "SUCCESS"|"ERROR", response, error, usage } }
+ *
+ * Fixtures for every branch live in lib/fixtures/agy/.
+ */
 export class AgyStreamHandler implements StreamHandler {
+  private sessionId: string | null = null;
   private complete = false;
   private success = false;
-  private sessionId: string | null = null;
-  private failureReason: string | null = null;
   private finalResult: string | null = null;
-  private rootConversationId: string | null = null;
+  private resultError: string | null = null;
+  private textDeltas: string[] = [];
+  private agyError: AgyError | null = null;
+  private stderrBuffer = "";
 
   onEvent(event: Record<string, unknown>): void {
-    const hookEventName = event.hook_event_name as string | undefined;
-    const conversationId = event.conversationId as string | undefined;
+    const kind = event.event as string | undefined;
 
-    if (conversationId && !this.rootConversationId) {
-      this.rootConversationId = conversationId;
-      this.sessionId = conversationId;
-    }
-
-    if (hookEventName !== "Stop") return;
-
-    // Subagents inherit the hook environment; only the root conversation Stop
-    // should terminate the parent workflow job.
-    if (
-      this.rootConversationId &&
-      conversationId &&
-      conversationId !== this.rootConversationId
-    ) {
+    if (kind === "init") {
+      const conversationId = event.conversation_id;
+      if (conversationId) this.sessionId = String(conversationId);
       return;
     }
 
-    const fullyIdle = event.fullyIdle as boolean | undefined;
-    if (fullyIdle === false) return;
-
-    this.complete = true;
-
-    const error = event.error as string | undefined;
-    const terminationReason = event.terminationReason as string | undefined;
-    const normalizedReason = (terminationReason || "").toLowerCase();
-    this.success = !error && !normalizedReason.includes("error") && !normalizedReason.includes("max_steps");
-
-    if (typeof event.result === "string") {
-      this.finalResult = event.result;
-    } else {
-      const transcriptPath = event.transcriptPath as string | undefined;
-      const transcriptResult = transcriptPath ? readAgyFinalPlannerResponse(transcriptPath) : null;
-      if (transcriptResult) {
-        this.finalResult = transcriptResult;
+    if (kind === "step_update") {
+      const step = event.step_update as {
+        step_type?: string;
+        state?: string;
+        text_delta?: string;
+      } | undefined;
+      if (step?.step_type === "agent_response" && step.state === "ACTIVE" && typeof step.text_delta === "string") {
+        this.textDeltas.push(step.text_delta);
       }
+      return;
     }
 
-    if (!this.success) {
-      this.failureReason = `agy_stop_${terminationReason || error || "unknown"}`;
+    if (kind === "result") {
+      const result = event.result as {
+        conversation_id?: string;
+        status?: string;
+        response?: string;
+        error?: string;
+      } | undefined;
+      this.complete = true;
+      this.success = result?.status === "SUCCESS";
+      if (result?.conversation_id) this.sessionId = String(result.conversation_id);
+      if (typeof result?.response === "string" && result.response.trim()) {
+        this.finalResult = result.response;
+      }
+      if (!this.success) {
+        this.resultError = (result?.error || "unknown").trim();
+      }
     }
   }
 
+  onStderr(chunk: string): void {
+    this.stderrBuffer += chunk;
+    let newline = this.stderrBuffer.indexOf("\n");
+    while (newline >= 0) {
+      this.parseStderrLine(this.stderrBuffer.slice(0, newline));
+      this.stderrBuffer = this.stderrBuffer.slice(newline + 1);
+      newline = this.stderrBuffer.indexOf("\n");
+    }
+    // The AGY_ERROR line is usually the last thing agy prints and may arrive
+    // without a trailing newline; try the remainder too, consuming it only
+    // when it parses as a whole line.
+    if (this.stderrBuffer.startsWith(AGY_ERROR_PREFIX) && this.parseStderrLine(this.stderrBuffer)) {
+      this.stderrBuffer = "";
+    }
+  }
+
+  private parseStderrLine(line: string): boolean {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith(AGY_ERROR_PREFIX)) return false;
+    try {
+      const parsed = JSON.parse(trimmed.slice(AGY_ERROR_PREFIX.length).trim()) as Partial<AgyError>;
+      if (typeof parsed.status === "string") {
+        this.agyError = parsed as AgyError;
+        return true;
+      }
+    } catch {
+      // Partial line — wait for more stderr.
+    }
+    return false;
+  }
+
+  /** The structured provider error, if agy reported one on stderr. */
+  getAgyError(): AgyError | null {
+    return this.agyError;
+  }
+
+  private isQuotaWall(): boolean {
+    return this.agyError?.status === "RESOURCE_EXHAUSTED" || this.agyError?.error_code === 429;
+  }
+
+  /**
+   * Result text. On a provider error the result is a legible notice rather
+   * than the raw error, because the PM reads this field to judge sibling
+   * output: a quota-walled reviewer is an absent reviewer, not a verdict.
+   */
   getResult(): string {
-    return this.finalResult || "";
+    if (this.finalResult) return this.finalResult;
+    if (this.agyError) return this.describeAgyError();
+    return truncateFallback(this.textDeltas.join(""));
+  }
+
+  private describeAgyError(): string {
+    const err = this.agyError!;
+    const code = err.error_code !== undefined ? ` ${err.error_code}` : "";
+    const detail = err.short_error ? ` ${err.short_error}` : "";
+    const headline = this.isQuotaWall()
+      ? "Antigravity (agy) provider quota exhausted — this job produced no output."
+      : "Antigravity (agy) provider error — this job produced no output.";
+    return `${headline} Status ${err.status}${code}.${detail}\nTreat this as an absent agent, not a verdict on the work under review.`;
   }
 
   isTerminal(): boolean {
@@ -492,44 +506,29 @@ export class AgyStreamHandler implements StreamHandler {
   }
 
   getFailureReason(): string | null {
-    return this.failureReason;
+    if (this.agyError) {
+      return this.isQuotaWall()
+        ? `rate_limited:${this.agyError.status}`
+        : `agy_error:${this.agyError.status}`;
+    }
+    if (this.complete && !this.success) {
+      return `agy_result_error: ${(this.resultError || "unknown").slice(0, 200)}`;
+    }
+    return null;
   }
 
+  /**
+   * Always null — hardcoded. An agy limit wall fails fast and never enters
+   * the awaiting_retry pause: the agy quota is small and its reset windows run
+   * to days, and the gemini slot is an expendable fan-out reviewer whose
+   * siblings cover the round. A pause here would freeze the group for the
+   * weakest reviewer in the room. See mental-model.md "Rate-Limit Resilience".
+   */
   getRateLimitInfo(): RateLimitInfo | null {
     return null;
   }
 }
 
-function readAgyFinalPlannerResponse(transcriptPath: string): string | null {
-  if (!existsSync(transcriptPath)) return null;
-
-  try {
-    const lines = readFileSync(transcriptPath, "utf-8")
-      .split("\n")
-      .filter((line) => line.trim());
-
-    for (let i = lines.length - 1; i >= 0; i--) {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(lines[i]) as Record<string, unknown>;
-      } catch {
-        continue;
-      }
-
-      if (
-        parsed.type === "PLANNER_RESPONSE" &&
-        parsed.source === "MODEL" &&
-        typeof parsed.content === "string"
-      ) {
-        return parsed.content;
-      }
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
 
 // ============================================================================
 // Factory Function
@@ -545,8 +544,7 @@ export function createStreamHandler(harness: string): StreamHandler {
     case "codex":
       return new CodexStreamHandler();
     case "gemini":
-      return new GeminiStreamHandler();
-    case "agy":
+      // Harness "gemini" runs on Antigravity (agy); the gemini CLI backend is gone.
       return new AgyStreamHandler();
     default:
       return new ClaudeStreamHandler();
@@ -561,8 +559,9 @@ export function createStreamHandler(harness: string): StreamHandler {
  * Build command and arguments for spawning a harness process.
  *
  * The prompt is intentionally NOT part of argv — callers must pipe it to the
- * child's stdin (claude: bare `-p`, codex: the `-` sentinel). Argv prompts
- * are visible in `ps` and capped at ~128KiB per argument by the kernel.
+ * child's stdin (claude: bare `-p`, codex: the `-` sentinel, agy: non-TTY
+ * stdin detection). Argv prompts are visible in `ps` and capped at ~128KiB
+ * per argument by the kernel.
  */
 export function buildCommand(
   harness: string,
@@ -611,33 +610,31 @@ export function buildCommand(
       }
       return { cmd: "codex", args };
     }
+    case "gemini": {
+      // Harness "gemini" runs on Antigravity headless mode (agy).
+      // No prompt flag: agy enters print mode by detecting a non-TTY stdin and
+      // reads the prompt from it. `-p` requires an inline argument and `-p -`
+      // sends a literal hyphen, so bare piping is the only stdin form agy supports.
+      // No --print-timeout: since agy 1.1.28 an expired print timeout exits 0
+      // with truncated output, which would record a cut-off run as a clean
+      // completion. The executor's own max-duration kill is the honest timeout.
+      const args = [
+        "--dangerously-skip-permissions",
+        "--disable-slash-commands",
+        "--output-format",
+        "stream-json",
+      ];
+      if (options.model) {
+        args.push("--model", options.model);
+      }
+      if (options.sessionId) {
+        args.push("--conversation", options.sessionId);
+      }
+      return { cmd: "agy", args };
+    }
     default:
       throw new Error(`Unknown harness: ${harness}`);
   }
-}
-
-export function buildAgyCommand(options: AgyCommandOptions = {}): CommandResult {
-  const args = ["--dangerously-skip-permissions"];
-
-  if (options.sessionId) {
-    args.push("--conversation", options.sessionId);
-  }
-  if (options.model) {
-    args.push("--model", options.model);
-  }
-  if (options.printTimeoutMs) {
-    args.push("--print-timeout", formatAgyDuration(options.printTimeoutMs));
-  }
-
-  // No prompt flag: agy enters print mode by detecting a non-TTY stdin and
-  // reads the prompt from it. `-p` requires an inline argument and `-p -`
-  // sends a literal hyphen, so bare piping is the only stdin form agy supports.
-  return { cmd: "agy", args };
-}
-
-function formatAgyDuration(ms: number): string {
-  const seconds = Math.max(1, Math.ceil(ms / 1000));
-  return `${seconds}s`;
 }
 
 /**
