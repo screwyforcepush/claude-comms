@@ -350,18 +350,123 @@ class FeedProtocolTest {
         assertEquals(listOf("post:note-1", "post:note-2", "ack:note-1,note-2", "persist:2.0"), effects.events)
     }
 
+    @Test
+    fun readReceiptCancelsTheThreadNotificationAndIsAcked() {
+        val effects = RecordingLiveEffects()
+        val page = FeedPage(
+            rows = listOf(row(id = "read-1", creationTime = 5.0, threadId = "thread-x", kind = "read")),
+            nextCursor = 5.0,
+        )
+
+        val result = FeedProtocol.processLivePage(page, effects = effects)
+
+        assertEquals(5.0, result.advancedCursor)
+        assertEquals(emptyList<String>(), result.postedIds)
+        assertEquals(listOf("read-1"), result.acknowledgedIds)
+        assertEquals(listOf("cancel:thread-x", "ack:read-1", "persist:5.0"), effects.events)
+    }
+
+    @Test
+    fun messageReadLaterInTheSamePageIsNeverPosted() {
+        val effects = RecordingLiveEffects()
+        val page = FeedPage(
+            rows = listOf(
+                row(id = "msg-1", creationTime = 1.0, threadId = "thread-x"),
+                row(id = "msg-2", creationTime = 2.0, threadId = "thread-y"),
+                row(id = "read-1", creationTime = 3.0, threadId = "thread-x", kind = "read"),
+            ),
+            nextCursor = 3.0,
+        )
+
+        val result = FeedProtocol.processLivePage(page, effects = effects)
+
+        assertEquals(3.0, result.advancedCursor)
+        assertEquals(listOf("msg-2"), result.postedIds)
+        assertEquals(listOf("msg-1", "msg-2", "read-1"), result.acknowledgedIds)
+        assertEquals(
+            listOf("post:msg-2", "cancel:thread-x", "ack:msg-1,msg-2,read-1", "persist:3.0"),
+            effects.events,
+        )
+    }
+
+    @Test
+    fun messageArrivingAfterTheReadReceiptStillPosts() {
+        val effects = RecordingLiveEffects()
+        val page = FeedPage(
+            rows = listOf(
+                row(id = "read-1", creationTime = 1.0, threadId = "thread-x", kind = "read"),
+                row(id = "msg-2", creationTime = 2.0, threadId = "thread-x"),
+            ),
+            nextCursor = 2.0,
+        )
+
+        val result = FeedProtocol.processLivePage(page, effects = effects)
+
+        assertEquals(listOf("msg-2"), result.postedIds)
+        assertEquals(listOf("cancel:thread-x", "post:msg-2", "ack:read-1,msg-2", "persist:2.0"), effects.events)
+    }
+
+    @Test
+    fun replayedDeliveredReadReceiptIsAckedWithoutCancelling() {
+        val effects = RecordingLiveEffects()
+        val page = FeedPage(
+            rows = listOf(row(id = "read-1", creationTime = 5.0, threadId = "thread-x", kind = "read", deliveredAt = 6.0)),
+            nextCursor = 5.0,
+        )
+
+        FeedProtocol.processLivePage(page, effects = effects)
+
+        assertEquals(listOf("ack:read-1", "persist:5.0"), effects.events)
+    }
+
+    @Test
+    fun feedDtoDecodesReadReceiptKind() {
+        val page = Json.decodeFromString<FeedPage>(
+            """
+                {
+                  "rows": [
+                    {
+                      "_id": "read-1",
+                      "threadId": "thread-1",
+                      "title": "Namespace - Thread",
+                      "body": "",
+                      "kind": "read",
+                      "createdAt": 1.0,
+                      "_creationTime": 2.0
+                    },
+                    {
+                      "_id": "msg-1",
+                      "threadId": "thread-1",
+                      "title": "Namespace - Thread",
+                      "body": "Body",
+                      "createdAt": 3.0,
+                      "_creationTime": 4.0
+                    }
+                  ],
+                  "nextCursor": 4.0
+                }
+            """.trimIndent(),
+        )
+
+        assertTrue(page.rows[0].isReadReceipt)
+        assertFalse(page.rows[1].isReadReceipt)
+    }
+
     private fun row(
         id: String,
         creationTime: Double,
         deliveredAt: Double? = null,
+        threadId: String = "thread-$id",
+        kind: String? = null,
     ): FeedRow = FeedRow(
         id = id,
-        threadId = "thread-$id",
+        threadId = threadId,
         title = "Thread $id",
         body = "Body $id",
         createdAt = creationTime - 1.0,
         creationTime = creationTime,
         deliveredAt = deliveredAt,
+        kind = kind,
     )
 
     private class RecordingLiveEffects(
@@ -375,6 +480,10 @@ class FeedProtocolTest {
         override fun post(row: FeedRow): Boolean {
             events += "post:${row.id}"
             return postResults[row.id] ?: true
+        }
+
+        override fun cancel(threadId: String) {
+            events += "cancel:$threadId"
         }
 
         override fun markDelivered(ids: List<String>): Boolean {

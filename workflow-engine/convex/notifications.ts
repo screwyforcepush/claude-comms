@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requirePassword } from "./auth";
 import { readAudioNotifications } from "./settings";
+import { notificationTitle } from "./lib/notificationFeed";
 
 const MAX_BODY_CHARS = 5000;
 const DEFAULT_FEED_LIMIT = 50;
@@ -36,7 +37,7 @@ export const post = mutation({
     return await ctx.db.insert("notifications", {
       namespaceId: thread.namespaceId,
       threadId: thread._id,
-      title: `${namespace.name} · ${thread.title}`,
+      title: notificationTitle(namespace.name, thread.title),
       body: args.body.slice(0, MAX_BODY_CHARS),
       createdAt: now,
     });

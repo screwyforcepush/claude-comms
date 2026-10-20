@@ -21,6 +21,7 @@ import type * as lib_attachments from "../lib/attachments.js";
 import type * as lib_groupTransition from "../lib/groupTransition.js";
 import type * as lib_handover from "../lib/handover.js";
 import type * as lib_harnessDefaults from "../lib/harnessDefaults.js";
+import type * as lib_notificationFeed from "../lib/notificationFeed.js";
 import type * as namespaces from "../namespaces.js";
 import type * as notifications from "../notifications.js";
 import type * as reflections from "../reflections.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   "lib/groupTransition": typeof lib_groupTransition;
   "lib/handover": typeof lib_handover;
   "lib/harnessDefaults": typeof lib_harnessDefaults;
+  "lib/notificationFeed": typeof lib_notificationFeed;
   namespaces: typeof namespaces;
   notifications: typeof notifications;
   reflections: typeof reflections;

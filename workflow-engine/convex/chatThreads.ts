@@ -10,6 +10,7 @@ import {
 } from "./lib/harnessDefaults";
 import { renderAttachmentsBlock } from "./lib/attachments";
 import { composeHandoverMessage, handoverTitle } from "./lib/handover";
+import { postReadReceipt } from "./lib/notificationFeed";
 
 // Queries
 
@@ -423,7 +424,11 @@ export const markRead = mutation({
   args: { password: v.string(), id: v.id("chatThreads") },
   handler: async (ctx, args) => {
     requirePassword(args);
+    const thread = await ctx.db.get(args.id);
+    if (!thread) throw new Error("Thread not found");
     await ctx.db.patch(args.id, { lastReadAt: Date.now() });
+    // Reading anywhere retires the thread's shade notification on the phone.
+    await postReadReceipt(ctx, thread);
   },
 });
 

@@ -239,6 +239,10 @@ class FeedListenerService : Service() {
             override fun post(row: com.claudecomms.voiceloop.core.FeedRow): Boolean =
                 poster.post(row)
 
+            override fun cancel(threadId: String) {
+                poster.cancelThread(threadId)
+            }
+
             override fun rememberPostedButUnacked(ids: List<String>) {
                 prefs.rememberPostedButUnacked(ids)
             }

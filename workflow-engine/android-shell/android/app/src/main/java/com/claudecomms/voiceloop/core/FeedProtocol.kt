@@ -15,7 +15,13 @@ data class FeedRow(
     @SerialName("_creationTime")
     val creationTime: Double,
     val deliveredAt: Double? = null,
-)
+    // Absent = message row. "read" = read receipt: the thread was read somewhere
+    // (phone or desk), so its notification is retired instead of posted.
+    val kind: String? = null,
+) {
+    val isReadReceipt: Boolean
+        get() = kind == FeedProtocol.READ_RECEIPT_KIND
+}
 
 @Serializable
 data class FeedPage(
@@ -26,6 +32,7 @@ data class FeedPage(
 object FeedProtocol {
     const val LIVE_LIMIT: Double = 50.0
     const val FRESH_INSTALL_DRAIN_LIMIT: Double = 200.0
+    const val READ_RECEIPT_KIND: String = "read"
 
     fun feedArgs(
         password: String,
@@ -58,14 +65,33 @@ object FeedProtocol {
         val idsToAck = linkedSetOf<String>()
         val postedButUnackedIds = effects.postedButUnackedIds().toMutableSet()
         var hadPostFailure = false
+        val lastReadReceiptIndex = lastReadReceiptIndexByThread(page.rows)
 
-        for (row in page.rows) {
+        for ((index, row) in page.rows.withIndex()) {
             if (row.deliveredAt != null) {
                 idsToAck += row.id
                 continue
             }
 
+            // A notification lives exactly as long as the thread is unread: a read
+            // receipt retires the thread's shade entry. Only an undelivered receipt
+            // cancels — a replayed, already-acked one must not wipe a newer message.
+            // @see docs/project/spec/mental-model.md#mm-hands-free-voice-loop
+            if (row.isReadReceipt) {
+                effects.cancel(row.threadId)
+                idsToAck += row.id
+                continue
+            }
+
             if (row.id in postedButUnackedIds) {
+                idsToAck += row.id
+                continue
+            }
+
+            // Catch-up collapse: a message whose thread was read later in the same
+            // page is never posted — no alert-then-cancel flicker.
+            val retiredLater = lastReadReceiptIndex[row.threadId]?.let { it > index } ?: false
+            if (retiredLater) {
                 idsToAck += row.id
                 continue
             }
@@ -117,6 +143,14 @@ object FeedProtocol {
         )
     }
 
+    private fun lastReadReceiptIndexByThread(rows: List<FeedRow>): Map<String, Int> {
+        val byThread = mutableMapOf<String, Int>()
+        rows.forEachIndexed { index, row ->
+            if (row.isReadReceipt) byThread[row.threadId] = index
+        }
+        return byThread
+    }
+
     suspend fun drainFreshInstall(
         password: String,
         feedInitialized: Boolean = false,
@@ -165,6 +199,8 @@ object FeedProtocol {
         fun postedButUnackedIds(): Set<String> = emptySet()
 
         fun post(row: FeedRow): Boolean
+
+        fun cancel(threadId: String) {}
 
         fun rememberPostedButUnacked(ids: List<String>) {}
 

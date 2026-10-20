@@ -201,6 +201,9 @@ export default defineSchema({
     threadId: v.id("chatThreads"),
     title: v.string(),
     body: v.string(),
+    // Absent = message row. "read" = read receipt: the thread was read somewhere,
+    // so the shell retires that thread's notification (body is empty).
+    kind: v.optional(v.union(v.literal("message"), v.literal("read"))),
     deliveredAt: v.optional(v.number()),
     createdAt: v.number(),
   })

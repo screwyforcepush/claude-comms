@@ -276,6 +276,12 @@ class NotificationPoster(private val context: Context) {
         return notify(tag, payload.identity.id, notification)
     }
 
+    // Read receipt from the feed: the thread was read somewhere (phone or desk),
+    // so its shade entry has no job left. Idempotent when nothing is standing.
+    fun cancelThread(threadId: String) {
+        notificationManagerCompat.cancel(threadId, MESSAGE_NOTIFICATION_ID)
+    }
+
     fun cancelLobby(namespaceId: String) {
         notificationManagerCompat.cancel(PayloadMapper.lobbyTag(namespaceId), MESSAGE_NOTIFICATION_ID)
     }
