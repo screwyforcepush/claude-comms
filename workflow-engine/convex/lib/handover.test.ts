@@ -13,41 +13,45 @@ import {
 } from "./handover";
 
 const THREAD = "jh7eaka3ses36pyqhsghak5emh8ggd37";
+const TAIL =
+  `I want to focus on this with you now, but you can read the messages from my other Steward thread ${THREAD} for context. ` +
+  `Play back to me your understanding of my intent.`;
 
 describe("composeHandoverMessage", () => {
-  it("wraps the topic in the fixed two-line handover ask", () => {
+  it("leads with the topic as its own paragraph, then the pointer and playback ask", () => {
     const msg = composeHandoverMessage("steward handover to new session", THREAD);
-    assert.strictEqual(
-      msg,
-      "Lets Jam on the topic of steward handover to new session.\n" +
-        `I touched on this topic in a previous Steward session. Read the messages from thread ${THREAD} for context, and play back to me your understanding of my intent before shaping anything.`
-    );
+    assert.strictEqual(msg, `steward handover to new session\n\n${TAIL}`);
   });
 
   it("points the new Steward at the source thread id", () => {
     const msg = composeHandoverMessage("anything", THREAD);
-    assert.ok(msg.includes(`from thread ${THREAD} `));
+    assert.ok(msg.includes(`Steward thread ${THREAD} for context`));
   });
 
-  it("asks for the playback before shaping (the handshake clause)", () => {
+  it("asks for the playback of intent (the handshake clause)", () => {
     const msg = composeHandoverMessage("anything", THREAD);
-    assert.ok(/play back to me your understanding of my intent before shaping anything\.$/.test(msg));
+    assert.ok(/Play back to me your understanding of my intent\.$/.test(msg));
+  });
+
+  it("separates the pointer and playback sentences with a space", () => {
+    const msg = composeHandoverMessage("anything", THREAD);
+    assert.ok(msg.includes("for context. Play back"));
   });
 
   it("trims surrounding whitespace from the topic", () => {
     const msg = composeHandoverMessage("  voice loop latency \n", THREAD);
-    assert.ok(msg.startsWith("Lets Jam on the topic of voice loop latency.\n"));
+    assert.ok(msg.startsWith("voice loop latency\n\n"));
   });
 
-  it("does not double up sentence punctuation the user already supplied", () => {
-    assert.ok(composeHandoverMessage("the fork banner.", THREAD).startsWith("Lets Jam on the topic of the fork banner.\n"));
-    assert.ok(composeHandoverMessage("why did it thrash?", THREAD).startsWith("Lets Jam on the topic of why did it thrash?\n"));
-    assert.ok(composeHandoverMessage("ship it!", THREAD).startsWith("Lets Jam on the topic of ship it!\n"));
+  it("keeps the user's own punctuation untouched", () => {
+    assert.ok(composeHandoverMessage("the fork banner.", THREAD).startsWith("the fork banner.\n\n"));
+    assert.ok(composeHandoverMessage("why did it thrash?", THREAD).startsWith("why did it thrash?\n\n"));
+    assert.ok(composeHandoverMessage("no full stop", THREAD).startsWith("no full stop\n\n"));
   });
 
-  it("keeps a multi-line topic verbatim inside the wrapper", () => {
+  it("keeps a multi-line topic verbatim", () => {
     const msg = composeHandoverMessage("two things:\n- a\n- b", THREAD);
-    assert.ok(msg.startsWith("Lets Jam on the topic of two things:\n- a\n- b.\n"));
+    assert.ok(msg.startsWith("two things:\n- a\n- b\n\n"));
   });
 
   it("rejects an empty topic: the empty case is dropped by design", () => {

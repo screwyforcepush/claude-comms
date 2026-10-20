@@ -20,18 +20,18 @@ export const HANDOVER_TITLE_GLYPH = "↦";
 /**
  * Compose the handover message. `topic` is the user's own focus text and must be
  * non-empty — the empty case was deliberately dropped (the user always names a
- * focus subset). Trailing sentence punctuation on the topic is respected so the
- * wrapper never produces "..".
+ * focus subset). The topic leads as its own paragraph, verbatim; the pointer and
+ * the playback ask follow.
  */
 export function composeHandoverMessage(topic: string, sourceThreadId: string): string {
   const focus = topic.trim();
   if (!focus) {
     throw new Error("Handover needs a topic: the user names the focus for the fresh session");
   }
-  const sentenceEnd = /[.!?]$/.test(focus) ? "" : ".";
   return (
-    `Lets Jam on the topic of ${focus}${sentenceEnd}\n` +
-    `I touched on this topic in a previous Steward session. Read the messages from thread ${sourceThreadId} for context, and play back to me your understanding of my intent before shaping anything.`
+    `${focus}\n\n` +
+    `I want to focus on this with you now, but you can read the messages from my other Steward thread ${sourceThreadId} for context. ` +
+    `Play back to me your understanding of my intent.`
   );
 }
 
