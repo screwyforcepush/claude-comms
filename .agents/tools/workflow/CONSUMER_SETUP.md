@@ -80,8 +80,9 @@ Each consumer repo needs its own `config.json`:
   "convexUrl": "https://your-project-123.convex.cloud",
   "namespace": "consumer-repo-name",
   "password": "your-admin-password",
-  "timeoutMs": 600000,
-  "idleTimeoutMs": 600000,
+  "timeoutMs": 5400000,
+  "idleTimeoutMs": 900000,
+  "claudeBashTimeoutMs": 840000,
   "reflectionTimeoutMs": 300000,
   "claudeExecutionMode": "headless",
   "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
@@ -89,6 +90,11 @@ Each consumer repo needs its own `config.json`:
   "claudeInteractiveStopGraceMs": 3000
 }
 ```
+
+`claudeBashTimeoutMs` is the foreground Bash ceiling for Claude jobs and must
+sit below `idleTimeoutMs` (the runner refuses to start otherwise; omit it to
+derive idle minus one minute). Needs Claude Code 2.1.259 or later on the runner
+host for the `--permission-prompts` flag the runner now passes.
 
 The `namespace` field isolates assignments/jobs per repo in the shared Convex backend.
 Harness/model defaults are namespace data stored in Convex, not local

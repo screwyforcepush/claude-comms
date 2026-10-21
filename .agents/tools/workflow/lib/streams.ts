@@ -68,8 +68,13 @@ export interface InteractiveClaudeCommandOptions extends CommandOptions {
 
 const FALLBACK_MAX_CHARS = 5000;
 
+// Monitor is the other door to "I'll act when the monitor reports": a headless
+// run never gets that event. Removed from the schema alongside the background
+// parameter (see buildClaudeHeadlessEnv in claude-runtime.ts).
+// @see docs/project/spec/mental-model.md#mm-headless-runtime-levers
 const CLAUDE_DISALLOWED_TOOLS = [
   "AskUserQuestion",
+  "Monitor",
   "NotebookEdit",
   "PushNotification",
   "RemoteTrigger",
@@ -575,6 +580,12 @@ export function buildCommand(
         "--output-format",
         "stream-json",
         "--disable-slash-commands",
+        // Nobody can answer a permission prompt in a headless run: anything
+        // that would prompt is denied outright and Claude is told so, which
+        // also covers MCP elicitation. Print-mode only, so not in the
+        // interactive builder below.
+        "--permission-prompts",
+        "none",
         "--disallowedTools",
         ...CLAUDE_DISALLOWED_TOOLS,
       ];

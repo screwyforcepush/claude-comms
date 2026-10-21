@@ -562,6 +562,15 @@ describe("buildCommand", () => {
     assert.ok(!basic.args.includes("--resume"));
     // Prompt is piped to stdin; bare -p must be the final arg
     assert.strictEqual(basic.args[basic.args.length - 1], "-p");
+    // Headless: nobody answers prompts, and Monitor's "notify" never arrives.
+    const promptsIdx = basic.args.indexOf("--permission-prompts");
+    assert.ok(promptsIdx >= 0);
+    assert.strictEqual(basic.args[promptsIdx + 1], "none");
+    const disallowedIdx = basic.args.indexOf("--disallowedTools");
+    assert.ok(disallowedIdx >= 0);
+    const disallowed = basic.args.slice(disallowedIdx + 1, basic.args.indexOf("-p"));
+    assert.ok(disallowed.includes("Monitor"));
+    assert.ok(disallowed.includes("AskUserQuestion"));
 
     const withSession = buildCommand("claude", { sessionId: "s123" });
     assert.ok(withSession.args.includes("--resume"));
@@ -651,5 +660,8 @@ describe("buildCommand", () => {
     assert.ok(!command.args.includes("-p"));
     assert.ok(!command.args.includes("--output-format"));
     assert.ok(!command.args.includes("stream-json"));
+    // Print-mode only flag stays off the interactive path; Monitor denial is shared.
+    assert.ok(!command.args.includes("--permission-prompts"));
+    assert.ok(command.args.includes("Monitor"));
   });
 });

@@ -37,8 +37,9 @@ Edit `config.json`:
   "convexSiteUrl": "https://<convex-deployment>.convex.site",
   "namespace": "your-repo-name",
   "password": "your-admin-password",
-  "timeoutMs": 600000,
-  "idleTimeoutMs": 600000,
+  "timeoutMs": 5400000,
+  "idleTimeoutMs": 900000,
+  "claudeBashTimeoutMs": 840000,
   "reflectionTimeoutMs": 300000,
   "claudeExecutionMode": "headless",
   "claudeInteractiveSettingsPath": ".agents/tools/workflow/claude-hook-settings.json",
@@ -46,6 +47,22 @@ Edit `config.json`:
   "claudeInteractiveStopGraceMs": 3000
 }
 ```
+
+`timeoutMs` is the wall-clock cap per job. `idleTimeoutMs` kills a job that
+emits no stream events for that long. `claudeBashTimeoutMs` is the foreground
+Bash ceiling handed to every Claude job (as both `BASH_DEFAULT_TIMEOUT_MS` and
+`BASH_MAX_TIMEOUT_MS`); it must be below `idleTimeoutMs`, and the runner refuses
+to start if it is not. When omitted it is derived as `idleTimeoutMs` minus one
+minute. A Bash call emits nothing while it runs, so the ceiling is what lets a
+long validate finish in one blocking call without the runner reading it as a
+stall.
+
+Every Claude job (chat and crew alike) also runs with the harness's background
+tasks, cron, terminal title and non-essential traffic disabled, with
+`--permission-prompts none`, and with the `Monitor` tool removed. Crew jobs
+additionally get the harness retry watchdog on transient provider errors; chat
+jobs fail fast so the user can re-send. See
+`docs/project/spec/mental-model.md#mm-headless-runtime-levers` for the why.
 
 `convexSiteUrl` is optional. The workflow CLI derives the HTTP-actions host by
 turning a `.convex.cloud` `convexUrl` into `.convex.site`; set

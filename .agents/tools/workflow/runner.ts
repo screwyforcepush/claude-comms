@@ -41,6 +41,7 @@ import { decidePmCompletion } from "./lib/pm-completion.js";
 
 // Harness executor (file-based event streaming for crash resilience)
 import { HarnessExecutor, Harness, OrphanInfo, removeLegacyAgyHookEntry } from "./lib/harness-executor.js";
+import { resolveClaudeBashTimeoutMs } from "./lib/claude-runtime.js";
 
 // Harness defaults (namespace-scoped harness+model config)
 import { HarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
@@ -90,6 +91,8 @@ interface Config {
   password: string;
   timeoutMs: number;
   idleTimeoutMs?: number;
+  /** Foreground Bash ceiling for Claude jobs. Must be below idleTimeoutMs; derived as idle minus 1 min when absent. */
+  claudeBashTimeoutMs?: number;
   claudeExecutionMode?: "headless" | "interactive";
   claudeInteractiveSettingsPath?: string;
   claudeInteractiveSettingSources?: string;
@@ -99,6 +102,15 @@ interface Config {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "config.json");
 const config: Config = JSON.parse(readFileSync(configPath, "utf-8"));
+
+// Refuses to start on a Bash ceiling at or above the idle timer: that pair
+// turns a harness "timed out" back into a runner "stalled".
+const claudeBashTimeoutMs = resolveClaudeBashTimeoutMs(config);
+
+// Crews retry transient provider errors in-process up to this bound; chat jobs
+// never get it (the user is the retry). The runner's own idle timer still
+// applies during the wait, so a silent retry backoff is bounded by it too.
+const CREW_RETRY_WATCHDOG_MAX_WAIT_MS = 15 * 60 * 1000;
 
 // Human/PM-facing descriptions of the two distinct timeout causes
 function describeTimeout(reason: TimeoutReason): string {
@@ -155,6 +167,7 @@ const killedJobIds = new Set<string>();
 const executor = new HarnessExecutor({
   timeoutMs: config.timeoutMs,
   idleTimeoutMs: config.idleTimeoutMs,
+  claudeBashTimeoutMs,
   cwd: projectRoot,
   claudeExecutionMode: config.claudeExecutionMode ?? "headless",
   claudeInteractiveSettingsPath: resolveProjectPath(config.claudeInteractiveSettingsPath),
@@ -519,6 +532,8 @@ async function executeJob(
       prompt,
       model: (job as any).model || undefined,
       sessionId: isChat && chatContext?.claudeSessionId ? chatContext.claudeSessionId : undefined,
+      // Chat jobs fail fast on provider errors; the user re-sends.
+      retryWatchdogMaxWaitMs: isChat ? undefined : CREW_RETRY_WATCHDOG_MAX_WAIT_MS,
       env,
     },
     {

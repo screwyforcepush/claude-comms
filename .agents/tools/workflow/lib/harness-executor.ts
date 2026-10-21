@@ -50,6 +50,7 @@ import {
   buildInteractiveClaudeCommand,
   CommandOptions,
 } from "./streams.js";
+import { buildClaudeHeadlessEnv } from "./claude-runtime.js";
 
 // ============================================================================
 // Types
@@ -84,6 +85,12 @@ export interface ExecutorConfig {
   timeoutMs: number;
   /** Idle timeout in milliseconds - kills job if no events received for this duration */
   idleTimeoutMs?: number;
+  /**
+   * Foreground Bash ceiling handed to every Claude spawn. Must sit below
+   * idleTimeoutMs; the runner resolves and validates the pair at startup.
+   * Undefined leaves the harness defaults in place.
+   */
+  claudeBashTimeoutMs?: number;
   /** Working directory for spawned processes (defaults to process.cwd()) */
   cwd?: string;
   /** Polling interval for file watcher fallback (ms) */
@@ -112,6 +119,11 @@ export interface ExecuteOptions {
   sessionId?: string;
   /** Fork the session instead of resuming in-place */
   forkSession?: boolean;
+  /**
+   * Claude only. Enables the harness's in-process retry on transient provider
+   * errors up to this bound. Crews set it; chat jobs omit it and fail fast.
+   */
+  retryWatchdogMaxWaitMs?: number;
   /** Additional environment variables */
   env?: Record<string, string>;
 }
@@ -413,6 +425,16 @@ export class HarnessExecutor {
     const paths = ensureJobDir(jobId);
     writeFileSync(paths.logPath, ""); // Ensure empty file exists
 
+    // Runtime levers applied below the caller's env so job identity and the
+    // memory switch stay the caller's. Uniform for chat and crew.
+    const runtimeEnv =
+      harness === "claude"
+        ? buildClaudeHeadlessEnv({
+            bashTimeoutMs: this.config.claudeBashTimeoutMs,
+            retryWatchdogMaxWaitMs: options.retryWatchdogMaxWaitMs,
+          })
+        : {};
+
     // 2. Open file descriptor for child stdout
     const logFd = openSync(paths.logPath, "a");
 
@@ -432,7 +454,7 @@ export class HarnessExecutor {
     // 4. Spawn child with stdout going directly to file, prompt piped to stdin
     const child = spawn(cmd, args, {
       stdio: ["pipe", logFd, "pipe"], // stdin from pipe, stdout to file, stderr to pipe
-      env: { ...process.env, ...env },
+      env: { ...process.env, ...runtimeEnv, ...env },
       cwd: this.config.cwd,
     });
 
@@ -715,6 +737,12 @@ export class HarnessExecutor {
         stdio: ["pipe", "ignore", "pipe"],
         env: {
           ...process.env,
+          // Same runtime levers as the headless path so the two execution
+          // modes cannot drift; only the print-mode arg differs.
+          ...buildClaudeHeadlessEnv({
+            bashTimeoutMs: this.config.claudeBashTimeoutMs,
+            retryWatchdogMaxWaitMs: options.retryWatchdogMaxWaitMs,
+          }),
           ...env,
           HOOK_EVENTS_FILE: paths.logPath,
         },
