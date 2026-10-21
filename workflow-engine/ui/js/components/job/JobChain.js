@@ -116,10 +116,18 @@ function TokenIcon() {
   );
 }
 
+// HP/ARM countdown ceilings. They mirror the runner's default timeoutMs and
+// idleTimeoutMs so an empty bar means "the runner is about to kill this job".
+// @see docs/project/spec/mental-model.md#mm-job-card-hud
+const HP_MAX_SECONDS = 90 * 60;
+const ARM_MAX_SECONDS = 15 * 60;
+
+// Whole units only: 1k, 12k, 2m. Thresholds sit at the rounding boundary so
+// 999,600 reads "1m" rather than "1000k".
 function formatCount(value) {
   if (value === null || value === undefined) return '—';
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  if (value >= 999_500) return `${Math.round(value / 1_000_000)}m`;
+  if (value >= 999.5) return `${Math.round(value / 1_000)}k`;
   return String(value);
 }
 
@@ -342,7 +350,7 @@ function chunkArray(arr, size) {
  * | [Provider Logo]  JOB_TYPE   [StatusRune]|
  * | subhead: subagent mini icons            |
  * +-----------------------------------------+
- * | HP  ████████░░░░  2m 34s                | <- Duration (1hr max countdown)
+ * | HP  ████████░░░░  2m 34s                | <- Duration (countdown to wall-clock kill)
  * | ARM ██████████░░  0s                    | <- Idle (running only)
  * +-----------------------------------------+
  * | FRAGS 47                      DMG 1.2k  | <- Tool calls + Tokens
@@ -381,8 +389,7 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
   const isFinished = status === 'complete' || status === 'failed';
 
   // --- Calculate HP (Duration) ---
-  // HP bar counts DOWN: full bar = job just started, empty = 1 hour elapsed
-  // Max = 1 hour (3600 seconds)
+  // HP bar counts DOWN: full bar = job just started, empty = HP_MAX_SECONDS elapsed
   // For finished jobs: use static duration (completedAt - startedAt), timer stops
   // For running jobs: use live duration (now - startedAt), timer ticks
   // For pending jobs: show full bar (100%), no duration yet
@@ -397,20 +404,19 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
   // else: pending job, durationMs stays 0 (full bar)
 
   const durationSeconds = Math.floor(durationMs / 1000);
-  const hpFill = Math.max(0, ((3600 - durationSeconds) / 3600) * 100);
+  const hpFill = Math.max(0, ((HP_MAX_SECONDS - durationSeconds) / HP_MAX_SECONDS) * 100);
   const durationDisplay = formatDuration(durationMs);
 
   // HP color based on remaining time (health metaphor)
   const hpColor = hpFill > 60 ? 'var(--q-slime1)' : hpFill > 25 ? 'var(--q-torch)' : 'var(--q-lava1)';
 
   // --- Calculate ARM (Idle) ---
-  // ARM bar counts DOWN: full bar = just active, empty = 10 min idle
-  // Max = 10 minutes (600 seconds)
+  // ARM bar counts DOWN: full bar = just active, empty = ARM_MAX_SECONDS idle
   // For finished jobs, show full bar (100%) and static display
   const idleBase = lastEventAt || startedAt || null;
   const idleMs = idleBase && !isFinished ? Math.max(0, now - idleBase) : 0;
   const idleSeconds = Math.floor(idleMs / 1000);
-  const armFill = isFinished ? 100 : Math.max(0, ((600 - idleSeconds) / 600) * 100);
+  const armFill = isFinished ? 100 : Math.max(0, ((ARM_MAX_SECONDS - idleSeconds) / ARM_MAX_SECONDS) * 100);
   const idleDisplay = isFinished ? '--' : formatIdleDuration(idleMs);
 
   // --- DMG (Tokens) ---
@@ -541,14 +547,14 @@ function JobNode({ job, isSelected, isCurrent, onClick, now }) {
         gap: '4px'
       }
     },
-      // HP Bar (Duration - countdown from 1hr)
+      // HP Bar (Duration - countdown to wall-clock kill)
       React.createElement(StatBar, {
         label: 'HP',
         fill: hpFill,
         value: durationDisplay,
         color: hpColor
       }),
-      // ARM Bar (Idle - countdown from 10min) - only shown when running
+      // ARM Bar (Idle - countdown to idle kill) - only shown when running
       status === 'running' && React.createElement(StatBar, {
         label: 'ARM',
         fill: armFill,

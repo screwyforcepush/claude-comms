@@ -99,10 +99,10 @@ What users need to see, in order:
 - Zero rounded corners (this is Quake)
 - Consistent QIcon usage throughout (except harness logos)
 
-### Job Card Mental Model (AgentHUD Pattern)
-Job cards in the chain visualization should feel like Quake HUD status bars:
-- **HP (Health)** = Duration — how long the job has been running. Bar counts DOWN from 1 hour max. Shows actual time, bar is visual countdown.
-- **ARM (Armor)** = Idle time — how long since last activity. Bar counts DOWN from 10 min max. When complete, armor is "full" (job is protected/done).
+### Job Card Mental Model (AgentHUD Pattern) {#mm-job-card-hud}
+Job cards in the chain visualization should feel like Quake HUD status bars. The bars mean what the health metaphor says: they count down toward the runner's own kill deadlines, so an empty bar is a job about to die. The ceilings are the runner's timeouts, not a design constant.
+- **HP (Health)** = Duration — how long the job has been running. Bar counts DOWN toward the wall-clock kill. Shows actual time, bar is visual countdown.
+- **ARM (Armor)** = Idle time — how long since last activity. Bar counts DOWN toward the idle kill. When complete, armor is "full" (job is protected/done).
 - **FRAGS** = Tool calls — kill count analogy. How many tools the agent has used.
 - **Tokens** = Can be DMG, AMMO, or similar — design judgment for fitting the theme.
 - **Status Rune** = Job state mapped to brandkit StatusRune patterns.
