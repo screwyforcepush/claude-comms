@@ -85,7 +85,7 @@ export default defineSchema({
       v.literal("gemini")
     ),
     context: v.optional(v.string()), // Job-specific context
-    prompt: v.optional(v.string()), // Complete prompt sent to agent
+    prompt: v.optional(v.string()), // Historical only; never written. New prompts live in jobPrompts.
     status: v.union(
       v.literal("pending"),
       v.literal("running"),
@@ -117,6 +117,15 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_namespace_completedAt", ["namespaceId", "completedAt"])
     .index("by_status_killRequested", ["status", "killRequested"]),
+
+  // Prompts are fetched by job id and never joined into chain walks.
+  // @see docs/project/spec/mental-model.md#mm-prompt-is-visibility-artefact
+  jobPrompts: defineTable({
+    jobId: v.id("jobs"),
+    prompt: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_job", ["jobId"]),
 
   reflections: defineTable({
     jobId: v.id("jobs"),

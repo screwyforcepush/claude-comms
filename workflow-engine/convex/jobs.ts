@@ -4,6 +4,7 @@ import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requirePassword } from "./auth";
 import { resolveGroupTransition, GroupStatus, JobStatus } from "./lib/groupTransition";
+import { deleteJob, readJobPrompt, upsertJobPrompt } from "./lib/jobPrompts";
 
 // ============================================================================
 // Queries
@@ -56,6 +57,14 @@ export const get = query({
   },
 });
 
+export const getPrompt = query({
+  args: { password: v.string(), id: v.id("jobs") },
+  handler: async (ctx, args): Promise<string | null> => {
+    requirePassword(args);
+    return readJobPrompt(ctx, args.id);
+  },
+});
+
 export const getWithGroup = query({
   args: { password: v.string(), id: v.id("jobs") },
   handler: async (ctx, args) => {
@@ -67,7 +76,8 @@ export const getWithGroup = query({
     if (!group) return null;
 
     const assignment = await ctx.db.get(group.assignmentId);
-    return { ...job, group, assignment };
+    const prompt = await readJobPrompt(ctx, job._id, async () => job.prompt);
+    return { ...job, prompt: prompt ?? undefined, group, assignment };
   },
 });
 
@@ -306,8 +316,10 @@ export const start = mutation({
     await ctx.db.patch(args.id, {
       status: "running",
       startedAt: now,
-      prompt: args.prompt,
     });
+    if (args.prompt !== undefined) {
+      await upsertJobPrompt(ctx, args.id, args.prompt, now);
+    }
 
     // Update group status to running
     const job = await ctx.db.get(args.id);
@@ -544,7 +556,8 @@ export const executeRetry = internalMutation({
 });
 
 // Retry a job group: cascade-delete all downstream groups, reset this group
-// and its jobs back to pending. Preserves prompt/jobType/harness/context.
+// and its jobs back to pending. Preserves jobType/harness/context. Surviving
+// member jobs keep their jobPrompts row, overwritten on their next start.
 // Power tool — no safety checks on running state. Caller is responsible.
 // Execution record only; filesystem state (code on disk) is not touched,
 // so stale artifacts/decisions/PM messages from prior groups remain valid
@@ -568,7 +581,7 @@ export const retryGroup = mutation({
         .withIndex("by_group", (q) => q.eq("groupId", downstreamId!))
         .collect();
       for (const j of downstreamJobs) {
-        await ctx.db.delete(j._id);
+        await deleteJob(ctx, j._id);
       }
       await ctx.db.delete(downstreamId);
 
@@ -582,7 +595,7 @@ export const retryGroup = mutation({
       nextGroupId: undefined,
     });
 
-    // Reset each member job (preserve prompt/jobType/harness/context)
+    // Reset each member job, preserving its prompt row and jobType/harness/context.
     const jobs = await ctx.db
       .query("jobs")
       .withIndex("by_group", (q) => q.eq("groupId", args.id))

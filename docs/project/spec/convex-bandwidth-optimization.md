@@ -231,6 +231,12 @@ This avoids walking the chain (and reading every job document) during the 95% of
 
 **6c. PM context walk is preserved.** The chain-walk for accumulating `accumulatedResults` / `previousNonPmGroupResults` / `r1GroupResults` only happens when a PM group is the next pending group. This is once per PM run (infrequent). No optimization needed — it's already outside the hot path after 6b.
 
+**6d. Prompt bytes leave the chain.** 6c's assumption failed: 6b short-circuits only while a group is running. Whenever no group is running and a group is pending, including every group transition, `findReadyJobs` walks from the head to the first pending group and `collect()`s every job document; the walk also re-runs reactively. Each started job carried its ~100–120 KB prompt, so reads grew linearly with chain length. A 192-job chain crossed Convex's 16 MiB per-query read limit: the runner subscription errored and `cleanup()` killed every running job in the namespace, chats included.
+
+Prompts now live in `jobPrompts` (one row per job, indexed by `by_job`): `jobs.start` writes them, `jobs.getPrompt` reads them for the job detail modal, and `jobs.getWithGroup` reads them for single-job consumers. `jobs.prompt` remains optional for historical rows, is never written, and is not migrated. Deleting a chain still reads one prompt row per started job, so very large chains can hit the same limit in `assignments.remove` and the thread cascade (`chatThreads.remove`); this limit is unchanged from before.
+
+**Rule:** `jobPrompts` is read by id, never joined in a chain walk. See [The Stored Prompt Is a Visibility Artefact](mental-model.md#mm-prompt-is-visibility-artefact).
+
 **Impact:** During normal execution (job running), `getReadyJobs` reads: active/pending assignments + their groups. No job documents read. Re-executes only on group status changes (rare).
 
 ---

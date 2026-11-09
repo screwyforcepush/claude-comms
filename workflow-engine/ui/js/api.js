@@ -42,6 +42,8 @@ export const api = {
   jobs: {
     list: "jobs:list",
     getActiveGroupsWithJobs: "jobs:getActiveGroupsWithJobs",
+    // Lazy prompt fetch for the job detail modal
+    getPrompt: "jobs:getPrompt",
     // Kill signal for running jobs
     requestKill: "jobs:requestKill",
     // Retry a job group (cascade-deletes downstream, resets this group)

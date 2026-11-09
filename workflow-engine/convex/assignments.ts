@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requirePassword } from "./auth";
+import { deleteJob } from "./lib/jobPrompts";
 
 // Helper: atomically adjust assignmentCounts on a namespace
 type CountKey = "pending" | "active" | "blocked" | "complete";
@@ -355,7 +356,7 @@ export const remove = mutation({
         .collect();
 
       for (const job of jobs) {
-        await ctx.db.delete(job._id);
+        await deleteJob(ctx, job._id);
         jobsDeleted++;
       }
 

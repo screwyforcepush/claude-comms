@@ -11,6 +11,7 @@ import {
 import { renderAttachmentsBlock } from "./lib/attachments";
 import { composeHandoverMessage, handoverTitle } from "./lib/handover";
 import { postReadReceipt } from "./lib/notificationFeed";
+import { deleteJob } from "./lib/jobPrompts";
 
 // Queries
 
@@ -660,7 +661,7 @@ export const remove = mutation({
           .withIndex("by_group", (q) => q.eq("groupId", group._id))
           .collect();
         for (const job of jobs) {
-          await ctx.db.delete(job._id);
+          await deleteJob(ctx, job._id);
         }
         await ctx.db.delete(group._id);
       }

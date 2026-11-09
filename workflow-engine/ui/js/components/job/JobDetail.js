@@ -6,6 +6,9 @@ import { StatusBadge } from '../shared/StatusBadge.js';
 import { Timestamp } from '../shared/Timestamp.js';
 import { JsonViewer } from '../shared/JsonViewer.js';
 import { QIcon } from '../shared/index.js';
+import { LoadingSkeleton } from '../shared/LoadingSkeleton.js';
+import { useQuery } from '../../hooks/useConvex.js';
+import { api } from '../../api.js';
 
 /**
  * Close icon
@@ -180,6 +183,16 @@ function CheckIcon() {
   );
 }
 
+const contentLabelStyle = {
+  fontSize: '10px',
+  fontFamily: 'var(--font-display)',
+  letterSpacing: '2px',
+  textTransform: 'uppercase',
+  color: 'var(--q-bone0)',
+  fontWeight: 600,
+  margin: 0
+};
+
 /**
  * Try to parse content as JSON for better display
  * Q palette styling for content boxes
@@ -187,8 +200,6 @@ function CheckIcon() {
 function ContentViewer({ content, label, isError = false }) {
   const [copied, setCopied] = React.useState(false);
   const [copyHovered, setCopyHovered] = React.useState(false);
-
-  if (!content) return null;
 
   // Try to parse as JSON
   let parsed = null;
@@ -207,6 +218,8 @@ function ContentViewer({ content, label, isError = false }) {
     });
   }, [content, parsed]);
 
+  if (!content) return null;
+
   return React.createElement('div', {
     style: { marginBottom: '16px' }
   },
@@ -221,13 +234,8 @@ function ContentViewer({ content, label, isError = false }) {
     },
       React.createElement('h4', {
         style: {
-          fontSize: '10px',
-          fontFamily: 'var(--font-display)',
-          letterSpacing: '2px',
-          textTransform: 'uppercase',
-          color: isError ? 'var(--q-lava1)' : 'var(--q-bone0)',
-          fontWeight: 600,
-          margin: 0
+          ...contentLabelStyle,
+          color: isError ? 'var(--q-lava1)' : contentLabelStyle.color
         }
       }, label),
       // Copy button
@@ -374,7 +382,6 @@ export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
     assignmentId,
     jobType,
     harness,
-    prompt,
     status,
     result,
     nextJobId,
@@ -389,6 +396,9 @@ export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
     retryAfter,
     rateLimitType
   } = job;
+
+  // @see docs/project/spec/mental-model.md#mm-prompt-is-visibility-artefact
+  const { data: prompt, loading: promptLoading, error: promptError } = useQuery(api.jobs.getPrompt, { id: _id });
 
   const shortId = _id ? _id.slice(-12) : 'unknown';
   const shortAssignmentId = assignmentId ? assignmentId.slice(-8) : 'unknown';
@@ -756,10 +766,20 @@ export function JobDetail({ job, onClose, isModal = true, onKillJob }) {
       ),
 
       // Prompt
-      React.createElement(ContentViewer, {
-        content: prompt,
-        label: 'Prompt'
-      }),
+      promptError ? null : promptLoading && !promptError
+        ? React.createElement('div', {
+            'aria-busy': true,
+            style: { marginBottom: '16px' }
+          },
+            React.createElement('h4', {
+              style: { ...contentLabelStyle, marginBottom: '8px' }
+            }, 'Prompt'),
+            React.createElement(LoadingSkeleton, { variant: 'text', count: 3 })
+          )
+        : React.createElement(ContentViewer, {
+            content: prompt,
+            label: 'Prompt'
+          }),
 
       // Result or Error
       (status === 'complete' || status === 'failed') && React.createElement(ContentViewer, {
