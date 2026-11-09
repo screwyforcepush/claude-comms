@@ -197,11 +197,10 @@ The two levers differ in weight:
 | Scope | Tactical verification | Strategic direction |
 | Visibility | Next PM only | Every PM + every job |
 
-### Self-Modification Awareness
-Claude Comms is its own upstream — changes here propagate to all client repos. The system must be careful about backward compatibility:
-- Schema changes should be additive (optional fields)
-- Runner-touching changes require manual runner restart by the user
-- The UI and Convex backend deploy atomically, so UI-only or UI+backend changes are safe
+### Self-Modification Awareness {#mm-self-surgery}
+Claude Comms is its own upstream — changes here propagate to all client repos — and it is also a client of itself: the crew that modifies the engine are jobs running inside that engine, on a runner subscribed to the very deployment they are editing. Two stances follow:
+- **Backward compatibility is non-negotiable.** Schema changes are additive (optional fields, new tables). Runner-facing mutation signatures stay stable, because a runner in a client repo may trail the server by days.
+- **Engine work is self-surgery.** From inside the loop a crew member cannot restart the runner (it kills their own process), deploy Convex (it swaps the engine out from under a chain mid-flight), or exercise the loop end to end (the loop is busy running them). Live verification is structurally unavailable to the crew; for engine-touching assignments it belongs to the Steward after the chain ends, and the crew's gate is static: code review, types, unit tests and build. The UI and the Convex backend deploy on separate paths, so a UI read of a new server function must degrade gracefully in the window between the two.
 
 ## Session Context Isolation
 
@@ -263,6 +262,9 @@ Real-time Convex subscriptions should only be maintained for **mutable data** �
 
 ### Execution Records vs. Filesystem State
 Job execution records (groups, jobs, results, aggregated decisions, artifacts, PM messages) are a **log of how the system got here** — not the source of truth about what exists. The real state is the code on disk. This matters most for **retry semantics**: when a job group is retried, downstream execution records are cascade-deleted, but stale decisions, artifacts, and PM chat messages from earlier groups are preserved. They still accurately describe what happened and what the filesystem now reflects. The execution record is history; the code is state.
+
+### The Stored Prompt Is a Visibility Artefact {#mm-prompt-is-visibility-artefact}
+The prompt handed to an agent is kept so the human can read what the agent was told. It is never operational state: no scheduler, PM or crew decision reads it back. It therefore lives beside the job record, fetched by id when someone opens it, and never rides along in a chain walk. A chain is a log that grows without bound, and anything stored on its records is paid for by every reader of the chain.
 
 ### Assignment Memory — Artifacts and Decisions
 
