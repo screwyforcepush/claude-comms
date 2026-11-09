@@ -1,7 +1,7 @@
 # Job Prompts Side Table (Spec)
 
 Phase: `23-JobPromptsSideTable`
-Status: PLANNED at HEAD `82b23ace`. No code written yet.
+Status: IMPLEMENTED at `a5be9673` (WP1–WP3, validate green). Pending: Steward Convex deploy, then UI deploy, then the Q4 readback.
 Why-layer: `docs/project/spec/mental-model.md` → `#mm-prompt-is-visibility-artefact`, `#mm-self-surgery`, "Subscription Efficiency Principle", "Execution Records vs. Filesystem State". These are settled. This spec does not reopen them.
 
 External research: skipped on purpose. This is a repo-internal change to an existing Convex schema. The repo already has a pattern for every choice: `lib/` helpers that take `Pick<…Ctx, "db">` and are tested with a fake ctx (`lib/notificationFeed.ts` + `.test.ts`), `useQuery` with an error channel (`ui/js/hooks/useConvex.js`), and additive tables (`reflectionsV2`). There is no greenfield technology decision to put through a matrix.
@@ -180,7 +180,7 @@ export async function deleteJob(ctx: Pick<MutationCtx, "db">, jobId: Id<"jobs">)
 - No new modal, toast or retry affordance. A prompt that cannot be fetched is a gap in a visibility artefact, not an error the user must act on.
 
 **D8. Codegen.**
-- Run `cd workflow-engine && npm run generate` (`convex codegen`). This is the only permitted Convex command. It generates types locally and pushes nothing.
+- Run `cd workflow-engine && npm run generate` (`convex codegen`). This is the only permitted Convex command. It generates types locally and activates nothing. Correction after implementation: in convex 1.31.2 it is not purely local. `runCodegen` loads the selected deployment's credentials and calls `startPush`, which uploads modules for analysis ("Uploading functions to Convex..."), but it never calls `finishPush`, so nothing goes live (`node_modules/convex/dist/cjs/cli/lib/components.js`). A self-surgery brief should not describe it as offline.
 - Expected diff: `_generated/api.d.ts` gains `import type * as lib_jobPrompts from "../lib/jobPrompts.js";` and the matching `"lib/jobPrompts": typeof lib_jobPrompts` entry. `dataModel.d.ts` derives from the schema and may not change at all. `api.js` is `anyApi` and does not change.
 - If codegen fails for environmental reasons (auth or network on deployment selection), **do not try any other Convex command**. Report the failure and criterion 8 as incomplete; hand-editing generated files does not satisfy it. Complete the remaining safe work and validation, and leave successful local `npm run generate` as a required gate before implementation can be accepted.
 

@@ -4,7 +4,7 @@
 > and lightweight peer communication.
 
 **Version:** 2.1
-**Last Updated:** 2026-09-19
+**Last Updated:** 2026-11-09
 **Status:** Active
 **Why-layer:** See [mental-model.md](mental-model.md) for the authoritative
 intent, philosophy, user mental model, and design principles. This document is
@@ -45,6 +45,7 @@ Namespace
   -> Assignments
        -> JobGroups, chained by nextGroupId
             -> Jobs, parallel within a group
+                 -> JobPrompts, one per started job, read by job id
        -> Reflections / ReflectionsV2, joined through jobs
 
 Namespace
@@ -80,6 +81,7 @@ Primary capabilities:
 | `namespaces` -> `assignments` | 1:N | `assignments.namespaceId` is required. |
 | `assignments` -> `jobGroups` | 1:N | `assignments.headGroupId` points to the first group; each group can point to `nextGroupId`. |
 | `jobGroups` -> `jobs` | 1:N | Jobs in the same group run in parallel. |
+| `jobs` -> `jobPrompts` | 1:0..1 | Written on start; fetched by job id, never joined into a chain walk. |
 | `jobs` -> `reflections` | 1:N | Reflection rows join by `jobId`; duplicates are accepted by schema. |
 | `jobs` -> `reflectionsV2` | 1:N | V2 rows join by `jobId`; read-side tooling prefers V2 where available. |
 | `namespaces` -> `chatThreads` | 1:N | Threads can be listed by namespace or globally sorted pinned-first then by `latestMessageAt`. |
@@ -215,7 +217,8 @@ Group status rules:
 ### `jobs`
 
 Individual assignment work items. Each job has its own type, harness, optional
-model, prompt, metrics, kill signal, session ID, and retry state.
+model, metrics, kill signal, session ID, and retry state. The prompt lives
+beside the job in [`jobPrompts`](#jobprompts).
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
@@ -224,7 +227,7 @@ model, prompt, metrics, kill signal, session ID, and retry state.
 | `jobType` | `string` | Yes | Work type, for example `review`, `pm`, `implement`, or `uat`. |
 | `harness` | union | Yes | Harness binary selected for execution. |
 | `context` | `string` | No | Job-specific context. |
-| `prompt` | `string` | No | Full prompt sent to the agent. |
+| `prompt` | `string` | No | Historical only; never written. Jobs started before `jobPrompts` keep their prompt here, and it is not migrated. |
 | `status` | union | Yes | Job lifecycle status. |
 | `result` | `string` | No | Agent output or failure output. |
 | `startedAt` | `number` | No | Start timestamp. |
@@ -263,6 +266,46 @@ Indexes:
 provider rate limit. It prevents PM auto-spawn while a Convex scheduled
 function waits until `retryAfter`, then resets the job to `pending`. See
 [mental-model.md#rate-limit-resilience](mental-model.md#rate-limit-resilience).
+
+### `jobPrompts`
+
+The prompt sent to an assignment job, kept for the human reading the job detail
+modal. It sits beside the job record so chain walks never read prompt bytes; see
+[mental-model.md#mm-prompt-is-visibility-artefact](mental-model.md#mm-prompt-is-visibility-artefact)
+and [convex-bandwidth-optimization.md](convex-bandwidth-optimization.md) §6d.
+
+| Field | Type | Required | Description |
+|---|---|---:|---|
+| `jobId` | `Id<"jobs">` | Yes | Job the prompt was sent to. |
+| `prompt` | `string` | Yes | Full prompt sent to the agent. |
+| `createdAt` | `number` | Yes | When this prompt was written; refreshed when a restart overwrites it. |
+
+Indexes:
+
+| Index | Fields | Purpose |
+|---|---|---|
+| `by_job` | `jobId` | Fetch or delete the prompt for one job. |
+
+Lifecycle (all in `workflow-engine/convex/lib/jobPrompts.ts`):
+
+- **Write.** `jobs.start` upserts the row in the same mutation as the status
+  flip. A start without a prompt (`cli start-job`) leaves an existing row alone.
+- **Read.** `jobs.getPrompt` (the job detail modal) and `jobs.getWithGroup`
+  (`cli job`, the reflection dump) read the row first and fall back to the
+  historical `jobs.prompt` only when no row exists. The job document is read
+  only on that fallback, so a prompt subscription does not re-fire on metric
+  ticks.
+- **Delete.** `deleteJob` is the only way a job document is deleted. It removes
+  the job's rows, then the job. `assignments.remove`, the `chatThreads.remove`
+  cascade and the `jobs.retryGroup` downstream cascade all use it. Surviving
+  members of a retried group keep their row until their next start overwrites
+  it.
+
+Rule: `jobPrompts` is read by job id, never joined in a chain or group query.
+Chain queries (`scheduler.getReadyJobs`, `assignments.getChainWithTerminalJobs`,
+`assignments.getWithGroups`, `jobs.getActiveGroupsWithJobs`,
+`jobs.getGroupWithJobs`, `jobs.list`) return
+jobs without a prompt for anything started after the side table landed.
 
 ### `reflections`
 
@@ -786,6 +829,7 @@ Rules:
 | Namespace functions | `workflow-engine/convex/namespaces.ts` |
 | Assignment functions | `workflow-engine/convex/assignments.ts` |
 | Job and group functions | `workflow-engine/convex/jobs.ts` |
+| Job prompt read/write/delete helpers | `workflow-engine/convex/lib/jobPrompts.ts` |
 | Scheduler queries | `workflow-engine/convex/scheduler.ts` |
 | Chat thread functions | `workflow-engine/convex/chatThreads.ts` |
 | Chat message functions | `workflow-engine/convex/chatMessages.ts` |
