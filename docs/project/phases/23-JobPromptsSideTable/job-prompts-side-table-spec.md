@@ -62,7 +62,10 @@ Confirmed by `rg -n '\bprompt\b' workflow-engine/convex workflow-engine/ui/js .a
   - `scheduler.findReadyJobs` (`scheduler.ts:97`)
   - `assignments.getChainWithTerminalJobs` (`assignments.ts:137`)
   - `jobs.getActiveGroupsWithJobs`, `jobs.getGroupWithJobs`, `jobs.list`
+  - `assignments.getWithGroups` (`cli.ts:224` `assignment get`)
   - `updateGroupStatus`
+
+  Consequence, by design: `cli assignment get`, `cli group get` and `cli job list` stop printing `prompt` for jobs started after the change. No agent or tool reads `prompt` from them. `cli job get` (through `getWithGroup`) is the CLI path to a prompt. Do not join `jobPrompts` into these to "restore" it; that would break the §6d rule.
 - **Single-job reads.**
   - `jobs.get` is used by `reflect.ts:350`, which does not read `prompt`.
   - `jobs.getWithAssignment`: the runner does not read `prompt` from it.
@@ -160,7 +163,8 @@ export async function deleteJob(ctx: Pick<MutationCtx, "db">, jobId: Id<"jobs">)
 **D6. A pending job has no row, so `getPrompt` reads the job doc.** This is acceptable and stays inside criterion 3:
 - Pending jobs do not tick metrics.
 - The `jobs.start` mutation that makes a job tick also inserts its row. That invalidates the `by_job` range read, and the re-run takes branch 1 and drops the job-doc dependency.
-- Historical jobs fall back permanently, but they are terminal, so they do not tick.
+- Historical jobs fall back permanently, and almost all of them are terminal, so they do not tick. The one exception is a job that is already running when Convex deploys. It has no row, so while its modal is open, `getPrompt` re-reads the job doc on each metric tick until the job ends. This is transitional and bounded by those jobs' lifetimes; accept it.
+- Reactivity basis: a query's read set is the documents it `get`s plus the index ranges it scans. `requirePassword` reads only `process.env`, and `v.id("jobs")` validation checks only the id's format and table, never the document. So in branch 1 the read set is just the `jobPrompts.by_job[jobId]` range, and patches to the job doc cannot invalidate it.
 
 **D7. How JobDetail degrades.** The modal follows the repo's loading vocabulary and makes three explicit render states:
 - Call `useQuery(api.jobs.getPrompt, { id: _id })` unconditionally at the top of `JobDetail` (hooks rule).
@@ -170,13 +174,15 @@ export async function deleteJob(ctx: Pick<MutationCtx, "db">, jobId: Id<"jobs">)
   - `loading && !error` → **loading**: the `Prompt` label, then `LoadingSkeleton` (shared primitive, `variant: 'text'`, a few lines), in a wrapper with `aria-busy="true"`.
   - Otherwise → `ContentViewer({ content: data, label: 'Prompt' })`. A `null` data value renders nothing.
 - Missing function: when the UI deploys before Convex, `ConvexClient.onUpdate` calls the hook's `onError` ("Could not find public function"). The hook sets `error` and logs `console.error`, so the UI shows the **empty** state and nothing throws. Every `useQuery` call already relies on this channel.
+- The `error` state is sticky for the life of the mount, because `useQuery` never clears `error` when a later result arrives. A modal that is open across a Convex deploy stays empty until it is reopened. This is accepted; do not patch `useQuery` for it, because that hook is shared and out of scope.
+- `!connected` holds `loading=true`, so a disconnected client shows the skeleton. This matches every other `useQuery` consumer during a disconnect, and it is not a stuck state.
 - Remove `prompt` from the `job` destructure. No UI file reads `job.prompt`.
 - No new modal, toast or retry affordance. A prompt that cannot be fetched is a gap in a visibility artefact, not an error the user must act on.
 
 **D8. Codegen.**
 - Run `cd workflow-engine && npm run generate` (`convex codegen`). This is the only permitted Convex command. It generates types locally and pushes nothing.
 - Expected diff: `_generated/api.d.ts` gains `import type * as lib_jobPrompts from "../lib/jobPrompts.js";` and the matching `"lib/jobPrompts": typeof lib_jobPrompts` entry. `dataModel.d.ts` derives from the schema and may not change at all. `api.js` is `anyApi` and does not change.
-- If codegen fails for environmental reasons (auth or network on deployment selection), **do not try any other Convex command**. Hand-edit `api.d.ts` to mirror the existing `lib_*` entries (precedent: `67437faf`) and say so in the job result.
+- If codegen fails for environmental reasons (auth or network on deployment selection), **do not try any other Convex command**. Report the failure and criterion 8 as incomplete; hand-editing generated files does not satisfy it. Complete the remaining safe work and validation, and leave successful local `npm run generate` as a required gate before implementation can be accepted.
 
 **D9. Known limit (not fixed, no regression).** `assignments.remove` and `chatThreads.remove` still read every prompt of the chain being deleted:
 - before this change, through the job docs;
@@ -316,7 +322,7 @@ These map 1:1 to the north star's eleven criteria.
 5. `jobs.getWithGroup` returns `prompt` resolved with the same fallback. The field is absent when there is no prompt, so the dump shape is unchanged. `reflections.ts` has no diff.
 6. `deleteJob` in `lib/jobPrompts.ts` is the only job-delete path. It is called from `assignments.remove`, `chatThreads.remove` and the `jobs.retryGroup` downstream cascade. Retried-group survivors are not deleted.
 7. `JobDetail.js` fetches through `api.jobs.getPrompt`, registered in `api.js`, only while open. It has a loading skeleton, and a missing or erroring query renders an empty prompt section. Grep confirms no other UI `prompt` reads.
-8. `_generated/*` is regenerated with `npm run generate` (or hand-mirrored per D8, which must then be reported).
+8. `_generated/*` is regenerated with a successful local `npm run generate`. Hand-edited substitutes do not satisfy this criterion; report a failure per D8 without running another Convex command.
 9. `scheduler.ts`, `runner.ts`, `getChainWithTerminalJobs` and `getActiveGroupsWithJobs` are unmodified.
 10. `convex-bandwidth-optimization.md` §6d is present per WP3.
 11. `npx tsx .agents/tools/validate/cli.ts` → `"ok": true` (lint, ts:check, ts:workflow, test, build).
