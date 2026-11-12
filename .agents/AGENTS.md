@@ -21,9 +21,9 @@ feel the edges. THINK HARD about the implications/impacts
 - Decision: Weigh up the implementation approach options
 
 *Decision: If you are implementing business logic, API, workflows, or user journeys: Write Tests FIRST (Red Phase):*
-   - THINK HARD about the *Testing Trophy* model for your Assignment/Task. Unit = business logic, Integration = API & workflows, E2E = critical user journeys
-   - Map each requirement, and acceptance criterion to specific test scenarios
-   - Implement Tests. ensuring that the tests cover all acceptance criteria
+   - Apply the repository's testing stance (Test approach in `.agents/repo.md`). Ask of every test: "if this failed, which decision of ours would be wrong?" A test proves a decision the product makes, never the framework rendering, echoing or focusing. One spec promise = one test, in exactly one tier, added to the subject's existing test file. No mirrors of the source, no fixture-echoes, no snapshots. A real-browser test only where the interface itself decides something before commit; everything else is proven engine-free.
+   - Map each acceptance criterion to the one test scenario and the one instrument that proves it
+   - Implement Tests. ensuring that the tests cover all acceptance criteria and nothing unpromised
 
 *Implementation (Green Phase)*:
    - Write minimal code to meet acceptance criteria.

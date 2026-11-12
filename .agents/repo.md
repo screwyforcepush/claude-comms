@@ -6,6 +6,15 @@ VALIDATE by running the blocking validate CLI — all gates must pass without wa
 Read the stdout JSON `ok` field for the verdict. If `ok` is `false`, open only the `log` paths for gates whose JSON `status` is `failed`; do not grep stdout or logs for the verdict.
 
 
+## Test approach
+Runner is `node:test` via `npx tsx --test`; no vitest, jest or Convex test harness. A test file is only run if it matches a glob in the validate `test` gate (`.agents/tools/validate/config.json`), so a test outside those homes is silently never executed. Homes, by tier:
+- Engine decisions: pull the logic out of the Convex function into a pure module in `workflow-engine/convex/lib/` and test it there (`*.test.ts` beside the module). Convex functions themselves stay thin and untested.
+- Toolkit decisions (CLI, runner, PM mechanics): `.agents/tools/workflow/lib/*.test.ts`.
+- Buildless UI helpers: `workflow-engine/ui/test/*.test.ts`. The UI is plain modules; a test imports the helper, never the DOM.
+- Browser behaviour is not a test tier here. Where the interface itself decides something, the instrument is a UAT job with the browsertools toolkit, not a test file.
+
+Add to the subject's existing test file before creating a new one. A new file opens with a `Run with: npx tsx --test <path>` header so it can be run alone.
+
 ## Dev server
 You can start the workflow engine UI server with `cd workflow-engine/ui && nohup npm start > /tmp/ui-server.log 2>&1 &` but it may already running in the background. check the `ui-server.log` file. Avoid starting up a new instance as it will bump the port.
 you can access the client on `http://localhost:3000/` using the UAT toolkit
