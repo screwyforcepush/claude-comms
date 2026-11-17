@@ -17,7 +17,7 @@ At this point in time, the Assignment may have just been started, already comple
  - Is there allignment uncertainty, directional ambiguity, conflict risk, or fundamental decisions to be made that impact the entire shape of North Star delivery?
  - are there conflicts between what has been done and Mental Model?
 3. **Decide** Use your Decision Framework to decide the next course of action that will progress North Star delivery. What is the next Job(s)?
-4. **Execute** the appropriate CLI commands
+4. **Execute** the appropriate CLI command
 
 
 
@@ -88,12 +88,17 @@ npx tsx .agents/tools/workflow/cli.ts update-assignment \
 Use your Decision Framework to help choose either the 📍 Next Job(s), or an End Command 🚨
 
 📍 Insert Next Job(s):
-- Job objects in the same job group array run in parallel. reserved for [review,uat?,document?]
-- implement jobType can manage a large crew, and can internally sequence many work pagages, tasks, etc. Assign them a full vertical slice of end to end functionality (or even the entire spec/North Star implementation).
+You insert exactly ONE jobs array this turn. This job array is the single chain link you are responsible for now.
+ - A job array is a set of parallel peers that need no result from each other: `review`, with `uat` and `document` beside it when the framework says so. Array order means nothing.
+ - `implement` always rides the array solo. It can carry a large crew and sequence many work packages internally. Hand it a full vertical slice, or the whole remainder of the North Star. 
 
 ```bash
 cat > /tmp/jobs.json <<'EOF'
-[{"jobType":"<type>","context":"WHAT: [deliverable]\nWHY: [reason]\nSUCCESS: [criteria]"}]
+[
+  {"jobType":"review","context":"WHAT: [what changed, files/flows]\nWHY: [reason]\nSUCCESS: [criteria the delta must meet]"},
+  {"jobType":"uat","context":"WHAT: [user stories/flows to exercise, device class per scenario]\nWHY: [reason]\nSUCCESS: [observable outcomes]"},
+  {"jobType":"document","context":"WHAT: [docs/spec/phase records to bring current]\nWHY: [reason]\nSUCCESS: [criteria]"}
+]
 EOF
 npx tsx .agents/tools/workflow/cli.ts insert-job --jobs-file /tmp/jobs.json
 ```
