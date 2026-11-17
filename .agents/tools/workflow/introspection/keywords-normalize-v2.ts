@@ -902,6 +902,348 @@ const MAPPING: Record<string, string> = {
 
   // orchestration-friction — additional variant.
   "orchestration-overhead": "orchestration-friction",
+
+  // ===========================================================================
+  // Pass 4 additions (2026-11-11) — ~13 weeks since Pass 3; 576 rows in the
+  // last month alone, 377 keyword slots still on pre-Pass-3 spellings.
+  // ===========================================================================
+
+  // tool-output-truncation — V2 canonical retained; now the #2 theme. The
+  // harness cut the output off (Claude persists >~30KB Bash output to a file,
+  // Codex caps the outer functions.exec budget). Tool-side framing. Kept
+  // distinct from oversized-docs (shape-side: the doc is too big) — same
+  // precedent as artifact-readback vs flat-prose-blob. Job-RESULT truncation
+  // (a timed-out job's digest) is a different mechanism → job-timeout-handoff.
+  "nested-output-budgets": "tool-output-truncation",
+  "nested-output-truncation": "tool-output-truncation",
+  "nested-output-limits": "tool-output-truncation",
+  "tool-output-overflow": "tool-output-truncation",
+  "tool-output-limit": "tool-output-truncation",
+  "tool-output-limits": "tool-output-truncation",
+  "tool-output-cap": "tool-output-truncation",
+  "tool-output-spill": "tool-output-truncation",
+  "unbounded-tool-output": "tool-output-truncation",
+  "output-truncation": "tool-output-truncation",
+  "doc-output-truncation": "tool-output-truncation",
+  "document-output-truncation": "tool-output-truncation",
+  "document-truncation": "tool-output-truncation",
+  "doc-read-truncation": "tool-output-truncation",
+  "oversized-doc-output-truncation": "tool-output-truncation",
+  "oversized-doc-output-limit": "tool-output-truncation",
+  "oversized-spec-truncation": "tool-output-truncation",
+  "required-doc-truncation": "tool-output-truncation",
+  "validate-output-truncation": "tool-output-truncation",
+  "persisted-output-truncation": "tool-output-truncation",
+  "batch-output-budget": "tool-output-truncation",
+  // read-batching — NEW canonical (Codex-leaning cause): combining several
+  // long reads into one exec so the combined output blows the budget.
+  // Cause-side of tool-output-truncation; kept distinct (remedy is "one doc
+  // per call", not "raise the cap").
+  "read-batch-sizing": "read-batching",
+  "read-budget-mismatch": "read-batching",
+  "read-budget-ergonomics": "read-batching",
+  "batched-read-overflow": "read-batching",
+  "oversized-read-batches": "read-batching",
+  // oversized-docs — additional variants.
+  "oversized-doc-output": "oversized-docs",
+  "oversized-document-reads": "oversized-docs",
+  "oversized-doc-reads": "oversized-docs",
+  "oversized-doc-spill": "oversized-docs",
+  "oversized-spec-output": "oversized-docs",
+  "oversized-doc-read": "oversized-docs",
+  "large-doc-read": "oversized-docs",
+  "large-spec-paging": "oversized-docs",
+  "large-generated-doc-navigation": "oversized-docs",
+  "documentation-sprawl": "oversized-docs",
+  "receipt-doc-bloat": "oversized-docs",
+  "doc-read-budget": "oversized-docs",
+  // append-only-growth — additional variants (completion.md accreting review
+  // rounds is the recurring instance).
+  "append-only-doc-growth": "append-only-growth",
+  "append-only-doc-bloat": "append-only-growth",
+  // redundant-reads — NEW canonical: same file read more than once in one
+  // job (rubric sameFileReadMultipleTimes is the presence check).
+  "repeated-file-reads": "redundant-reads",
+  "repeated-context-reads": "redundant-reads",
+  "repeated-document-reads": "redundant-reads",
+  "repeated-read-overhead": "redundant-reads",
+  "avoidable-rereads": "redundant-reads",
+  "read-before-edit-redundancy": "redundant-reads",
+
+  // hidden-fanout — Pass 3 canonical retained (Claude PM only): one `review`
+  // entry silently expands to every configured reviewer harness; the PM wrote
+  // the brief for one reviewer. hidden-job-fanout is now the louder spelling
+  // (19 vs 6) but cross-pass continuity wins. Distinct from parallel-dispatch
+  // (missed parallelism) and from concurrent-writer-collision (the effect).
+  "hidden-job-fanout": "hidden-fanout",
+  "implicit-job-fanout": "hidden-fanout",
+  "silent-job-fanout": "hidden-fanout",
+  "silent-fanout": "hidden-fanout",
+  "hidden-harness-fanout": "hidden-fanout",
+  "insert-job-silent-fanout": "hidden-fanout",
+  "insert-job-hidden-fanout": "hidden-fanout",
+  "insert-job-opaque-expansion": "hidden-fanout",
+  "harness-assignment-opacity": "hidden-fanout",
+  "harness-assignment-opaque": "hidden-fanout",
+  "harness-routing-opacity": "hidden-fanout",
+  // job-grouping-footgun — NEW canonical: implement and review placed in one
+  // parallel group so reviewers race the implementer. Kept distinct from
+  // hidden-job-fanout (the PM knew they were parallel; they didn't know
+  // the group semantics).
+  "job-group-parallelism-footgun": "job-grouping-footgun",
+
+  // shared-worktree-race — additional variants (general theme).
+  "shared-worktree-drift": "shared-worktree-race",
+  "shared-worktree-coordination": "shared-worktree-race",
+  "shared-worktree-contention": "shared-worktree-race",
+  "shared-worktree-interference": "shared-worktree-race",
+  "shared-worktree-contamination": "shared-worktree-race",
+  "shared-worktree-file-contention": "shared-worktree-race",
+  "shared-workspace-concurrency": "shared-worktree-race",
+  "concurrent-head-mutation": "shared-worktree-race",
+  "concurrent-job-interference": "shared-worktree-race",
+  "environment-contention": "shared-worktree-race",
+  "shared-environment-contention": "shared-worktree-race",
+  "moving-review-target": "shared-worktree-race",
+  "mutable-review-target": "shared-worktree-race",
+  // concurrent-writer-collision — NEW canonical, the specific recurring
+  // sub-topic: two agents (usually fan-out reviewers) editing the SAME file
+  // or output path. General-vs-specific precedent — stays distinct from
+  // shared-worktree-race.
+  "concurrent-agent-collision": "concurrent-writer-collision",
+  "parallel-writer-collision": "concurrent-writer-collision",
+  "parallel-output-collision": "concurrent-writer-collision",
+  "output-path-collision": "concurrent-writer-collision",
+  "concurrent-edit-visibility": "concurrent-writer-collision",
+  "concurrent-edit-risk": "concurrent-writer-collision",
+  "concurrent-edit-collision": "concurrent-writer-collision",
+  "concurrent-write-collision": "concurrent-writer-collision",
+  "concurrent-file-mutation": "concurrent-writer-collision",
+  "concurrent-session-collision": "concurrent-writer-collision",
+  "concurrent-reviewer-edits": "concurrent-writer-collision",
+  "concurrent-reviewer-collision": "concurrent-writer-collision",
+  "concurrent-review-collision": "concurrent-writer-collision",
+  "concurrent-reviewer-drift": "concurrent-writer-collision",
+  "edit-collision": "concurrent-writer-collision",
+  "silent-overwrite": "concurrent-writer-collision",
+  "fanout-shared-artifact": "concurrent-writer-collision",
+  // shared-build-artifact-collision — NEW canonical: validate's build and the
+  // dev server share one output dir (.next). Remedy is an isolated distDir,
+  // nothing to do with file edits → distinct from the two above.
+  "shared-build-directory": "shared-build-artifact-collision",
+  "shared-build-dir": "shared-build-artifact-collision",
+  "shared-build-dir-clobber": "shared-build-artifact-collision",
+  "shared-build-artifacts": "shared-build-artifact-collision",
+  "shared-build-output": "shared-build-artifact-collision",
+  "dev-build-state-collision": "shared-build-artifact-collision",
+  "shared-generator-race": "shared-build-artifact-collision",
+  // dirty-worktree — additional variants (inherited dirt, attribution of it).
+  "dirty-shared-worktree": "dirty-worktree",
+  "dirty-tree-provenance": "dirty-worktree",
+  "dirty-tree-attribution": "dirty-worktree",
+  "shared-worktree-attribution": "dirty-worktree",
+  "shared-worktree-ownership": "dirty-worktree",
+  "agent-change-attribution": "dirty-worktree",
+  // id-collision — NEW canonical: D-ids, phase numbers, test ids allocated
+  // by hand collide across assignment Decisions, phase specs and parallel
+  // reviewers.
+  "decision-id-collision": "id-collision",
+  "decision-id-namespace-collision": "id-collision",
+  "id-namespace-collision": "id-collision",
+  "phase-id-collision": "id-collision",
+  "finding-id-collision": "id-collision",
+  "manual-id-allocation": "id-collision",
+  "identifier-ambiguity": "id-collision",
+
+  // calibration-overhead — NEW canonical: AOP.CALIBRATE's full-read mandate
+  // applied to a narrow PM/review job. Behavioural tell in the rows: "so I
+  // skipped it" — a silent deviation, not a relevance whinge. Kept distinct
+  // from oversized-docs (doc size) and from duplicated-calibration (subagents
+  // re-calibrating independently).
+  "calibrate-overhead": "calibration-overhead",
+  "calibrate-overreach": "calibration-overhead",
+  "aop-calibrate-overreach": "calibration-overhead",
+  "aop-calibrate-overscoped-for-pm": "calibration-overhead",
+  "unbounded-calibration": "calibration-overhead",
+  "calibrate-scope-mismatch": "calibration-overhead",
+  "calibrate-cost-vs-pm-scope": "calibration-overhead",
+  "intent-conflict-calibrate-vs-pm-scope": "calibration-overhead",
+  "calibration-scope-overload": "calibration-overhead",
+  "calibration-cost": "calibration-overhead",
+  "overbroad-calibration": "calibration-overhead",
+  "calibrate-overhead-mismatch": "calibration-overhead",
+  "oversized-calibration": "calibration-overhead",
+  "mandatory-doc-overread": "calibration-overhead",
+  "mandatory-reading-overload": "calibration-overhead",
+
+  // polling-overhead — NEW canonical: hand-rolled nohup/pgrep/sleep loops
+  // around a validate run longer than the foreground Bash cap, with no
+  // deterministic status/wait primitive.
+  "active-polling-overhead": "polling-overhead",
+  "active-polling-rule-overhead": "polling-overhead",
+  "polling-ergonomics": "polling-overhead",
+  "polling-friction": "polling-overhead",
+  "manual-polling": "polling-overhead",
+  "idle-wait-ergonomics": "polling-overhead",
+  "background-task-polling": "polling-overhead",
+  "background-process-polling": "polling-overhead",
+  "background-task-monitoring": "polling-overhead",
+  "task-monitoring-overhead": "polling-overhead",
+  "sibling-job-polling-overhead": "polling-overhead",
+  "long-validate-polling": "polling-overhead",
+  "long-gate-wait-ergonomics": "polling-overhead",
+  "long-running-gate-ergonomics": "polling-overhead",
+  "long-running-tool-ergonomics": "polling-overhead",
+  // validation-observability — NEW canonical: validate is silent inside a
+  // gate and --status reports the last finished run, not the active one.
+  // Cause of polling-overhead; kept distinct (remedy lives in the CLI).
+  "validation-observability-gap": "validation-observability",
+  "validation-progress-blindness": "validation-observability",
+  "validation-feedback-latency": "validation-observability",
+  "validation-diagnostic-latency": "validation-observability",
+  "stale-status-reporting": "validation-observability",
+  "stale-status-readback": "validation-observability",
+  "stale-status": "validation-observability",
+  "single-flight-opacity": "validation-observability",
+  "single-flight-observability": "validation-observability",
+  "single-flight-ambiguity": "validation-observability",
+  "single-flight-gap": "validation-observability",
+  // validation-ergonomics — additional variants.
+  "validate-exceeds-bash-timeout": "validation-ergonomics",
+  "long-blocking-validate": "validation-ergonomics",
+  "long-running-gate": "validation-ergonomics",
+  "long-running-cli": "validation-ergonomics",
+  "validation-cost": "validation-ergonomics",
+  // validation-duplication — V2 canonical retained: the PM re-runs a full
+  // validate when a crew receipt at the same HEAD already exists.
+  "validate-receipt-trust": "validation-duplication",
+  "receipt-trust": "validation-duplication",
+  "receipt-version-ambiguity": "validation-duplication",
+  "redundant-long-run": "validation-duplication",
+  "duplicate-execution": "validation-duplication",
+  // validation-policy-ambiguity — additional variants: which validation
+  // applies to a fenced (read-only / docs-only / no-runners) job.
+  "validation-scope-mismatch": "validation-policy-ambiguity",
+  "validation-scope-conflict": "validation-policy-ambiguity",
+  "validation-mode-ambiguity": "validation-policy-ambiguity",
+  "validation-ownership-ambiguity": "validation-policy-ambiguity",
+  "validate-gate-ambiguity": "validation-policy-ambiguity",
+  "validate-gate-docs-only-ambiguity": "validation-policy-ambiguity",
+  "docs-only-validate": "validation-policy-ambiguity",
+  "premature-validation": "validation-policy-ambiguity",
+  // validation-fragmentation — NEW canonical: the gate is N separate runner
+  // invocations with no single manifest (namespace-side config smell).
+  "test-runner-fragmentation": "validation-fragmentation",
+  // validation-output-noise — additional variants.
+  "validate-output-verbosity": "validation-output-noise",
+  "validate-noise": "validation-output-noise",
+  "validation-signal-noise": "validation-output-noise",
+  "known-red-gate-noise": "validation-output-noise",
+  "known-environment-failure-noise": "validation-output-noise",
+  // known-env-gate-failure — NEW canonical (cause-side of the noise above):
+  // a gate is permanently red for an environmental reason every job must
+  // re-diagnose. Remedy is an allowlist, not quieter logs → distinct.
+  "known-environmental-gate-failure": "known-env-gate-failure",
+  "known-environment-failure": "known-env-gate-failure",
+  "known-env-failure-not-allowlisted": "known-env-gate-failure",
+  "environmental-gate-failure": "known-env-gate-failure",
+  "environmental-false-failure": "known-env-gate-failure",
+  "validate-environmental-failure": "known-env-gate-failure",
+  "validate-gate-permanent-red": "known-env-gate-failure",
+  "false-red-gate": "known-env-gate-failure",
+  "unrelated-gate-failure": "known-env-gate-failure",
+  "external-dependency-false-positive": "known-env-gate-failure",
+
+  // intent-conflict — additional pair-named variants, folded per the
+  // existing precedent (aop-vs-assignment already folds). The pair survives
+  // in items[].painPoint for slice reading.
+  "intent-conflict-aop-vs-pm-role": "intent-conflict",
+  "intent-conflict-aop-vs-pm-scope": "intent-conflict",
+  "intent-conflict-northstar-vs-mental-model": "intent-conflict",
+  "intent-conflict-northstar-internal": "intent-conflict",
+  "intent-conflict-northstar-vs-nudge": "intent-conflict",
+  "intent-conflict-spec-vs-guide": "intent-conflict",
+  "intent-conflict-framework-vs-nudge": "intent-conflict",
+  "intent-conflict-template-vs-scope-fence": "intent-conflict",
+  "instruction-scope-conflict": "intent-conflict",
+  "instruction-precedence-friction": "intent-conflict",
+  "instruction-contradiction": "intent-conflict",
+  "instruction-tool-contract-mismatch": "intent-conflict",
+  "aop-scope-mismatch": "intent-conflict",
+  // superseded-context-unmarked — NEW canonical: prompts carry superseded
+  // rulings/reviews phrased as still-mandatory. Distinct from intent-conflict
+  // (the sources don't disagree; one is just stale) and from
+  // decision-log-bloat (size, not staleness).
+  "superseded-instructions": "superseded-context-unmarked",
+  "superseded-decisions-unmarked": "superseded-context-unmarked",
+  "superseded-decision-context": "superseded-context-unmarked",
+  "decision-log-supersession": "superseded-context-unmarked",
+  "historical-requirement-overload": "superseded-context-unmarked",
+  "stale-prior-output-in-prompt": "superseded-context-unmarked",
+  // review-split-verdict — Pass 3 canonical retained, a decision-framework
+  // sub-topic: the fan-out panel disagrees and post-review has no
+  // aggregation rule.
+  "conflicting-reviewer-verdicts": "review-split-verdict",
+  "split-review-verdict-aggregation": "review-split-verdict",
+  "review-quorum-undefined": "review-split-verdict",
+  // decision-log-bloat — NEW canonical (size of the Decisions ledger).
+  "decision-log-growth": "decision-log-bloat",
+  "decision-log-churn": "decision-log-bloat",
+  // artifact-readback / flat-prose-blob — additional variants.
+  "decision-retrieval-friction": "artifact-readback",
+  "decision-log-scan-cost": "artifact-readback",
+  "flat-context-readback": "artifact-readback",
+  "decision-record-flat-prose": "flat-prose-blob",
+  "unstructured-decision-history": "flat-prose-blob",
+  "decision-record-fragmentation": "flat-prose-blob",
+
+  // stale-nudge — NEW canonical (Claude PM only): pmNudge carries no
+  // timestamp or SHA, so the PM can't tell new guidance from absorbed.
+  "nudge-lifecycle": "stale-nudge",
+  "nudge-lifecycle-ambiguity": "stale-nudge",
+  "nudge-metadata-missing": "stale-nudge",
+
+  // headless-status-nudge-noise — NEW canonical: the harness's "user hasn't
+  // heard from you" reminder firing in an unattended job. Harness-side
+  // injection, but a named recurring sub-topic (todowrite-noise precedent).
+  "headless-status-nudges": "headless-status-nudge-noise",
+  "headless-progress-nudge-noise": "headless-status-nudge-noise",
+  "headless-interruptions": "headless-status-nudge-noise",
+  // progress-update-noise — NEW canonical (Codex-leaning): a mandated
+  // sub-minute commentary cadence during a silent long gate. Effect-side of
+  // status-update-policy (the intent conflict), kept distinct.
+  "forced-progress-noise": "progress-update-noise",
+  "forced-progress-chatter": "progress-update-noise",
+  "status-update-churn": "progress-update-noise",
+  "status-update-pressure": "progress-update-noise",
+  "status-message-churn": "progress-update-noise",
+  "progress-update-pressure": "progress-update-noise",
+  "heartbeat-noise": "progress-update-noise",
+  "heartbeat-nudge-noise": "progress-update-noise",
+  "low-information-updates": "progress-update-noise",
+  // cwd-drift — NEW canonical: a `cd` inside a compound Bash call persists
+  // and the harness injects an environment-update notice.
+  "cwd-drift-notices": "cwd-drift",
+  "persistent-cwd-surprise": "cwd-drift",
+  "bash-state-surprise": "cwd-drift",
+  // pkill-self-match — NEW canonical: `pkill -f <pattern>` matches the
+  // agent's own bash -c string and kills its shell.
+  "process-kill-self-match": "pkill-self-match",
+  // dev-server-lifecycle — NEW canonical: no managed start/stop/restart for
+  // the dev server; nohup'd processes vanish or orphan.
+  "background-process-lifecycle": "dev-server-lifecycle",
+  "background-process-lifetime": "dev-server-lifecycle",
+  "orphaned-background-process": "dev-server-lifecycle",
+  "process-lifecycle": "dev-server-lifecycle",
+  "dev-server-restart": "dev-server-lifecycle",
+
+  // job-timeout-handoff — NEW canonical (Claude PM only): a job that hit its
+  // wall-clock limit hands the PM a truncated chatter tail with no final
+  // state. Runner-side mechanism; NOT tool-output-truncation.
+  "truncated-job-output": "job-timeout-handoff",
+  "truncated-job-report": "job-timeout-handoff",
+  "timeout-handoff-loss": "job-timeout-handoff",
+  "opaque-job-failure": "job-timeout-handoff",
 };
 
 function help(): void {
