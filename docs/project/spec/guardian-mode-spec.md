@@ -24,10 +24,10 @@ Enable alignment monitoring at convergence checkpoints during autonomous assignm
 
 A third thread mode (alongside jam and cook) where:
 - PO evaluates every third completion-review knock-back for convergence and alignment with original intent
-- PO has jam context and checkpoint history via a per-assignment session fork
+- PO has jam context and checkpoint history because the thread has one session across every mode
 - The final PM report triggers an executive assessment, preferring the guardian thread, otherwise the linked jam/cook thread
 - A blocking PM report triggers an advisory block assessment in the guardian thread, otherwise the linked jam/cook thread, regardless of whether the PM queued another group
-- Routine PM reports between checkpoints never reach the guardian fork
+- Routine PM reports between checkpoints never reach the guardian thread
 - PO acts as user's advocate, flagging drift before it compounds
 - User can engage PO to discuss and resolve uncertainty
 
@@ -103,7 +103,7 @@ Checkpoint context is `{ round, completionReviews, chainShape }`: round is count
 P M I M R+R+R+D M I M R+R+R+D M I M R+R+R+D M
 ```
 
-The final assessment uses `completion_summary`, even in guardian mode, rather than `guardian_eval`. A PM Block takes precedence over both and uses `block_assessment`. Guardian checkpoint evaluations, final assessments, block assessments, and user messages all use the assignment's guardian fork; jam/cook uses the original session. Without an existing fork or original session, a guardian interaction starts fresh and saves its returned session to the guardian map.
+The final assessment uses `completion_summary`, even in guardian mode, rather than `guardian_eval`. A PM Block takes precedence over both and uses `block_assessment`. Guardian checkpoint evaluations, final assessments, block assessments, and user messages all resume the thread's one session, the same one jam/cook uses; guardian mode never forks. Without a session yet, a guardian interaction starts fresh and saves its returned session to the thread like any other turn. The `guardianSessions` map is retired and unread.
 
 The block trigger mirrors the completion trigger: `getCompletionThread` prefers guardian, otherwise a linked jam/cook thread; one `role: 'pm'` message carries the PM report and one `chatJobs.trigger` call carries `isBlockAssessment: true` and the fresh assignment's `blockedReason`. These optional fields are stored in the existing JSON context; no schema change is needed. `determinePromptType` gates the block flag before `guardian_eval` and the new-session check. `buildChatPrompt` selects only `BLOCK_ASSESSMENT`, substitutes `{{ASSIGNMENT_ID}}`, `{{BLOCKED_REASON}}`, and `{{LATEST_MESSAGE}}` in one pass, and omits the user-message suffix. Like completion summaries and guardian evaluations, block assessments do not update `lastPromptMode`.
 

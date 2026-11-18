@@ -237,25 +237,6 @@ async function saveSessionId(threadId: string, sessionId: string): Promise<void>
   }
 }
 
-// Save guardian-mode forked session ID (per assignment)
-async function saveGuardianSessionId(
-  threadId: string,
-  assignmentId: string,
-  sessionId: string
-): Promise<void> {
-  try {
-    await client!.mutation(api.chatThreads.updateGuardianSessionId, {
-      password: config.password,
-      id: threadId as any,
-      assignmentId,
-      sessionId,
-    });
-    console.log(`[Chat] Saved guardian session_id ${sessionId} for assignment ${assignmentId.slice(-8)} on thread ${threadId}`);
-  } catch (e) {
-    console.error(`[Chat] Failed to save guardian session_id:`, e);
-  }
-}
-
 // Save lastPromptMode to thread for differential prompting
 async function saveLastPromptMode(
   threadId: string,
@@ -978,12 +959,9 @@ async function executeChatJob(chatJob: ChatJob): Promise<void> {
           await saveChatResponse(chatContext.threadId, result, { hint });
           if (sessionId) {
             // Route session save: guardian mode saves to per-assignment map
-            const isGuardianSession = chatContext.mode === "guardian" && chatContext.assignmentId;
-            if (isGuardianSession) {
-              await saveGuardianSessionId(chatContext.threadId, chatContext.assignmentId!, sessionId);
-            } else {
-              await saveSessionId(chatContext.threadId, sessionId);
-            }
+            // One thread, one session: every mode saves to the thread session.
+            // @see docs/project/spec/mental-model.md#mm-one-thread-one-session
+            await saveSessionId(chatContext.threadId, sessionId);
           }
           if (!chatContext.isGuardianEvaluation && !chatContext.isCompletionSummary && !chatContext.isBlockAssessment) {
             await saveLastPromptMode(chatContext.threadId, chatContext.effectivePromptMode);

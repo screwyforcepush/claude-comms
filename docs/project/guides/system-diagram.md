@@ -34,7 +34,7 @@
   │  │  mode: jam|cook|guardian    │   │  northStar: "Implement dark mode"             │ │
   │  │  title: "API Auth Design"  │   │  status: pending|active|blocked|complete      │ │
   │  │  claudeSessionId: "abc..."  │   │  priority: 1-99                               │ │
-  │  │  guardianSessions: {id:sid} │   │                                               │ │
+  │  │  forkedFrom, handedOverFrom │   │                                               │ │
   │  │  lastReadAt: (unread track) │   │  independent: bool (parallel vs sequential)   │ │
   │  │  pinned: bool (float top)   │   │                                               │ │
   │  │  assignmentId ─ ─ ─ ─ ─ ─ ─┼──▶│  artifacts: accumulated output               │ │
@@ -159,9 +159,7 @@
   │                                                                                        │
   │    User sends message ──▶ chatJobs.trigger ──▶ pending ──▶ Runner picks up            │
   │      ──▶ running ──▶ complete ──▶ save response as assistant message                  │
-  │                                   save sessionId (routed by mode):                     │
-  │                                     jam/cook → claudeSessionId                         │
-  │                                     guardian → guardianSessions[assignmentId]           │
+  │                                   save sessionId → claudeSessionId (every mode)        │
   │    Any assistant save succeeds ──▶ notifications.post (own catch; no fork/retry)      │
   │      Server audio toggle on ──▶ body.slice(0, 5000); off ──▶ no notification row     │
   └────────────────────────────────────────────────────────────────────────────────────────┘
@@ -214,16 +212,13 @@
   │    - Final report    → completion prompt (also in guardian mode); no checkpoint eval   │
   │    - Blocking report → block prompt + recorded reason; no completion/checkpoint eval   │
   │                                                                                        │
-  │  Session Isolation (Guardian Fork):                                                    │
-  │    - jam/cook        → resumes claudeSessionId (OG session)                            │
-  │    - guardian         → resumes guardianSessions[assignmentId]                          │
-  │      - First eval    → --resume <OG> --fork-session (creates branch)                   │
-  │                        No OG session? Start fresh and save to the guardian map.        │
-  │      - Subsequent    → --resume <guardian fork> (accumulates eval context)              │
-  │    - Per-assignment  → each assignment gets its own guardian fork                       │
-  │    - Guardian fork   → checkpoint evals, final/block assessments, and user messages    │
-  │                        Routine PM reports between checkpoints never reach the fork.    │
-  │    - Mode switching  → instant, non-destructive (OG and forks coexist)                 │
+  │  One Thread, One Session (mental-model #mm-one-thread-one-session):                    │
+  │    - every mode     → resumes claudeSessionId; jam, cook and guardian share one head   │
+  │    - guardian turns → checkpoint evals, final/block assessments, user messages         │
+  │                        Routine PM reports between checkpoints never reach the thread.  │
+  │    - forking        → a user move only: chatThreads.fork → --fork-session              │
+  │    - handover       → transcript by pointer, no session carried                        │
+  │    - guardianSessions → RETIRED, unread; mutation kept for trailing runners            │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -253,7 +248,7 @@
   │    3 CHAIN    crew group ──▶ auto PM ──▶ crew group ──▶ auto PM ──▶ ...                │
   │               PM harvests Artifacts/Decisions, picks next group via pm-modules/*.md.   │
   │               Gate per cycle: PM Decides insert | complete | block.                    │
-  │    4 WATCH    every third completion-review knock-back ──▶ guardian fork assesses     │
+  │    4 WATCH    every third completion-review knock-back ──▶ guardian thread assesses   │
   │               convergence/alignment; nudge (next PM) | block (ripcord → user).         │
   │               Count review+document groups only; reacting PM must have a next group.  │
   │               Review-only, review+uat, and document-only groups never count.           │

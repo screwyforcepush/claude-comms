@@ -217,10 +217,12 @@ describe("guardian completion-thread lookup cold handlers", () => {
 
 describe("chatJobs.trigger guardian context cold handler", () => {
   const checkpoint = { round: 2, completionReviews: 6, chainShape: "P M R+R+R+D M" };
+  // One thread, one session: guardian turns resume the thread session and never fork.
+  // A retired guardianSessions map left on the row is ignored.
   const scenarios = [
-    { name: "existing assignment fork", thread: { claudeSessionId: "og", guardianSessions: { a: "fork", other: "unrelated" } }, session: "fork", fork: false },
-    { name: "first fork", thread: { claudeSessionId: "og", guardianSessions: { other: "unrelated" } }, session: "og", fork: true },
-    { name: "no sessions", thread: {}, session: undefined, fork: false },
+    { name: "thread session, retired guardian map ignored", thread: { claudeSessionId: "og", guardianSessions: { a: "fork", other: "unrelated" } }, session: "og" },
+    { name: "thread session, no guardian map", thread: { claudeSessionId: "og" }, session: "og" },
+    { name: "no session yet", thread: {}, session: undefined },
   ];
   for (const scenario of scenarios) {
     for (const completion of [false, true]) {
@@ -238,7 +240,7 @@ describe("chatJobs.trigger guardian context cold handler", () => {
         assert.deepEqual(JSON.parse(row.value.context), {
           threadId: "thread", namespaceId: "ns", mode: "guardian", effectivePromptMode: "cook", lastPromptMode: "cook",
           latestUserMessage: "PM report", ...(scenario.session ? { claudeSessionId: scenario.session } : {}),
-          forkSession: scenario.fork, assignmentId: "a", isGuardianEvaluation: !completion, isCompletionSummary: completion, isBlockAssessment: false,
+          forkSession: false, assignmentId: "a", isGuardianEvaluation: !completion, isCompletionSummary: completion, isBlockAssessment: false,
           ...(!completion ? { checkpoint } : {}),
         });
         assert.deepEqual(db.tables.chatThreads, [thread]);

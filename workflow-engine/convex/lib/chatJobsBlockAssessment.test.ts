@@ -65,12 +65,13 @@ describe("chatJobs.trigger block-assessment cold handler", () => {
     assert.deepEqual(args.blockedReason, { fieldType: { type: "string" }, optional: true });
   });
 
+  // One thread, one session: every mode resumes the thread session, never a fork.
+  // A retired guardianSessions map left on the row is ignored.
   const routes = [
-    { name: "guardian existing assignment session", mode: "guardian", sessions: { claudeSessionId: "original", guardianSessions: { [assignmentId]: "assignment-fork", other: "other-fork" } }, session: "assignment-fork", fork: false },
-    { name: "guardian first-use fork", mode: "guardian", sessions: { claudeSessionId: "original", guardianSessions: { other: "other-fork" } }, session: "original", fork: true },
-    { name: "guardian fresh session", mode: "guardian", sessions: {}, session: undefined, fork: false },
-    { name: "jam original session", mode: "jam", sessions: { claudeSessionId: "original", guardianSessions: { [assignmentId]: "assignment-fork" } }, session: "original", fork: false },
-    { name: "cook original session", mode: "cook", sessions: { claudeSessionId: "original", guardianSessions: { [assignmentId]: "assignment-fork" } }, session: "original", fork: false },
+    { name: "guardian thread session, retired guardian map ignored", mode: "guardian", sessions: { claudeSessionId: "original", guardianSessions: { [assignmentId]: "assignment-fork", other: "other-fork" } }, session: "original" },
+    { name: "guardian fresh session", mode: "guardian", sessions: {}, session: undefined },
+    { name: "jam thread session", mode: "jam", sessions: { claudeSessionId: "original", guardianSessions: { [assignmentId]: "assignment-fork" } }, session: "original" },
+    { name: "cook thread session", mode: "cook", sessions: { claudeSessionId: "original", guardianSessions: { [assignmentId]: "assignment-fork" } }, session: "original" },
   ];
   for (const route of routes) {
     it(`preserves report/reason and routes block context through ${route.name}`, async () => {
@@ -98,7 +99,7 @@ describe("chatJobs.trigger block-assessment cold handler", () => {
         effectivePromptMode: route.mode === "guardian" ? "cook" : route.mode,
         lastPromptMode: "jam", latestUserMessage: report,
         ...(route.session === undefined ? {} : { claudeSessionId: route.session }),
-        forkSession: route.fork, assignmentId,
+        forkSession: false, assignmentId,
         isGuardianEvaluation: false, isCompletionSummary: false, isBlockAssessment: true, blockedReason,
       });
       assert.deepEqual(db.tables, originalTables);

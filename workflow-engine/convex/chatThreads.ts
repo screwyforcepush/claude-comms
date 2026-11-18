@@ -215,7 +215,7 @@ export const create = mutation({
 // job in one transaction so a network hiccup can't leave a half-created fork.
 // History is NOT copied: the forked Claude session carries the full context;
 // the parent thread remains the authoritative scrollback.
-// @see docs/project/spec/mental-model.md — Session Context Isolation / The Fork Model
+// @see docs/project/spec/mental-model.md#mm-one-thread-one-session (User-Initiated Thread Fork)
 export const fork = mutation({
   args: {
     password: v.string(),
@@ -234,8 +234,7 @@ export const fork = mutation({
     if (!source) throw new Error("Source thread not found");
     const now = Date.now();
 
-    // Always fork the OG session — never a guardian fork. Guardian context is
-    // evaluative noise for a fresh jam; the conversation lives in claudeSessionId.
+    // The thread has one session across every mode; the fork carries it whole.
     const sessionId = source.claudeSessionId;
 
     // Provisional title until the fork agent sets its own via chat-title.
@@ -303,7 +302,7 @@ export const fork = mutation({
 // the source thread (chat-thread <id>) and playing it back before shaping.
 // Atomic like fork (thread + message + chat job). Text and a pointer only, so
 // it works on any harness. Assignment links stay with the source thread.
-// @see docs/project/spec/mental-model.md — Session Context Isolation / Steward Handover
+// @see docs/project/spec/mental-model.md#mm-one-thread-one-session (Steward Handover)
 export const handover = mutation({
   args: {
     password: v.string(),
@@ -487,8 +486,8 @@ export const getGuardianThread = query({
   },
 });
 
-// Completion assessment prefers the guardian fork, then the linked jam/cook thread.
-// @see docs/project/spec/mental-model.md § Session Routing
+// Completion assessment prefers the guardian-mode thread, then the linked jam/cook thread.
+// @see docs/project/spec/mental-model.md#mm-machine-roles (Guardian is handed the final PM report)
 export const getCompletionThread = query({
   args: { password: v.string(), assignmentId: v.id("assignments") },
   handler: async (ctx, args) => {
@@ -568,7 +567,10 @@ export const updateSessionId = mutation({
   },
 });
 
-// Save a guardian-mode forked session ID for a specific assignment
+// RETIRED: guardian turns now resume the thread session (see chatJobs.trigger).
+// Kept callable so trailing runners still succeed; the map it writes is unread.
+// Remove once every client runner is past this release.
+// @see docs/project/spec/mental-model.md#mm-one-thread-one-session
 export const updateGuardianSessionId = mutation({
   args: {
     password: v.string(),

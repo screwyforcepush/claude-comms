@@ -441,8 +441,8 @@ describe('buildChatPrompt scenarios', () => {
   });
 
   for (const session of [
-    { name: 'existing guardian fork', claudeSessionId: 'guardian_session', forkSession: false },
-    { name: 'first guardian fork', claudeSessionId: 'original_session', forkSession: true },
+    { name: 'resumed thread session', claudeSessionId: 'thread_session', forkSession: false },
+    { name: 'forked session (user fork flag)', claudeSessionId: 'thread_session', forkSession: true },
     { name: 'session-less guardian', claudeSessionId: undefined, forkSession: false },
   ]) {
     for (const isGuardianEvaluation of [false, true]) {

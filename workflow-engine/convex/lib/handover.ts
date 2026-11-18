@@ -11,7 +11,7 @@
  * message in the user's voice: the playback is the user's ask, not a system
  * directive.
  *
- * @see docs/project/spec/mental-model.md — Session Context Isolation / Steward Handover
+ * @see docs/project/spec/mental-model.md#mm-one-thread-one-session (Steward Handover)
  */
 
 /** Provisional title prefix until the new Steward sets its own via chat-title. */

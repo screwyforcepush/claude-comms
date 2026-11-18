@@ -227,8 +227,9 @@ export default defineSchema({
     lastPromptMode: v.optional(v.union(v.literal("jam"), v.literal("cook"))),
     assignmentId: v.optional(v.id("assignments")),
     claudeSessionId: v.optional(v.string()),
-    // Guardian mode: per-assignment forked session IDs
-    // key: assignmentId (string), value: Claude session ID
+    // RETIRED (unread): per-assignment guardian session forks. Kept so existing
+    // rows validate and trailing runners can still write it harmlessly.
+    // @see docs/project/spec/mental-model.md#mm-one-thread-one-session
     guardianSessions: v.optional(v.record(v.string(), v.string())),
     // Phase 10: Operations Center Upgrade
     lastReadAt: v.optional(v.number()), // B1: Unread tracking — timestamp of last read

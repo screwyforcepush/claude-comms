@@ -67,7 +67,8 @@ Primary capabilities:
 - Real-time chat in `jam`, `cook`, and `guardian` modes.
 - Password-gated chat message attachments stored in Convex storage and fetched
   through the workflow toolkit, never through public storage URLs.
-- Per-assignment guardian forks through `chatThreads.guardianSessions`.
+- One Claude session per chat thread across jam, cook and guardian; session
+  forking only as a user move (`chatThreads.fork`).
 - Runner metrics, kill requests, session IDs, rate-limit pause/retry state, and
   reflection coverage data.
 - Password-protected UI/runner/CLI access per the password-wall model.
@@ -406,8 +407,8 @@ slice so a quiet pinned thread never falls out of the sidebar window.
 | `mode` | union | Yes | Prompt/execution mode. |
 | `lastPromptMode` | union | No | Last non-guardian prompt mode sent to Claude for differential prompting. |
 | `assignmentId` | `Id<"assignments">` | No | Current focused assignment for guardian/assignment pane routing. |
-| `claudeSessionId` | `string` | No | Original Claude session for jam/cook conversation. |
-| `guardianSessions` | `Record<string, string>` | No | Per-assignment guardian fork session IDs; key is assignment ID string, value is Claude session ID. |
+| `claudeSessionId` | `string` | No | The thread's one Claude session, resumed in every mode (jam, cook, guardian). |
+| `guardianSessions` | `Record<string, string>` | No | Retired and unread. Former per-assignment guardian fork map; kept so existing rows validate and trailing runners can still write it. |
 | `lastReadAt` | `number` | No | Unread tracking timestamp. |
 | `assignmentsCreated` | `Id<"assignments">[]` | No | All assignments ever created/linked from this thread. |
 | `latestMessageAt` | `number` | No | Denormalized timestamp of the latest message, used for cross-namespace sorting. |

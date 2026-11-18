@@ -76,20 +76,10 @@ export const trigger = mutation({
     // Determine effective prompt mode (guardian uses cook for normal interactions)
     const effectivePromptMode = thread.mode === "guardian" ? "cook" : thread.mode;
 
-    // Session resolution: guardian mode uses per-assignment forked sessions
-    let resolvedSessionId = thread.claudeSessionId;
-    let forkSession = false;
-    if (thread.mode === "guardian" && thread.assignmentId) {
-      const guardianSessions = thread.guardianSessions ?? {};
-      const guardianSessionId = guardianSessions[thread.assignmentId];
-      if (guardianSessionId) {
-        resolvedSessionId = guardianSessionId;
-      } else if (thread.claudeSessionId) {
-        resolvedSessionId = thread.claudeSessionId;
-        forkSession = true;
-      }
-    }
-
+    // One thread, one session: every mode (jam, cook, guardian) resumes the
+    // thread's session. Session forking is a user move (chatThreads.fork),
+    // never a side effect of a mode.
+    // @see docs/project/spec/mental-model.md#mm-one-thread-one-session
     const chatContext = {
       threadId: args.threadId,
       namespaceId: thread.namespaceId,
@@ -100,8 +90,8 @@ export const trigger = mutation({
         triggerMessage.content,
         triggerMessage.attachments
       ),
-      claudeSessionId: resolvedSessionId,
-      forkSession,
+      claudeSessionId: thread.claudeSessionId,
+      forkSession: false,
       assignmentId: thread.assignmentId,
       isGuardianEvaluation: args.isGuardianEvaluation ?? false,
       isCompletionSummary: args.isCompletionSummary ?? false,
