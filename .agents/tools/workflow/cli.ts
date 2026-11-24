@@ -59,12 +59,13 @@
  *   chat-mode <threadId> <jam|cook|guardian>  Change thread mode
  *   chat-title <threadId> <title>       Update thread title
  *   attachment-fetch <storageId> --out <path>  Fetch a chat attachment to a local file (password-gated)
+ *   attachment-share <threadId> <path>  Attach a local file to the Steward's next reply in the thread
  */
 
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, join, resolve } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { HarnessDefaults, HarnessModelEntry, parseHarnessDefaults, resolveJobType, DEFAULT_HARNESS_DEFAULTS } from "./lib/harness-defaults.js";
 import { collapseFanOutDuplicates } from "./lib/collapse-fanout.js";
@@ -76,6 +77,9 @@ import {
   deriveSiteUrl,
   describeFetchFailure,
   successVerdict,
+  ATTACHMENT_SHARE_COMMAND,
+  mimeForFilename,
+  shareRefusal,
 } from "./lib/attachments.js";
 
 // Use anyApi for portability (same as runner.ts)
@@ -189,6 +193,7 @@ const COMMAND_FLAGS: Record<string, string[]> = {
   "chat-mode": ["assignment"],
   "chat-title": [],
   [ATTACHMENT_FETCH_COMMAND]: ["out"],
+  [ATTACHMENT_SHARE_COMMAND]: ["name"],
 };
 
 function validateFlags(command: string, flags: Record<string, string>) {
@@ -877,6 +882,66 @@ async function sendChatMessage(threadId: string, message: string, harness?: stri
   });
 }
 
+// Steward → user: upload a local file and stage it on the thread. The server
+// puts staged files on the Steward's next reply.
+// @see docs/project/spec/mental-model.md#mm-message-attachments
+async function shareAttachment(threadId: string, filePath: string, nameOverride?: string) {
+  const absolutePath = resolve(filePath);
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(absolutePath);
+  } catch (err) {
+    error(`Cannot read ${absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const refusal = shareRefusal(bytes.byteLength);
+  if (refusal) error(refusal);
+
+  const filename = nameOverride?.trim() || basename(absolutePath);
+  const mime = mimeForFilename(filename);
+
+  const uploadUrl: string = await client.mutation(api.files.generateUploadUrl, {
+    password: config.password,
+  });
+
+  let storageId: string;
+  try {
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": mime },
+      body: new Uint8Array(bytes),
+    });
+    if (!response.ok) error(`Upload failed with HTTP ${response.status}`);
+    storageId = ((await response.json()) as { storageId: string }).storageId;
+  } catch (err) {
+    error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  try {
+    await client.mutation(api.chatMessages.stageAttachment, {
+      password: config.password,
+      threadId: threadId as Id<"chatThreads">,
+      attachment: { filename, storageId, size: bytes.byteLength, mime },
+    });
+  } catch (err) {
+    // Don't leave an unreferenced blob behind when staging is refused.
+    await client
+      .mutation(api.chatMessages.discardAttachment, { password: config.password, storageId })
+      .catch(() => {});
+    throw err;
+  }
+
+  output({
+    ok: true,
+    threadId,
+    filename,
+    storageId,
+    bytes: bytes.byteLength,
+    mime,
+    message: "Staged; it will appear on your next reply in this thread",
+  });
+}
+
 async function fetchAttachment(storageId: string, outPath: string) {
   const siteUrl = config.convexSiteUrl?.trim() || deriveSiteUrl(config.convexUrl);
   if (!siteUrl) {
@@ -987,6 +1052,8 @@ Chat Commands:
 Attachment Commands:
   attachment-fetch <storageId> --out <path>
                                       Fetch a chat attachment to a local file (password-gated)
+  attachment-share <threadId> <path> [--name <filename>]
+                                      Steward: attach a local file (max 20 MB) to your next reply in the thread
 
 Environment Variables (auto-injected):
   WORKFLOW_ASSIGNMENT_ID   Default assignment for commands
@@ -1214,6 +1281,13 @@ async function main() {
         if (!("out" in flags)) error("--out <path> required");
         if (flags.out === "true") error("--out requires a path");
         await fetchAttachment(positional[0], flags.out);
+        break;
+
+      case ATTACHMENT_SHARE_COMMAND:
+        if (!positional[0]) error("Thread ID required");
+        if (!positional[1]) error("File path required");
+        if (flags.name === "true") error("--name requires a filename");
+        await shareAttachment(positional[0], positional[1], flags.name);
         break;
 
       default:

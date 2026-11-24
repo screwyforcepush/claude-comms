@@ -472,6 +472,14 @@ password-gated block with each filename, storage ID, and the
 `attachment-fetch` command. Deleting a thread best-effort deletes blobs for the
 messages it owns before removing the message rows.
 
+Steward-to-user attachments use the same field. The toolkit's
+`attachment-share` command uploads a local file and calls
+`chatMessages.stageAttachment`, which appends it to the optional
+`chatThreads.stagedAttachments` array. The next `chatMessages.add` with role
+`assistant` moves the staged set onto that message and clears the stage; user
+and PM messages leave it untouched. The runner posts replies unchanged.
+Deleting a thread also deletes any staged blobs.
+
 ### `agentComms`
 
 Lightweight peer communication for hand-cranked agent batches. This backs
@@ -701,6 +709,8 @@ Chat Commands:
   chat-title <threadId> <title>       Update thread title
   attachment-fetch <storageId> --out <path>
                                       Fetch a chat attachment to a local file (password-gated)
+  attachment-share <threadId> <path> [--name <filename>]
+                                      Steward: attach a local file (max 20 MB) to your next reply in the thread
 
 Environment Variables (auto-injected):
   WORKFLOW_ASSIGNMENT_ID   Default assignment for commands

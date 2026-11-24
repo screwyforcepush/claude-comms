@@ -187,6 +187,16 @@ cli.ts attachment-fetch <storageId> --out <path>
 `/attachments/<storageId>` HTTP route with an `Authorization: Bearer ...`
 header, creates the output directory, and writes the blob to `--out`.
 
+```bash
+# Steward → user: attach a local file to your next reply in the thread
+cli.ts attachment-share <threadId> <path> [--name <filename>]
+```
+
+`attachment-share` uploads the file through the password-gated upload URL and
+stages it on the thread. The server puts staged files on the next assistant
+message, so the file shows in the reply's bubble like a user attachment. Files
+over 20 MB are refused because the fetch route could not serve them back.
+
 ## Job Types
 
 | Type | Purpose |

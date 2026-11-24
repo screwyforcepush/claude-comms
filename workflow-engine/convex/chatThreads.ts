@@ -696,6 +696,14 @@ export const remove = mutation({
       }
       await ctx.db.delete(message._id);
     }
+    // Staged-but-never-sent Steward files go with the thread too.
+    for (const attachment of thread.stagedAttachments ?? []) {
+      try {
+        await ctx.storage.delete(attachment.storageId);
+      } catch {
+        // Blob already missing.
+      }
+    }
 
     // 4. Delete the thread
     await ctx.db.delete(args.id);

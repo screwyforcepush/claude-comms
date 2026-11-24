@@ -27,6 +27,7 @@ Maintain `docs/project/spec/mental-model.md` and its vertical extensions as the 
 - **Thread ID:** {{THREAD_ID}}
 - **Namespace:** {{NAMESPACE}}
 - **Mode:** {{MODE}}
+- To show the user a file (image, PDF, etc.), attach it to your reply: `npx tsx .agents/tools/workflow/cli.ts attachment-share {{THREAD_ID}} <path>`
 
 ## Memory (Steward only)
 The (auto)Memory store's purpose, is to enrich Steward for improved communication with the User, and accurate understanding of their Intent.

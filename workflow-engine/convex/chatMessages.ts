@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requirePassword } from "./auth";
+import { collectMessageAttachments } from "./lib/attachments";
 
 // Queries
 
@@ -49,8 +50,21 @@ export const add = mutation({
     requirePassword(args);
     const now = Date.now();
 
+    // The Steward's staged files ride its reply; the runner posts that reply
+    // as plain text, so the binding happens here and needs no runner change.
+    const thread = await ctx.db.get(args.threadId);
+    const { attachments, sweepStaged } = collectMessageAttachments(
+      args.role,
+      args.attachments,
+      thread?.stagedAttachments
+    );
+
     // Update thread's updatedAt + denormalized latestMessageAt
-    await ctx.db.patch(args.threadId, { updatedAt: now, latestMessageAt: now });
+    await ctx.db.patch(args.threadId, {
+      updatedAt: now,
+      latestMessageAt: now,
+      ...(sweepStaged ? { stagedAttachments: undefined } : {}),
+    });
 
     return await ctx.db.insert("chatMessages", {
       threadId: args.threadId,
@@ -58,10 +72,31 @@ export const add = mutation({
       content: args.content,
       createdAt: now,
       ...(args.hint ? { hint: args.hint } : {}),
-      ...(args.attachments && args.attachments.length > 0
-        ? { attachments: args.attachments }
-        : {}),
+      ...(attachments.length > 0 ? { attachments } : {}),
     });
+  },
+});
+
+// Stage an uploaded file on the thread; the next assistant message collects it.
+// @see docs/project/spec/mental-model.md#mm-message-attachments
+export const stageAttachment = mutation({
+  args: {
+    password: v.string(),
+    threadId: v.id("chatThreads"),
+    attachment: v.object({
+      filename: v.string(),
+      storageId: v.id("_storage"),
+      size: v.number(),
+      mime: v.string(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    requirePassword(args);
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) throw new Error("Thread not found");
+    const staged = [...(thread.stagedAttachments ?? []), args.attachment];
+    await ctx.db.patch(args.threadId, { stagedAttachments: staged });
+    return { staged: staged.length };
   },
 });
 

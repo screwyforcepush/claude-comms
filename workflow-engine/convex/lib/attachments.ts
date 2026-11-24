@@ -76,6 +76,24 @@ export function renderAttachmentsBlock(
   return content.length > 0 ? `${content}\n\n---\n${block}` : block;
 }
 
+/**
+ * The Steward shares files by staging them on the thread mid-turn; the staged
+ * set rides its next reply. Only an assistant message collects the stage: the
+ * user's and the PM's messages leave it for the reply it was staged for.
+ * @see docs/project/spec/mental-model.md#mm-message-attachments
+ */
+export function collectMessageAttachments<T>(
+  role: "user" | "assistant" | "pm",
+  explicit: readonly T[] | undefined,
+  staged: readonly T[] | undefined
+): { attachments: T[]; sweepStaged: boolean } {
+  const own = explicit ?? [];
+  if (role !== "assistant" || !staged || staged.length === 0) {
+    return { attachments: [...own], sweepStaged: false };
+  }
+  return { attachments: [...own, ...staged], sweepStaged: true };
+}
+
 export function parseAttachmentPath(pathname: string): string | null {
   if (!pathname.startsWith(ATTACHMENT_ROUTE_PREFIX)) return null;
   const encodedId = pathname.slice(ATTACHMENT_ROUTE_PREFIX.length);

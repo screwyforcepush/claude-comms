@@ -12,6 +12,7 @@ import {
   ATTACHMENT_AUTH_SCHEME,
   attachmentResponseHeaders,
   bearerFrom,
+  collectMessageAttachments,
   contentDispositionFor,
   corsHeaders,
   formatBytes,
@@ -232,5 +233,41 @@ describe("contract constants", () => {
     assert.strictEqual(ATTACHMENT_ROUTE_PREFIX, "/attachments/");
     assert.strictEqual(ATTACHMENT_AUTH_SCHEME, "Bearer");
     assert.strictEqual(ATTACHMENT_MAX_BYTES, 20 * 1024 * 1024);
+  });
+});
+
+describe("collectMessageAttachments", () => {
+  const staged = [{ storageId: storageA }];
+  const own = [{ storageId: storageB }];
+
+  it("puts staged files on the assistant's reply and sweeps the stage", () => {
+    assert.deepStrictEqual(collectMessageAttachments("assistant", undefined, staged), {
+      attachments: staged,
+      sweepStaged: true,
+    });
+    assert.deepStrictEqual(collectMessageAttachments("assistant", own, staged), {
+      attachments: [...own, ...staged],
+      sweepStaged: true,
+    });
+  });
+
+  it("leaves the stage alone for user and PM messages", () => {
+    for (const role of ["user", "pm"] as const) {
+      assert.deepStrictEqual(collectMessageAttachments(role, own, staged), {
+        attachments: own,
+        sweepStaged: false,
+      });
+    }
+  });
+
+  it("does not sweep when nothing is staged", () => {
+    assert.deepStrictEqual(collectMessageAttachments("assistant", undefined, undefined), {
+      attachments: [],
+      sweepStaged: false,
+    });
+    assert.deepStrictEqual(collectMessageAttachments("assistant", own, []), {
+      attachments: own,
+      sweepStaged: false,
+    });
   });
 });

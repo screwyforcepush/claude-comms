@@ -17,8 +17,29 @@ import {
   buildAttachmentRequest,
   deriveSiteUrl,
   describeFetchFailure,
+  mimeForFilename,
+  shareRefusal,
   successVerdict,
 } from "./attachments.js";
+
+describe("attachment-share helpers", () => {
+  it("maps image extensions to image mimes so the bubble previews them", () => {
+    assert.strictEqual(mimeForFilename("shot.PNG"), "image/png");
+    assert.strictEqual(mimeForFilename("photo.jpeg"), "image/jpeg");
+    assert.strictEqual(mimeForFilename("report.pdf"), "application/pdf");
+  });
+
+  it("falls back to octet-stream for unknown or missing extensions", () => {
+    assert.strictEqual(mimeForFilename("Makefile"), "application/octet-stream");
+    assert.strictEqual(mimeForFilename("data.xyz"), "application/octet-stream");
+  });
+
+  it("refuses files nobody could fetch back, and empty files", () => {
+    assert.strictEqual(shareRefusal(ATTACHMENT_MAX_BYTES), null);
+    assert.match(shareRefusal(ATTACHMENT_MAX_BYTES + 1) ?? "", /20 MB/);
+    assert.match(shareRefusal(0) ?? "", /empty/);
+  });
+});
 
 describe("deriveSiteUrl", () => {
   it("derives the HTTP-actions host from Convex cloud URLs", () => {

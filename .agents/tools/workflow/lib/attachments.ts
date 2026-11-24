@@ -3,6 +3,41 @@ export const ATTACHMENT_AUTH_SCHEME = "Bearer";
 export const ATTACHMENT_FETCH_COMMAND = "attachment-fetch";
 export const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 
+export const ATTACHMENT_SHARE_COMMAND = "attachment-share";
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  pdf: "application/pdf",
+  txt: "text/plain",
+  md: "text/markdown",
+  csv: "text/csv",
+  json: "application/json",
+  html: "text/html",
+  zip: "application/zip",
+  mp4: "video/mp4",
+  webm: "video/webm",
+};
+
+/** Mime for a shared file: the bubble previews inline only what it knows is an image. */
+export function mimeForFilename(filename: string): string {
+  const extension = filename.includes(".") ? filename.split(".").pop()!.toLowerCase() : "";
+  return MIME_BY_EXTENSION[extension] ?? "application/octet-stream";
+}
+
+/** A file over the fetch cap could be stored but never read back, so sharing refuses it. */
+export function shareRefusal(bytes: number): string | null {
+  if (bytes === 0) return "File is empty; nothing to share";
+  if (bytes > ATTACHMENT_MAX_BYTES) {
+    return "File exceeds the 20 MB fetch limit, so the user could not open it; share a smaller file";
+  }
+  return null;
+}
+
 export interface AttachmentRequestInput {
   siteUrl: string;
   storageId: string;

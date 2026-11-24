@@ -243,6 +243,14 @@ export default defineSchema({
     // The complement of a fork — no session is carried; the new Steward reads
     // the source thread's scrollback by pointer and plays back intent.
     handedOverFrom: v.optional(v.id("chatThreads")),
+    // Files the Steward staged mid-turn; swept onto its next assistant message.
+    // @see docs/project/spec/mental-model.md#mm-message-attachments
+    stagedAttachments: v.optional(v.array(v.object({
+      filename: v.string(),
+      storageId: v.id("_storage"),
+      size: v.number(),
+      mime: v.string(),
+    }))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
