@@ -13,6 +13,10 @@
  * @see docs/project/spec/mental-model.md#mm-headless-runtime-levers
  */
 
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 /** Gap the runner's idle timer keeps above the harness Bash ceiling. */
 export const BASH_CEILING_IDLE_MARGIN_MS = 60_000;
 
@@ -103,4 +107,45 @@ export function resolveClaudeBashTimeoutMs(config: BashCeilingConfig): number | 
   }
 
   return undefined;
+}
+
+/**
+ * Locate the host's own Claude config when it declares MCP servers.
+ *
+ * Returns the path to `.claude.json` (honouring CLAUDE_CONFIG_DIR) only when it
+ * parses and carries a non-empty user-level `mcpServers` block; otherwise
+ * undefined, and the spawn runs with no MCP servers at all.
+ */
+export function resolveClaudeMcpConfigPath(
+  configDir: string = process.env.CLAUDE_CONFIG_DIR || homedir()
+): string | undefined {
+  const path = join(configDir, ".claude.json");
+  try {
+    const servers = JSON.parse(readFileSync(path, "utf-8"))?.mcpServers;
+    if (servers && typeof servers === "object" && Object.keys(servers).length > 0) {
+      return path;
+    }
+  } catch {
+    // Missing or unreadable config: nothing declared on this host.
+  }
+  return undefined;
+}
+
+/**
+ * MCP flags for every Claude spawn: only the servers the host's spin-up
+ * declared in its own `.claude.json`, nothing else.
+ *
+ * Connectors the vendor attaches to the login (claude.ai Gmail, Docs, ...)
+ * arrive with instruction blocks that deny-listing their tools does not
+ * remove; strict mode is the only switch that takes the whole server out of
+ * the model's context. `--strict-mcp-config` goes last so it terminates the
+ * variadic `--mcp-config`.
+ *
+ * Pass `null` for "no host config"; omit to resolve from the host.
+ *
+ * @see docs/project/spec/mental-model.md#mm-headless-runtime-levers
+ */
+export function buildClaudeMcpArgs(mcpConfigPath?: string | null): string[] {
+  const path = mcpConfigPath === undefined ? resolveClaudeMcpConfigPath() : mcpConfigPath;
+  return path ? ["--mcp-config", path, "--strict-mcp-config"] : ["--strict-mcp-config"];
 }

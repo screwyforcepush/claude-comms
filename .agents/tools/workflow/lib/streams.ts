@@ -5,6 +5,8 @@
  * Extracts text results, completion status, and session IDs.
  */
 
+import { buildClaudeMcpArgs } from "./claude-runtime.js";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -48,6 +50,8 @@ export interface CommandOptions {
   forkSession?: boolean;
   /** Model to pass to harness CLI */
   model?: string;
+  /** Claude only: host MCP config path; null for none, omit to resolve from the host. */
+  mcpConfigPath?: string | null;
 }
 
 export interface CommandResult {
@@ -80,12 +84,6 @@ const CLAUDE_DISALLOWED_TOOLS = [
   "RemoteTrigger",
   "Workflow",
   "ScheduleWakeup",
-  "mcp__claude_ai_Gmail__authenticate",
-  "mcp__claude_ai_Gmail__complete_authentication",
-  "mcp__claude_ai_Google_Calendar__authenticate",
-  "mcp__claude_ai_Google_Calendar__complete_authentication",
-  "mcp__claude_ai_Google_Drive__authenticate",
-  "mcp__claude_ai_Google_Drive__complete_authentication",
 ];
 
 function truncateFallback(text: string): string {
@@ -588,6 +586,7 @@ export function buildCommand(
         "none",
         "--disallowedTools",
         ...CLAUDE_DISALLOWED_TOOLS,
+        ...buildClaudeMcpArgs(options.mcpConfigPath),
       ];
       if (options.model) {
         args.push("--model", options.model);
@@ -662,6 +661,7 @@ export function buildInteractiveClaudeCommand(
     "--disable-slash-commands",
     "--disallowedTools",
     ...CLAUDE_DISALLOWED_TOOLS,
+    ...buildClaudeMcpArgs(options.mcpConfigPath),
   ];
 
   if (options.model) {

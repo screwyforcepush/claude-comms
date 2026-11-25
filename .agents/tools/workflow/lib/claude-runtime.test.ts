@@ -6,11 +6,48 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   BASH_CEILING_IDLE_MARGIN_MS,
   buildClaudeHeadlessEnv,
+  buildClaudeMcpArgs,
   resolveClaudeBashTimeoutMs,
+  resolveClaudeMcpConfigPath,
 } from "./claude-runtime.js";
+
+describe("host MCP whitelist", () => {
+  it("passes the host config only when it declares servers", () => {
+    const dir = mkdtempSync(join(tmpdir(), "claude-mcp-"));
+    try {
+      assert.strictEqual(resolveClaudeMcpConfigPath(dir), undefined);
+
+      writeFileSync(join(dir, ".claude.json"), JSON.stringify({ mcpServers: {} }));
+      assert.strictEqual(resolveClaudeMcpConfigPath(dir), undefined);
+
+      writeFileSync(join(dir, ".claude.json"), "{not json");
+      assert.strictEqual(resolveClaudeMcpConfigPath(dir), undefined);
+
+      writeFileSync(
+        join(dir, ".claude.json"),
+        JSON.stringify({ mcpServers: { search: { command: "npx" } } })
+      );
+      assert.strictEqual(resolveClaudeMcpConfigPath(dir), join(dir, ".claude.json"));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("is always strict, with strict closing the variadic config flag", () => {
+    assert.deepStrictEqual(buildClaudeMcpArgs(null), ["--strict-mcp-config"]);
+    assert.deepStrictEqual(buildClaudeMcpArgs("/host/.claude.json"), [
+      "--mcp-config",
+      "/host/.claude.json",
+      "--strict-mcp-config",
+    ]);
+  });
+});
 
 describe("buildClaudeHeadlessEnv", () => {
   it("always removes the affordances a headless run cannot honour", () => {

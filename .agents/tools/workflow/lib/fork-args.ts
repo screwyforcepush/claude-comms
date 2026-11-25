@@ -1,6 +1,10 @@
+import { buildClaudeMcpArgs } from "./claude-runtime.js";
+
 export interface ClaudeForkArgsOptions {
   sessionId: string;
   model?: string;
+  /** Host MCP config path; null for none, omit to resolve from the host. */
+  mcpConfigPath?: string | null;
 }
 
 export function buildClaudeForkArgs(options: ClaudeForkArgsOptions): string[] {
@@ -10,6 +14,7 @@ export function buildClaudeForkArgs(options: ClaudeForkArgsOptions): string[] {
     "--output-format",
     "stream-json",
     "--disable-slash-commands",
+    ...buildClaudeMcpArgs(options.mcpConfigPath),
   ];
 
   if (options.model) {

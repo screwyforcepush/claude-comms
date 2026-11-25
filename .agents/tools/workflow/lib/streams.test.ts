@@ -572,6 +572,18 @@ describe("buildCommand", () => {
     assert.ok(disallowed.includes("Monitor"));
     assert.ok(disallowed.includes("AskUserQuestion"));
 
+    // Only the host's own MCP servers: account connectors never load.
+    assert.ok(basic.args.includes("--strict-mcp-config"));
+    assert.ok(!disallowed.some((tool) => tool.startsWith("mcp__claude_ai_")));
+    const hostMcp = buildCommand("claude", { mcpConfigPath: "/host/.claude.json" });
+    const mcpIdx = hostMcp.args.indexOf("--mcp-config");
+    assert.deepStrictEqual(hostMcp.args.slice(mcpIdx, mcpIdx + 3), [
+      "--mcp-config",
+      "/host/.claude.json",
+      "--strict-mcp-config",
+    ]);
+    assert.ok(!buildCommand("claude", { mcpConfigPath: null }).args.includes("--mcp-config"));
+
     const withSession = buildCommand("claude", { sessionId: "s123" });
     assert.ok(withSession.args.includes("--resume"));
     assert.ok(withSession.args.includes("s123"));
@@ -663,5 +675,6 @@ describe("buildCommand", () => {
     // Print-mode only flag stays off the interactive path; Monitor denial is shared.
     assert.ok(!command.args.includes("--permission-prompts"));
     assert.ok(command.args.includes("Monitor"));
+    assert.ok(command.args.includes("--strict-mcp-config"));
   });
 });

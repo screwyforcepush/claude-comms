@@ -4,12 +4,13 @@ import { buildClaudeForkArgs } from "./fork-args.js";
 
 describe("buildClaudeForkArgs", () => {
   it("builds the Claude fork args with resume/fork/print last", () => {
-    assert.deepStrictEqual(buildClaudeForkArgs({ sessionId: "session_123" }), [
+    assert.deepStrictEqual(buildClaudeForkArgs({ sessionId: "session_123", mcpConfigPath: null }), [
       "--dangerously-skip-permissions",
       "--verbose",
       "--output-format",
       "stream-json",
       "--disable-slash-commands",
+      "--strict-mcp-config",
       "--resume",
       "session_123",
       "--fork-session",
@@ -19,13 +20,20 @@ describe("buildClaudeForkArgs", () => {
 
   it("inserts model before resume when present", () => {
     assert.deepStrictEqual(
-      buildClaudeForkArgs({ sessionId: "session_123", model: "claude-opus-4-6" }),
+      buildClaudeForkArgs({
+        sessionId: "session_123",
+        model: "claude-opus-4-6",
+        mcpConfigPath: "/host/.claude.json",
+      }),
       [
         "--dangerously-skip-permissions",
         "--verbose",
         "--output-format",
         "stream-json",
         "--disable-slash-commands",
+        "--mcp-config",
+        "/host/.claude.json",
+        "--strict-mcp-config",
         "--model",
         "claude-opus-4-6",
         "--resume",

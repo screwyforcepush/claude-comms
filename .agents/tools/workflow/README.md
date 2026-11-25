@@ -61,7 +61,11 @@ Every Claude job (chat and crew alike) also runs with the harness's background
 tasks, cron, terminal title and non-essential traffic disabled, with
 `--permission-prompts none`, and with the `Monitor` tool removed. Crew jobs
 additionally get the harness retry watchdog on transient provider errors; chat
-jobs fail fast so the user can re-send. See
+jobs fail fast so the user can re-send. Every Claude spawn is also launched
+with `--strict-mcp-config`, handing back only the user-level `mcpServers` block
+of the host's own `.claude.json` (under `CLAUDE_CONFIG_DIR` or the home
+directory), so connectors attached to the claude.ai login never load; a server
+a job should have is declared there, not in a project `.mcp.json`. See
 `docs/project/spec/mental-model.md#mm-headless-runtime-levers` for the why.
 
 `convexSiteUrl` is optional. The workflow CLI derives the HTTP-actions host by
