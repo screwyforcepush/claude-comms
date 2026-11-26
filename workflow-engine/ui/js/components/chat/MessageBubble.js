@@ -1,5 +1,5 @@
 // MessageBubble - Individual message display
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useConvex } from '../../hooks/useConvex.js';
@@ -9,7 +9,9 @@ import {
   fetchAttachmentBlob,
   formatBytes,
   isImageMime,
+  isPlayableVideoMime,
 } from './attachmentUtils.js';
+import { openImageLightbox } from './imageLightbox.js';
 
 const previewUrlCache = new Map();
 
@@ -185,7 +187,13 @@ function cachedPreviewUrl({ siteUrl, password, attachment }) {
       storageId: attachment.storageId,
       filename: attachment.filename,
     })
-      .then((blob) => URL.createObjectURL(blob))
+      // Re-type the blob from the message's mime: a player refuses a stored
+      // file that came back as a generic binary type.
+      .then((blob) => URL.createObjectURL(
+        attachment.mime && blob.type !== attachment.mime
+          ? blob.slice(0, blob.size, attachment.mime)
+          : blob
+      ))
       .catch((err) => {
         previewUrlCache.delete(key);
         throw err;
@@ -231,6 +239,9 @@ function AttachmentPreview({ attachment, siteUrl, password }) {
     };
   }, [attachment.storageId, attachment.filename, attachment.mime, siteUrl, password]);
 
+  if (isPlayableVideoMime(attachment.mime)) {
+    return React.createElement(VideoPreview, { attachment, siteUrl, password });
+  }
   if (!isImageMime(attachment.mime)) return null;
   if (failed) {
     return React.createElement('div', {
@@ -244,12 +255,97 @@ function AttachmentPreview({ attachment, siteUrl, password }) {
     });
   }
 
-  return React.createElement('img', {
-    className: 'chat-attachment-preview-image',
-    src: previewUrl,
-    alt: attachment.filename || 'attachment preview',
-    loading: 'lazy'
+  return React.createElement('button', {
+    type: 'button',
+    className: 'chat-attachment-preview-enlarge',
+    onClick: () => openImageLightbox(previewUrl, attachment.filename),
+    title: 'Enlarge image',
+    'aria-label': `Enlarge ${attachment.filename || 'image'}`
+  },
+    React.createElement('img', {
+      className: 'chat-attachment-preview-image',
+      src: previewUrl,
+      alt: attachment.filename || 'attachment preview',
+      loading: 'lazy'
+    })
+  );
+}
+
+function pauseOtherVideos(current) {
+  document.querySelectorAll('video.chat-attachment-preview-video').forEach((video) => {
+    if (video !== current) video.pause();
   });
+}
+
+/**
+ * Video loads only when asked for: a clip can be 20 MB, and scrolling past one
+ * on a phone must not download it.
+ */
+function VideoPreview({ attachment, siteUrl, password }) {
+  // idle | loading | ready | failed | unplayable
+  const [phase, setPhase] = useState('idle');
+  const [videoUrl, setVideoUrl] = useState(null);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  const canFetch = !!siteUrl && !!password && !!attachment.storageId;
+
+  const load = useCallback(() => {
+    if (!canFetch) return;
+    setPhase('loading');
+    cachedPreviewUrl({ siteUrl, password, attachment })
+      .then((url) => {
+        if (!mounted.current) return;
+        setVideoUrl(url);
+        setPhase('ready');
+      })
+      .catch(() => {
+        if (mounted.current) setPhase('failed');
+      });
+  }, [canFetch, siteUrl, password, attachment.storageId, attachment.filename, attachment.mime]);
+
+  if (phase === 'ready' && videoUrl) {
+    return React.createElement('video', {
+      className: 'chat-attachment-preview-video',
+      src: videoUrl,
+      controls: true,
+      autoPlay: true,
+      playsInline: true,
+      preload: 'metadata',
+      'aria-label': attachment.filename || 'video attachment',
+      onPlay: (event) => pauseOtherVideos(event.currentTarget),
+      onError: () => setPhase('unplayable')
+    });
+  }
+
+  if (phase === 'unplayable') {
+    return React.createElement('div', {
+      className: 'chat-attachment-preview-unavailable'
+    }, 'cannot play here — download instead');
+  }
+
+  if (phase === 'loading') {
+    return React.createElement('div', {
+      className: 'chat-attachment-preview-loading',
+      'aria-label': `Loading ${attachment.filename || 'video'}`
+    });
+  }
+
+  return React.createElement('button', {
+    type: 'button',
+    className: 'chat-attachment-video-play',
+    onClick: load,
+    disabled: !canFetch,
+    'aria-label': `Play ${attachment.filename || 'video'}`
+  },
+    React.createElement('span', { className: 'chat-attachment-video-play-glyph', 'aria-hidden': 'true' }, '\u25B6\uFE0E'),
+    React.createElement('span', null, phase === 'failed' ? 'Load failed — retry' : 'Play video'),
+    React.createElement('span', { className: 'chat-attachment-chip-meta' }, formatBytes(attachment.size))
+  );
 }
 
 /**

@@ -49,6 +49,13 @@ export function isImageMime(mime) {
   return typeof mime === "string" && mime.toLowerCase().startsWith("image/");
 }
 
+const PLAYABLE_VIDEO_MIMES = new Set(["video/mp4", "video/webm"]);
+
+/** Only the formats every browser plays get a player; any other video stays a download chip. */
+export function isPlayableVideoMime(mime) {
+  return typeof mime === "string" && PLAYABLE_VIDEO_MIMES.has(mime.toLowerCase());
+}
+
 export function formatBytes(bytes) {
   const safeBytes = Number.isFinite(bytes) ? Math.max(0, bytes) : 0;
   if (safeBytes < 1024) return `${Math.round(safeBytes)} B`;

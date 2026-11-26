@@ -1,6 +1,7 @@
 // Main entry point for Workflow Engine UI
 import React, { useState, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
+import { consumeOverlayBack } from './components/chat/imageLightbox.js';
 import { useQuery } from './hooks/useConvex.js';
 import { api } from './api.js';
 import { ErrorBoundary } from './components/shared/ErrorBoundary.js';
@@ -89,7 +90,9 @@ function AppLayout() {
     history.pushState(null, '');
 
     const handlePopState = () => {
-      if (activeView === 'introspection') {
+      if (consumeOverlayBack()) {
+        // An enlarged image was open: back closes it and nothing else.
+      } else if (activeView === 'introspection') {
         setActiveView('threads');
       } else {
         setMobileBackTrigger(c => c + 1);

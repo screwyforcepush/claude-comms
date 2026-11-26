@@ -19,6 +19,7 @@ import {
   formatBytes,
   isImageMime,
   isOversize,
+  isPlayableVideoMime,
   parseDraftAttachments,
   serializeDraftAttachments,
 } from "../js/components/chat/attachmentUtils.js";
@@ -92,6 +93,14 @@ describe("size and mime helpers", () => {
     assert.strictEqual(isImageMime("application/pdf"), false);
     assert.strictEqual(isImageMime(""), false);
     assert.strictEqual(isImageMime(null), false);
+  });
+
+  it("plays only mp4 and webm in the bubble", () => {
+    assert.strictEqual(isPlayableVideoMime("video/mp4"), true);
+    assert.strictEqual(isPlayableVideoMime("VIDEO/WEBM"), true);
+    assert.strictEqual(isPlayableVideoMime("video/quicktime"), false);
+    assert.strictEqual(isPlayableVideoMime("image/png"), false);
+    assert.strictEqual(isPlayableVideoMime(null), false);
   });
 
   it("formats byte counts with the backend's binary-unit contract", () => {
